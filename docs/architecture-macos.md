@@ -108,6 +108,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `Settings/HelpBadge.swift` / `Settings/SettingsHelp.swift` | Reusable "?" help-popover badge + its shared copy, used across Settings sections |
 | `Settings/View+RecordOnly.swift` | `recordOnlyDisabled(_:)` view modifier — dims + disables the Transcription/Protocol/VAD/Diarization sections when record-only mode is on |
 | `SpeakerNamingView.swift` | Speaker naming dialog after diarization |
+| `SpeakerNamingRowState.swift` | Per-row naming-dialog state keyed by speaker label (never row position), held as one `@Observable` object so a chip tap or typed name is attributable to the row it wrote to (issue #700) |
 | `NamingGraceKey.swift` | Identity of one keyboard-grace window in the naming dialog — what counts as "a new grace window" (data revision + pending-job count), so the gate re-locks when another job steals focus |
 | `KnownVoicesView.swift` | Manage persisted speaker DB (rename, delete, merge) — embedded in `SpeakersSettingsView` |
 | `RecognitionStatsView.swift` | Recognition stats display — aggregate counts from `recognition_log.jsonl` |
@@ -152,7 +153,10 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `ProtocolResumePolicy.swift` | Decides what the snapshot restore does with a job interrupted mid-run: resume from the saved transcript, just finish, or run in full. Keys on the interrupted stage, never on "a transcript exists", because stage 1 writes a draft without speaker labels |
 | `AudioPersistencePolicy.swift` | Decides per finished-job source file whether to relocate it into the output folder or leave it in place (staging-dir recording vs. user-picked import) |
 | `TranscribingEngine.swift` | `TranscribingEngine` protocol + `mergeDualSourceSegments` default impl |
+| `TimestampedSegment.swift` | A transcribed segment (start/end/text/speaker); every field is `var` so downstream passes (delay shift, VAD remap, block merge) copy-and-mutate instead of a memberwise rebuild that could silently drop a field |
 | `WhisperKitEngine.swift` | WhisperKit transcription engine (99+ languages, ~1 GB model) |
+| `WhisperKitModelSource.swift` | The three steps `WhisperKitEngine.loadModel()` takes to reach a usable pipeline (locate local, download, load), named so a test can observe which ran |
+| `WhisperKitLocalSnapshot.swift` | Locates an already-downloaded WhisperKit model on disk so `loadModel()` can skip `WhisperKit.download`, which reaches huggingface.co before checking for a local copy (issue #736) |
 | `WhisperDecodingClient.swift` | Narrow decode boundary used by `WhisperKitEngine` — production forwards to WhisperKit, tests capture the exact options passed |
 | `WhisperVocabularyPrompt.swift` | Converts the shared custom-vocabulary file into a bounded WhisperKit decoder prompt (experimental, off by default) |
 | `ParakeetEngine.swift` | NVIDIA Parakeet TDT v3 via FluidAudio (25 EU languages, ~50 MB, ~10× faster) |
@@ -163,7 +167,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `StreamingTranscriber.swift` | Per-channel live transcription actor (FluidVAD streaming → `engine.transcribeSamples` → partial/final captions) |
 | `PipelineQueue.swift` | Decouples recording from post-processing, sequential job pipeline |
 | `PipelineQueue+Stages.swift` | Per-stage job processing (transcribe → diarize → naming → protocol), split out of `PipelineQueue` (line-cap) |
-| `PipelineQueue+Recovery.swift` | Snapshot restore and orphaned-recording recovery for `PipelineQueue` |
+| `PipelineQueue+Recovery.swift` | Snapshot restore and orphaned-recording recovery for `PipelineQueue`; also `retryJob`/`canRetryJob`, which puts a failed job back to `.waiting` under its own id after clearing the prior run's naming state, error/warnings and echo verdicts |
 | `PipelineQueue+EchoBleed.swift` | Warns when a dual-source recording carries the same speech on both tracks (loudspeaker bleeding into the microphone) — measurement half of the echo mitigation (issue #581) |
 | `PipelineQueue+EchoCancellation.swift` | Removes the far end from the microphone track before anything reads it — cancellation half of the echo mitigation, the other branch of `EchoRemedy` |
 | `EchoBleedDetector.swift` | Decides `.notMeasured` / `.clean` / `.affected` for a dual-source recording, from per-10s-window envelope correlation between the two tracks |
@@ -178,6 +182,8 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `LocalVQEModel.swift` | Resolves the bundled LocalVQE AEC model (`localvqe-*.gguf`) the canceller runs against; refuses to silently fall back when an override path is missing |
 | `LocalVQESelftest.swift` | Hidden `--localvqe-selftest` CLI probe proving the statically linked library resolves its compute backend from inside a signed `.app` bundle (`#if !APPSTORE`) |
 | `PipelineJob.swift` | Pipeline job model (waiting → transcribing → diarizing → generatingProtocol → done) |
+| `DualTrackViability.swift` | Decides per track whether a dual-source recording carries enough audio to transcribe, so an empty microphone or app track fails only that track instead of throwing the whole job (issue #724) |
+| `TranscriptNote.swift` | Puts a recording-level annotation at the top of a rendered transcript, applied through `[TimestampedSegment].transcriptText(note:)` so every render (draft, speaker-labeled, late re-diarization) gets it exactly once |
 | `PipelineSnapshot.swift` | Pure I/O helpers for persisting `PipelineQueue` jobs to disk (atomic rename) |
 | `PipelineEventLog.swift` | Append-only JSONL log of `PipelineQueue` job state transitions |
 | `StageTimingStats.swift` | Per-stage wall-clock duration tracking, backs `ProcessingStatsView` |
@@ -226,6 +232,8 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `SilentRecordingMonitor.swift` | Pure state machine detecting fully-silent recordings (both channels below threshold) |
 | `ChannelHealthMonitor.swift` | Pure state machine for per-channel asymmetric silence detection (one channel live, other dead) — levels + hysteresis, drives the menu-bar tint |
 | `ChannelHealthController.swift` | `@Observable` controller polling channel dBFS levels and driving `ChannelHealthMonitor` |
+| `ChannelHealthController+Alerts.swift` | Notification copy (title, body, Focus behaviour) for each capture fault and for a silent recording, split out of the controller for size |
+| `ChannelHealthController+LogLines.swift` | Diagnostics lines the controller writes as pure, testable strings (monitoring start/stop, verdicts reached, silent-episode recovery), split out for size |
 | `ChannelFaultMonitor.swift` | Pure state machine deciding whether a channel has stopped delivering, from per-buffer ages rather than levels (issue #614) — drives the "Capture Channel Silent" notification, deliberately separate from the level-based tint |
 | `PairedImportPanelDelegate.swift` | `NSOpenPanel` delegate + accessory view for paired dual-source file import |
 | `PairedRecordingResolver.swift` | Groups recording URLs into dual-source groups (app + mic pairs, singletons) for reimport |
@@ -243,6 +251,8 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | File | Role |
 |------|------|
 | `AudioMixer.swift` | Resampling, mixing, echo suppression, mute masking, WAV I/O |
+| `AudioMixer+Streaming.swift` | Incremental decode + resample for long imports, so a multi-hour recording never needs one buffer sized for the entire file |
+| `AudioMixer+AssetFallback.swift` | Tier 2 of `loadAudioAsFloat32`: decodes the first audio track via `AVAssetReader` as mono Float32, for files `AVAudioFile` refuses |
 | `AudioConstants.swift` | Shared audio pipeline constants (target sample rate) |
 | `FFmpegHelper.swift` | ffmpeg CLI detection + 16 kHz mono WAV conversion fallback for file-import formats AVAsset can't decode |
 | `FluidVAD.swift` | VAD preprocessing via FluidAudio Silero v6 — silence trimming + `VadSegmentMap` timeline remapping |
@@ -329,6 +339,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `Bundle+AppVersion.swift` | Bundle extension: `appVersion` + `gitCommitHash` from `Info.plist` |
 | `DiagnosticExporter.swift` | Reads log entries and writes shareable `.log` file (Settings → Advanced → Export Diagnostics) |
 | `PersistentDiagnosticLog.swift` | Persistent `log stream` subprocess with sliding-window restart policy for long-term log retention |
+| `DiagnosticsLogging.swift` | Seam a component writes its diagnostics lines through, instead of a bare `Logger`, so a test can assert a line was written at the point it claims |
 | `String+LogRedaction.swift` | String extensions: `.pseudonymized` (SHA-256 4-hex prefix) and `.redactedName` for log privacy |
 | `FileManager+OwnerOnly.swift` | `FileManager` extension: owner-only file permission constant (`rw-------`) as single source of truth |
 | `SingleFlight.swift` | Single-flight async deduplication coordinator (concurrent callers await one shared run and receive its outcome) |
