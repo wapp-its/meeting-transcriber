@@ -2,3 +2,4 @@
 # Branches, deren PR im Original übernommen ist, überspringt mt-update von selbst.
 feat/custom-whisperkit-model
 feat/nemotron-diarization
+local/diagnostics
