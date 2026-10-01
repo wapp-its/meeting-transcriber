@@ -20,3 +20,20 @@ Danach:
 
 Schlägt das Mischen oder Bauen fehl, bleibt die installierte App unverändert.
 Das Skript aktualisiert sich bei jedem Lauf selbst von diesem Branch.
+
+## Einreichen ans Original: `submit.sh`
+
+Baut `submit/<name>` frisch auf dem neuesten Stand des Originals, mit genau den
+Code-Commits eines Feature-Branches (ohne die flow-next-Buchhaltung `.flow/`).
+Bricht ab, wenn der Branch `.claude/rules/`, `CLAUDE.md` oder `AGENTS.md` ändert
+oder Commit-Nachrichten auf Issues oder Specs des Forks verweisen.
+
+In einem Checkout des Forks (mit Remote `upstream` = Original):
+
+- `submit.sh feat/<name>` — nur lokal bauen und prüfen
+- `submit.sh feat/<name> --go --body-file pr.md` — in den Fork pushen und den PR
+  im Original als Entwurf öffnen (bzw. einen offenen aktualisieren); nur nach
+  Freigabe
+
+`mt-update` erkennt einen übernommenen PR auch dann, wenn er über `submit/<name>`
+eingereicht wurde, und lässt den Branch dann weg.

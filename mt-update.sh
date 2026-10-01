@@ -74,9 +74,14 @@ git fetch --quiet upstream main
 
 # --- 3. Eigene Branches bestimmen ----------------------------------------------
 pr_merged() {  # 0 = PR zu diesem Branch ist im Original übernommen
-    local json
-    json="$(curl -fsS "$UPSTREAM_API/pulls?state=closed&head=$FORK_OWNER:$1" 2>/dev/null || true)"
-    printf '%s' "$json" | grep -q '"merged_at": *"20'
+    # Eingereicht wird entweder der Branch selbst oder seine Kopie submit/<name>
+    # (submit.sh), darum beide Köpfe prüfen.
+    local json head
+    for head in "$1" "submit/${1#*/}"; do
+        json="$(curl -fsS "$UPSTREAM_API/pulls?state=closed&head=$FORK_OWNER:$head" 2>/dev/null || true)"
+        printf '%s' "$json" | grep -q '"merged_at": *"20' && return 0
+    done
+    return 1
 }
 if [ -n "${MT_BRANCHES:-}" ]; then
     wanted="$(printf '%s\n' $MT_BRANCHES)"
