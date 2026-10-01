@@ -14,6 +14,9 @@
 # Aufruf (in einem Checkout des Forks):
 #   submit.sh <branch> [--name <name>]                  nur bauen und prüfen
 #   submit.sh <branch> --go --body-file <pr.md> [--title <titel>] [--ready]
+#   --allow-claude-md   eine Änderung am CLAUDE.md des Originals zulassen (dort
+#                       Architektur-Doku, siehe CONTRIBUTING.md); ihr Diff wird
+#                       ausgegeben, damit er vor der Freigabe sichtbar ist
 #
 # <name> ist ohne Angabe der Branch-Name ohne Präfix (feat/hf-token → hf-token).
 
@@ -29,14 +32,18 @@ HOME_BRANCH="wapp/main"
 # absichtlich gemacht hat, und dürfen nicht stillschweigend verschwinden, darum
 # Abbruch statt Weglassen.
 forbidden_regex='(^|/)(CLAUDE\.md|AGENTS\.md)$|^\.claude/rules/|^\.flow/'
-# Verweise, die im Original auf etwas anderes zeigen würden: Issue-Nummern des
-# Forks, Spec-IDs, Fork-Namen.
-reference_regex='(^|[^A-Za-z0-9])#[0-9]+|\b(gh|fn)-[0-9]+|wapp|\.flow/'
+# Verweise, die es nur im Fork gibt: Spec-IDs, Fork-Namen. Immer Abbruch.
+reference_regex='\b(gh|fn)-[0-9]+|wapp|\.flow/'
+# #N ist mehrdeutig: dieselbe Nummer gibt es im Fork und im Original. Verweise
+# aufs Original (#736) sind erwünscht, darum nur Warnung mit beiden Titeln, wenn
+# die Nummer auch im Fork existiert; --go verlangt dann --refs-ok.
+FORK_API="https://api.github.com/repos/$FORK_SLUG"
+UPSTREAM_API="https://api.github.com/repos/$UPSTREAM_SLUG"
 
 say() { printf '\033[1m%s\033[0m\n' "$*"; }
 fail() { printf '\033[31m✗ %s\033[0m\n' "$1" >&2; exit "${2:-1}"; }
 
-branch=""; name=""; go=false; body_file=""; title=""; draft=true
+branch=""; name=""; go=false; body_file=""; title=""; draft=true; allow_claude_md=false; refs_ok=false
 while [ $# -gt 0 ]; do
     case "$1" in
         --name) name="$2"; shift 2 ;;
@@ -44,13 +51,18 @@ while [ $# -gt 0 ]; do
         --body-file) body_file="$2"; shift 2 ;;
         --title) title="$2"; shift 2 ;;
         --ready) draft=false; shift ;;
-        -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
+        --allow-claude-md) allow_claude_md=true; shift ;;
+        --refs-ok) refs_ok=true; shift ;;
+        -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
         -*) fail "Unbekannte Option $1" 2 ;;
         *) [ -z "$branch" ] || fail "Nur ein Branch pro Aufruf" 2; branch="$1"; shift ;;
     esac
 done
 [ -n "$branch" ] || fail "Aufruf: submit.sh <branch> [--name <name>] [--go --body-file <pr.md>]" 2
 name="${name:-${branch#*/}}"
+# Mit --allow-claude-md fällt nur CLAUDE.md aus der Sperrliste; .claude/rules/,
+# AGENTS.md und .flow/ bleiben gesperrt.
+$allow_claude_md && forbidden_regex='(^|/)AGENTS\.md$|^\.claude/rules/|^\.flow/'
 target="submit/$name"
 if $go; then
     [ -n "$body_file" ] && [ -f "$body_file" ] || fail "--go braucht --body-file mit dem PR-Text" 2
@@ -90,9 +102,12 @@ commits="$(git rev-list --reverse --no-merges "$base..$src")"
 # --- 2. Prüfungen vor dem Übertragen --------------------------------------------
 touched="$(git diff --name-only "$base" "$src")"
 blocked="$(printf '%s\n' "$touched" | grep -E "$forbidden_regex" | grep -vE '^\.flow/' || true)"
+hint="    Diese Änderungen aus dem Branch nehmen (oder in einen local/*-Branch verschieben)."
+printf '%s\n' "$blocked" | grep -qE '(^|/)CLAUDE\.md$' \
+    && hint+=$'\n'"    Ist es Architektur-Doku fürs Original: mit --allow-claude-md zulassen."
 [ -z "$blocked" ] || fail "$branch ändert Dateien, die nicht ins Original gehören:
 $(printf '%s\n' "$blocked" | sed 's/^/    /')
-    Diese Änderungen aus dem Branch nehmen (oder in einen local/*-Branch verschieben)."
+$hint"
 
 refs=""
 for c in $commits; do
@@ -101,6 +116,18 @@ for c in $commits; do
 done
 [ -z "$refs" ] || fail "Commit-Nachrichten verweisen auf Fork-Interna (würden im Original falsch verlinken):
 $refs    Nachrichten im Branch bereinigen (z. B. git rebase -i), dann erneut."
+
+issue_title() {  # $1 = API-Basis, $2 = Nummer → Titel oder leer
+    # Eine fehlende Nummer (404) ist ein normales Ergebnis, kein Abbruch.
+    { curl -fsS "$1/issues/$2" 2>/dev/null || true; } | sed -n 's/^  "title": "\(.*\)",$/\1/p' | head -1
+}
+ambiguous=""
+for n in $(git log --format=%B "$base..$src" | grep -oE '(^|[^A-Za-z0-9&])#[0-9]+' | grep -oE '[0-9]+' | sort -un); do
+    fork_title="$(issue_title "$FORK_API" "$n")"
+    [ -n "$fork_title" ] || continue
+    ambiguous+="    #$n  Original: $(issue_title "$UPSTREAM_API" "$n" | cut -c1-60)"$'\n'
+    ambiguous+="         Fork:     $(printf '%s' "$fork_title" | cut -c1-60)"$'\n'
+done
 
 # --- 3. submit/<name> auf upstream/main aufbauen --------------------------------
 tmp="$(mktemp -d)"
@@ -137,11 +164,24 @@ say "✓ $target gebaut auf upstream/main $(git rev-parse --short upstream/main)
 for a in "${applied[@]}"; do echo "  + $a"; done
 for s in ${skipped[@]+"${skipped[@]}"}; do echo "  – $s (nur .flow/, weggelassen)"; done
 git diff --stat upstream/main "$target" | tail -1
+claude_md_diff="$(git diff upstream/main "$target" -- 'CLAUDE.md' '**/CLAUDE.md')"
+if [ -n "$claude_md_diff" ]; then
+    say "Änderung am CLAUDE.md des Originals (mit --allow-claude-md zugelassen):"
+    printf '%s\n' "$claude_md_diff"
+fi
+
+if [ -n "$ambiguous" ]; then
+    say "⚠ Diese #-Verweise gibt es auch im Fork — im Original zeigen sie auf das Issue des Originals:"
+    printf '%s' "$ambiguous"
+fi
 
 if ! $go; then
-    say "Nur lokal gebaut. Einreichen (nach Freigabe): submit.sh $branch --go --body-file <pr.md>"
+    extra=""; [ -n "$claude_md_diff" ] && extra+=" --allow-claude-md"
+    [ -n "$ambiguous" ] && extra+=" --refs-ok"
+    say "Nur lokal gebaut. Einreichen (nach Freigabe): submit.sh $branch$extra --go --body-file <pr.md>"
     exit 0
 fi
+[ -z "$ambiguous" ] || $refs_ok || fail "Mehrdeutige #-Verweise (siehe oben): geprüft? Dann mit --refs-ok" 2
 
 # --- 4. Einreichen (nur mit --go) -----------------------------------------------
 token="$(gh auth token --user "$FORK_OWNER" 2>/dev/null)" || fail "gh ist für $FORK_OWNER nicht angemeldet"
