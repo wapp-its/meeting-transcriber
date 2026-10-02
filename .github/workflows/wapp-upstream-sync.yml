@@ -77,8 +77,9 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add upstream "https://github.com/$UPSTREAM_REPO.git"
           git fetch --quiet upstream "$UPSTREAM_REF"
-          git fetch --quiet origin tools
+          # Read FETCH_HEAD before the next fetch overwrites it.
           up="$(git rev-parse FETCH_HEAD)"; git update-ref refs/sync/upstream "$up"
+          git fetch --quiet origin tools
           home="$(git rev-parse HEAD)"
           echo "home_sha=$home" >> "$GITHUB_OUTPUT"
           echo "upstream_sha=$up" >> "$GITHUB_OUTPUT"
@@ -86,8 +87,13 @@ jobs:
           new="$(git rev-list --count "HEAD..refs/sync/upstream")"
           if [ "$new" -eq 0 ]; then
             echo "merge=none" >> "$GITHUB_OUTPUT"; echo "Up to date with upstream ${up:0:7}"
-          elif git merge --quiet --no-ff --no-edit "refs/sync/upstream" >/dev/null 2>&1; then
+          elif git merge --quiet --no-ff --no-edit "refs/sync/upstream" > "$RUNNER_TEMP/merge.out" 2>&1; then
             echo "merge=clean" >> "$GITHUB_OUTPUT"; echo "$new new upstream commit(s), merge is clean"
+          elif ! git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+            # The merge did not even start (unrelated histories, a bad ref, ...).
+            cat "$RUNNER_TEMP/merge.out"
+            { echo "### Mischen nicht möglich"; echo; echo '```'; cat "$RUNNER_TEMP/merge.out"; echo '```'; echo; } >> "$RUNNER_TEMP/problems.md"
+            echo "merge=conflict" >> "$GITHUB_OUTPUT"
           else
             {
               echo "### Das Original mischt nicht in \`$HOME_BRANCH\` (Konflikt)"; echo
