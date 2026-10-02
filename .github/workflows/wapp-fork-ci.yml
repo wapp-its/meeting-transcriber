@@ -54,22 +54,22 @@ jobs:
           if gh run watch "$id" -R "$GITHUB_REPOSITORY" --exit-status --interval 60 >/dev/null; then
             echo "ci.yml passed"; exit 0
           fi
-          # ci.yml compiles with a 300 ms type-check limit as an error
-          # (-warn-long-expression-type-checking, Package.swift); GitHub's hosted
-          # runners land just over it now and then (331 ms measured on code the
-          # original's CI passes). A failure made only of that is retried once;
-          # anything else stays red.
-          other="$(gh run view "$id" -R "$GITHUB_REPOSITORY" --log-failed 2>/dev/null \
-            | grep -E ' error: ' | grep -vE 'to type-check \(limit: [0-9]+ms\)|took [0-9]+ms to type-check' | head -5 || true)"
-          timing="$(gh run view "$id" -R "$GITHUB_REPOSITORY" --log-failed 2>/dev/null | grep -cE 'to type-check \(limit' || true)"
-          if [ -z "$other" ] && [ "${timing:-0}" -gt 0 ]; then
-            echo "::warning::ci.yml failed only on the compile-time type-check limit; retrying the failed jobs once"
-            gh run rerun "$id" -R "$GITHUB_REPOSITORY" --failed
-            sleep 15
-            if gh run watch "$id" -R "$GITHUB_REPOSITORY" --exit-status --interval 60 >/dev/null; then
-              echo "ci.yml passed on retry"; exit 0
-            fi
+          # ci.yml is flaky on GitHub's hosted runners in this fork, for reasons
+          # outside our code: a 300 ms compile-time type-check limit treated as an
+          # error (331 ms measured on a commit the original's CI passed), and model
+          # downloads into caches that are cold here. So one full retry; a real
+          # failure fails twice and stays red. The first failure stays visible as
+          # a warning on the PR. ci.yml cancels its own run when a job fails, so
+          # the failing tests are read from the log, not from job conclusions.
+          first="$(gh run view "$id" -R "$GITHUB_REPOSITORY" --log 2>/dev/null \
+            | grep -E "Test Case '.*' failed| error: " | sed -E 's/^[^\t]*\t[^\t]*\t[^ ]* //' | sort -u | head -3 | tr '\n' ' ' || true)"
+          echo "::warning::ci.yml failed on the first attempt, retrying once: ${first:-see run $id}"
+          gh run rerun "$id" -R "$GITHUB_REPOSITORY"
+          sleep 20
+          if gh run watch "$id" -R "$GITHUB_REPOSITORY" --exit-status --interval 60 >/dev/null; then
+            echo "ci.yml passed on retry"; exit 0
           fi
-          gh run view "$id" -R "$GITHUB_REPOSITORY" --json jobs \
-            --jq '.jobs[] | select(.conclusion == "failure") | "::error::ci.yml job failed: \(.name)"'
+          again="$(gh run view "$id" -R "$GITHUB_REPOSITORY" --log 2>/dev/null \
+            | grep -E "Test Case '.*' failed| error: " | sed -E 's/^[^\t]*\t[^\t]*\t[^ ]* //' | sort -u | head -5 || true)"
+          printf '%s\n' "${again:-ci.yml failed twice, see run $id}" | sed 's/^/::error::/'
           exit 1
