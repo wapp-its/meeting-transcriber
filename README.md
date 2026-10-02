@@ -19,6 +19,10 @@ Danach:
 - `mt-update --check` — nur anzeigen, ob es Neues gibt
 
 Schlägt das Mischen oder Bauen fehl, bleibt die installierte App unverändert.
+Läuft gerade eine Aufnahme oder ein Transkriptions-Job, wartet `mt-update` nach
+dem Bauen, bis die App frei ist (höchstens 3 h), und ersetzt sie erst dann.
+Offene Sprecher-Benennungen blockieren nicht, sie erscheinen nach dem Neustart
+wieder. `MT_NO_WAIT=1 mt-update` bricht stattdessen ab.
 Das Skript aktualisiert sich bei jedem Lauf selbst von diesem Branch.
 
 ## Einreichen ans Original: `submit.sh`

@@ -8,12 +8,17 @@
 # im Original schon übernommen wurde, fallen automatisch weg.
 #
 # Schlägt das Mischen oder Bauen fehl, bleibt die installierte App unverändert.
+# Läuft gerade eine Aufnahme oder ein Transkriptions-Job, wartet das Skript nach
+# dem Bauen, bis die App frei ist, und ersetzt sie erst dann.
 #
-# Aufruf:  mt-update            bauen + installieren + starten
+# Aufruf:  mt-update            bauen + (wenn frei) installieren + starten
 #          mt-update --check    nur zeigen, was sich seit dem letzten Build geändert hat
 #
 # Anpassbar per Umgebung: MT_DIR (Checkout), MT_APP_DIR (Zielordner),
-# MT_NO_LAUNCH=1 (App danach nicht starten), MT_BRANCHES (Liste statt branches.txt).
+# MT_NO_LAUNCH=1 (App danach nicht starten), MT_BRANCHES (Liste statt branches.txt),
+# MT_NO_WAIT=1 (nicht warten, sondern abbrechen, wenn die App beschäftigt ist),
+# MT_WAIT_MAX (höchste Wartezeit in Sekunden, Standard 3 h),
+# MT_DATA_DIR (Datenordner der App, für Tests).
 
 set -euo pipefail
 
@@ -28,6 +33,8 @@ MT_APP_DIR="${MT_APP_DIR:-/Applications}"
 APP_NAME="MeetingTranscriber-Dev.app"
 BUNDLE_ID="app.meetingtranscriber.dev"
 STAMP="$MT_DIR/../last-build.txt"
+MT_DATA_DIR="${MT_DATA_DIR:-$HOME/Library/Application Support/MeetingTranscriber}"
+MT_WAIT_MAX="${MT_WAIT_MAX:-10800}"
 
 CHECK_ONLY=false
 [ "${1:-}" = "--check" ] && CHECK_ONLY=true
@@ -140,13 +147,53 @@ fi
 built="$MT_DIR/app/MeetingTranscriber/.build/$APP_NAME"
 [ -d "$built" ] || fail "Build meldet Erfolg, aber $built fehlt" 3
 
-# --- 6. Installieren -----------------------------------------------------------
+# --- 6. Warten, bis die App frei ist, dann installieren ------------------------
+# Die App beendet sich beim Quit sofort und ohne Rückfrage: eine laufende
+# Aufnahme endet dann abrupt (die nächste Sitzung rettet sie nur als
+# Absturz-Wiederherstellung), ein laufender Job beginnt nach dem Neustart von
+# vorn. Darum wird erst ersetzt, wenn nichts läuft.
 target="$MT_APP_DIR/$APP_NAME"
-if pgrep -f "$target/Contents/MacOS/" >/dev/null 2>&1; then
+# Verankert auf den Programmpfad: ein Shell-Befehl, der den Pfad nur erwähnt,
+# zählt nicht als laufende App.
+app_pid() { pgrep -f "^$target/Contents/MacOS/MeetingTranscriber" | head -1 || true; }
+
+busy_reason() {  # leer = nichts in Arbeit; sonst kurze Begründung
+    local pid started q reason="" n m
+    pid="$(app_pid)"
+    [ -n "$pid" ] || return 0
+    # Eine Aufnahme hinterlässt einen Marker, solange sie läuft. Ein Absturz
+    # lässt ihn liegen; der ist dann älter als der laufende Prozess.
+    started="$(LC_ALL=C date -j -f "%a %b %d %T %Y" "$(echo $(ps -o lstart= -p "$pid"))" +%s 2>/dev/null || echo 0)"
+    for m in "$MT_DATA_DIR"/recordings/*_recording.marker; do
+        [ -e "$m" ] || continue
+        if [ "$(stat -f %m "$m")" -ge "$started" ]; then reason+="Aufnahme läuft · "; break; fi
+    done
+    q="$MT_DATA_DIR/ipc/pipeline_queue.json"
+    n="$(grep -oE '"state" *: *"(waiting|transcribing|diarizing|generatingProtocol)"' "$q" 2>/dev/null | wc -l | tr -d ' ')"
+    [ "${n:-0}" -eq 0 ] || reason+="$n Job(s) in Arbeit · "
+    printf '%s' "${reason% · }"
+}
+
+reason="$(busy_reason)"
+if [ -n "$reason" ]; then
+    [ -z "${MT_NO_WAIT:-}" ] || fail "App ist beschäftigt ($reason) — installierte App bleibt unverändert." 4
+    say "Neue Version ist gebaut. Warte, bis die App frei ist: $reason"
+    say "  (prüft alle 30 s, höchstens $(( MT_WAIT_MAX / 60 )) min; Ctrl-C bricht ab, App bleibt dann unverändert)"
+    waited=0
+    while reason="$(busy_reason)"; [ -n "$reason" ]; do
+        [ "$waited" -lt "$MT_WAIT_MAX" ] || fail "Nach $(( MT_WAIT_MAX / 60 )) min immer noch beschäftigt ($reason) — abgebrochen, App unverändert." 4
+        sleep 30; waited=$(( waited + 30 ))
+    done
+    say "App ist frei."
+fi
+naming="$(grep -oE '"state" *: *"speakerNamingPending"' "$MT_DATA_DIR/ipc/pipeline_queue.json" 2>/dev/null | wc -l | tr -d ' ')"
+[ "${naming:-0}" -eq 0 ] || say "Hinweis: $naming Sprecher-Benennung(en) offen — sie erscheinen nach dem Neustart wieder; im Dialog getippte, noch nicht bestätigte Namen gehen verloren."
+
+if [ -n "$(app_pid)" ]; then
     say "Beende die laufende App …"
     osascript -e "tell application id \"$BUNDLE_ID\" to quit" >/dev/null 2>&1 || true
-    for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -f "$target/Contents/MacOS/" >/dev/null || break; sleep 1; done
-    pgrep -f "$target/Contents/MacOS/" >/dev/null && fail "App lässt sich nicht beenden (läuft eine Aufnahme?). Später nochmals." 4
+    for _ in 1 2 3 4 5 6 7 8 9 10; do [ -n "$(app_pid)" ] || break; sleep 1; done
+    [ -z "$(app_pid)" ] || fail "App lässt sich nicht beenden. Später nochmals." 4
 fi
 staging="$MT_APP_DIR/.$APP_NAME.new"
 rm -rf "$staging"
