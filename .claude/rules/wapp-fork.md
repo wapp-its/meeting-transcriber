@@ -55,6 +55,27 @@ untouched by fork work.
 - reviewer: codex gpt-6-astra at xhigh (plan-review, spec-completion); codex gpt-5.6-sol at xhigh per task
 <!-- flow-next:model-routing:end -->
 
+## Trying a change in the installed app
+
+- After pushing a branch listed in `branches.txt`, run `mt-update` yourself to get the
+  change into `/Applications/MeetingTranscriber-Dev.app`; do not ask the owner to
+  restart the app.
+- `mt-update` restarts the app only when it is idle: it builds first, then waits
+  (up to 3 h, polling every 30 s) while a recording runs or a job is waiting,
+  transcribing, diarizing or generating a protocol, and only then quits and replaces
+  the app. Run it in the background and act on its result. Never quit or kill the app
+  any other way (`pkill`, `kill`, `osascript … quit`): the app quits without asking,
+  a running recording ends abruptly and a running job starts over.
+- Open speaker namings do not block; they reappear after the restart (names typed
+  into the dialog but not yet confirmed are lost).
+- Failed jobs survive a restart (unless their audio is gone); finished ones are
+  dropped from the menu after 60 s.
+- Match the app process anchored on its executable,
+  `pgrep -f '^/Applications/MeetingTranscriber-Dev.app/Contents/MacOS/MeetingTranscriber'`;
+  an unanchored pattern also matches any shell whose command line mentions the path.
+- App logs: `/usr/bin/log show --last 10m --predicate 'subsystem == "com.meetingtranscriber"'`
+  (in zsh, plain `log` is a shell builtin). Info-level lines are not retained.
+
 ## Build, test, lint
 
 - Tests download models into `~/Documents`; redirect them:
