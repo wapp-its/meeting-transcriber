@@ -72,6 +72,23 @@
     },
     "provenance": null,
     "readyState": null,
+    "resolved": {
+      "capabilities": {
+        "attachments": false,
+        "blockedBy": false,
+        "deleteIssue": false,
+        "subIssues": true
+      },
+      "destination": {
+        "owner": "wapp-its",
+        "repo": "meeting-transcriber"
+      },
+      "resolvedAt": "2026-10-02T21:31:09.203666Z",
+      "scopeResolvedAt": {
+        "capabilities": "2026-10-02T21:31:09.203666Z",
+        "destination": "2026-10-02T21:31:09.186390Z"
+      }
+    },
     "specIds": "tracker",
     "staleAfterHours": 24,
     "type": "github",
