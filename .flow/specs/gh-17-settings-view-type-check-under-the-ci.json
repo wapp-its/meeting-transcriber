@@ -1,7 +1,7 @@
 {
   "branch_name": "fix/gh-17-settings-typecheck",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-02T22:15:16.544788Z",
   "created_at": "2026-10-02T21:32:03.971961Z",
   "default_impl": null,
   "default_review": null,
@@ -104,14 +104,61 @@
       "task": "gh-17-settings-view-type-check-under-the-ci.1",
       "timestamp": "2026-10-02T22:12:07.714144Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "5608a51b40d66a62212c9e7db3775ae6a7ff92612674c5361646a46ecfcd73a0",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-4fb9be982fccc2ba2e00b3077407fd91",
+            "classification": "introduced",
+            "findingId": "finding-4fb9be982fccc2ba2e00b3077407fd91",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "ea0216a25a1e4a5942d5f2b6ae05bec8da832d56",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 282142,
+      "output_sha256": "1e449025d06b7a72520c5e123e84b53445389b3c32db1181e54b291be28e5e77",
+      "reservation_id": "c3a70318198647789f061f5cb222fe2c",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-02T22:15:16.502913Z",
+      "tool_calls": 17,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
-    "impl:gh-17-settings-view-type-check-under-the-ci.1": 1
+    "impl:gh-17-settings-view-type-check-under-the-ci.1": 1,
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-17-settings-view-type-check-under-the-ci.1": 0
   },
   "spec_path": ".flow/specs/gh-17-settings-view-type-check-under-the-ci.md",
@@ -129,5 +176,5 @@
     "mergeBaseTracker": "## Problem\n\nDie App wird mit einer Zeitgrenze f\u00fcr den Compiler gebaut: Ein Funktionsrumpf darf beim Typpr\u00fcfen h\u00f6chstens 300 ms brauchen, sonst ist es ein Fehler (`-warn-long-expression-type-checking=300` plus `treatAllWarnings(as: .error)` in `app/MeetingTranscriber/Package.swift`). Der `body` von `TranscriptionSettingsView` (`Sources/Settings/TranscriptionSettingsView.swift:23`) liegt auf den macOS-Runnern von GitHub genau an dieser Grenze:\n\n| Lauf | Zeit | Ergebnis |\n|---|---|---|\n| PR #14, 1. Lauf | 331 ms | rot |\n| PR #14, 2. Lauf | < 300 ms | gr\u00fcn |\n| PR #16, beide Versuche | 302 ms | rot |\n\nDer Code ist dabei unver\u00e4ndert der des Originals (`37616f5`); keiner der PRs ber\u00fchrt Swift-Code. Das Original zeigt auf `main` ebenfalls mehrere abgebrochene CI-L\u00e4ufe. Folge im Fork: die CI f\u00fcr Fork-PRs (`wapp-fork-ci.yml`) ist f\u00fcr jeden PR zuf\u00e4llig rot, und der Upstream-Sync kann am Build scheitern.\n\n## Wunsch\n\nDen `body` in kleinere Teil-Views oder `@ViewBuilder`-Eigenschaften aufteilen, so dass er deutlich unter 300 ms bleibt (Ziel: unter 150 ms auf dem Runner). Reines Refactoring, keine sichtbare \u00c4nderung.\n\n## Hinweise\n\n- `feat/custom-whisperkit-model` (PR #759 im Original) \u00e4ndert dieselbe Datei und vergr\u00f6ssert den `body` zus\u00e4tzlich; der Fix sollte darauf abgestimmt werden (zuerst einspielen, #759-Branch danach darauf bringen).\n- Messbar lokal mit `swift build -Xswiftc -Xfrontend -Xswiftc -debug-time-function-bodies`.\n- Hilft auch dem Original; Einreichung \u00fcber `submit.sh` nach Freigabe.\n\n## Abnahme\n\n- Drei CI-L\u00e4ufe in Folge auf einem Fork-PR gr\u00fcn, ohne Wiederholung.\n- Die Einstellungen sehen aus und verhalten sich wie vorher (bestehende ViewInspector-Tests gr\u00fcn).\n\nKandidat f\u00fcrs Original (eigener `fix/\u2026`-Branch).",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/17"
   },
-  "updated_at": "2026-10-02T22:12:07.747558Z"
+  "updated_at": "2026-10-02T22:15:16.549900Z"
 }
