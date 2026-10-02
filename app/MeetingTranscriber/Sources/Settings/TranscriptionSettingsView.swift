@@ -21,101 +21,145 @@ struct TranscriptionSettingsView: View {
     ]
 
     var body: some View {
-        // swiftlint:disable:next closure_body_length
         Form {
-            // swiftlint:disable:next closure_body_length
-            Section("Transcription") {
-                Picker("Engine", selection: $settings.transcriptionEngine) {
-                    ForEach(TranscriptionEngineSetting.availableCases, id: \.self) { engine in
-                        Text(engine.label).tag(engine)
-                    }
-                }
-
-                if settings.transcriptionEngine == .whisperKit {
-                    Picker("Model", selection: $settings.whisperKitModel) {
-                        ForEach(Self.whisperKitModels, id: \.variant) { model in
-                            Text(model.label).tag(model.variant)
-                        }
-                    }
-
-                    Picker("Language", selection: $settings.whisperLanguage) {
-                        ForEach(PickerLanguages.whisperKit, id: \.code) { lang in
-                            Text(lang.label).tag(lang.code)
-                        }
-                    }
-                }
-
-                if settings.transcriptionEngine == .parakeet {
-                    Picker("Language", selection: $settings.parakeetLanguage) {
-                        ForEach(PickerLanguages.parakeet, id: \.code) { lang in
-                            Text(lang.label).tag(lang.code)
-                        }
-                    }
-                }
-
-                HStack {
-                    TextField("Custom vocabulary file", text: Binding(
-                        get: { settings.customVocabularyPath },
-                        set: { settings.setCustomVocabularyPath($0) },
-                    ))
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityIdentifier(A11yID.customVocabularyPathField)
-                    Button("Choose\u{2026}") {
-                        let panel = NSOpenPanel()
-                        panel.allowedContentTypes = [.plainText]
-                        panel.allowsMultipleSelection = false
-                        if panel.runModal() == .OK, let url = panel.url {
-                            settings.setCustomVocabularyFile(url)
-                        }
-                    }
-                }
-                .help(Self.vocabularyHelpText(for: settings.transcriptionEngine))
-
-                Text(settings.customVocabularyValidation.message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .onAppear { settings.refreshCustomVocabularyValidation() }
-                    .onChange(of: settings.customVocabularyPath) { _, _ in
-                        settings.refreshCustomVocabularyValidation()
-                    }
-                if settings.transcriptionEngine == .whisperKit {
-                    Toggle("Use custom vocabulary prompt (experimental)", isOn: $settings.whisperKitVocabularyPromptEnabled)
-                        .accessibilityIdentifier(A11yID.whisperKitVocabularyPromptToggle)
-                        .help(Self.whisperKitVocabularyPromptHelpText)
-                    Text("Experimental: dense audio can omit whole sentences. See help for measured results; prefer Parakeet for vocabulary boosting.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text("When enabled, WhisperKit uses a 32-token hint; earlier terms have priority.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Canonical terminology")
-                    TextEditor(text: $settings.terminologyRulesText)
-                        .font(.body.monospaced())
-                        .frame(minHeight: 72)
-                        .accessibilityIdentifier(A11yID.terminologyRulesEditor)
-                    Text(
-                        "Applied to saved transcripts after ASR. One rule per line: "
-                            + "Canonical spelling => spoken variant | another variant. "
-                            + "Rules only replace whole words or phrases.",
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    Text(settings.terminologyRulesValidation.message)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                engineStatusView
-            }
-            .accessibilityIdentifier(A11yID.transcriptionSection)
-            .recordOnlyDisabled(settings.recordOnly)
-
+            transcriptionSection
             liveTranscriptionSection
         }
         .formStyle(.grouped)
+    }
+
+    /// Hoisted out of `body`, with every row a named property, because each
+    /// named property is type-checked as its own function body: built inline,
+    /// this section took `body` past the 300 ms hard limit on CI's slower
+    /// runners. One property per row keeps the rows where they were, so a
+    /// test that addresses a row by its position still finds it.
+    private var transcriptionSection: some View {
+        Section("Transcription") {
+            enginePicker
+            whisperKitPickers
+            parakeetLanguagePicker
+            customVocabularyField
+            customVocabularyValidation
+            whisperKitVocabularyPromptControls
+            terminologyEditor
+            engineStatusView
+        }
+        .accessibilityIdentifier(A11yID.transcriptionSection)
+        .recordOnlyDisabled(settings.recordOnly)
+    }
+
+    private var enginePicker: some View {
+        Picker("Engine", selection: $settings.transcriptionEngine) {
+            ForEach(TranscriptionEngineSetting.availableCases, id: \.self) { engine in
+                Text(engine.label).tag(engine)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var whisperKitPickers: some View { // swiftlint:disable:this attributes
+        if settings.transcriptionEngine == .whisperKit {
+            whisperKitModelPicker
+
+            Picker("Language", selection: $settings.whisperLanguage) {
+                ForEach(PickerLanguages.whisperKit, id: \.code) { lang in
+                    Text(lang.label).tag(lang.code)
+                }
+            }
+        }
+    }
+
+    /// Its own property so that anything added next to the model choice grows
+    /// this body rather than `whisperKitPickers`.
+    private var whisperKitModelPicker: some View {
+        Picker("Model", selection: $settings.whisperKitModel) {
+            ForEach(Self.whisperKitModels, id: \.variant) { model in
+                Text(model.label).tag(model.variant)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var parakeetLanguagePicker: some View { // swiftlint:disable:this attributes
+        if settings.transcriptionEngine == .parakeet {
+            Picker("Language", selection: $settings.parakeetLanguage) {
+                ForEach(PickerLanguages.parakeet, id: \.code) { lang in
+                    Text(lang.label).tag(lang.code)
+                }
+            }
+        }
+    }
+
+    private var customVocabularyField: some View {
+        HStack {
+            TextField("Custom vocabulary file", text: customVocabularyPathBinding)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier(A11yID.customVocabularyPathField)
+            Button("Choose\u{2026}") { chooseCustomVocabularyFile() }
+        }
+        .help(Self.vocabularyHelpText(for: settings.transcriptionEngine))
+    }
+
+    /// Writes through the bookmark-safe setter rather than the stored path.
+    private var customVocabularyPathBinding: Binding<String> {
+        Binding(
+            get: { settings.customVocabularyPath },
+            set: { settings.setCustomVocabularyPath($0) },
+        )
+    }
+
+    private func chooseCustomVocabularyFile() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.plainText]
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url {
+            settings.setCustomVocabularyFile(url)
+        }
+    }
+
+    private var customVocabularyValidation: some View {
+        Text(settings.customVocabularyValidation.message)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .onAppear { settings.refreshCustomVocabularyValidation() }
+            .onChange(of: settings.customVocabularyPath) { _, _ in
+                settings.refreshCustomVocabularyValidation()
+            }
+    }
+
+    @ViewBuilder
+    private var whisperKitVocabularyPromptControls: some View { // swiftlint:disable:this attributes
+        if settings.transcriptionEngine == .whisperKit {
+            Toggle("Use custom vocabulary prompt (experimental)", isOn: $settings.whisperKitVocabularyPromptEnabled)
+                .accessibilityIdentifier(A11yID.whisperKitVocabularyPromptToggle)
+                .help(Self.whisperKitVocabularyPromptHelpText)
+            Text("Experimental: dense audio can omit whole sentences. See help for measured results; prefer Parakeet for vocabulary boosting.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("When enabled, WhisperKit uses a 32-token hint; earlier terms have priority.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var terminologyEditor: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Canonical terminology")
+            TextEditor(text: $settings.terminologyRulesText)
+                .font(.body.monospaced())
+                .frame(minHeight: 72)
+                .accessibilityIdentifier(A11yID.terminologyRulesEditor)
+            Text(
+                "Applied to saved transcripts after ASR. One rule per line: "
+                    + "Canonical spelling => spoken variant | another variant. "
+                    + "Rules only replace whole words or phrases.",
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            Text(settings.terminologyRulesValidation.message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     /// Hoisted out of `body` into a named property so the section's nesting
