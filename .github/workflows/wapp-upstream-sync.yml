@@ -1,0 +1,254 @@
+# Fork-only (wapp-its/meeting-transcriber); never part of a submission to the
+# original (submit.sh blocks .github/workflows/wapp-*).
+#
+# Keeps wapp/main up to date with the original (pasrom/meeting-transcriber, main):
+#   - new upstream commits that merge cleanly and still build are merged and pushed,
+#     no questions asked (most are dependency bumps);
+#   - a conflict, a failed build or a refused push leaves wapp/main untouched and
+#     opens (or updates) one fork issue labelled `upstream-sync`;
+#   - every branch in branches.txt (branch `tools`) is checked to still merge onto
+#     the original in mt-update's order;
+#   - once a run is clean, an open `upstream-sync` issue closes itself.
+# It also keeps the original's workflows switched off in the fork, except ci.yml
+# (started per fork PR by wapp-fork-ci.yml) and our own wapp-* workflows: the rest
+# needs the original's self-hosted runner, publishes its site or cuts releases.
+#
+# Pushing a merge that changes .github/workflows needs a token with the workflows
+# permission (GITHUB_TOKEN never has it): repository secret WAPP_SYNC_TOKEN, a
+# fine-grained token for this repository with Contents, Workflows, Issues and
+# Actions read/write. Without it such merges are reported instead of pushed.
+name: wapp upstream sync
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Merge and build, but push nothing and touch no issue"
+        type: boolean
+        default: false
+      upstream_repo:
+        description: "Repository to take changes from (tests only)"
+        type: string
+        default: "pasrom/meeting-transcriber"
+      upstream_ref:
+        description: "Branch or commit there (tests only)"
+        type: string
+        default: "main"
+      home_branch:
+        description: "Fork branch to update (tests only)"
+        type: string
+        default: "wapp/main"
+
+concurrency:
+  group: wapp-upstream-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  UPSTREAM_REPO: ${{ inputs.upstream_repo || 'pasrom/meeting-transcriber' }}
+  UPSTREAM_REF: ${{ inputs.upstream_ref || 'main' }}
+  HOME_BRANCH: ${{ inputs.home_branch || 'wapp/main' }}
+  DRY_RUN: ${{ inputs.dry_run && 'true' || '' }}
+
+jobs:
+  check:
+    if: github.repository == 'wapp-its/meeting-transcriber'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      merge: ${{ steps.merge.outputs.merge }}
+      home_sha: ${{ steps.merge.outputs.home_sha }}
+      upstream_sha: ${{ steps.merge.outputs.upstream_sha }}
+      problems: ${{ steps.report.outputs.problems }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.HOME_BRANCH }}
+          fetch-depth: 0
+      - name: Merge upstream (dry, to classify)
+        id: merge
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream "https://github.com/$UPSTREAM_REPO.git"
+          git fetch --quiet upstream "$UPSTREAM_REF"
+          git fetch --quiet origin tools
+          up="$(git rev-parse FETCH_HEAD)"; git update-ref refs/sync/upstream "$up"
+          home="$(git rev-parse HEAD)"
+          echo "home_sha=$home" >> "$GITHUB_OUTPUT"
+          echo "upstream_sha=$up" >> "$GITHUB_OUTPUT"
+          : > "$RUNNER_TEMP/problems.md"
+          new="$(git rev-list --count "HEAD..refs/sync/upstream")"
+          if [ "$new" -eq 0 ]; then
+            echo "merge=none" >> "$GITHUB_OUTPUT"; echo "Up to date with upstream ${up:0:7}"
+          elif git merge --quiet --no-ff --no-edit "refs/sync/upstream" >/dev/null 2>&1; then
+            echo "merge=clean" >> "$GITHUB_OUTPUT"; echo "$new new upstream commit(s), merge is clean"
+          else
+            {
+              echo "### Das Original mischt nicht in \`$HOME_BRANCH\` (Konflikt)"; echo
+              echo "Neue Commits im Original bis \`${up:0:7}\`:"
+              git log --no-merges --format='- `%h` %s' "$home..refs/sync/upstream" | head -40; echo
+              echo "Betroffene Dateien:"
+              git diff --name-only --diff-filter=U | sed 's/^/- `/; s/$/`/'; echo
+            } >> "$RUNNER_TEMP/problems.md"
+            git merge --abort
+            echo "merge=conflict" >> "$GITHUB_OUTPUT"; echo "Merge conflict"
+          fi
+          git checkout --quiet --force "$home"
+      - name: Check branches.txt against upstream (mt-update's order)
+        run: |
+          set -euo pipefail
+          git checkout --quiet --force --detach refs/sync/upstream
+          for b in $(git show origin/tools:branches.txt | sed 's/#.*//' | tr -d '[:blank:]' | grep -v '^$'); do
+            git fetch --quiet origin "$b" 2>/dev/null || { printf '### `%s` aus branches.txt fehlt im Fork\n\n' "$b" >> "$RUNNER_TEMP/problems.md"; continue; }
+            if ! git merge --quiet --no-ff --no-edit FETCH_HEAD >/dev/null 2>&1; then
+              { printf '### `%s` mischt nicht mehr auf das Original (mt-update würde abbrechen)\n\n' "$b"
+                git diff --name-only --diff-filter=U | sed 's/^/- `/; s/$/`/'; echo; } >> "$RUNNER_TEMP/problems.md"
+              git merge --abort; break
+            fi
+            echo "✓ $b"
+          done
+      - name: Hand problems to the report
+        id: report
+        run: |
+          { echo "problems<<WAPP_EOF"; cat "$RUNNER_TEMP/problems.md"; echo "WAPP_EOF"; } >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: check
+    if: needs.check.outputs.merge == 'clean'
+    runs-on: macos-26
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    outputs:
+      result: ${{ steps.push.outputs.result }}
+      errors: ${{ steps.build.outputs.errors }}
+      merged_sha: ${{ steps.push.outputs.merged_sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.check.outputs.home_sha }}
+          fetch-depth: 0
+          token: ${{ secrets.WAPP_SYNC_TOKEN || github.token }}
+      - name: Merge upstream
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          up="${{ needs.check.outputs.upstream_sha }}"
+          git fetch --quiet "https://github.com/$UPSTREAM_REPO.git" "$up"
+          git merge --no-ff --no-edit -m "Merge upstream/main (${up:0:7}) into $HOME_BRANCH" "$up"
+      - uses: ./.github/actions/setup-swift-test
+        timeout-minutes: 20
+        with:
+          cache-key-suffix: wapp-sync
+          cache-models: "false"
+      - name: Build
+        id: build
+        run: |
+          set -o pipefail
+          if (cd app/MeetingTranscriber && swift build) 2>&1 | tee "$RUNNER_TEMP/build.log"; then exit 0; fi
+          # One retry: the app compiles with a 300 ms type-check limit as an error,
+          # which hosted runners overshoot now and then, and a package fetch can
+          # fail transiently. An incremental rebuild redoes only what failed; a real
+          # error fails again.
+          echo "::warning::build failed, retrying once"
+          if (cd app/MeetingTranscriber && swift build) 2>&1 | tee "$RUNNER_TEMP/build.log"; then exit 0; fi
+          { echo "errors<<WAPP_EOF"; grep -E 'error:' "$RUNNER_TEMP/build.log" | sed -E 's#/Users/runner/work/[^/]+/[^/]+/##' | sort -u | head -15; echo "WAPP_EOF"; } >> "$GITHUB_OUTPUT"
+          exit 1
+      - name: Push
+        id: push
+        run: |
+          set -uo pipefail
+          echo "merged_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          if [ -n "$DRY_RUN" ]; then
+            echo "DRY RUN: would push $(git rev-parse --short HEAD) to $HOME_BRANCH"
+            echo "result=dry-run" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if git push --force-with-lease="$HOME_BRANCH:${{ needs.check.outputs.home_sha }}" origin "HEAD:$HOME_BRANCH" 2> "$RUNNER_TEMP/push.err"; then
+            echo "result=pushed" >> "$GITHUB_OUTPUT"; echo "Pushed $(git rev-parse --short HEAD) to $HOME_BRANCH"
+          elif grep -q "workflow" "$RUNNER_TEMP/push.err"; then
+            cat "$RUNNER_TEMP/push.err"; echo "result=needs-workflow-token" >> "$GITHUB_OUTPUT"
+          else
+            cat "$RUNNER_TEMP/push.err"; echo "result=push-failed" >> "$GITHUB_OUTPUT"; exit 1
+          fi
+
+  report:
+    needs: [check, build]
+    if: ${{ always() && needs.check.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+      actions: write
+    steps:
+      - name: Assemble the outcome
+        id: outcome
+        env:
+          PROBLEMS: ${{ needs.check.outputs.problems }}
+          MERGE: ${{ needs.check.outputs.merge }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          PUSH_RESULT: ${{ needs.build.outputs.result }}
+          ERRORS: ${{ needs.build.outputs.errors }}
+          UP_SHA: ${{ needs.check.outputs.upstream_sha }}
+        run: |
+          set -euo pipefail
+          f="$RUNNER_TEMP/problems.md"; printf '%s' "$PROBLEMS" > "$f"
+          if [ "$MERGE" = clean ]; then
+            if [ "$BUILD_RESULT" != success ]; then
+              { echo; echo "### Nach dem Mischen von \`${UP_SHA:0:7}\` baut die App nicht"; echo
+                echo '```'; printf '%s\n' "${ERRORS:-(siehe Log des Laufs)}"; echo '```'; echo; } >> "$f"
+            elif [ "$PUSH_RESULT" = needs-workflow-token ]; then
+              { echo; echo "### Push abgelehnt: die Änderungen des Originals betreffen Workflow-Dateien"; echo
+                echo "Dafür braucht der Lauf das Secret \`WAPP_SYNC_TOKEN\` (siehe Kopf von \`wapp-upstream-sync.yml\`)."; echo; } >> "$f"
+            fi
+          fi
+          if grep -q '[^[:space:]]' "$f"; then echo "state=problem" >> "$GITHUB_OUTPUT"; else echo "state=ok" >> "$GITHUB_OUTPUT"; fi
+          echo "--- outcome"; cat "$f"
+      - name: Open, update or close the upstream-sync issue
+        if: ${{ env.DRY_RUN == '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATE: ${{ steps.outcome.outputs.state }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          UP_SHA: ${{ needs.check.outputs.upstream_sha }}
+          MERGED: ${{ needs.build.outputs.merged_sha }}
+          PUSH_RESULT: ${{ needs.build.outputs.result }}
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"; label="upstream-sync"
+          existing="$(gh issue list -R "$repo" --label "$label" --state open --json number --jq '.[0].number // empty')"
+          if [ "$STATE" = ok ]; then
+            note=""; [ "$PUSH_RESULT" = pushed ] && note=" Zuletzt eingemischt: \`${UP_SHA:0:7}\` → \`$HOME_BRANCH\` \`${MERGED:0:7}\`."
+            if [ -n "$existing" ]; then
+              gh issue close "$existing" -R "$repo" --comment "Erledigt: \`$HOME_BRANCH\` ist auf dem Stand des Originals, und alle Branches aus branches.txt mischen sauber.$note ([Lauf]($RUN_URL))"
+            fi
+            exit 0
+          fi
+          body="$RUNNER_TEMP/body.md"
+          { echo "Automatisch von \`wapp-upstream-sync.yml\` ([letzter Lauf]($RUN_URL)). Schliesst sich selbst, sobald ein Lauf sauber durchgeht."; echo
+            cat "$RUNNER_TEMP/problems.md"; echo
+            echo "**Auflösen:** Konflikte in einem Branch auf dem neuesten \`$HOME_BRANCH\` lösen (für \`$HOME_BRANCH\` selbst: \`upstream/main\` hineinmischen, Konflikte lösen, Fork-PR nach \`$HOME_BRANCH\`); der nächste Lauf prüft erneut."
+          } > "$body"
+          gh label create "$label" -R "$repo" --color FBCA04 --description "Änderungen des Originals hängen" 2>/dev/null || true
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" -R "$repo" --body-file "$body"
+          else
+            gh issue create -R "$repo" --label "$label" --title "Änderungen des Originals lassen sich nicht automatisch einmischen" --body-file "$body"
+          fi
+      - name: Keep only ci.yml and wapp-* workflows switched on
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows" --paginate \
+            --jq '.workflows[] | select(.state == "active") | select(.path | test("^\\.github/workflows/(ci\\.yml|wapp-[^/]+)$") | not) | .path' |
+          while read -r path; do
+            if [ -n "$DRY_RUN" ]; then echo "DRY RUN: would disable $path"; continue; fi
+            gh workflow disable "$(basename "$path")" -R "$GITHUB_REPOSITORY" && echo "disabled $path"
+          done

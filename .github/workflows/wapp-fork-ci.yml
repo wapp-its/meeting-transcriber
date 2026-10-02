@@ -1,0 +1,75 @@
+# Fork-only (wapp-its/meeting-transcriber); never part of a submission to the
+# original (submit.sh blocks .github/workflows/wapp-*).
+#
+# The original's ci.yml listens to pull requests into `main` only, while fork PRs go
+# into wapp/main. Editing ci.yml would conflict with every upstream change to it, so
+# this starts ci.yml on the PR's branch instead: on a manual start all of its real
+# jobs run (lint, analyze, test for both variants, audiotap coverage), only the
+# advisory merge-commit check is skipped.
+#
+# A manually started run is not attached to the PR, so this job waits for it and
+# ends with its result: the PR's check `ci (upstream ci.yml)` is green or red exactly
+# when ci.yml is. A newer push to the PR cancels the wait for the older one.
+name: wapp fork CI
+
+on:
+  pull_request:
+    branches: [wapp/main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  actions: write
+
+concurrency:
+  group: wapp-fork-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: ci (upstream ci.yml)
+    # Same-repository branches only; a fork of the fork gets no Actions token here.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Start ci.yml on the PR branch and wait for its result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          before="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          gh workflow run ci.yml -R "$GITHUB_REPOSITORY" --ref "$HEAD_REF"
+          id=""
+          for _ in $(seq 1 36); do
+            id="$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch "$HEAD_REF" \
+              --event workflow_dispatch --limit 10 --json databaseId,headSha,createdAt \
+              --jq "[.[] | select(.headSha == \"$HEAD_SHA\" and .createdAt >= \"$before\")][0].databaseId // empty")"
+            [ -n "$id" ] && break
+            sleep 5
+          done
+          [ -n "$id" ] || { echo "::error::Started ci.yml, but found no run for $HEAD_SHA"; exit 1; }
+          echo "ci.yml run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$id"
+          if gh run watch "$id" -R "$GITHUB_REPOSITORY" --exit-status --interval 60 >/dev/null; then
+            echo "ci.yml passed"; exit 0
+          fi
+          # ci.yml is flaky on GitHub's hosted runners in this fork, for reasons
+          # outside our code: a 300 ms compile-time type-check limit treated as an
+          # error (331 ms measured on a commit the original's CI passed), and model
+          # downloads into caches that are cold here. So one full retry; a real
+          # failure fails twice and stays red. The first failure stays visible as
+          # a warning on the PR. ci.yml cancels its own run when a job fails, so
+          # the failing tests are read from the log, not from job conclusions.
+          first="$(gh run view "$id" -R "$GITHUB_REPOSITORY" --log 2>/dev/null \
+            | grep -E "Test Case '.*' failed| error: " | sed -E 's/^[^\t]*\t[^\t]*\t[^ ]* //' | sort -u | head -3 | tr '\n' ' ' || true)"
+          echo "::warning::ci.yml failed on the first attempt, retrying once: ${first:-see run $id}"
+          gh run rerun "$id" -R "$GITHUB_REPOSITORY"
+          sleep 20
+          if gh run watch "$id" -R "$GITHUB_REPOSITORY" --exit-status --interval 60 >/dev/null; then
+            echo "ci.yml passed on retry"; exit 0
+          fi
+          again="$(gh run view "$id" -R "$GITHUB_REPOSITORY" --log 2>/dev/null \
+            | grep -E "Test Case '.*' failed| error: " | sed -E 's/^[^\t]*\t[^\t]*\t[^ ]* //' | sort -u | head -5 || true)"
+          printf '%s\n' "${again:-ci.yml failed twice, see run $id}" | sed 's/^/::error::/'
+          exit 1

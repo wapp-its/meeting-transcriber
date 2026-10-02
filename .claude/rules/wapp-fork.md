@@ -58,8 +58,21 @@ untouched by fork work.
   `feat/nemotron-diarization`, `local/diagnostics`). After a fork PR merges, run
   `mt-update` (see below); a new branch only needs its own `branches.txt` line when
   it must be tried before its merge.
-- No CI runs in the fork (GitHub's fork gate), so fork PRs merge on clean local
-  review receipts: `gh pr merge --merge --match-head-commit <sha>`.
+- **CI for fork PRs:** `.github/workflows/wapp-fork-ci.yml` starts the original's
+  `ci.yml` (lint, analyze, tests for both variants) on every PR into `wapp/main`; the
+  run shows on the PR's head commit. A fork PR merges once that run is green and the
+  local review receipts are clean: `gh pr merge --merge --match-head-commit <sha>`.
+  Hosted runners, macOS included, are free for this public repo.
+- **Upstream sync:** `.github/workflows/wapp-upstream-sync.yml` runs every 6 h. Clean,
+  building upstream changes are merged into `wapp/main` and pushed automatically; a
+  conflict, a failed build or a refused push opens one issue labelled `upstream-sync`,
+  which closes itself after the next clean run. Treat an open `upstream-sync` issue as
+  the next thing to fix: merge `upstream/main` into a branch from `wapp/main`, resolve,
+  fork PR. Merges touching `.github/workflows` need the `WAPP_SYNC_TOKEN` secret.
+- **Only `ci.yml` and `wapp-*` workflows are switched on** in the fork; the sync
+  switches off any other workflow upstream adds. The rest of the original's workflows
+  need its self-hosted runner, publish its site or cut releases. Fork-only workflows
+  are named `wapp-*.yml` so `submit.sh` keeps them out of submissions.
 
 <!-- flow-next:model-routing:start -->
 - implementer: opus at xhigh
