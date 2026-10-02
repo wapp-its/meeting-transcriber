@@ -27,11 +27,11 @@ UPSTREAM_SLUG="pasrom/meeting-transcriber"
 FORK_OWNER="wapp-its"
 HOME_BRANCH="wapp/main"
 
-# Pfade, die nie ins Original gehören. .flow/ wird beim Übertragen bewusst
+# Pfade, die nie ins Original gehören (inkl. der Fork-Workflows wapp-*). .flow/ wird beim Übertragen bewusst
 # weggelassen (Buchhaltung des Forks); die übrigen sind Änderungen, die jemand
 # absichtlich gemacht hat, und dürfen nicht stillschweigend verschwinden, darum
 # Abbruch statt Weglassen.
-forbidden_regex='(^|/)(CLAUDE\.md|AGENTS\.md)$|^\.claude/rules/|^\.flow/'
+forbidden_regex='(^|/)(CLAUDE\.md|AGENTS\.md)$|^\.claude/rules/|^\.flow/|^\.github/workflows/wapp-'
 # Verweise, die es nur im Fork gibt: Spec-IDs, Fork-Namen. Immer Abbruch.
 reference_regex='\b(gh|fn)-[0-9]+|wapp|\.flow/'
 # #N ist mehrdeutig: dieselbe Nummer gibt es im Fork und im Original. Verweise
@@ -62,7 +62,7 @@ done
 name="${name:-${branch#*/}}"
 # Mit --allow-claude-md fällt nur CLAUDE.md aus der Sperrliste; .claude/rules/,
 # AGENTS.md und .flow/ bleiben gesperrt.
-$allow_claude_md && forbidden_regex='(^|/)AGENTS\.md$|^\.claude/rules/|^\.flow/'
+$allow_claude_md && forbidden_regex='(^|/)AGENTS\.md$|^\.claude/rules/|^\.flow/|^\.github/workflows/wapp-'
 target="submit/$name"
 if $go; then
     [ -n "$body_file" ] && [ -f "$body_file" ] || fail "--go braucht --body-file mit dem PR-Text" 2
