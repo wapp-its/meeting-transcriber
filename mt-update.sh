@@ -169,7 +169,7 @@ busy_reason() {  # leer = nichts in Arbeit; sonst kurze Begründung
         if [ "$(stat -f %m "$m")" -ge "$started" ]; then reason+="Aufnahme läuft · "; break; fi
     done
     q="$MT_DATA_DIR/ipc/pipeline_queue.json"
-    n="$(grep -oE '"state" *: *"(waiting|transcribing|diarizing|generatingProtocol)"' "$q" 2>/dev/null | wc -l | tr -d ' ')"
+    n="$({ grep -oE '"state" *: *"(waiting|transcribing|diarizing|generatingProtocol)"' "$q" 2>/dev/null || true; } | wc -l | tr -d ' ')"
     [ "${n:-0}" -eq 0 ] || reason+="$n Job(s) in Arbeit · "
     printf '%s' "${reason% · }"
 }
@@ -186,7 +186,8 @@ if [ -n "$reason" ]; then
     done
     say "App ist frei."
 fi
-naming="$(grep -oE '"state" *: *"speakerNamingPending"' "$MT_DATA_DIR/ipc/pipeline_queue.json" 2>/dev/null | wc -l | tr -d ' ')"
+# Kein Treffer ist der Normalfall; ohne "|| true" beendet pipefail hier das Skript.
+naming="$({ grep -oE '"state" *: *"speakerNamingPending"' "$MT_DATA_DIR/ipc/pipeline_queue.json" 2>/dev/null || true; } | wc -l | tr -d ' ')"
 [ "${naming:-0}" -eq 0 ] || say "Hinweis: $naming Sprecher-Benennung(en) offen — sie erscheinen nach dem Neustart wieder; im Dialog getippte, noch nicht bestätigte Namen gehen verloren."
 
 if [ -n "$(app_pid)" ]; then
