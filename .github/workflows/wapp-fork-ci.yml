@@ -5,7 +5,11 @@
 # into wapp/main. Editing ci.yml would conflict with every upstream change to it, so
 # this starts ci.yml on the PR's branch instead: on a manual start all of its real
 # jobs run (lint, analyze, test for both variants, audiotap coverage), only the
-# advisory merge-commit check is skipped. The run is reported on the PR's head commit.
+# advisory merge-commit check is skipped.
+#
+# A manually started run is not attached to the PR, so this job waits for it and
+# ends with its result: the PR's check `ci (upstream ci.yml)` is green or red exactly
+# when ci.yml is. A newer push to the PR cancels the wait for the older one.
 name: wapp fork CI
 
 on:
@@ -16,15 +20,40 @@ on:
 permissions:
   actions: write
 
+concurrency:
+  group: wapp-fork-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
-  start-ci:
+  ci:
+    name: ci (upstream ci.yml)
     # Same-repository branches only; a fork of the fork gets no Actions token here.
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 90
     steps:
-      - name: Start ci.yml on the PR branch
+      - name: Start ci.yml on the PR branch and wait for its result
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: gh workflow run ci.yml -R "$GITHUB_REPOSITORY" --ref "$HEAD_REF"
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          before="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          gh workflow run ci.yml -R "$GITHUB_REPOSITORY" --ref "$HEAD_REF"
+          id=""
+          for _ in $(seq 1 36); do
+            id="$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch "$HEAD_REF" \
+              --event workflow_dispatch --limit 10 --json databaseId,headSha,createdAt \
+              --jq "[.[] | select(.headSha == \"$HEAD_SHA\" and .createdAt >= \"$before\")][0].databaseId // empty")"
+            [ -n "$id" ] && break
+            sleep 5
+          done
+          [ -n "$id" ] || { echo "::error::Started ci.yml, but found no run for $HEAD_SHA"; exit 1; }
+          echo "ci.yml run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$id"
+          gh run watch "$id" -R "$GITHUB_REPOSITORY" --exit-status --interval 60 >/dev/null || {
+            gh run view "$id" -R "$GITHUB_REPOSITORY" --json jobs \
+              --jq '.jobs[] | select(.conclusion == "failure") | "::error::ci.yml job failed: \(.name)"'
+            exit 1
+          }
+          echo "ci.yml passed"
