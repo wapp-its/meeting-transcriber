@@ -10,7 +10,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-17-settings-view-type-check-under-the-ci",
   "spec_path": ".flow/tasks/gh-17-settings-view-type-check-under-the-ci.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement Settings view type-check under the CI limit",
   "updated_at": "2026-10-02T22:10:16.880837Z"
 }

@@ -162,7 +162,7 @@
     "impl:gh-17-settings-view-type-check-under-the-ci.1": 0
   },
   "spec_path": ".flow/specs/gh-17-settings-view-type-check-under-the-ci.md",
-  "status": "open",
+  "status": "done",
   "title": "Settings view type-check under the CI limit",
   "tracker": {
     "baseHashFlow": "c38b9a55a382a943bf6f9dcc8a4e6674282eba2243bde038cdd68140ed9302e3",
@@ -176,5 +176,5 @@
     "mergeBaseTracker": "## Problem\n\nDie App wird mit einer Zeitgrenze f\u00fcr den Compiler gebaut: Ein Funktionsrumpf darf beim Typpr\u00fcfen h\u00f6chstens 300 ms brauchen, sonst ist es ein Fehler (`-warn-long-expression-type-checking=300` plus `treatAllWarnings(as: .error)` in `app/MeetingTranscriber/Package.swift`). Der `body` von `TranscriptionSettingsView` (`Sources/Settings/TranscriptionSettingsView.swift:23`) liegt auf den macOS-Runnern von GitHub genau an dieser Grenze:\n\n| Lauf | Zeit | Ergebnis |\n|---|---|---|\n| PR #14, 1. Lauf | 331 ms | rot |\n| PR #14, 2. Lauf | < 300 ms | gr\u00fcn |\n| PR #16, beide Versuche | 302 ms | rot |\n\nDer Code ist dabei unver\u00e4ndert der des Originals (`37616f5`); keiner der PRs ber\u00fchrt Swift-Code. Das Original zeigt auf `main` ebenfalls mehrere abgebrochene CI-L\u00e4ufe. Folge im Fork: die CI f\u00fcr Fork-PRs (`wapp-fork-ci.yml`) ist f\u00fcr jeden PR zuf\u00e4llig rot, und der Upstream-Sync kann am Build scheitern.\n\n## Wunsch\n\nDen `body` in kleinere Teil-Views oder `@ViewBuilder`-Eigenschaften aufteilen, so dass er deutlich unter 300 ms bleibt (Ziel: unter 150 ms auf dem Runner). Reines Refactoring, keine sichtbare \u00c4nderung.\n\n## Hinweise\n\n- `feat/custom-whisperkit-model` (PR #759 im Original) \u00e4ndert dieselbe Datei und vergr\u00f6ssert den `body` zus\u00e4tzlich; der Fix sollte darauf abgestimmt werden (zuerst einspielen, #759-Branch danach darauf bringen).\n- Messbar lokal mit `swift build -Xswiftc -Xfrontend -Xswiftc -debug-time-function-bodies`.\n- Hilft auch dem Original; Einreichung \u00fcber `submit.sh` nach Freigabe.\n\n## Abnahme\n\n- Drei CI-L\u00e4ufe in Folge auf einem Fork-PR gr\u00fcn, ohne Wiederholung.\n- Die Einstellungen sehen aus und verhalten sich wie vorher (bestehende ViewInspector-Tests gr\u00fcn).\n\nKandidat f\u00fcrs Original (eigener `fix/\u2026`-Branch).",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/17"
   },
-  "updated_at": "2026-10-02T22:15:16.549900Z"
+  "updated_at": "2026-10-02T22:16:31.036739Z"
 }
