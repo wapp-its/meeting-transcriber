@@ -9,7 +9,7 @@
   "depends_on_epics": [],
   "id": "gh-17-settings-view-type-check-under-the-ci",
   "impl_review_rounds": {
-    "gh-17-settings-view-type-check-under-the-ci.1": 1
+    "gh-17-settings-view-type-check-under-the-ci.1": 0
   },
   "next_task": 1,
   "no_plan": true,
@@ -60,9 +60,55 @@
       "task": "gh-17-settings-view-type-check-under-the-ci.1",
       "timestamp": "2026-10-02T22:09:35.097116Z",
       "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "41262a54b8f7d8d1c253da2968eb868f179a47b8ad2a8397adb478990e15126f",
+      "backend": "codex",
+      "base_sha": "6c763a06b120c07de5560f956ded11cf6e3d8922",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-91be61bef729ce561b3fb4c59f833c2d",
+            "classification": "introduced",
+            "findingId": "finding-91be61bef729ce561b3fb4c59f833c2d",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "bb09f3d6b2c95629ecf88cad909e99b1e03bc6f8",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 744,
+      "output_sha256": "fd480c7468cb53b711e343d2dfa0928636bcfb52803eeebc6c02ab225451dbf3",
+      "reservation_id": "df0dd906418a40519342ae802d64f5ba",
+      "round_consumed": true,
+      "scope": "impl:gh-17-settings-view-type-check-under-the-ci.1",
+      "superseded_by": null,
+      "task": "gh-17-settings-view-type-check-under-the-ci.1",
+      "timestamp": "2026-10-02T22:12:07.714144Z",
+      "verdict": "SHIP"
     }
   ],
-  "review_hash_epoch": {},
+  "review_hash_epoch": {
+    "impl:gh-17-settings-view-type-check-under-the-ci.1": 1
+  },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
@@ -83,5 +129,5 @@
     "mergeBaseTracker": "## Problem\n\nDie App wird mit einer Zeitgrenze f\u00fcr den Compiler gebaut: Ein Funktionsrumpf darf beim Typpr\u00fcfen h\u00f6chstens 300 ms brauchen, sonst ist es ein Fehler (`-warn-long-expression-type-checking=300` plus `treatAllWarnings(as: .error)` in `app/MeetingTranscriber/Package.swift`). Der `body` von `TranscriptionSettingsView` (`Sources/Settings/TranscriptionSettingsView.swift:23`) liegt auf den macOS-Runnern von GitHub genau an dieser Grenze:\n\n| Lauf | Zeit | Ergebnis |\n|---|---|---|\n| PR #14, 1. Lauf | 331 ms | rot |\n| PR #14, 2. Lauf | < 300 ms | gr\u00fcn |\n| PR #16, beide Versuche | 302 ms | rot |\n\nDer Code ist dabei unver\u00e4ndert der des Originals (`37616f5`); keiner der PRs ber\u00fchrt Swift-Code. Das Original zeigt auf `main` ebenfalls mehrere abgebrochene CI-L\u00e4ufe. Folge im Fork: die CI f\u00fcr Fork-PRs (`wapp-fork-ci.yml`) ist f\u00fcr jeden PR zuf\u00e4llig rot, und der Upstream-Sync kann am Build scheitern.\n\n## Wunsch\n\nDen `body` in kleinere Teil-Views oder `@ViewBuilder`-Eigenschaften aufteilen, so dass er deutlich unter 300 ms bleibt (Ziel: unter 150 ms auf dem Runner). Reines Refactoring, keine sichtbare \u00c4nderung.\n\n## Hinweise\n\n- `feat/custom-whisperkit-model` (PR #759 im Original) \u00e4ndert dieselbe Datei und vergr\u00f6ssert den `body` zus\u00e4tzlich; der Fix sollte darauf abgestimmt werden (zuerst einspielen, #759-Branch danach darauf bringen).\n- Messbar lokal mit `swift build -Xswiftc -Xfrontend -Xswiftc -debug-time-function-bodies`.\n- Hilft auch dem Original; Einreichung \u00fcber `submit.sh` nach Freigabe.\n\n## Abnahme\n\n- Drei CI-L\u00e4ufe in Folge auf einem Fork-PR gr\u00fcn, ohne Wiederholung.\n- Die Einstellungen sehen aus und verhalten sich wie vorher (bestehende ViewInspector-Tests gr\u00fcn).\n\nKandidat f\u00fcrs Original (eigener `fix/\u2026`-Branch).",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/17"
   },
-  "updated_at": "2026-10-02T22:09:35.121373Z"
+  "updated_at": "2026-10-02T22:12:07.747558Z"
 }

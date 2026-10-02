@@ -16,9 +16,12 @@ Whole-spec owner task (direct route). Implementation: the Transcription section 
 Every R-ID in the parent spec's ## Acceptance Criteria is satisfied; judge this task against the spec's criteria directly.
 
 ## Done summary
-TBD
+Split the Transcription section of TranscriptionSettingsView out of `body`, one named property per row in the original order, and moved the vocabulary row's file-picker action and binding out of the view builder. `body` type-checks in 1.4 ms locally (was 37-39 ms); on a slow GitHub runner (fork CI run 37068250552) no body of the view reaches the slowest-ten cut-off of 84.67 ms (was 142.82 ms on a fast run, 302-331 ms on slow ones). No visible change: 167 settings and live-caption tests pass unedited, lint clean. A trial merge with the custom-model branch keeps its additions outside `body` (0.9 ms, 106 tests green). Three green PR runs without a retry (R3) are checked at landing.
 
+stage: impl-review - ran [2026-10-03] NEEDS_WORK (evidence gap only, 0 code findings) -> evidence recorded -> SHIP (model: gpt-5.6-sol xhigh, one draw)
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: b74801f637a1dc4538ac4efa71f7c22d27e2393f, 79f9547d942eb9cf75565104ec94d37b7a3764ba, bb09f3d6b2c95629ecf88cad909e99b1e03bc6f8
+- Tests: swift test --filter 'TranscriptionSettingsVocabularyTests|SettingsViewTests|SettingsInteractionTests|ViewInspectorIdentifierTests|LiveCaption' (167 passed); ./scripts/lint.sh (0 violations); fork CI run 37068250552 (all jobs green)
 - PRs:
