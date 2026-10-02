@@ -1,0 +1,30 @@
+# Fork-only (wapp-its/meeting-transcriber); never part of a submission to the
+# original (submit.sh blocks .github/workflows/wapp-*).
+#
+# The original's ci.yml listens to pull requests into `main` only, while fork PRs go
+# into wapp/main. Editing ci.yml would conflict with every upstream change to it, so
+# this starts ci.yml on the PR's branch instead: on a manual start all of its real
+# jobs run (lint, analyze, test for both variants, audiotap coverage), only the
+# advisory merge-commit check is skipped. The run is reported on the PR's head commit.
+name: wapp fork CI
+
+on:
+  pull_request:
+    branches: [wapp/main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  actions: write
+
+jobs:
+  start-ci:
+    # Same-repository branches only; a fork of the fork gets no Actions token here.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Start ci.yml on the PR branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: gh workflow run ci.yml -R "$GITHUB_REPOSITORY" --ref "$HEAD_REF"
