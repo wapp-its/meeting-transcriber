@@ -9,11 +9,16 @@ untouched by fork work.
 
 - `origin` = `github.com/wapp-its/meeting-transcriber` (the fork), `upstream` =
   `github.com/pasrom/meeting-transcriber` (the original).
-- **`wapp/main` is the fork's home and default branch:** `upstream/main` plus `.flow/`
-  and this file, nothing else. Keep it that way: bring upstream in by merging
-  `upstream/main`, never commit app code here.
+- **`wapp/main` is the fork's home and default branch:** `upstream/main` plus `.flow/`,
+  this file, and every feature the fork has finished. Features arrive only through
+  merged fork PRs (flow-next specs); upstream comes in by merging `upstream/main`.
+  No direct commits of app code.
 - Each improvement is its own branch: `feat/*` may go to the original later,
   `local/*` stays in the fork. Spec work (flow-next) branches from `wapp/main`.
+- **Never wait for the original's maintainer** (owner, 2026-10-02: not very active).
+  A feature is done for us when it is merged into `wapp/main` and installed via
+  `mt-update`; a PR to the original is optional and fire-and-forget, never a
+  dependency and never a reason to park work.
 - Branch `tools` holds the fork's tooling: `mt-update.sh` (builds `upstream/main`
   plus every branch in `branches.txt` and installs
   `/Applications/MeetingTranscriber-Dev.app`), `branches.txt`, `submit.sh`.
@@ -48,7 +53,13 @@ untouched by fork work.
   `.claude/rules/`, `CLAUDE.md` or `AGENTS.md`, or commit messages that reference fork
   issues or spec ids. Write commit messages for the original's readers: no `#N` of
   fork issues, no `gh-N`/`fn-N` ids.
-- To ship a feature in our own build, add its branch to `branches.txt` on `tools`.
+- Our build: `branches.txt` on `tools` lists `wapp/main` (all merged fork features)
+  plus older branches made before flow-next (`feat/custom-whisperkit-model`,
+  `feat/nemotron-diarization`, `local/diagnostics`). After a fork PR merges, run
+  `mt-update` (see below); a new branch only needs its own `branches.txt` line when
+  it must be tried before its merge.
+- No CI runs in the fork (GitHub's fork gate), so fork PRs merge on clean local
+  review receipts: `gh pr merge --merge --match-head-commit <sha>`.
 
 <!-- flow-next:model-routing:start -->
 - implementer: opus at xhigh
