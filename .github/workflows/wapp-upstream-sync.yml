@@ -153,6 +153,13 @@ jobs:
         run: |
           set -o pipefail
           if (cd app/MeetingTranscriber && swift build) 2>&1 | tee "$RUNNER_TEMP/build.log"; then exit 0; fi
+          # The app compiles with a 300 ms type-check limit as an error, which hosted
+          # runners overshoot now and then. A failure made only of that gets one
+          # retry (an incremental build recompiles just the affected files).
+          if ! grep -E ' error: ' "$RUNNER_TEMP/build.log" | grep -qvE 'to type-check \(limit: [0-9]+ms\)'; then
+            echo "::warning::build failed only on the type-check time limit; retrying once"
+            if (cd app/MeetingTranscriber && swift build) 2>&1 | tee "$RUNNER_TEMP/build.log"; then exit 0; fi
+          fi
           { echo "errors<<WAPP_EOF"; grep -E 'error:' "$RUNNER_TEMP/build.log" | sed -E 's#/Users/runner/work/[^/]+/[^/]+/##' | sort -u | head -15; echo "WAPP_EOF"; } >> "$GITHUB_OUTPUT"
           exit 1
       - name: Push

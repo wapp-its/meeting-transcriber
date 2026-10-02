@@ -51,9 +51,25 @@ jobs:
           done
           [ -n "$id" ] || { echo "::error::Started ci.yml, but found no run for $HEAD_SHA"; exit 1; }
           echo "ci.yml run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$id"
-          gh run watch "$id" -R "$GITHUB_REPOSITORY" --exit-status --interval 60 >/dev/null || {
-            gh run view "$id" -R "$GITHUB_REPOSITORY" --json jobs \
-              --jq '.jobs[] | select(.conclusion == "failure") | "::error::ci.yml job failed: \(.name)"'
-            exit 1
-          }
-          echo "ci.yml passed"
+          if gh run watch "$id" -R "$GITHUB_REPOSITORY" --exit-status --interval 60 >/dev/null; then
+            echo "ci.yml passed"; exit 0
+          fi
+          # ci.yml compiles with a 300 ms type-check limit as an error
+          # (-warn-long-expression-type-checking, Package.swift); GitHub's hosted
+          # runners land just over it now and then (331 ms measured on code the
+          # original's CI passes). A failure made only of that is retried once;
+          # anything else stays red.
+          other="$(gh run view "$id" -R "$GITHUB_REPOSITORY" --log-failed 2>/dev/null \
+            | grep -E ' error: ' | grep -vE 'to type-check \(limit: [0-9]+ms\)|took [0-9]+ms to type-check' | head -5 || true)"
+          timing="$(gh run view "$id" -R "$GITHUB_REPOSITORY" --log-failed 2>/dev/null | grep -cE 'to type-check \(limit' || true)"
+          if [ -z "$other" ] && [ "${timing:-0}" -gt 0 ]; then
+            echo "::warning::ci.yml failed only on the compile-time type-check limit; retrying the failed jobs once"
+            gh run rerun "$id" -R "$GITHUB_REPOSITORY" --failed
+            sleep 15
+            if gh run watch "$id" -R "$GITHUB_REPOSITORY" --exit-status --interval 60 >/dev/null; then
+              echo "ci.yml passed on retry"; exit 0
+            fi
+          fi
+          gh run view "$id" -R "$GITHUB_REPOSITORY" --json jobs \
+            --jq '.jobs[] | select(.conclusion == "failure") | "::error::ci.yml job failed: \(.name)"'
+          exit 1
