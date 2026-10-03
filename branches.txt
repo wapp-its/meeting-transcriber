@@ -1,5 +1,7 @@
 # Eigene Branches, die mt-update ins Original mischt (in dieser Reihenfolge).
 # Branches, deren PR im Original übernommen ist, überspringt mt-update von selbst.
+# Neuer Branch hier = auch in den GitHub-Ruleset „Long-lived branches: no deletion“
+# aufnehmen, sonst löscht GitHub ihn beim Merge eines Fork-PRs von ihm automatisch.
 # Heim-Branch: alle im Fork gemergten Features (flow-next-PRs)
 wapp/main
 feat/custom-whisperkit-model
