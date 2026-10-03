@@ -22,6 +22,12 @@ untouched by fork work.
 - Branch `tools` holds the fork's tooling: `mt-update.sh` (builds `upstream/main`
   plus every branch in `branches.txt` and installs
   `/Applications/MeetingTranscriber-Dev.app`), `branches.txt`, `submit.sh`.
+- **A merged fork PR's head branch is deleted automatically** (repo setting, owner
+  2026-10-03). The long-lived branches (`main`, `wapp/main`, `tools` and every branch in
+  `branches.txt`) are exempt only because the fork ruleset "Long-lived branches: no
+  deletion" forbids deleting them. A branch added to `branches.txt` goes into that
+  ruleset in the same step: otherwise merging a fork PR from it deletes it, which also
+  closes its PR in the original.
 - Never work inside `~/Library/Application Support/mt-update/` — mt-update resets it.
 
 ## Identity, accounts, outward actions
