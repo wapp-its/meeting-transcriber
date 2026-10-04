@@ -9,6 +9,63 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Pipelin
 /// type inherits that isolation, so the moved methods need no explicit
 /// annotation. Pure move; no behavior change.
 extension PipelineQueue {
+    // MARK: - Adopting the jobs of a replaced queue
+
+    /// Take over the state of the queue this one replaces, instead of reading
+    /// the snapshot file.
+    ///
+    /// The counterpart to `loadSnapshot()`, and it has to make the same
+    /// decisions, because the only difference is where the jobs come from. A
+    /// folder change is triggered by the very job transition whose snapshot
+    /// write is still in flight, so the file on disk can still show a finished
+    /// job as running; restoring it from there would queue that job a second
+    /// time (issue #744). The queue being replaced holds the current state in
+    /// memory, and the caller has already checked that it holds no unfinished
+    /// work.
+    ///
+    /// Finished jobs are dropped with their sidecars, exactly as the restore
+    /// drops them. Keeping them looked harmless and is not: the reaper that
+    /// removes a `.done` job after `completedJobLifetime` is a task owned by the
+    /// queue the job came from, so an adopted job would carry no reaper, sit in
+    /// the list and the snapshot indefinitely, keep its 16 kHz sidecars in the
+    /// folder the user navigated away from, and offer the menu an "open" that
+    /// reaches into a folder whose security scope died with the old queue.
+    /// Failed jobs are kept, because the restore keeps them and a retry is
+    /// what cleans up after them.
+    func adoptJobs(of replaced: PipelineQueue) {
+        // Before anything is written: the replaced queue may still owe a write,
+        // and both queues share one staging file. See `discardPendingSnapshot`.
+        replaced.discardPendingSnapshot()
+        var adopted = replaced.jobs
+        discardFinishedJobs(from: &adopted)
+        discardJobsWithMissingAudio(&adopted, interruptedIn: [:])
+        // Count, not equality: both calls above only ever remove, so a
+        // differing count is exactly "something was dropped". `PipelineJob` is
+        // not `Equatable`, and making it so for one bookkeeping line would put
+        // a conformance on a type with two dozen fields.
+        let changed = adopted.count != replaced.jobs.count
+        jobs = adopted
+        // Only when this queue's list differs from what the replaced one held.
+        // Every rebuild comes through here once the controller has built a queue
+        // itself, including each watch start, and writing an unchanged (usually
+        // empty) list would spend an atomic replace on nothing. The replace is
+        // the syscall this queue keeps a serializing actor for.
+        if changed { saveSnapshot() }
+    }
+
+    /// Drop finished jobs and let their sidecars go with them.
+    ///
+    /// Shared by the restore and the adoption so the two cannot drift: both
+    /// start a queue's job list, and which jobs a fresh list may contain is one
+    /// decision, not two. It used to be written out at both call sites, held
+    /// together only by a comment saying they had to agree.
+    private func discardFinishedJobs(from list: inout [PipelineJob]) {
+        let finished = list.filter { $0.state == .done }
+        guard !finished.isEmpty else { return }
+        list.removeAll { $0.state == .done }
+        removeNamingDataOfDiscardedJobs(finished)
+    }
+
     // MARK: - Snapshot Recovery
 
     /// Load pipeline queue from the JSON snapshot written by `saveSnapshot()`.
@@ -44,10 +101,7 @@ extension PipelineQueue {
             }
         }
 
-        // Discard done jobs, and let their sidecars go with them.
-        let doneJobs = loaded.filter { $0.state == .done }
-        loaded.removeAll { $0.state == .done }
-        removeNamingDataOfDiscardedJobs(doneJobs)
+        discardFinishedJobs(from: &loaded)
 
         discardJobsWithMissingAudio(&loaded, interruptedIn: interruptedStates)
 
@@ -84,7 +138,8 @@ extension PipelineQueue {
         // .speakerNamingPending jobs.
         let missingNamingDataJobIDs = jobs.compactMap { job -> UUID? in
             guard job.state == .speakerNamingPending else { return nil }
-            if let slug = job.namingSlug, naming.restore(jobID: job.id, slug: slug) {
+            if let slug = job.namingSlug,
+               naming.restore(jobID: job.id, slug: slug, in: sidecarDir(of: job)) {
                 return nil
             }
             logger.warning("Naming data not found for job \(job.id), marking as done")
@@ -119,7 +174,7 @@ extension PipelineQueue {
     private func resumeDispositions(for loaded: [PipelineJob]) -> [UUID: ProtocolResumeDisposition] {
         var dispositions: [UUID: ProtocolResumeDisposition] = [:]
         for job in loaded where job.state == .generatingProtocol {
-            let store = SpeakerNamingStore(outputDir: job.sidecarOutputDir ?? outputDir)
+            let store = SpeakerNamingStore(outputDir: sidecarDir(of: job))
             let disposition = ProtocolResumePolicy.decide(
                 interruptedIn: job.state,
                 namingDataOnDisk: store.hasNamingData(slug: job.namingSlug),
@@ -263,7 +318,7 @@ extension PipelineQueue {
     private func removeNamingDataOfDiscardedJobs(_ discarded: [PipelineJob]) {
         for job in discarded where !inFlightRuns.isInFlight(job) {
             naming.removeNamingData(
-                jobID: job.id, slug: job.namingSlug, in: job.sidecarOutputDir ?? outputDir,
+                jobID: job.id, slug: job.namingSlug, in: sidecarDir(of: job),
             )
         }
     }

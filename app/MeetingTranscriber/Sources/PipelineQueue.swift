@@ -67,6 +67,21 @@ class PipelineQueue {
     let diarizationFactoryWithMode: ((DiarizerMode) -> any DiarizationProvider)?
     let protocolGeneratorFactory: (() -> (any ProtocolGenerating)?)?
     let outputDir: URL?
+    /// Opens and closes security-scoped access on `outputDir`. Injectable so a
+    /// test can record where and when the scope is held; see `SecurityScopeAccess`.
+    let securityScope: SecurityScopeAccess
+    /// `outputDir`, when this queue holds the security scope on it.
+    ///
+    /// Opened once in `init`, on the URL object this queue was built with (the
+    /// one that resolved from the bookmark), and closed in `deinit`. Everything
+    /// the queue and its naming session read or write under the output folder
+    /// therefore runs inside it, with no call site opening a scope of its own.
+    /// One scope for the lifetime rather than one per call, because the defect
+    /// this replaces was a call site that opened none, or opened it on the
+    /// wrong URL. A rebuilt queue opens its own; the queue it replaces keeps
+    /// its scope until it is deallocated, which a running job delays, since
+    /// the processing task holds the queue until the job returns.
+    private let scopedOutputDir: URL?
     /// Where `DualSourceRecorder` writes, i.e. the audio this app produced and
     /// may therefore relocate. Injectable so a test can exercise the hand-off
     /// without writing into the real user directory; see `AudioPersistencePolicy`.
@@ -280,6 +295,8 @@ class PipelineQueue {
         self.diarizationFactoryWithMode = nil
         self.protocolGeneratorFactory = nil
         self.outputDir = nil
+        securityScope = .live
+        scopedOutputDir = nil
         stagingDir = AppPaths.recordingsDir
         self.diarizeEnabled = false
         echoDedupEnabled = true
@@ -383,6 +400,7 @@ class PipelineQueue {
         completedJobLifetime: TimeInterval = 60,
         terminalJobStore: TerminalJobStore? = nil,
         inFlightRuns: InFlightRunRegistry? = nil,
+        securityScope: SecurityScopeAccess = .live,
     ) {
         self.logDir = logDir ?? AppPaths.ipcDir
         self.processedLedger = ProcessedRecordingsLedger(logDir: self.logDir)
@@ -392,6 +410,8 @@ class PipelineQueue {
         self.diarizationFactoryWithMode = diarizationFactoryWithMode
         self.protocolGeneratorFactory = protocolGeneratorFactory
         self.outputDir = outputDir
+        self.securityScope = securityScope
+        scopedOutputDir = securityScope.start(outputDir) ? outputDir : nil
         self.stagingDir = stagingDir
         self.diarizeEnabled = diarizeEnabled
         self.echoDedupEnabled = echoDedupEnabled
@@ -433,6 +453,15 @@ class PipelineQueue {
         )
         naming.delegate = self
         refreshStageAverages()
+    }
+
+    /// May run off the main actor: the snapshot worker can hold the last
+    /// reference. `SecurityScopeAccess` requires `stop` to be callable from
+    /// any thread for that reason.
+    deinit {
+        if let scopedOutputDir {
+            securityScope.stop(scopedOutputDir)
+        }
     }
 
     var activeJobs: [PipelineJob] {
@@ -509,6 +538,16 @@ class PipelineQueue {
         }
     }
 
+    /// The folder a job's naming sidecars were written under.
+    ///
+    /// One place for a decision that was spelled out at each call site in three
+    /// different ways. `nil` in the job means it predates the field or never
+    /// wrote sidecars, and then the folder this queue writes to is what the
+    /// code did before the field existed.
+    func sidecarDir(of job: PipelineJob) -> URL? {
+        job.sidecarOutputDir ?? outputDir
+    }
+
     func removeJob(id: UUID) {
         if let index = jobs.firstIndex(where: { $0.id == id }) {
             processedLedger.markProcessed(mixPath: jobs[index].mixPath)
@@ -519,7 +558,14 @@ class PipelineQueue {
             // folder for them and the job is gone from the snapshot that would
             // have named them. Resolved jobs have nothing left here, so this
             // costs them a no-op.
-            naming.removeNamingData(jobID: id, slug: jobs[index].namingSlug)
+            // `in:` is load-bearing: without it the cleanup runs against this
+            // queue's own store, so a job whose sidecars were written under a
+            // different output folder gets looked for in the wrong one and its
+            // files stay behind for good, since the job is then gone from the
+            // snapshot that would have named them.
+            naming.removeNamingData(
+                jobID: id, slug: jobs[index].namingSlug, in: sidecarDir(of: jobs[index]),
+            )
             jobs.remove(at: index)
         }
         stageStartByJob.removeValue(forKey: id)
@@ -643,12 +689,6 @@ class PipelineQueue {
 
         let transcriptPath = jobs[index].transcriptPath
         let slug = jobs[index].namingSlug
-        let isAccessingOutputDir = outputDir?.startAccessingSecurityScopedResource() ?? false
-        defer {
-            if isAccessingOutputDir {
-                outputDir?.stopAccessingSecurityScopedResource()
-            }
-        }
         if let transcriptPath {
             do {
                 try FileManager.default.removeItem(at: transcriptPath)
@@ -900,6 +940,20 @@ class PipelineQueue {
     /// a stalled `replaceItemAt` (macOS 26 `mds_stores` rename deadlock)
     /// can't freeze the UI / RPC / watch loop. Rapid successive calls
     /// coalesce: only the last state is actually written.
+    /// Drop a snapshot write this queue still owes, for a queue that is being
+    /// replaced.
+    ///
+    /// Both queues share one `logDir`, so they share `pipeline_queue.tmp`, and
+    /// their serializing actors are per-queue and know nothing of each other.
+    /// Left in place, the replaced queue's pending write and the replacement's
+    /// own race on that one staging file: the loser of `replaceItemAt` fails
+    /// with a missing source, and the winner may be the queue that is going
+    /// away. Dropping the batch is enough to end the worker, which stops as
+    /// soon as `takeNextSnapshotBatch` hands it nothing.
+    func discardPendingSnapshot() {
+        pendingSnapshotJobs = nil
+    }
+
     func saveSnapshot() {
         ensureLogDir()
         pendingSnapshotJobs = jobs

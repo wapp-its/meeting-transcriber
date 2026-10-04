@@ -1,4 +1,7 @@
 import Foundation
+import os.log
+
+private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "SpeakerNamingStore")
 
 /// Disk persistence for a job's speaker-naming sidecars, keyed by a per-job
 /// `slug`. Pure I/O over a single `outputDir` (the protocol output folder) —
@@ -14,6 +17,14 @@ struct SpeakerNamingStore {
     /// Protocol output directory; the `recordings/` subfolder holds the
     /// sidecars. `nil` disables all I/O (skeleton queues / tests without an
     /// output dir) — every method is then a no-op.
+    ///
+    /// Opens no security scope of its own. A store on the queue's own output
+    /// root is covered by the scope `PipelineQueue` holds for its lifetime. A
+    /// store built on a job's recorded `sidecarOutputDir` (restore and its
+    /// cleanup) is covered only while that folder is still the current root; an
+    /// earlier output folder is unreachable in the sandboxed build, and opening
+    /// a scope here would not help, since a URL decoded from the snapshot
+    /// carries none.
     let outputDir: URL?
 
     /// Filesystem slug for a job's persisted artefacts. Embeds the job's
@@ -39,25 +50,6 @@ struct SpeakerNamingStore {
 
     private var recordingsDir: URL? {
         outputDir?.appendingPathComponent("recordings")
-    }
-
-    /// Run `body` with the output directory's security scope open.
-    ///
-    /// Security-scoped access is the caller's job for anything under a
-    /// user-picked output folder, and the removals below go through `try?`, so
-    /// a sandboxed build without the scope deletes nothing and says nothing.
-    /// It sits here rather than at each caller because every site that drops a
-    /// job's sidecars would otherwise need its own copy, and all but one never
-    /// had one. Opened on `outputDir`, the bookmark-resolved root, not on the
-    /// `recordings` child.
-    private func withOutputDirAccess<R>(_ body: () throws -> R) rethrows -> R {
-        let accessing = outputDir?.startAccessingSecurityScopedResource() ?? false
-        defer {
-            if accessing {
-                outputDir?.stopAccessingSecurityScopedResource()
-            }
-        }
-        return try body()
     }
 
     // FluidAudio embeddings can contain NaN/Inf for short or silent segments.
@@ -116,11 +108,7 @@ struct SpeakerNamingStore {
     /// the concern of `cleanupSidecarFiles`.
     func deleteNamingJSON(slug: String?) {
         guard let slug, let recordingsDir else { return }
-        withOutputDirAccess {
-            try? FileManager.default.removeItem(
-                at: recordingsDir.appendingPathComponent("\(slug)\(Self.namingJSONSuffix)"),
-            )
-        }
+        Self.remove(recordingsDir.appendingPathComponent("\(slug)\(Self.namingJSONSuffix)"))
     }
 
     /// Delete only the cached transcript segments. These contain verbatim
@@ -129,19 +117,31 @@ struct SpeakerNamingStore {
     func deleteTranscriptSegments(slug: String?) throws {
         guard let slug, let recordingsDir else { return }
         let path = recordingsDir.appendingPathComponent("\(slug)\(Self.segmentsSuffix)")
-        try withOutputDirAccess {
-            guard FileManager.default.fileExists(atPath: path.path) else { return }
-            try FileManager.default.removeItem(at: path)
-        }
+        guard FileManager.default.fileExists(atPath: path.path) else { return }
+        try FileManager.default.removeItem(at: path)
     }
 
     /// Delete the 16 kHz audio and segment sidecar files for a slug.
     func cleanupSidecarFiles(slug: String?) {
         guard let slug, let recordingsDir else { return }
-        withOutputDirAccess {
-            for suffix in Self.sidecarSuffixes {
-                try? FileManager.default.removeItem(at: recordingsDir.appendingPathComponent("\(slug)\(suffix)"))
-            }
+        for suffix in Self.sidecarSuffixes {
+            Self.remove(recordingsDir.appendingPathComponent("\(slug)\(suffix)"))
+        }
+    }
+
+    /// Best-effort removal. A file that is not there is the normal case (not
+    /// every job has every sidecar); any other failure, a missing security
+    /// scope among them, is logged rather than dropped. The path is private
+    /// because the file name carries the meeting title.
+    private static func remove(_ url: URL) {
+        do {
+            try FileManager.default.removeItem(at: url)
+        } catch CocoaError.fileNoSuchFile {
+            return
+        } catch {
+            logger.warning(
+                "Could not remove naming sidecar \(url.lastPathComponent, privacy: .private): \((error as NSError).domain, privacy: .public) \((error as NSError).code, privacy: .public)",
+            )
         }
     }
 }

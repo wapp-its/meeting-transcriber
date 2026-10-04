@@ -933,29 +933,20 @@ extension PipelineQueue {
         let basename = job?.namingSlug
             ?? Self.namingSlug(title: title, jobID: jobID, startTime: Date())
         let meetingStartTime = job?.meetingStartTime
+        updateJobState(id: jobID, to: .generatingProtocol)
+        startElapsedTimer()
+        defer { stopElapsedTimer() }
+        let protocolMD: String
         do {
-            updateJobState(id: jobID, to: .generatingProtocol)
-            startElapsedTimer()
             let diarized = transcript.range(
                 of: #"\[\w[\w\s]*\]"#, options: .regularExpression,
             ) != nil
-            let protocolMD = try await generator.generate(
+            protocolMD = try await generator.generate(
                 transcript: transcript,
                 title: title,
                 diarized: diarized,
                 meetingStartTime: meetingStartTime,
             )
-            let markdown = transcriptOutputOptions(forJobID: jobID).includeFullTranscriptInProtocol
-                ? protocolMD + "\n\n---\n\n## Full Transcript\n\n" + transcript
-                : protocolMD
-            let mdPath = try ProtocolGenerator.saveProtocol(
-                markdown, basename: basename, dir: protocolsDir,
-            )
-            logger.info("[\(shortID, privacy: .public)] protocol_saved file=\(mdPath.lastPathComponent, privacy: .private)")
-            if let idx = jobs.firstIndex(where: { $0.id == jobID }) {
-                jobs[idx].protocolPath = mdPath
-            }
-            stopElapsedTimer()
         } catch {
             // Every ProtocolGenerating error's message is now guaranteed
             // content-free: ClaudeCLIProtocolGenerator sources cliFailed's
@@ -968,7 +959,22 @@ extension PipelineQueue {
             // restores the visibility traded away in PR #692's 4th commit.
             logger.warning("[\(shortID, privacy: .public)] protocol_generation_failed error=\(error.localizedDescription, privacy: .public)")
             addWarning(id: jobID, "Protocol generation failed — transcript saved")
-            stopElapsedTimer()
+            return
+        }
+        let markdown = transcriptOutputOptions(forJobID: jobID).includeFullTranscriptInProtocol
+            ? protocolMD + "\n\n---\n\n## Full Transcript\n\n" + transcript
+            : protocolMD
+        do {
+            let mdPath = try ProtocolGenerator.saveProtocol(markdown, basename: basename, dir: protocolsDir)
+            logger.info("[\(shortID, privacy: .public)] protocol_saved file=\(mdPath.lastPathComponent, privacy: .private)")
+            if let idx = jobs.firstIndex(where: { $0.id == jobID }) {
+                jobs[idx].protocolPath = mdPath
+            }
+        } catch {
+            // Private, unlike the generation failure above: a file-write
+            // CocoaError names the file, and the file name is the meeting title.
+            logger.warning("[\(shortID, privacy: .public)] protocol_save_failed error=\(error.localizedDescription, privacy: .private)")
+            addWarning(id: jobID, "Protocol was generated but could not be saved; the transcript was saved")
         }
     }
 
@@ -1012,7 +1018,8 @@ extension PipelineQueue {
     /// Hand the app's own staging recordings over to the protocol output
     /// directory, per `AudioPersistencePolicy`. Nil `mixPath` (paired imports
     /// without a `_mix.wav` source) → mix slot is skipped, no persistent mix is
-    /// written.
+    /// written. `outputDir` here is `<root>/recordings`, reachable because the
+    /// queue holds the security scope on the root.
     private static func persistAudioToOutput(
         ctx: JobContext, outputDir: URL, stagingDir: URL,
     ) -> RelocatedAudioPaths {
@@ -1030,9 +1037,6 @@ extension PipelineQueue {
                 "persistAudioToOutput: mixPath aliases micPath — would destroy source",
             )
         }
-
-        let accessing = outputDir.startAccessingSecurityScopedResource()
-        defer { if accessing { outputDir.stopAccessingSecurityScopedResource() } }
 
         let fm = FileManager.default
         try? fm.createDirectory(at: outputDir, withIntermediateDirectories: true)
