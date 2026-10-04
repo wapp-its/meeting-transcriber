@@ -28,20 +28,22 @@ struct TranscriptionSettingsView: View {
         .formStyle(.grouped)
     }
 
-    /// Hoisted out of `body`, with every row a named property, because each
-    /// named property is type-checked as its own function body: built inline,
-    /// this section took `body` past the 300 ms hard limit on CI's slower
-    /// runners. One property per row keeps the rows where they were, so a
-    /// test that addresses a row by its position still finds it.
+    /// Each group of controls is a named property rather than inline in
+    /// `body`: inline, this section made `body` the slowest body in the app
+    /// to type-check, close enough to the 300 ms limit CI enforces that a
+    /// slow runner pushed it over. Each property stands for exactly one of the
+    /// section's former direct children, in the same order: view tests reach
+    /// some controls by their position in the section, so merging two of them
+    /// into one property would move every control after it.
     private var transcriptionSection: some View {
         Section("Transcription") {
             enginePicker
             whisperKitPickers
             parakeetLanguagePicker
-            customVocabularyField
+            customVocabularyRow
             customVocabularyValidation
             whisperKitVocabularyPromptControls
-            terminologyEditor
+            terminologyRulesEditor
             engineStatusView
         }
         .accessibilityIdentifier(A11yID.transcriptionSection)
@@ -97,31 +99,24 @@ struct TranscriptionSettingsView: View {
         }
     }
 
-    private var customVocabularyField: some View {
+    private var customVocabularyRow: some View {
         HStack {
-            TextField("Custom vocabulary file", text: customVocabularyPathBinding)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityIdentifier(A11yID.customVocabularyPathField)
-            Button("Choose\u{2026}") { chooseCustomVocabularyFile() }
+            TextField("Custom vocabulary file", text: Binding(
+                get: { settings.customVocabularyPath },
+                set: { settings.setCustomVocabularyPath($0) },
+            ))
+            .textFieldStyle(.roundedBorder)
+            .accessibilityIdentifier(A11yID.customVocabularyPathField)
+            Button("Choose\u{2026}") {
+                let panel = NSOpenPanel()
+                panel.allowedContentTypes = [.plainText]
+                panel.allowsMultipleSelection = false
+                if panel.runModal() == .OK, let url = panel.url {
+                    settings.setCustomVocabularyFile(url)
+                }
+            }
         }
         .help(Self.vocabularyHelpText(for: settings.transcriptionEngine))
-    }
-
-    /// Writes through the bookmark-safe setter rather than the stored path.
-    private var customVocabularyPathBinding: Binding<String> {
-        Binding(
-            get: { settings.customVocabularyPath },
-            set: { settings.setCustomVocabularyPath($0) },
-        )
-    }
-
-    private func chooseCustomVocabularyFile() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.plainText]
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-            settings.setCustomVocabularyFile(url)
-        }
     }
 
     private var customVocabularyValidation: some View {
@@ -149,7 +144,7 @@ struct TranscriptionSettingsView: View {
         }
     }
 
-    private var terminologyEditor: some View {
+    private var terminologyRulesEditor: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Canonical terminology")
             TextEditor(text: $settings.terminologyRulesText)
