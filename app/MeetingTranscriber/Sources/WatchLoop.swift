@@ -76,10 +76,15 @@ class WatchLoop {
     /// spawning a real subprocess.
     let pidAliveCheck: (pid_t) -> Bool
 
-    /// Suppresses re-prompting after a browser-meeting decline (issue #503).
+    /// Suppresses re-prompting after a declined consent prompt (issue #503).
     /// Internal so the consent gate can live in `WatchLoop+Consent.swift`.
     var consentPolicy: BrowserConsentPolicy
     let denyListStore: any ConsentDenyListStoring
+    /// Dynamic accessor — the apps whose meetings record without the consent
+    /// prompt (`AppSettings.recordWithoutAskingApps`). Read at every detection,
+    /// like the deny list, so a Settings change applies without restarting
+    /// watching. Empty by default: every detected meeting asks.
+    let recordWithoutAskingApps: () -> [String]
 
     /// The app whose consent prompt is currently parked, nil when no question
     /// is open. The answer is awaited in `consentTask` rather than inline, so
@@ -87,6 +92,12 @@ class WatchLoop {
     /// the first one waits. Internal (not `private(set)`) because
     /// `WatchLoop+Consent.swift` owns the transitions.
     var pendingConsentApp: String?
+
+    /// Apps that needed a prompt while `pendingConsentApp`'s was open. Not a
+    /// queue: they are kept out of detection until that question settles, so
+    /// none of them can hide a meeting that needs no prompt, and are detected
+    /// and asked about afterwards if their call still runs.
+    var appsWaitingForPrompt: Set<String> = []
 
     /// A meeting the user approved, waiting for the loop to pick it up.
     /// Recordings start in the loop and nowhere else, so an answer arriving
@@ -100,6 +111,7 @@ class WatchLoop {
     /// what an answer (or the lack of one) means.
     func clearConsentState() {
         pendingConsentApp = nil
+        appsWaitingForPrompt = []
         approvedConsentMeeting = nil
         consentTask = nil
     }
@@ -123,6 +135,7 @@ class WatchLoop {
         recordOnlyDestination: @escaping () -> RecordOnlyDestination = {
             .unscoped(AppPaths.recordingsDir)
         },
+        recordWithoutAskingApps: @escaping () -> [String] = { [] },
         notifier: any AppNotifying = SilentNotifier(),
         nowProvider: @escaping () -> Date = Date.init,
         sleepProvider: @escaping (TimeInterval) async throws -> Void = { interval in
@@ -149,6 +162,7 @@ class WatchLoop {
         self.pidAliveCheck = pidAliveCheck
         self.consentPolicy = consentPolicy
         self.denyListStore = denyListStore
+        self.recordWithoutAskingApps = recordWithoutAskingApps
     }
 
     nonisolated static var defaultOutputDir: URL {
@@ -303,18 +317,21 @@ class WatchLoop {
         while !Task.isCancelled {
             // A prompt answered since the last poll comes first: the answer
             // arrives out of band, but recordings only ever start here.
-            // Re-checked because the answer may have landed while another
-            // meeting was recording, which blocks this loop for its duration —
-            // by now the approved call can be long over.
+            // Re-checked because up to a poll interval has passed since the
+            // answer, and the call may have ended in it.
             if let approved = takeApprovedConsentMeeting(), detector.isMeetingActive(approved) {
                 if await runMeeting(approved) { return }
-            } else if let meeting = detector.checkOnce() {
-                // Browser meetings (issue #503) ask before recording; native
-                // meetings skip this (flag false). See WatchLoop+Consent.swift.
+            } else if let meeting = detector.checkOnce(excluding: appsExcludedFromDetection) {
+                // A detected meeting asks before recording unless its app
+                // records without asking. See WatchLoop+Consent.swift.
                 // Asking does NOT block this loop — that is the whole point:
                 // an unanswered prompt used to stop `checkOnce()` from running
-                // for a full minute, so a Teams or Zoom call starting in that
-                // window went unrecorded.
+                // for a full minute, so a call that needed no prompt and
+                // started in that window went unrecorded. The app being asked
+                // about, and every app waiting for that answer, is excluded
+                // from detection for the same reason: each is re-detected
+                // every poll, and as the one meeting a poll returns it would
+                // hide every other app's call behind it.
                 if requestConsentIfNeeded(for: meeting) {
                     try? await sleepProvider(pollInterval)
                     continue

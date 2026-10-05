@@ -1,0 +1,311 @@
+{
+  "branch_name": "feat/gh-3-ask-before-recording",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-05T12:05:12.013931Z",
+  "created_at": "2026-10-05T10:21:27.244244Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-3-ask-before-recording-detected-meetings",
+  "impl_review_rounds": {
+    "gh-3-ask-before-recording-detected-meetings.1": 0
+  },
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-05T10:39:54.147541Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "2000470a57daa6be5a0c2e5c492cae0cd7e6f7bb862c971321ca433a0ec292bb",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-39dfaaa2c3fe4fa1b1bd430dfc857e71",
+            "classification": "introduced",
+            "findingId": "finding-39dfaaa2c3fe4fa1b1bd430dfc857e71",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-a3bc7f0ac4f57a4a1d562be9c0d23050",
+            "classification": "introduced",
+            "findingId": "finding-a3bc7f0ac4f57a4a1d562be9c0d23050",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-9123e142e095e169feb3307591794ba2",
+            "classification": "introduced",
+            "findingId": "finding-9123e142e095e169feb3307591794ba2",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "1ea5f599c73e3598d26dbf5df2fdd507ce55c73c",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 337872,
+      "output_sha256": "a5bba21ef1e9fd848b0e90ef48fb4a7f240ef1b62bf0f0eae3aee99fc93378d7",
+      "reservation_id": "a2f8c2af9008438c9bbc622c2202df24",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-05T10:37:23.484039Z",
+      "tool_calls": 24,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "914cc7a2831e0c436804f6a0f59c459444df096912e3ce2d30d2df8a47d41338",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-39dfaaa2c3fe4fa1b1bd430dfc857e71",
+            "classification": "introduced",
+            "findingId": "finding-39dfaaa2c3fe4fa1b1bd430dfc857e71",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-a3bc7f0ac4f57a4a1d562be9c0d23050",
+            "classification": "introduced",
+            "findingId": "finding-a3bc7f0ac4f57a4a1d562be9c0d23050",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-9123e142e095e169feb3307591794ba2",
+            "classification": "introduced",
+            "findingId": "finding-9123e142e095e169feb3307591794ba2",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "1ea5f599c73e3598d26dbf5df2fdd507ce55c73c",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 491,
+      "output_sha256": "20838c28e0d1f68e6f55213c2f3ca79f175664b2de1adf0772466e53effd43a9",
+      "reservation_id": "95ae869e19f94b158b2afcc1afde5cf8",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-05T10:39:54.111659Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "511c2893545f683ddbeb9cdb1420924ffe8f15fd8407929476567d9e7422548d",
+      "backend": "codex",
+      "base_sha": "39be867c71e7a0d4f9bee604c65fa43b85601661",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-62ce4b95ff8c9bb37411050554532551",
+            "classification": "introduced",
+            "findingId": "finding-62ce4b95ff8c9bb37411050554532551",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-c2f5a6f1acf59a64fb6daae1e1cea9df",
+            "classification": "introduced",
+            "findingId": "finding-c2f5a6f1acf59a64fb6daae1e1cea9df",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "8ba8600a1434443e98dc00c99ab75eae479323ef",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 2127,
+      "output_sha256": "d75af43c7bf49e7850dac5400c66e345d4f1b0e6d52a241ad6ae0aa0ec3b8c9e",
+      "reservation_id": "59faee36a4bb4df9ad8fdbe1d0e4f262",
+      "round_consumed": true,
+      "scope": "impl:gh-3-ask-before-recording-detected-meetings.1",
+      "superseded_by": null,
+      "task": "gh-3-ask-before-recording-detected-meetings.1",
+      "timestamp": "2026-10-05T11:42:53.151158Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "471455eb30ceeb7a5be0722660e773ac49bd788947cba7d3129b2406134b8905",
+      "backend": "codex",
+      "base_sha": "39be867c71e7a0d4f9bee604c65fa43b85601661",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-62ce4b95ff8c9bb37411050554532551",
+            "classification": "introduced",
+            "findingId": "finding-62ce4b95ff8c9bb37411050554532551",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-c2f5a6f1acf59a64fb6daae1e1cea9df",
+            "classification": "introduced",
+            "findingId": "finding-c2f5a6f1acf59a64fb6daae1e1cea9df",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "5bf8e16d907229be4bf08188e44986ad3554fb31",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 847,
+      "output_sha256": "718bb35743f3b0bc97977fe7febebb28055f67c0c65febf473651026157f0eba",
+      "reservation_id": "b01add2934ed437ca0428c3188e6f42e",
+      "round_consumed": true,
+      "scope": "impl:gh-3-ask-before-recording-detected-meetings.1",
+      "superseded_by": null,
+      "task": "gh-3-ask-before-recording-detected-meetings.1",
+      "timestamp": "2026-10-05T11:50:29.081917Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "6e4585e61595616dbc00fbf5116427d42d56a168efd1edc7814b35187b67a825",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "be6c9e0ab8a9925985b7e04e0d2079c7ea4d9e26",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 663667,
+      "output_sha256": "70488cb8a41e373ba9190d68ad3634391cdbe3ca593534fc3c821f4197e9c5fd",
+      "reservation_id": "ecf7de1e56d24d46978b198c55296c16",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-05T12:05:11.961989Z",
+      "tool_calls": 23,
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "impl:gh-3-ask-before-recording-detected-meetings.1": 1,
+    "plan": 1,
+    "plan#completion": 1
+  },
+  "review_pending_rounds": {},
+  "review_phase_leases": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-3-ask-before-recording-detected-meetings.1": 0,
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-3-ask-before-recording-detected-meetings.md",
+  "status": "done",
+  "title": "Ask before recording detected meetings",
+  "tracker": {
+    "baseHashFlow": "03f092aa56e5348b996311d3bbf6171eba70a8bad8a219b806b6baa502cc7736",
+    "baseHashTracker": "6ee469d5699e8f1381fafa99e08f43fdd6f0a4ae5b3e5be27e651d63e8aba69a",
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABUN9x-Q",
+    "identifier": "#3",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": "# Ask before recording detected meetings\n\n## Conversation Evidence\n\n> user (turn 1): \"Oh and its now automatically recording every meeting automatically. This should be an extra setting, but better default would be if it asks first if it should record, isnt it?\"\n> user (turn 2, selected): \"A: Ask first, per-app switch (Recommended)\"\n> issue #3 (owner, Wunsch): \"Option \u201eErkannte Meetings ohne R\u00fcckfrage aufnehmen\", am besten je App einstellbar (z. B. Teams: immer, Browser: fragen) \u2014 als Gegenst\u00fcck zur bestehenden Sperrliste consentDeniedApps.\"\n> issue #3 (owner, Hinweis): \"Die R\u00fcckfrage erinnert auch daran, dass alle Beteiligten mit der Aufnahme einverstanden sein m\u00fcssen (in der Schweiz strafrechtlich relevant, Art. 179bis ff. StGB). Beim automatischen Start liegt das ganz bei der Person, die aufnimmt \u2014 in der Einstellung kurz darauf hinweisen.\"\n> issue #3 (owner, Abnahme): \"Option f\u00fcr Teams eingeschaltet \u2192 Teams-Meeting beginnt \u2192 Aufnahme startet ohne Mitteilung. F\u00fcr andere Apps unver\u00e4ndert mit R\u00fcckfrage.\"\n\n## Goal & Context\n\nWhile \"Watch for meetings\" runs, the app today records Teams, Zoom and Webex calls (watched by default) and FaceTime, WhatsApp, WeChat and Tencent Meeting calls (opt-in) the moment it detects them, without asking. Only browser meetings ask first, through a notification with Record / Ignore / Never for this app. This is the original app's behaviour, not a fork feature. The owner wants the opposite default: every detected meeting asks first, and recording without asking becomes an explicit per-app choice. Asking first also reminds the person recording that everyone in the meeting has to agree, which is a legal requirement in Switzerland (Art. 179bis ff. StGB).\n\n<!-- Source: 60% user / 30% [paraphrase] / 10% [inferred] -->\n\n## Architecture & Data Models\n\n- **Who asks.** Whether a detected meeting needs a prompt is decided per app from settings, no longer fixed in the meeting pattern: a watched app asks unless its \"record without asking\" switch is on. Browser meetings always ask. [paraphrase]\n- **One consent path for every app.** Native and mic-input detections use the consent flow browser meetings already use: the prompt is awaited off the poll loop, the per-app cooldowns after Ignore and after no answer, the \"Never for this app\" deny list, and at most one open prompt at a time. Mic-input detections join the same gate. [inferred]\n- **Setting.** One persisted per-app list of apps whose meetings record without asking, empty by default. A name that matches no watched app is ignored. It is the counterpart of the existing deny list (`consentDeniedApps`). [paraphrase]\n- **Prompt text.** The prompt names the concrete app (\"Record <app> meeting?\"), not \"browser\". [inferred]\n\n## Edge Cases & Constraints\n\n- A meeting detected while another prompt is open waits; it is asked about once the open prompt is answered or expires. [inferred]\n- No answer within the prompt timeout means no recording, as for browser meetings today. The start of a meeting is lost while a prompt waits; that is the accepted cost of asking first. [inferred]\n- Record-only mode asks the same way; only the destination of the recording differs. [inferred]\n- An app on the deny list is never asked about and never recorded, whatever its \"record without asking\" switch says. [inferred]\n\n## Acceptance Criteria\n\n- **R1:** With watching on, a meeting detected in any watched app (Teams, Zoom, Webex, FaceTime, WhatsApp, WeChat, Tencent Meeting, browser meetings) starts recording only after the user answers its prompt with Record, unless that app's \"record without asking\" switch is on. Errors: Ignore, Never for this app, or no answer within the prompt timeout \u2192 no recording; the cooldown and deny-list rules that apply to browser meetings today apply to every app. [paraphrase]\n- **R2:** Settings offers a \"record without asking\" switch for each native and mic-input app (Teams, Zoom, Webex, FaceTime, WhatsApp, WeChat, Tencent Meeting), off by default. With the switch on for Teams, a Teams meeting starts recording without a notification, and other apps still ask. Errors: the switch has no effect while that app is not watched, or while the app is on the deny list. [paraphrase]\n- **R3:** Browser meetings always ask; they get no \"record without asking\" switch, because their detection signal also fires on pages that are not meetings. [inferred]\n- **R4:** Turning on a \"record without asking\" switch shows a short note in Settings that everyone in the meeting must agree to the recording and that, without the prompt, this is entirely up to the person recording. No error surface beyond the note's visibility. [paraphrase]\n- **R5:** The prompt names the detected app and offers Record, Ignore and Never for this app, for every app that asks. No error surface beyond R1's answer handling. [inferred]\n- **R6:** The Settings warning that notifications cannot be seen (denied, banners off, alerts silenced, Time Sensitive off) appears whenever at least one watched app asks first, not only when browser meetings are watched, because a prompt nobody sees means nothing is recorded. Errors: no warning when every watched app records without asking. [inferred]\n- **R7:** Starting a recording by hand (app picker, menu, automation API) never asks, as today. No error surface beyond the existing manual-start behaviour. [inferred]\n\n## Boundaries\n\n- Choosing a protocol template or meeting notes when a recording starts (issue #2) is not part of this. [paraphrase]\n- How meetings are detected does not change; only what happens after a detection. [inferred]\n- No provisional recording before the answer: nothing is captured until the user says Record. [inferred]\n\n## Decision Context\n\n### Motivation\n\nThe owner found the app recording every meeting automatically and wants it to ask first by default, with recording without asking as a separate, per-app setting (option A, chosen 2026-10-05). The prompt also serves as the consent reminder that issue #3 asks for. [paraphrase]\n\nRejected: keeping auto-recording as the default with a per-app \"ask first\" switch (B), and one global \"ask before recording\" switch (C), both offered on 2026-10-05. Recording provisionally and discarding on a decline was not offered because it captures audio before anyone agreed, which is what the prompt exists to prevent. [inferred]\n",
+    "mergeBaseTracker": "## Problem\n\nErkennt die App ein Meeting (Teams, Zoom, Webex, Browser), fragt sie per Mitteilung nach, ob sie aufnehmen soll (Consent-Prompt, `ConsentPromptCoordinator`, Upstream-Issue pasrom/meeting-transcriber#503). Wer jedes Meeting aufnehmen will, muss jedes Mal best\u00e4tigen \u2014 und verpasst den Anfang, wenn die Mitteilung \u00fcbersehen wird.\n\n## Wunsch\n\nOption **\u201eErkannte Meetings ohne R\u00fcckfrage aufnehmen\"**, am besten **je App** einstellbar (z. B. Teams: immer, Browser: fragen) \u2014 als Gegenst\u00fcck zur bestehenden Sperrliste `consentDeniedApps`.\n\n- W\u00e4hrend der Aufnahme bleibt der Hinweis in der Men\u00fcleiste gut sichtbar (Symbol animiert), damit klar ist, dass aufgenommen wird.\n- Mit Issue #2 (Start-Dialog) abstimmen: Bei automatischem Start gilt die Standardvorlage, Vorlage und Infos lassen sich nachtr\u00e4glich \u00e4ndern.\n\n## Hinweis\n\nDie R\u00fcckfrage erinnert auch daran, dass alle Beteiligten mit der Aufnahme einverstanden sein m\u00fcssen (in der Schweiz strafrechtlich relevant, Art. 179bis ff. StGB). Beim automatischen Start liegt das ganz bei der Person, die aufnimmt \u2014 in der Einstellung kurz darauf hinweisen.\n\n## Abnahme\n\n- Option f\u00fcr Teams eingeschaltet \u2192 Teams-Meeting beginnt \u2192 Aufnahme startet ohne Mitteilung.\n- F\u00fcr andere Apps unver\u00e4ndert mit R\u00fcckfrage.\n\n",
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/3"
+  },
+  "updated_at": "2026-10-05T12:05:55.496116Z"
+}

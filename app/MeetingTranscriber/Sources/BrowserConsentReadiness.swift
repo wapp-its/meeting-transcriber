@@ -1,14 +1,17 @@
 import UserNotifications
 
-/// Whether a browser-meeting consent prompt can actually reach the user.
+/// Whether the recording consent prompt can actually reach the user.
 ///
-/// Browser meetings (issue #503) never auto-record: detection parks a prompt and
-/// waits for an answer. That prompt is a `UNUserNotification`, which makes the
-/// notification permission a hard dependency of the feature rather than a
-/// nicety. With notifications denied the failure is silent and total: detection
-/// fires, the prompt parks where nobody can see it, it times out as a decline
-/// after `NotificationManager.consentPromptTimeout`, a cooldown starts, and the
-/// cycle repeats forever while the toggle still reads as on.
+/// A detected meeting asks before it records, unless its app records without
+/// asking, and browser meetings always ask (issue #503): detection parks a
+/// prompt and waits for an answer. Named for the browser feature that
+/// introduced the prompt; it now covers every app that asks. That prompt is a
+/// `UNUserNotification`, which makes the notification permission a hard
+/// dependency of recording those meetings rather than a nicety. With
+/// notifications denied the failure is silent and total: detection fires, the
+/// prompt parks where nobody can see it, it times out as a decline after
+/// `NotificationManager.consentPromptTimeout`, a cooldown starts, and the cycle
+/// repeats forever while watching still reads as on.
 ///
 /// Authorisation is not the whole question, and treating it as the whole
 /// question is what let the original field report through (issue #543): that
@@ -21,7 +24,8 @@ import UserNotifications
 /// be self-defeating. Hence a Settings-side warning, decided here so the rule is
 /// testable without a notification centre.
 enum BrowserConsentReadiness: Equatable {
-    /// Browser watching is off, so there is nothing to warn about even if
+    /// No watched app asks first (nothing is watched, or every watched app
+    /// records without asking), so there is nothing to warn about even if
     /// notifications are denied.
     case disabled
     /// The prompt will be shown.
@@ -42,10 +46,10 @@ enum BrowserConsentReadiness: Equatable {
     case timeSensitiveOff
 
     static func evaluate(
-        browserMeetingsEnabled: Bool,
+        anyWatchedAppAsks: Bool,
         visibility: NotificationVisibility,
     ) -> Self {
-        guard browserMeetingsEnabled else { return .disabled }
+        guard anyWatchedAppAsks else { return .disabled }
         // Authorisation first: without permission to post, no presentation
         // setting can rescue the prompt, so reporting the subtler problem would
         // send the user to a switch that changes nothing. An unknown future
@@ -71,13 +75,13 @@ enum BrowserConsentReadiness: Equatable {
     }
 
     /// Headline for the Settings warning, or nil when there is nothing to say.
-    /// Only the states that stop every browser meeting claim that outright: an
-    /// overstated warning is one users learn to scroll past.
+    /// Only the states that stop every meeting that asks claim that outright:
+    /// an overstated warning is one users learn to scroll past.
     var headline: String? {
         switch self {
         case .disabled, .ready: nil
-        case .denied, .undetermined, .quiet, .bannersOff: "Browser meetings cannot be recorded."
-        case .timeSensitiveOff: "Browser meetings can be missed."
+        case .denied, .undetermined, .quiet, .bannersOff: "Meetings that ask first cannot be recorded."
+        case .timeSensitiveOff: "Meetings that ask first can be missed."
         }
     }
 
@@ -91,29 +95,29 @@ enum BrowserConsentReadiness: Equatable {
 
         case .denied:
             "Notifications are turned off for Meeting Transcriber, so the "
-                + "\"record this meeting?\" prompt cannot appear and browser meetings "
+                + "\"record this meeting?\" prompt cannot appear and meetings that ask first "
                 + "will never be recorded. Allow notifications in System Settings."
 
         case .undetermined:
             "Meeting Transcriber has not been allowed to send notifications yet. "
                 + "Until it is, the \"record this meeting?\" prompt cannot appear and "
-                + "browser meetings will never be recorded."
+                + "meetings that ask first will never be recorded."
 
         case .quiet:
             "Notifications are delivered quietly, so the \"record this meeting?\" "
                 + "prompt arrives without a banner and usually expires unanswered. "
-                + "Browser meetings will rarely be recorded. Allow banners in System Settings."
+                + "Meetings that ask first will rarely be recorded. Allow banners in System Settings."
 
         case .bannersOff:
             "Notifications are allowed but show no banner, so the \"record this meeting?\" "
                 + "prompt goes straight to Notification Center and expires unanswered. "
-                + "Browser meetings will rarely be recorded. Set the alert style to "
+                + "Meetings that ask first will rarely be recorded. Set the alert style to "
                 + "Banners or Alerts in System Settings."
 
         case .timeSensitiveOff:
             "Time Sensitive notifications are turned off for Meeting Transcriber, so the "
                 + "\"record this meeting?\" prompt is hidden while a Focus mode or Do Not "
-                + "Disturb is on. Browser meetings started during Focus will not be "
+                + "Disturb is on. Meetings that ask first and start during Focus will not be "
                 + "recorded. Allow Time Sensitive notifications in System Settings."
         }
     }

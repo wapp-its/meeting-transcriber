@@ -5,7 +5,8 @@ import XCTest
 /// whose pattern requires consent prompt before recording instead of
 /// auto-starting, and a decline must not re-prompt on every poll. Driven
 /// through the real `start()`/`watchLoop()` path so the gate is exercised in
-/// place, not via a widened-visibility hook.
+/// place, not via a widened-visibility hook. The same gate now serves every
+/// app; `WatchLoopAskBeforeRecordingTests` covers the rest.
 @MainActor
 final class WatchLoopBrowserConsentTests: XCTestCase {
     /// Detector that always reports one meeting, active.
@@ -208,6 +209,7 @@ final class WatchLoopBrowserConsentTests: XCTestCase {
         spy: any AppNotifying,
         consentPolicy: BrowserConsentPolicy = BrowserConsentPolicy(),
         denyListStore: any ConsentDenyListStoring = InMemoryConsentDenyListStore(),
+        recordWithoutAsking: [String] = [],
         nowProvider: @escaping () -> Date = Date.init,
     ) -> (WatchLoop, MockRecorder) {
         let recorder = MockRecorder()
@@ -217,6 +219,7 @@ final class WatchLoopBrowserConsentTests: XCTestCase {
             recorderFactory: { recorder },
             pollInterval: 0.05,
             endGracePeriod: 0.05,
+            recordWithoutAskingApps: { recordWithoutAsking },
             notifier: spy,
             nowProvider: nowProvider,
             consentPolicy: consentPolicy,
@@ -272,13 +275,16 @@ final class WatchLoopBrowserConsentTests: XCTestCase {
         loop.stop()
     }
 
-    func testNativeMeetingNeverPromptsAndAutoStarts() async {
-        let spy = ConsentSpy(answer: .declined) // would block recording IF consulted
+    /// Native meetings used to auto-start without a prompt. They ask first now,
+    /// like browser meetings, unless their app records without asking.
+    func testNativeMeetingAsksBeforeRecording() async {
+        let spy = ConsentSpy(answer: .declined)
         let (loop, recorder) = makeLoop(detector: FixedDetector(nativeMeeting()), spy: spy)
         loop.start()
-        await waitFor(recorder.startCalled)
-        XCTAssertTrue(recorder.startCalled, "native meetings keep auto-start")
-        XCTAssertEqual(spy.calls, 0, "native meetings must never consult the consent prompt")
+        await waitFor(spy.calls >= 1)
+        try? await Task.sleep(nanoseconds: 250_000_000)
+        XCTAssertEqual(spy.calls, 1, "a native meeting must consult the consent prompt")
+        XCTAssertFalse(recorder.startCalled, "and must not record on a decline")
         loop.stop()
     }
 
@@ -309,14 +315,15 @@ final class WatchLoopBrowserConsentTests: XCTestCase {
     func testParkedConsentPromptDoesNotBlockANativeMeeting() async throws {
         let spy = ParkingConsentSpy()
         let detector = try SwappableDetector(browserMeeting())
-        let (loop, recorder) = makeLoop(detector: detector, spy: spy)
+        let (loop, recorder) = makeLoop(detector: detector, spy: spy, recordWithoutAsking: ["Zoom"])
         loop.start()
 
         await waitFor(spy.isParked)
         XCTAssertFalse(recorder.startCalled, "nothing may record while the question is open")
 
         // The browser call is still going, but the user has now joined a Zoom
-        // call as well. That one needs no consent and must start immediately.
+        // call as well. Zoom records without asking, so it must start
+        // immediately.
         detector.meeting = nativeMeeting()
         await waitFor(recorder.startCalled, timeout: .seconds(3))
         XCTAssertTrue(recorder.startCalled, "a native meeting must record while consent is still parked")

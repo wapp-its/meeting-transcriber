@@ -526,7 +526,8 @@ as `null` when they have no value. Read them as "absent means none".
   status display, since it folds the whole pipeline into one glanceable value.
 - `manualRecording`: an app-picker recording owns the loop. Watch control is
   refused (`409`) while this is true.
-- `pendingConsentApp`: the app name awaiting a browser-meeting consent answer.
+- `pendingConsentApp`: the app name awaiting a recording consent answer (any app
+  that asks before recording, not only a browser).
   Absent when no prompt is parked. Resolve it with
   `POST /action/confirmBrowserConsent`.
 - `permissionsHealthy`: false only when a permission probe has actually failed.

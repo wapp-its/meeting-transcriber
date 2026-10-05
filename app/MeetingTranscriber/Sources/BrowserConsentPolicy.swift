@@ -1,12 +1,13 @@
 import Foundation
 
-/// Pure decision logic for the browser-meeting "ask before recording" prompt
-/// (issue #503). Native meeting apps auto-start; browser meetings prompt, and a
-/// declined prompt must not re-appear on every poll while the user stays in the
-/// call. This is the *prompt* policy — distinct from `PowerAssertionDetector`'s
-/// 5 s detection debounce (`cooldownDuration`), which only entprellt detection.
+/// Pure decision logic for the "ask before recording" prompt (issue #503),
+/// named for the browser meetings that asked first; every app that asks uses
+/// it now. A declined prompt must not re-appear on every poll while the user
+/// stays in the call. This is the *prompt* policy — distinct from
+/// `PowerAssertionDetector`'s 5 s detection debounce (`cooldownDuration`),
+/// which only entprellt detection.
 ///
-/// The WebRTC power assertion keeps firing for the whole call, so `checkOnce()`
+/// The detection signal keeps firing for the whole call, so `checkOnce()`
 /// re-detects the same meeting every few seconds; the policy is asked *before*
 /// prompting so a decline suppresses re-prompts for `cooldown` seconds instead
 /// of spamming. Value type with an injected `now` so it is deterministically

@@ -1,6 +1,6 @@
 import Foundation
 
-/// How a browser-meeting consent prompt ended (issue #503).
+/// How a recording consent prompt ended (issue #503).
 ///
 /// Three outcomes, not two, because "no" and "nobody answered" are different
 /// facts about the user and deserve different re-prompt behaviour (issue #543).

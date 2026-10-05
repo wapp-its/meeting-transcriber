@@ -117,7 +117,7 @@ final class WatchingControllerRecordControlTests: XCTestCase {
     /// the availability check above stands between a remote key press and that.
     func testStartIsBlockedWhileAnAutoDetectedMeetingIsBeingRecorded() async {
         let controller = makeWatchingController(logDir: tmpDir)
-        let (loop, _) = makeTestWatchLoop(detector: FixedMeetingDetector())
+        let (loop, _) = makeTestWatchLoop(detector: FixedMeetingDetector(), notifier: RecordingNotifier(consentAnswer: .granted))
         controller.watchLoop = loop
         loop.start()
         addTeardownBlock { await loop.stop() }

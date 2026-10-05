@@ -1,0 +1,35 @@
+{
+  "branch_name": "local/gh-32-consent-reminder",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-05T10:32:07.081391Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [
+    "gh-3-ask-before-recording-detected-meetings"
+  ],
+  "id": "gh-32-consent-reminder-in-the-recording",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 0,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/gh-32-consent-reminder-in-the-recording.md",
+  "status": "open",
+  "title": "Consent reminder in the recording prompt and Settings",
+  "tracker": {
+    "baseHashFlow": "28cd8fe96133a6a94605127e19242c70f54860ab11d5878f32f12eed7b4bb8ed",
+    "baseHashTracker": "51eab86d189af3e10a8251b052cc0affd0ea28b1ded2dbf482c55228b920fb70",
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABVF4vTA",
+    "identifier": "#32",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": "# Consent reminder in the recording prompt and Settings\n\n## Conversation Evidence\n\n> user (turn 3): \"The not / swiss law - please add it as extra feature in own branch because its very specific and will never push upstream. And show it on the request dialog maybe\"\n> issue #3 (owner, Hinweis): \"Die R\u00fcckfrage erinnert auch daran, dass alle Beteiligten mit der Aufnahme einverstanden sein m\u00fcssen (in der Schweiz strafrechtlich relevant, Art. 179bis ff. StGB). Beim automatischen Start liegt das ganz bei der Person, die aufnimmt \u2014 in der Einstellung kurz darauf hinweisen.\"\n\n## Goal & Context\n\nIn Switzerland, recording a conversation without everyone's agreement is a criminal offence (Art. 179bis ff. StGB). Once every detected meeting asks before recording (spec gh-3), the prompt is the natural moment to remind the person recording of that, and Settings is the place to say that a \"record without asking\" switch hands this responsibility entirely to them. The reminder is specific to Switzerland, so it lives only in this fork and never goes to the original app.\n\n<!-- Source: 50% user / 40% [paraphrase] / 10% [inferred] -->\n\n## Acceptance Criteria\n\n- **R1:** The recording prompt of every app that asks before recording carries a short line that everyone in the meeting must agree to being recorded. No error surface beyond the prompt's existing answers (Record / Ignore / Never for this app). [paraphrase]\n- **R2:** While an app's \"record without asking\" switch is on, Settings shows next to it a short note that, without the prompt, making sure everyone agrees is entirely up to the person recording, naming the Swiss legal basis (Art. 179bis StGB). No error surface beyond the note's visibility. [paraphrase]\n\n## Boundaries\n\n- Fork-only: built on its own branch and never submitted to the original app. [paraphrase]\n- No extra dialog or confirmation step beyond the prompt gh-3 introduces; the reminder is text inside existing surfaces. [inferred]\n\n## Decision Context\n\nSplit out of gh-3 on 2026-10-05 so that gh-3 (ask before recording, per-app switch) stays suitable for the original app, while this Switzerland-specific wording stays in the fork. [paraphrase]\n",
+    "mergeBaseTracker": "## Was\n\nEin kurzer Hinweis, dass alle Beteiligten mit der Aufnahme einverstanden sein m\u00fcssen (in der Schweiz strafrechtlich relevant, Art. 179bis ff. StGB):\n\n- **in der R\u00fcckfrage vor einer Aufnahme** (die Mitteilung \u201eAufnehmen?\u201c jeder App, die fragt);\n- **in den Einstellungen**, sobald f\u00fcr eine App \u201eohne R\u00fcckfrage aufnehmen\u201c eingeschaltet wird: Ohne R\u00fcckfrage liegt die Einwilligung ganz bei der Person, die aufnimmt.\n\n## Warum ein eigener Branch\n\nSehr spezifisch f\u00fcr die Schweiz; geht nie ans Original (Owner, 2026-10-05). Darum ein `local/\u2026`-Branch, getrennt von #3, damit #3 ohne diesen Teil ans Original eingereicht werden kann.\n\n## Abh\u00e4ngigkeit\n\nBaut auf #3 auf (R\u00fcckfrage f\u00fcr alle Apps, Schalter \u201eohne R\u00fcckfrage aufnehmen\u201c je App).\n\n",
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/32"
+  },
+  "updated_at": "2026-10-05T10:32:15.480367Z"
+}

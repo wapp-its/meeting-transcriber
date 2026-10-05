@@ -2,10 +2,10 @@
 import UserNotifications
 import XCTest
 
-/// The browser-meeting consent prompt is a user notification. If notifications
-/// can't reach the user, the feature is not degraded, it is DEAD: detection
-/// fires, the prompt parks invisibly, it times out as a decline, and nothing is
-/// ever recorded, with the toggle still showing as on.
+/// The recording consent prompt is a user notification. If notifications
+/// can't reach the user, recording a meeting that asks first is not degraded,
+/// it is DEAD: detection fires, the prompt parks invisibly, it times out as a
+/// decline, and nothing is ever recorded, with watching still showing as on.
 ///
 /// Nothing surfaced that before: `canDeliver` only checks for an app bundle,
 /// `PermissionHealthCheck` covers mic/screen/accessibility, and the e2e lane
@@ -34,10 +34,12 @@ final class BrowserConsentReadinessTests: XCTestCase {
         )
     }
 
-    func test_toggleOff_neverWarns_whateverTheAuthorizationStatus() {
+    /// Nothing watched asks first (nothing watched, or every watched app
+    /// records without asking), so no prompt is ever posted.
+    func test_noWatchedAppAsks_neverWarns_whateverTheAuthorizationStatus() {
         for status: UNAuthorizationStatus in [.denied, .notDetermined, .authorized, .provisional] {
             let readiness = BrowserConsentReadiness.evaluate(
-                browserMeetingsEnabled: false,
+                anyWatchedAppAsks: false,
                 visibility: visibility(authorization: status),
             )
             XCTAssertEqual(readiness, .disabled, "status \(status.rawValue)")
@@ -47,7 +49,7 @@ final class BrowserConsentReadinessTests: XCTestCase {
 
     func test_authorizedAndVisible_isReadyAndSilent() {
         let readiness = BrowserConsentReadiness.evaluate(
-            browserMeetingsEnabled: true,
+            anyWatchedAppAsks: true,
             visibility: visibility(),
         )
         XCTAssertEqual(readiness, .ready)
@@ -56,7 +58,7 @@ final class BrowserConsentReadinessTests: XCTestCase {
 
     func test_denied_warns() {
         let readiness = BrowserConsentReadiness.evaluate(
-            browserMeetingsEnabled: true,
+            anyWatchedAppAsks: true,
             visibility: visibility(authorization: .denied),
         )
         XCTAssertEqual(readiness, .denied)
@@ -65,7 +67,7 @@ final class BrowserConsentReadinessTests: XCTestCase {
 
     func test_notDetermined_warns() {
         let readiness = BrowserConsentReadiness.evaluate(
-            browserMeetingsEnabled: true,
+            anyWatchedAppAsks: true,
             visibility: visibility(authorization: .notDetermined),
         )
         XCTAssertEqual(readiness, .undetermined)
@@ -77,7 +79,7 @@ final class BrowserConsentReadinessTests: XCTestCase {
     /// so a prompt the user has to notice on their own is effectively invisible.
     func test_provisional_warns_becauseAQuietPromptExpiresUnseen() {
         let readiness = BrowserConsentReadiness.evaluate(
-            browserMeetingsEnabled: true,
+            anyWatchedAppAsks: true,
             visibility: visibility(authorization: .provisional),
         )
         XCTAssertEqual(readiness, .quiet)
@@ -92,7 +94,7 @@ final class BrowserConsentReadinessTests: XCTestCase {
     /// every authorisation-based check reports health.
     func test_alertStyleNone_warns_eventhoughAuthorized() {
         let readiness = BrowserConsentReadiness.evaluate(
-            browserMeetingsEnabled: true,
+            anyWatchedAppAsks: true,
             visibility: visibility(alertStyle: .none),
         )
         XCTAssertEqual(readiness, .bannersOff)
@@ -102,7 +104,7 @@ final class BrowserConsentReadinessTests: XCTestCase {
     /// Alerts switched off wholesale is the same failure by a different switch.
     func test_alertsDisabled_warns_eventhoughAuthorized() {
         let readiness = BrowserConsentReadiness.evaluate(
-            browserMeetingsEnabled: true,
+            anyWatchedAppAsks: true,
             visibility: visibility(alert: .disabled),
         )
         XCTAssertEqual(readiness, .bannersOff)
@@ -113,7 +115,7 @@ final class BrowserConsentReadinessTests: XCTestCase {
     /// invisible during any Focus mode, which is when meetings happen.
     func test_timeSensitiveDisabled_warns() {
         let readiness = BrowserConsentReadiness.evaluate(
-            browserMeetingsEnabled: true,
+            anyWatchedAppAsks: true,
             visibility: visibility(timeSensitive: .disabled),
         )
         XCTAssertEqual(readiness, .timeSensitiveOff)
@@ -126,7 +128,7 @@ final class BrowserConsentReadinessTests: XCTestCase {
     /// be advice nobody can act on.
     func test_timeSensitiveNotSupported_staysSilent() {
         let readiness = BrowserConsentReadiness.evaluate(
-            browserMeetingsEnabled: true,
+            anyWatchedAppAsks: true,
             visibility: visibility(timeSensitive: .notSupported),
         )
         XCTAssertEqual(readiness, .ready)
@@ -138,7 +140,7 @@ final class BrowserConsentReadinessTests: XCTestCase {
     /// banner style irrelevant.
     func test_deniedWins_overTheVisibilityProblems() {
         let readiness = BrowserConsentReadiness.evaluate(
-            browserMeetingsEnabled: true,
+            anyWatchedAppAsks: true,
             visibility: visibility(
                 authorization: .denied,
                 alert: .disabled,
@@ -153,14 +155,14 @@ final class BrowserConsentReadinessTests: XCTestCase {
     /// appears at all is the worse of the two, and fixing it is the first step.
     func test_bannersOffWins_overTimeSensitiveOff() {
         let readiness = BrowserConsentReadiness.evaluate(
-            browserMeetingsEnabled: true,
+            anyWatchedAppAsks: true,
             visibility: visibility(alertStyle: .none, timeSensitive: .disabled),
         )
         XCTAssertEqual(readiness, .bannersOff)
     }
 
     /// Every warning has to name the consequence, not just the state. "Turn on
-    /// notifications" without "otherwise browser meetings are never recorded"
+    /// notifications" without "otherwise these meetings are never recorded"
     /// reads as optional polish.
     func test_warnings_nameTheConsequence() {
         let cases: [(String, NotificationVisibility)] = [
@@ -172,7 +174,7 @@ final class BrowserConsentReadinessTests: XCTestCase {
         ]
         for (name, visibility) in cases {
             let readiness = BrowserConsentReadiness.evaluate(
-                browserMeetingsEnabled: true,
+                anyWatchedAppAsks: true,
                 visibility: visibility,
             )
             let warning = readiness.warning ?? ""
@@ -184,16 +186,16 @@ final class BrowserConsentReadinessTests: XCTestCase {
     }
 
     /// The headline is not one fixed sentence: only the states that stop every
-    /// browser meeting may claim that. A prompt that merely loses to Focus is
+    /// meeting that asks may claim that. A prompt that merely loses to Focus is
     /// overstated as "cannot be recorded", and an overstated warning is the kind
     /// users learn to ignore.
     func test_headline_matchesHowTotalTheFailureIs() {
         let dead = BrowserConsentReadiness.evaluate(
-            browserMeetingsEnabled: true,
+            anyWatchedAppAsks: true,
             visibility: visibility(authorization: .denied),
         )
         let partial = BrowserConsentReadiness.evaluate(
-            browserMeetingsEnabled: true,
+            anyWatchedAppAsks: true,
             visibility: visibility(timeSensitive: .disabled),
         )
         XCTAssertNotEqual(dead.headline, partial.headline)

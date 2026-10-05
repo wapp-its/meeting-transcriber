@@ -34,7 +34,7 @@
         /// `watchState == "recording"` when no caption signal is available
         /// (live transcription off — the default user profile).
         let watchState: String?
-        /// The app whose browser-meeting consent prompt is currently parked,
+        /// The app whose recording consent prompt is currently parked,
         /// nil when no question is open. `watchState` stays "watching" while a
         /// prompt waits, so this is the only wire signal that tells "detected,
         /// waiting for an answer" from "nothing detected" — the pair that was
@@ -208,7 +208,7 @@
             /// and cannot occur here, so it falls through to "unknown".
             ///
             /// Deliberately outside `isHealthy`: it is not a TCC permission and
-            /// only matters for browser-meeting consent, which is opt-in. It is
+            /// only matters for meetings that ask before recording. It is
             /// here because the browser e2e lane answers consent over RPC, which
             /// resolves the parked prompt whether or not a notification was ever
             /// shown — so without this the lane could pass on a runner where the

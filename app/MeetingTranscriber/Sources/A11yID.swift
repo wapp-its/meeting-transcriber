@@ -32,6 +32,14 @@ enum A11yID {
         "consentDeniedAppRemove.\(index)"
     }
 
+    /// One app's "record without asking" switch. Addressed by app name, unlike
+    /// the rows above: the switches are a fixed list of apps the app ships
+    /// with (`AppMeetingPattern.recordWithoutAskingCandidates`), so the name
+    /// says nothing about the user, and the identifier carries no switch state.
+    static func recordWithoutAskingToggle(_ appName: String) -> String {
+        "recordWithoutAskingToggle.\(appName)"
+    }
+
     /// Menu bar job row's Retry button, addressed by ROW INDEX like
     /// `consentDeniedAppRemove`, so every row's button has its own handle and
     /// no meeting title ends up in an identifier.

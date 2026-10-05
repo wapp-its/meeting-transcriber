@@ -136,19 +136,30 @@ final class AppSettings {
     }
 
     /// Watch for browser-based meetings (Chromium browsers / WebRTC), issue #503.
-    /// Off by default — opt-in, and browser meetings prompt before recording
-    /// (the WebRTC signal isn't meeting-exclusive), unlike native auto-start.
+    /// Off by default — opt-in, and browser meetings always prompt before
+    /// recording (the WebRTC signal isn't meeting-exclusive), with no
+    /// "record without asking" switch.
     var watchBrowserMeetings: Bool {
         didSet { defaults.set(watchBrowserMeetings, forKey: "watchBrowserMeetings") }
     }
 
-    /// Apps the user answered "Never for this app" about on a browser-meeting
+    /// Apps the user answered "Never for this app" about on a recording
     /// consent prompt (see `ConsentDenyList`). Starts empty: there is nothing
     /// to seed, because an app the user has approved is treated exactly like one
     /// never seen (both still get the per-meeting prompt), so only refusals are
     /// worth persisting.
     var consentDeniedApps: [String] {
         didSet { defaults.set(consentDeniedApps, forKey: "consentDeniedApps") }
+    }
+
+    /// Apps whose detected meetings start recording without the consent
+    /// prompt, the counterpart of `consentDeniedApps`. Empty by default: every
+    /// watched app asks first. Only the native and mic-input apps can be listed
+    /// (`AppMeetingPattern.recordWithoutAskingCandidates`); any other name is
+    /// ignored, and a denied app is never recorded whatever this says. Read
+    /// per detection, so a Settings change applies without restarting watching.
+    var recordWithoutAskingApps: [String] {
+        didSet { defaults.set(recordWithoutAskingApps, forKey: "recordWithoutAskingApps") }
     }
 
     /// Mic-input-detected call apps (see `MicInputDetector`). Off by default —
@@ -606,6 +617,7 @@ final class AppSettings {
         watchWebex = defaults.object(forKey: "watchWebex") as? Bool ?? true
         watchBrowserMeetings = defaults.object(forKey: "watchBrowserMeetings") as? Bool ?? false
         consentDeniedApps = defaults.stringArray(forKey: "consentDeniedApps") ?? []
+        recordWithoutAskingApps = defaults.stringArray(forKey: "recordWithoutAskingApps") ?? []
         watchWeChat = defaults.object(forKey: "watchWeChat") as? Bool ?? false
         watchTencentMeeting = defaults.object(forKey: "watchTencentMeeting") as? Bool ?? false
         watchFaceTime = defaults.object(forKey: "watchFaceTime") as? Bool ?? false

@@ -17,11 +17,12 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
 
     private(set) var isSetUp = false
 
-    // MARK: - Browser meeting consent prompt (issue #503)
+    // MARK: - Recording consent prompt (issue #503)
 
-    /// Notification category + action identifiers for the "record this browser
-    /// meeting?" prompt. The category is registered in `setUp()`; the action
-    /// identifier the user taps maps to an answer via `consentAnswer(for:)`.
+    /// Notification category + action identifiers for the "record this
+    /// meeting?" prompt, for every app that asks (the names date from when only
+    /// browser meetings did). The category is registered in `setUp()`; the
+    /// action identifier the user taps maps to an answer via `consentAnswer(for:)`.
     static let consentCategoryID = "BROWSER_MEETING_CONSENT"
     static let recordActionID = "BROWSER_MEETING_RECORD"
     static let ignoreActionID = "BROWSER_MEETING_IGNORE"
@@ -229,7 +230,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
 
     // MARK: - Consent prompt (issue #503)
 
-    /// The "record this browser meeting?" category with Record / Ignore actions.
+    /// The "record this meeting?" category with Record / Ignore actions.
     static func makeConsentCategory() -> UNNotificationCategory {
         // No `.foreground` on either action: the delegate callback fires
         // whether or not the app is activated, so the flag adds nothing except
@@ -263,7 +264,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
         }
     }
 
-    /// Post an actionable "record this browser meeting?" prompt and await the
+    /// Post an actionable "record this meeting?" prompt and await the
     /// user's choice (issue #503). Returns `.declined` when notifications can't
     /// be delivered (no bundle / not set up) so we never record without a
     /// visible prompt, `.expired` when nobody answered in time.
@@ -296,7 +297,8 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
     /// How a posted notification would be presented, for
     /// `BrowserConsentReadiness`. Read live rather than cached from
     /// `requestAuthorization`: the user can change any of it in System Settings
-    /// long after launch, and that silently disables browser-meeting recording.
+    /// long after launch, and that silently stops every meeting that asks from
+    /// being recorded.
     @MainActor
     func notificationVisibility() async -> NotificationVisibility {
         // Same guard as `setUp` and `notify`: without a real app bundle the
@@ -323,7 +325,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
         // The one notification the app posts that asks a question with a
         // deadline. At `.active` it is a banner: gone in seconds, and
         // suppressed outright by any Focus mode, so it expires unseen and
-        // browser meetings silently never record. `.timeSensitive` is the
+        // meetings that ask silently never record. `.timeSensitive` is the
         // only level that breaks through Focus, and it needs the matching
         // entitlement to do so; see `NotificationUrgency.timeSensitive`.
         let urgency = NotificationUrgency.timeSensitive

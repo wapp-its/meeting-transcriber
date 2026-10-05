@@ -2,19 +2,22 @@ import Foundation
 @testable import MeetingTranscriber
 
 /// A meeting for tests that need one but do not care what it is.
+///
+/// Carried under a real app, Zoom, because a detected meeting asks before it
+/// records unless its app is switched to record without asking, and only the
+/// real apps have that switch. A test that needs this meeting recording lists
+/// `testMeetingApp` as recording without asking, or answers the prompt.
 func makeTestMeeting(pid: pid_t = 4242) -> DetectedMeeting {
     DetectedMeeting(
-        pattern: AppMeetingPattern(
-            appName: "Test App",
-            ownerNames: ["TestApp"],
-            meetingPatterns: [#"^Meeting:.*"#],
-            idlePatterns: [#"^Test App$"#],
-        ),
+        pattern: .zoom,
         windowTitle: "Meeting: Sprint",
         ownerName: "TestApp",
         windowPID: pid,
     )
 }
+
+/// The app `makeTestMeeting` is carried under.
+let testMeetingApp = AppMeetingPattern.zoom.appName
 
 /// Reports one meeting forever, so a started `WatchLoop` enters `handleMeeting`
 /// and stays there. `makeSilentDetector`'s opposite, and the counterpart to

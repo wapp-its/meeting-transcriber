@@ -1,22 +1,23 @@
 import Foundation
 
-/// Apps the user answered "Never for this app" about, so the browser-meeting
+/// Apps the user answered "Never for this app" about, so the recording
 /// consent prompt stops asking (issue #503 follow-up).
 ///
 /// This is the durable half of the consent answer. Ignore is per call and
 /// Record starts one recording; only Never has to outlive the prompt, because
 /// only Never is an answer about the *app* rather than about this one call.
 ///
-/// Deliberately one list, not a confirmed/denied pair. A positive list would
-/// carry no behaviour: an app the user has approved still gets the per-meeting
-/// prompt, exactly as a never-seen one does, because the WebRTC assertion is
-/// not meeting-exclusive (Google Meet holds it on a page you cannot even join).
-/// So "approved" and "unknown" are the same state as far as anything observable
-/// goes, and storing them apart would be bookkeeping that can only drift.
+/// Deliberately one list of answers, not a confirmed/denied pair. A Record
+/// answer is about one call: the app is asked again at its next meeting, so
+/// "approved" and "unknown" are the same state as far as anything observable
+/// goes, and storing them apart would be bookkeeping that can only drift. The
+/// way to stop being asked about an app is a setting, not an answer:
+/// `AppSettings.recordWithoutAskingApps`, which this list outranks.
 ///
-/// Entries are process names exactly as the power assertion reports them, and
-/// they are matched exactly: the detector matches process names that way, and a
-/// looser rule here would silence an app the user was never asked about.
+/// Entries are app identities exactly as the detectors report them (for a
+/// browser, the process name off the power assertion), and they are matched
+/// exactly: a looser rule here would silence an app the user was never asked
+/// about.
 struct ConsentDenyList: Equatable {
     /// Insertion-ordered, so the Settings rows do not reshuffle between renders.
     private(set) var denied: [String]

@@ -35,12 +35,9 @@ final class GeneralSettingsConsentDenyListTests: XCTestCase {
     }
 
     func testSectionStaysVisibleWhenBrowserWatchingIsOff() throws {
-        // Deliberately NOT gated on the browser toggle, though today only
-        // browser meetings can add an entry. The gate the deny list hangs off is
-        // `requiresRecordingConsent`, a general pattern property, so as soon as
-        // another app adopts it a denial made there would become impossible to
-        // undo behind a browser-specific switch. Emptiness is the only condition
-        // for hiding it.
+        // Deliberately NOT gated on the browser toggle: every app that asks
+        // can add an entry, so a denial hidden behind one app's switch would be
+        // impossible to undo. Emptiness is the only condition for hiding it.
         let view = try view(browserMeetings: false, denied: ["Fjordfox"])
         XCTAssertNotNil(
             try? view.inspect().find(viewWithAccessibilityIdentifier: A11yID.consentDenyListSection),

@@ -240,6 +240,10 @@ class PowerAssertionDetector: MeetingDetecting {
     }
 
     func checkOnce() -> DetectedMeeting? {
+        checkOnce(excluding: [])
+    }
+
+    func checkOnce(excluding excludedApps: Set<String>) -> DetectedMeeting? {
         let assertions = assertionProvider()
         var hitsThisRound: Set<String> = []
         var firstMatch: [String: (pid: Int32, processName: String, pattern: AssertionPattern)] = [:]
@@ -281,8 +285,9 @@ class PowerAssertionDetector: MeetingDetecting {
 
         logUnmatchedWatchedAssertions(assertions, hits: hitsThisRound)
 
-        // Check confirmation threshold
-        for (key, hits) in consecutiveHits {
+        // Check confirmation threshold. An excluded identity keeps counting
+        // above but is passed over here (see `MeetingDetecting`).
+        for (key, hits) in consecutiveHits where !excludedApps.contains(key) {
             if hits >= confirmationCount, let match = firstMatch[key] {
                 let meetingPattern = Self.meetingIdentity(
                     pattern: match.pattern, processName: match.processName,
@@ -313,9 +318,10 @@ class PowerAssertionDetector: MeetingDetecting {
     ///
     /// The synthesis MUST carry the category's `requiresRecordingConsent`
     /// forward. `AppMeetingPattern`'s initializer defaults it to false, and a
-    /// synthesised browser identity that dropped the flag would auto-record a
-    /// call with no prompt, which is the exact inverse of the browser-meeting
-    /// safety story. `testPerProcessIdentityKeepsTheConsentRequirement` pins it.
+    /// synthesised browser identity that dropped the flag would fall under the
+    /// per-app "record without asking" rule instead of always asking, which a
+    /// signal this unspecific must never do.
+    /// `testPerProcessIdentityKeepsTheConsentRequirement` pins it.
     static func meetingIdentity(pattern: AssertionPattern, processName: String) -> AppMeetingPattern {
         let category = AppMeetingPattern.forAppName(pattern.appName)
         switch pattern.identity {
@@ -331,8 +337,8 @@ class PowerAssertionDetector: MeetingDetecting {
                 // The drift guard in `init` only inspects `.shared` patterns, so
                 // a per-process pattern whose category `appName` does not resolve
                 // (a typo, or a rename applied on one side only) would otherwise
-                // fall to the initializer's `false` default and auto-record with
-                // no prompt. Fail towards asking.
+                // fall to the initializer's `false` default and lose the
+                // always-ask guarantee. Fail towards asking.
                 logger.error(
                     "No AppMeetingPattern for process-open category \(pattern.appName, privacy: .public); requiring consent",
                 )

@@ -19,8 +19,8 @@ protocol AppNotifying {
     /// exists to prevent. `notify(title:body:)` lives in the extension below.
     func notify(title: String, body: String, urgency: NotificationUrgency)
 
-    /// Ask the user whether to record a just-detected browser meeting (issue
-    /// #503); true = record. `@MainActor` — the real prompt is UI. Defaults to
+    /// Ask the user whether to record a just-detected meeting (issue #503);
+    /// true = record. `@MainActor` — the real prompt is UI. Defaults to
     /// false so a notifier without a prompt never records silently.
     @MainActor
     func askToRecord(title: String, body: String) async -> ConsentAnswer
@@ -33,7 +33,7 @@ protocol AppNotifying {
 
     /// How a posted notification would be presented. On the same seam as
     /// `askToRecord` because it answers whether that prompt could be SEEN, which
-    /// decides whether browser meetings work at all (see
+    /// decides whether a meeting that asks can be recorded at all (see
     /// `BrowserConsentReadiness`).
     ///
     /// Here rather than as a probe closure on `PermissionsController` because
@@ -380,7 +380,7 @@ final class AppState {
                     }
                 }
             }
-            // Answers a parked browser-meeting consent prompt (issue #503) so an
+            // Answers a parked recording consent prompt (issue #503) so an
             // e2e driver can confirm recording without a clickable notification.
             // Rides the injected `notifier` seam — the same one `askToRecord`
             // parks in (WatchLoop+Consent) — so park + resolve stay symmetric.

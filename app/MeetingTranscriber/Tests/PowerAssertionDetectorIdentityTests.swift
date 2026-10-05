@@ -33,7 +33,8 @@ final class PowerAssertionDetectorIdentityTests: XCTestCase {
         // The trap this test exists for: with per-process identity,
         // `forAppName("Brave Browser")` no longer resolves, so the identity is
         // synthesised. The synthesis default for `requiresRecordingConsent` is
-        // false, which would auto-record a browser call with no prompt.
+        // false, which would put a browser call under the per-app "record
+        // without asking" rule instead of always asking.
         let browser = try XCTUnwrap(
             PowerAssertionDetector.defaultPatterns
                 .first { $0.appName == AppMeetingPattern.browserMeetings.appName },
