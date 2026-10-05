@@ -120,10 +120,10 @@ class MicInputDetector: MeetingDetecting {
     }
 
     func checkOnce() -> DetectedMeeting? {
-        checkOnce(excluding: nil)
+        checkOnce(excluding: [])
     }
 
-    func checkOnce(excluding excludedApp: String?) -> DetectedMeeting? {
+    func checkOnce(excluding excludedApps: Set<String>) -> DetectedMeeting? {
         // All four toggles default to off, so most installs run this detector
         // with an empty pattern set. Skip the whole round then: no Core Audio
         // enumeration every poll, and no diagnostic naming every mic-using
@@ -147,7 +147,7 @@ class MicInputDetector: MeetingDetecting {
             consecutiveHits[pattern.appName, default: 0] += 1
         }
 
-        for (appName, hits) in consecutiveHits where appName != excludedApp {
+        for (appName, hits) in consecutiveHits where !excludedApps.contains(appName) {
             if hits >= confirmationCount, let pid = firstMatch[appName] {
                 let meetingPattern = AppMeetingPattern.forAppName(appName) ?? AppMeetingPattern(
                     appName: appName,
@@ -284,14 +284,14 @@ final class CompositeMeetingDetector: MeetingDetecting {
     }
 
     func checkOnce() -> DetectedMeeting? {
-        checkOnce(excluding: nil)
+        checkOnce(excluding: [])
     }
 
     /// Passed down to every strategy: an excluded meeting in the first one
     /// must not stop the second from being asked at all.
-    func checkOnce(excluding excludedApp: String?) -> DetectedMeeting? {
+    func checkOnce(excluding excludedApps: Set<String>) -> DetectedMeeting? {
         for detector in detectors {
-            if let meeting = detector.checkOnce(excluding: excludedApp) {
+            if let meeting = detector.checkOnce(excluding: excludedApps) {
                 return meeting
             }
         }

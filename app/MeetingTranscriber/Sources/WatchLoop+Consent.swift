@@ -34,9 +34,13 @@ extension WatchLoop {
         // One question at a time. The detector re-detects the same call every
         // poll, so without this the loop would post a fresh prompt every few
         // seconds while the first one is still on screen. Another app that
-        // needs a prompt is not queued either: it is detected again once this
-        // question is settled, and asked about then if its call still runs.
-        guard pendingConsentApp == nil else { return true }
+        // needs a prompt is not queued either: it waits out of detection until
+        // this question is settled, and is asked about then if its call still
+        // runs.
+        guard pendingConsentApp == nil else {
+            appsWaitingForPrompt.insert(app)
+            return true
+        }
 
         guard case .ask = consentPolicy.decision(
             app: app, now: nowProvider(), isDenied: isDenied,
@@ -61,6 +65,13 @@ extension WatchLoop {
             finishConsent(for: meeting, answer: answer)
         }
         return true
+    }
+
+    /// The apps detection passes over this poll: the one being asked about
+    /// and the ones waiting for that answer. Empty while nothing is asked.
+    var appsExcludedFromDetection: Set<String> {
+        guard let pendingConsentApp else { return [] }
+        return appsWaitingForPrompt.union([pendingConsentApp])
     }
 
     /// Take the approved meeting, if any, clearing it. The poll loop is the

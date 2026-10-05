@@ -42,4 +42,18 @@ final class AppSettingsRecordWithoutAskingTests: XCTestCase {
         settings.recordWithoutAskingApps = []
         XCTAssertFalse(settings.anyWatchedAppAsksFirst, "nothing watched, nothing asks")
     }
+
+    /// An app on the deny list is never asked, so it needs no visible prompt.
+    func testADeniedAppDoesNotCountAsAsking() throws {
+        let settings = try AppSettings(defaults: makeDefaults())
+        settings.watchZoom = false
+        settings.watchWebex = false
+        settings.consentDeniedApps = ["Microsoft Teams"]
+        XCTAssertFalse(settings.anyWatchedAppAsksFirst, "the only watched app is denied")
+
+        // A browser denial names one browser; every other one still asks.
+        settings.watchBrowserMeetings = true
+        settings.consentDeniedApps = ["Microsoft Teams", "Google Chrome"]
+        XCTAssertTrue(settings.anyWatchedAppAsksFirst)
+    }
 }

@@ -22,11 +22,11 @@ final class WatchLoopAskBeforeRecordingTests: XCTestCase {
         }
 
         func checkOnce() -> DetectedMeeting? {
-            checkOnce(excluding: nil)
+            checkOnce(excluding: [])
         }
 
-        func checkOnce(excluding excludedApp: String?) -> DetectedMeeting? {
-            confirmed.first { $0.pattern.appName != excludedApp }
+        func checkOnce(excluding excludedApps: Set<String>) -> DetectedMeeting? {
+            confirmed.first { !excludedApps.contains($0.pattern.appName) }
         }
 
         func isMeetingActive(_ meeting: DetectedMeeting) -> Bool {
@@ -123,6 +123,10 @@ final class WatchLoopAskBeforeRecordingTests: XCTestCase {
 
     private var zoom: DetectedMeeting {
         meeting(.zoom, owner: "zoom.us")
+    }
+
+    private var webex: DetectedMeeting {
+        meeting(.webex, owner: "Webex")
     }
 
     /// A mic-input detection, as `MicInputDetector` reports it.
@@ -224,9 +228,10 @@ final class WatchLoopAskBeforeRecordingTests: XCTestCase {
     }
 
     /// The other half of R2, and the competing-meetings rule: only Teams is
-    /// switched on, so Zoom asks, and Teams starts recording while the Zoom
-    /// question is still open. Zoom is first in the detector's order, so this
-    /// also fails if the open question's app is not excluded from detection.
+    /// switched on, so Zoom and Webex ask, and Teams starts recording while the
+    /// Zoom question is still open. Zoom and Webex come first in the
+    /// detector's order, so this also fails if either the app being asked
+    /// about or the app waiting for that answer is not excluded from detection.
     func testOtherAppsStillAskAndANoAskAppDoesNotWaitForTheirPrompt() async throws {
         let notifier = ParkingNotifier()
         let detector = ScriptedDetector([zoom])
@@ -237,12 +242,12 @@ final class WatchLoopAskBeforeRecordingTests: XCTestCase {
         await waitFor(notifier.isParked)
         XCTAssertEqual(notifier.prompts.map(\.title), ["Record Zoom meeting?"])
 
-        detector.confirmed = [zoom, teams]
-        detector.running.insert("Microsoft Teams")
+        detector.confirmed = [zoom, webex, teams]
+        detector.running.formUnion(["Webex", "Microsoft Teams"])
         await waitFor(recorders.starts == 1)
         XCTAssertEqual(recorders.starts, 1, "Teams must record while the Zoom question is open")
         XCTAssertEqual(loop.currentMeeting?.pattern.appName, "Microsoft Teams")
-        XCTAssertEqual(notifier.prompts.count, 1, "and Teams is never asked about")
+        XCTAssertEqual(notifier.prompts.count, 1, "Teams is never asked about, and Webex waits for the Zoom answer")
 
         notifier.answer(.declined)
         loop.stop()

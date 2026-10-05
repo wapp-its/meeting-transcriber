@@ -93,6 +93,12 @@ class WatchLoop {
     /// `WatchLoop+Consent.swift` owns the transitions.
     var pendingConsentApp: String?
 
+    /// Apps that needed a prompt while `pendingConsentApp`'s was open. Not a
+    /// queue: they are kept out of detection until that question settles, so
+    /// none of them can hide a meeting that needs no prompt, and are detected
+    /// and asked about afterwards if their call still runs.
+    var appsWaitingForPrompt: Set<String> = []
+
     /// A meeting the user approved, waiting for the loop to pick it up.
     /// Recordings start in the loop and nowhere else, so an answer arriving
     /// out of band parks here instead of starting one from the consent task.
@@ -105,6 +111,7 @@ class WatchLoop {
     /// what an answer (or the lack of one) means.
     func clearConsentState() {
         pendingConsentApp = nil
+        appsWaitingForPrompt = []
         approvedConsentMeeting = nil
         consentTask = nil
     }
@@ -314,16 +321,17 @@ class WatchLoop {
             // answer, and the call may have ended in it.
             if let approved = takeApprovedConsentMeeting(), detector.isMeetingActive(approved) {
                 if await runMeeting(approved) { return }
-            } else if let meeting = detector.checkOnce(excluding: pendingConsentApp) {
+            } else if let meeting = detector.checkOnce(excluding: appsExcludedFromDetection) {
                 // A detected meeting asks before recording unless its app
                 // records without asking. See WatchLoop+Consent.swift.
                 // Asking does NOT block this loop — that is the whole point:
                 // an unanswered prompt used to stop `checkOnce()` from running
                 // for a full minute, so a call that needed no prompt and
                 // started in that window went unrecorded. The app being asked
-                // about is excluded from detection for the same reason: it is
-                // re-detected every poll, and as the one meeting a poll
-                // returns it would hide every other app's call behind it.
+                // about, and every app waiting for that answer, is excluded
+                // from detection for the same reason: each is re-detected
+                // every poll, and as the one meeting a poll returns it would
+                // hide every other app's call behind it.
                 if requestConsentIfNeeded(for: meeting) {
                     try? await sleepProvider(pollInterval)
                     continue

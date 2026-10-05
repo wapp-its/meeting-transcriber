@@ -33,8 +33,9 @@ final class MeetingDetectorExclusionTests: XCTestCase {
         detector.assertionProvider = {
             PowerAssertionFixture.assertions((1, "MSTeams", "call in progress"), (2, "zoom.us", "Zoom call"))
         }
-        XCTAssertEqual(detector.checkOnce(excluding: "Microsoft Teams")?.pattern.appName, "Zoom")
-        XCTAssertEqual(detector.checkOnce(excluding: "Zoom")?.pattern.appName, "Microsoft Teams")
+        XCTAssertEqual(detector.checkOnce(excluding: ["Microsoft Teams"])?.pattern.appName, "Zoom")
+        XCTAssertEqual(detector.checkOnce(excluding: ["Zoom"])?.pattern.appName, "Microsoft Teams")
+        XCTAssertNil(detector.checkOnce(excluding: ["Microsoft Teams", "Zoom"]), "every excluded app is passed over")
     }
 
     /// The excluded app keeps counting, so it is back as soon as its question
@@ -42,15 +43,15 @@ final class MeetingDetectorExclusionTests: XCTestCase {
     func testTheExcludedAppKeepsCounting() {
         let detector = assertionDetector(confirmationCount: 3)
         detector.assertionProvider = { PowerAssertionFixture.assertions((1, "MSTeams", "call in progress")) }
-        XCTAssertNil(detector.checkOnce(excluding: "Microsoft Teams"))
-        XCTAssertNil(detector.checkOnce(excluding: "Microsoft Teams"))
-        XCTAssertEqual(detector.checkOnce(excluding: nil)?.pattern.appName, "Microsoft Teams")
+        XCTAssertNil(detector.checkOnce(excluding: ["Microsoft Teams"]))
+        XCTAssertNil(detector.checkOnce(excluding: ["Microsoft Teams"]))
+        XCTAssertEqual(detector.checkOnce(excluding: [])?.pattern.appName, "Microsoft Teams")
     }
 
     func testMicInputDetectorPassesOverTheExcludedApp() {
         let detector = micDetector()
-        XCTAssertEqual(detector.checkOnce(excluding: "WeChat")?.pattern.appName, "WhatsApp")
-        XCTAssertEqual(detector.checkOnce(excluding: "WhatsApp")?.pattern.appName, "WeChat")
+        XCTAssertEqual(detector.checkOnce(excluding: ["WeChat"])?.pattern.appName, "WhatsApp")
+        XCTAssertEqual(detector.checkOnce(excluding: ["WhatsApp"])?.pattern.appName, "WeChat")
     }
 
     /// A mic-input app can now be answered "Never for this app" too. Like the
@@ -60,7 +61,7 @@ final class MeetingDetectorExclusionTests: XCTestCase {
         let detector = micDetector()
         detector.isIdentityDenied = { $0 == "WeChat" }
         XCTAssertEqual(detector.checkOnce()?.pattern.appName, "WhatsApp")
-        XCTAssertNil(detector.checkOnce(excluding: "WhatsApp"), "WeChat must not confirm while denied")
+        XCTAssertNil(detector.checkOnce(excluding: ["WhatsApp"]), "WeChat must not confirm while denied")
     }
 
     /// The first strategy's excluded meeting must not stop the second
@@ -69,8 +70,8 @@ final class MeetingDetectorExclusionTests: XCTestCase {
         let teams = DetectedMeeting(pattern: .teams, windowTitle: "Call", ownerName: "MSTeams", windowPID: 1)
         let weChat = DetectedMeeting(pattern: .wechat, windowTitle: "Call", ownerName: "WeChat", windowPID: 2)
         let composite = CompositeMeetingDetector([FixedMeetingDetector(teams), FixedMeetingDetector(weChat)])
-        XCTAssertEqual(composite.checkOnce(excluding: "Microsoft Teams"), weChat)
-        XCTAssertEqual(composite.checkOnce(excluding: nil), teams)
+        XCTAssertEqual(composite.checkOnce(excluding: ["Microsoft Teams"]), weChat)
+        XCTAssertEqual(composite.checkOnce(excluding: []), teams)
     }
 
     /// The production wiring hands the persisted deny list to both strategies.

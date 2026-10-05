@@ -240,10 +240,10 @@ class PowerAssertionDetector: MeetingDetecting {
     }
 
     func checkOnce() -> DetectedMeeting? {
-        checkOnce(excluding: nil)
+        checkOnce(excluding: [])
     }
 
-    func checkOnce(excluding excludedApp: String?) -> DetectedMeeting? {
+    func checkOnce(excluding excludedApps: Set<String>) -> DetectedMeeting? {
         let assertions = assertionProvider()
         var hitsThisRound: Set<String> = []
         var firstMatch: [String: (pid: Int32, processName: String, pattern: AssertionPattern)] = [:]
@@ -285,9 +285,9 @@ class PowerAssertionDetector: MeetingDetecting {
 
         logUnmatchedWatchedAssertions(assertions, hits: hitsThisRound)
 
-        // Check confirmation threshold. The excluded identity keeps counting
+        // Check confirmation threshold. An excluded identity keeps counting
         // above but is passed over here (see `MeetingDetecting`).
-        for (key, hits) in consecutiveHits where key != excludedApp {
+        for (key, hits) in consecutiveHits where !excludedApps.contains(key) {
             if hits >= confirmationCount, let match = firstMatch[key] {
                 let meetingPattern = Self.meetingIdentity(
                     pattern: match.pattern, processName: match.processName,

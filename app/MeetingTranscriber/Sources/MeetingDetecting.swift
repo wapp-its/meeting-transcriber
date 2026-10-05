@@ -29,13 +29,13 @@ protocol MeetingDetecting {
     /// Single poll: check for active meetings. Returns a meeting after confirmation threshold.
     func checkOnce() -> DetectedMeeting?
 
-    /// Single poll that never returns a meeting of `excludedApp`, the app whose
-    /// consent prompt is open. A poll returns one meeting, so without this the
-    /// meeting already being asked about would come back every poll and could
-    /// hide another app's call for as long as the prompt stays open. Hits for
-    /// the excluded app still count, so it is confirmed again as soon as the
-    /// exclusion lifts.
-    func checkOnce(excluding excludedApp: String?) -> DetectedMeeting?
+    /// Single poll that never returns a meeting of an app in `excludedApps`:
+    /// the app whose consent prompt is open, and the apps waiting for that
+    /// question to settle. A poll returns one meeting, so without this those
+    /// meetings would come back every poll and could hide another app's call
+    /// for as long as the prompt stays open. Hits for an excluded app still
+    /// count, so it is confirmed again as soon as the exclusion lifts.
+    func checkOnce(excluding excludedApps: Set<String>) -> DetectedMeeting?
 
     /// Check if a previously detected meeting is still active.
     func isMeetingActive(_ meeting: DetectedMeeting) -> Bool
@@ -51,11 +51,11 @@ extension MeetingDetecting {
     }
 
     /// For a detector that reports at most one meeting per poll anyway: drop
-    /// it when it is the excluded one. The detectors that can confirm several
+    /// it when it is an excluded one. The detectors that can confirm several
     /// apps at once implement the requirement themselves and pass over the
-    /// excluded app to the next confirmed one.
-    func checkOnce(excluding excludedApp: String?) -> DetectedMeeting? {
-        guard let meeting = checkOnce(), meeting.pattern.appName != excludedApp else { return nil }
+    /// excluded apps to the next confirmed one.
+    func checkOnce(excluding excludedApps: Set<String>) -> DetectedMeeting? {
+        guard let meeting = checkOnce(), !excludedApps.contains(meeting.pattern.appName) else { return nil }
         return meeting
     }
 }
