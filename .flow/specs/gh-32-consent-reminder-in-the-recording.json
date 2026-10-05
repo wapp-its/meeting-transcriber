@@ -1,7 +1,7 @@
 {
   "branch_name": "local/gh-32-consent-reminder",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-05T12:54:07.976596Z",
   "created_at": "2026-10-05T10:32:07.081391Z",
   "default_impl": null,
   "default_review": null,
@@ -53,15 +53,53 @@
       "task": "gh-32-consent-reminder-in-the-recording.1",
       "timestamp": "2026-10-05T12:45:28.382065Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "470d561a40fd6ad3325f7e5df8d3c27d86a608a26449b7c0542cccfa7e36f3e8",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "9da3c1fa83b785044b867fb076916e2be4aa83de",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 655818,
+      "output_sha256": "61bb25e2f9e852ac45fa27b3bc218b93555d0f67c58159c4d841d8e1bfbee66e",
+      "reservation_id": "d5637668c7584cbbadc2cecd24df480e",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-05T12:54:07.943752Z",
+      "tool_calls": 17,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
-    "impl:gh-32-consent-reminder-in-the-recording.1": 1
+    "impl:gh-32-consent-reminder-in-the-recording.1": 1,
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-32-consent-reminder-in-the-recording.1": 0
   },
   "spec_path": ".flow/specs/gh-32-consent-reminder-in-the-recording.md",
@@ -79,5 +117,5 @@
     "mergeBaseTracker": "## Was\n\nEin kurzer Hinweis, dass alle Beteiligten mit der Aufnahme einverstanden sein m\u00fcssen (in der Schweiz strafrechtlich relevant, Art. 179bis ff. StGB):\n\n- **in der R\u00fcckfrage vor einer Aufnahme** (die Mitteilung \u201eAufnehmen?\u201c jeder App, die fragt);\n- **in den Einstellungen**, sobald f\u00fcr eine App \u201eohne R\u00fcckfrage aufnehmen\u201c eingeschaltet wird: Ohne R\u00fcckfrage liegt die Einwilligung ganz bei der Person, die aufnimmt.\n\n## Warum ein eigener Branch\n\nSehr spezifisch f\u00fcr die Schweiz; geht nie ans Original (Owner, 2026-10-05). Darum ein `local/\u2026`-Branch, getrennt von #3, damit #3 ohne diesen Teil ans Original eingereicht werden kann.\n\n## Abh\u00e4ngigkeit\n\nBaut auf #3 auf (R\u00fcckfrage f\u00fcr alle Apps, Schalter \u201eohne R\u00fcckfrage aufnehmen\u201c je App).\n\n",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/32"
   },
-  "updated_at": "2026-10-05T12:45:33.382693Z"
+  "updated_at": "2026-10-05T12:54:07.983585Z"
 }
