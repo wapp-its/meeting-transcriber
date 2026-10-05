@@ -103,7 +103,7 @@
     "impl:gh-32-consent-reminder-in-the-recording.1": 0
   },
   "spec_path": ".flow/specs/gh-32-consent-reminder-in-the-recording.md",
-  "status": "open",
+  "status": "done",
   "title": "Consent reminder in the recording prompt and Settings",
   "tracker": {
     "baseHashFlow": "28cd8fe96133a6a94605127e19242c70f54860ab11d5878f32f12eed7b4bb8ed",
@@ -117,5 +117,5 @@
     "mergeBaseTracker": "## Was\n\nEin kurzer Hinweis, dass alle Beteiligten mit der Aufnahme einverstanden sein m\u00fcssen (in der Schweiz strafrechtlich relevant, Art. 179bis ff. StGB):\n\n- **in der R\u00fcckfrage vor einer Aufnahme** (die Mitteilung \u201eAufnehmen?\u201c jeder App, die fragt);\n- **in den Einstellungen**, sobald f\u00fcr eine App \u201eohne R\u00fcckfrage aufnehmen\u201c eingeschaltet wird: Ohne R\u00fcckfrage liegt die Einwilligung ganz bei der Person, die aufnimmt.\n\n## Warum ein eigener Branch\n\nSehr spezifisch f\u00fcr die Schweiz; geht nie ans Original (Owner, 2026-10-05). Darum ein `local/\u2026`-Branch, getrennt von #3, damit #3 ohne diesen Teil ans Original eingereicht werden kann.\n\n## Abh\u00e4ngigkeit\n\nBaut auf #3 auf (R\u00fcckfrage f\u00fcr alle Apps, Schalter \u201eohne R\u00fcckfrage aufnehmen\u201c je App).\n\n",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/32"
   },
-  "updated_at": "2026-10-05T12:54:07.983585Z"
+  "updated_at": "2026-10-05T12:54:21.590223Z"
 }
