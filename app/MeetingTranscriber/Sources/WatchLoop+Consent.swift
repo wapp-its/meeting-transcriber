@@ -58,9 +58,13 @@ extension WatchLoop {
         let appLabel = app.isEmpty ? meeting.ownerName : app
         consentTask = Task { [weak self] in
             guard let self else { return }
+            // The reminder rides the prompt because the prompt is the moment
+            // the user decides to record: recording a conversation without
+            // everyone's agreement is an offence in Switzerland. One short
+            // sentence, since a notification body has room for little more.
             let answer = await notifier.askToRecord(
                 title: "Record \(appLabel) meeting?",
-                body: "A meeting is active in \(appLabel).",
+                body: "A meeting is active in \(appLabel). Everyone must agree to being recorded.",
             )
             finishConsent(for: meeting, answer: answer)
         }
