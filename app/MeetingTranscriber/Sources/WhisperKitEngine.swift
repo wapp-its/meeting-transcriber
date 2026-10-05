@@ -235,7 +235,7 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
             // also ends in `adoptPipe`, this can carry WhisperKit's path-bearing
             // `modelsUnavailable` message, not only a path-free URLError.
             logger.error(
-                "WhisperKit model load failed (\(String(describing: type(of: error)), privacy: .public): \(error.localizedDescription, privacy: .private))",
+                "WhisperKit model load failed (\(String(describing: type(of: error)), privacy: .public): \(String(reflecting: error), privacy: .public))",
             )
             // A failed *reload* keeps the prior pipe (see `unloadModel`), and the
             // state has to say so: `ensureModel` short-circuits on a non-nil pipe
