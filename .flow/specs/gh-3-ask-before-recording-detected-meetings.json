@@ -293,7 +293,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-3-ask-before-recording-detected-meetings.md",
-  "status": "open",
+  "status": "done",
   "title": "Ask before recording detected meetings",
   "tracker": {
     "baseHashFlow": "03f092aa56e5348b996311d3bbf6171eba70a8bad8a219b806b6baa502cc7736",
@@ -307,5 +307,5 @@
     "mergeBaseTracker": "## Problem\n\nErkennt die App ein Meeting (Teams, Zoom, Webex, Browser), fragt sie per Mitteilung nach, ob sie aufnehmen soll (Consent-Prompt, `ConsentPromptCoordinator`, Upstream-Issue pasrom/meeting-transcriber#503). Wer jedes Meeting aufnehmen will, muss jedes Mal best\u00e4tigen \u2014 und verpasst den Anfang, wenn die Mitteilung \u00fcbersehen wird.\n\n## Wunsch\n\nOption **\u201eErkannte Meetings ohne R\u00fcckfrage aufnehmen\"**, am besten **je App** einstellbar (z. B. Teams: immer, Browser: fragen) \u2014 als Gegenst\u00fcck zur bestehenden Sperrliste `consentDeniedApps`.\n\n- W\u00e4hrend der Aufnahme bleibt der Hinweis in der Men\u00fcleiste gut sichtbar (Symbol animiert), damit klar ist, dass aufgenommen wird.\n- Mit Issue #2 (Start-Dialog) abstimmen: Bei automatischem Start gilt die Standardvorlage, Vorlage und Infos lassen sich nachtr\u00e4glich \u00e4ndern.\n\n## Hinweis\n\nDie R\u00fcckfrage erinnert auch daran, dass alle Beteiligten mit der Aufnahme einverstanden sein m\u00fcssen (in der Schweiz strafrechtlich relevant, Art. 179bis ff. StGB). Beim automatischen Start liegt das ganz bei der Person, die aufnimmt \u2014 in der Einstellung kurz darauf hinweisen.\n\n## Abnahme\n\n- Option f\u00fcr Teams eingeschaltet \u2192 Teams-Meeting beginnt \u2192 Aufnahme startet ohne Mitteilung.\n- F\u00fcr andere Apps unver\u00e4ndert mit R\u00fcckfrage.\n\n",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/3"
   },
-  "updated_at": "2026-10-05T12:05:12.022965Z"
+  "updated_at": "2026-10-05T12:05:55.496116Z"
 }
