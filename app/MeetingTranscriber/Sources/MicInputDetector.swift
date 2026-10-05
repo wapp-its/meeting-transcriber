@@ -16,14 +16,14 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "MicInpu
 /// is a reliable signal.
 ///
 /// Precision is deliberately traded for coverage, and the cost is real: any
-/// watched app holding the mic across `confirmationCount` polls starts a
-/// recording, so a WeChat or WhatsApp voice message longer than roughly
-/// `pollInterval * confirmationCount` (about 6 s at the defaults) looks like a
-/// call. There is no minimum-duration filter downstream to catch that. What
-/// limits the blast radius today: every one of these apps is off by default,
-/// detection needs N consecutive polls, and a 5 s cooldown follows a reset.
-/// `AppMeetingPattern.requiresRecordingConsent` would be the stronger lever,
-/// as the browser channel uses it, but it is not enabled for these patterns.
+/// watched app holding the mic across `confirmationCount` polls counts as a
+/// call, so a WeChat or WhatsApp voice message longer than roughly
+/// `pollInterval * confirmationCount` (about 6 s at the defaults) looks like
+/// one. There is no minimum-duration filter downstream to catch that. What
+/// limits the blast radius: every one of these apps is off by default,
+/// detection needs N consecutive polls, a 5 s cooldown follows a reset, and a
+/// detected call asks before recording unless the user switched that app to
+/// record without asking.
 @Observable
 class MicInputDetector: MeetingDetecting {
     /// A call app watched by bundle ID.
@@ -87,6 +87,13 @@ class MicInputDetector: MeetingDetecting {
     /// Injectable window list for title lookup, mirroring PowerAssertionDetector.
     var windowListProvider: () -> [[String: Any]] = MeetingDetector.systemWindowList
 
+    /// Apps the user answered "Never for this app" about, so they never reach
+    /// confirmation. Same reason as `PowerAssertionDetector.isIdentityDenied`:
+    /// a denied app holding the mic would otherwise re-confirm every few polls
+    /// for as long as it does, and each skip at the consent gate resets every
+    /// app's confirmation count.
+    var isIdentityDenied: (String) -> Bool = { _ in false }
+
     private let matchers: [String: MeetingTitleMatcher]
 
     struct AudioProcessSnapshot {
@@ -113,6 +120,10 @@ class MicInputDetector: MeetingDetecting {
     }
 
     func checkOnce() -> DetectedMeeting? {
+        checkOnce(excluding: nil)
+    }
+
+    func checkOnce(excluding excludedApp: String?) -> DetectedMeeting? {
         // All four toggles default to off, so most installs run this detector
         // with an empty pattern set. Skip the whole round then: no Core Audio
         // enumeration every poll, and no diagnostic naming every mic-using
@@ -128,6 +139,7 @@ class MicInputDetector: MeetingDetecting {
                 logUnmatchedRunningInput(bundleID: process.bundleID)
                 continue
             }
+            if isIdentityDenied(pattern.appName) { continue }
             if let until = cooldownUntil[pattern.appName], Date() < until { continue }
             guard !hitsThisRound.contains(pattern.appName) else { continue }
             hitsThisRound.insert(pattern.appName)
@@ -135,7 +147,7 @@ class MicInputDetector: MeetingDetecting {
             consecutiveHits[pattern.appName, default: 0] += 1
         }
 
-        for (appName, hits) in consecutiveHits {
+        for (appName, hits) in consecutiveHits where appName != excludedApp {
             if hits >= confirmationCount, let pid = firstMatch[appName] {
                 let meetingPattern = AppMeetingPattern.forAppName(appName) ?? AppMeetingPattern(
                     appName: appName,
@@ -272,8 +284,14 @@ final class CompositeMeetingDetector: MeetingDetecting {
     }
 
     func checkOnce() -> DetectedMeeting? {
+        checkOnce(excluding: nil)
+    }
+
+    /// Passed down to every strategy: an excluded meeting in the first one
+    /// must not stop the second from being asked at all.
+    func checkOnce(excluding excludedApp: String?) -> DetectedMeeting? {
         for detector in detectors {
-            if let meeting = detector.checkOnce() {
+            if let meeting = detector.checkOnce(excluding: excludedApp) {
                 return meeting
             }
         }

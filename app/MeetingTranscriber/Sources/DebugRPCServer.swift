@@ -67,8 +67,9 @@
         private let snapshot: () -> RPCStateSnapshot
         private let speakerActions: SpeakerDBActions
         private let skipNaming: () -> Void
-        /// Resolves a parked browser-meeting consent prompt (issue #503) with the
-        /// posted `granted` value; returns whether a prompt was actually waiting.
+        /// Resolves a parked recording consent prompt (issue #503), whichever app
+        /// it asks about, with the posted `granted` value; returns whether a
+        /// prompt was actually waiting.
         /// Lets the e2e driver answer the ask-before-recording prompt without a
         /// clickable macOS notification.
         private let confirmBrowserConsent: (Bool) -> Bool
@@ -430,8 +431,9 @@
             }
         }
 
-        /// Resolve a parked browser-meeting consent prompt (issue #503) without a
-        /// clickable macOS notification — the e2e driver posts `{"granted":bool}`.
+        /// Resolve a parked recording consent prompt (issue #503), for any app,
+        /// without a clickable macOS notification — the e2e driver posts
+        /// `{"granted":bool}`.
         /// Threading: unlike the scene actions (openSettings etc.) which hop to
         /// the main actor via `Notification.Name`, this only touches the
         /// lock-guarded `ConsentPromptCoordinator`, so it resolves inline — don't

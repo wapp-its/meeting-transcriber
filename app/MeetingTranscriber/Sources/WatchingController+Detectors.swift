@@ -22,12 +22,12 @@ extension WatchingController {
         )
         // Read through the settings each poll rather than captured once, so a
         // Settings "Remove" takes effect without restarting the watch loop.
-        assertions.isIdentityDenied = { [settings] app in
+        let isDenied: (String) -> Bool = { [settings] app in
             settings.consentDeniedApps.contains(app)
         }
-        return [
-            assertions,
-            MicInputDetector(patterns: MicInputDetector.patterns(watching: settings.watchApps)),
-        ]
+        assertions.isIdentityDenied = isDenied
+        let micInput = MicInputDetector(patterns: MicInputDetector.patterns(watching: settings.watchApps))
+        micInput.isIdentityDenied = isDenied
+        return [assertions, micInput]
     }
 }

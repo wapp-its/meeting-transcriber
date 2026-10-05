@@ -25,8 +25,8 @@ protocol NotificationScheduling: AnyObject, Sendable {
 
     /// How a posted notification would actually be presented, queried rather
     /// than remembered from the `requestAuthorization` callback: the user can
-    /// change any of it in System Settings at any time, and browser-meeting
-    /// consent silently stops working when they do (see
+    /// change any of it in System Settings at any time, and the recording
+    /// consent prompt silently stops working when they do (see
     /// `BrowserConsentReadiness`).
     func visibility() async -> NotificationVisibility
 }

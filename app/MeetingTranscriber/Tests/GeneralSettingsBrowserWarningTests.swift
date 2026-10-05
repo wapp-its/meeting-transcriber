@@ -3,25 +3,26 @@ import UserNotifications
 import ViewInspector
 import XCTest
 
-/// Wiring test for the browser-consent warning: `BrowserConsentReadinessTests`
+/// Wiring test for the consent-prompt warning: `BrowserConsentReadinessTests`
 /// owns the decision logic, this only proves the General tab actually renders it.
 ///
 /// It exists because the failure it guards against is invisible by construction:
-/// with notifications denied the browser-meeting toggle looks enabled, detection
-/// keeps firing, and nothing is ever recorded. Settings is the only surface that
-/// can say so, since warning by notification would depend on the very channel
-/// that is broken.
+/// with notifications denied watching looks enabled, detection keeps firing, and
+/// no meeting that asks first is ever recorded. Settings is the only surface
+/// that can say so, since warning by notification would depend on the very
+/// channel that is broken.
 @MainActor
 final class GeneralSettingsBrowserWarningTests: XCTestCase {
     /// Isolated defaults per call, torn down by the test itself — the idiom
     /// `makeRPCTestState()` uses, which needs no stored properties, no
     /// setUp/tearDown overrides and no implicitly-unwrapped optionals.
-    private func makeSettings(browserMeetings: Bool) throws -> AppSettings {
+    private func makeSettings(browserMeetings: Bool, recordWithoutAsking: [String] = []) throws -> AppSettings {
         let suiteName = "GeneralSettingsBrowserWarningTests.\(UUID().uuidString)"
         let suite = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         addTeardownBlock { DefaultsSuite.remove(suiteName) }
         let settings = AppSettings(defaults: suite)
         settings.watchBrowserMeetings = browserMeetings
+        settings.recordWithoutAskingApps = recordWithoutAsking
         return settings
     }
 
@@ -43,9 +44,10 @@ final class GeneralSettingsBrowserWarningTests: XCTestCase {
     private func warningText(
         browserMeetings: Bool,
         visibility: NotificationVisibility?,
+        recordWithoutAsking: [String] = [],
     ) throws -> String? {
         let view = try GeneralSettingsView(
-            settings: makeSettings(browserMeetings: browserMeetings),
+            settings: makeSettings(browserMeetings: browserMeetings, recordWithoutAsking: recordWithoutAsking),
             notificationVisibility: visibility,
         )
         let found = try? view.inspect().find(viewWithAccessibilityIdentifier: A11yID.browserConsentWarning)
@@ -62,10 +64,19 @@ final class GeneralSettingsBrowserWarningTests: XCTestCase {
         XCTAssertNil(try warningText(browserMeetings: true, visibility: visibility()))
     }
 
-    func test_browserWatchingOff_showsNoWarningEvenWhenDenied() throws {
+    /// The prompt is no longer the browser's alone: Teams, Zoom and Webex are
+    /// watched by default and ask first, so a broken notification channel
+    /// stops them being recorded with browser watching off.
+    func test_watchedNativeAppThatAsks_showsTheWarningWithBrowserWatchingOff() throws {
+        let text = try warningText(browserMeetings: false, visibility: visibility(authorization: .denied))
+        XCTAssertNotNil(text, "a watched app that asks first needs a visible prompt")
+    }
+
+    func test_everyWatchedAppRecordingWithoutAsking_showsNoWarningEvenWhenDenied() throws {
         XCTAssertNil(try warningText(
             browserMeetings: false,
             visibility: visibility(authorization: .denied),
+            recordWithoutAsking: ["Microsoft Teams", "Zoom", "Webex"],
         ))
     }
 

@@ -184,7 +184,7 @@ final class WatchingControllerManualRecordingTests: XCTestCase {
         let controller = makeWatchingController(
             logDir: tmpDir, notifier: notifier, permissionHealth: .allHealthy,
         )
-        let (loop, _) = makeTestWatchLoop(detector: FixedMeetingDetector())
+        let (loop, _) = makeTestWatchLoop(detector: FixedMeetingDetector(), notifier: RecordingNotifier(consentAnswer: .granted))
         controller.watchLoop = loop
         loop.start()
         addTeardownBlock { await loop.stop() }
@@ -218,7 +218,7 @@ final class WatchingControllerManualRecordingTests: XCTestCase {
     /// covers, telling a client to retry a conflict the docs say to stop on.
     func testATakeoverRefusalReportsItselfAsBlockedRatherThanFailed() async {
         let controller = makeWatchingController(logDir: tmpDir, permissionHealth: .allHealthy)
-        let (loop, _) = makeTestWatchLoop(detector: FixedMeetingDetector())
+        let (loop, _) = makeTestWatchLoop(detector: FixedMeetingDetector(), notifier: RecordingNotifier(consentAnswer: .granted))
         controller.watchLoop = loop
         loop.start()
         addTeardownBlock { await loop.stop() }

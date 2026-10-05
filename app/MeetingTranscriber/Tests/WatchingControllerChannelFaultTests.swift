@@ -119,6 +119,7 @@ final class WatchingControllerChannelFaultTests: XCTestCase {
             makeDetector: { FixedMeetingDetector() },
             makeRecorder: { recorder },
         )
+        controller.settings.recordWithoutAskingApps = [testMeetingApp]
         let started = await controller.startWatching()
         // Registered before anything can fail: a failed assertion must not
         // leave the recording and its 10 Hz polling running into the next test.

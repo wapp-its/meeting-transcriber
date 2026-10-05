@@ -26,13 +26,11 @@ final class PermissionsController {
     private(set) var lastCheckAt: Date?
 
     /// Latest notification visibility, refreshed by `check()`. Deliberately
-    /// NOT folded into `HealthCheckResult`: it only matters when browser
-    /// watching is on (see `BrowserConsentReadiness`), so treating it as a
-    /// general problem would badge the menu bar for a permission most users
-    /// never need, and `handle(_:)` reports problems BY posting a notification,
-    /// which cannot work when the problem is that notifications do not arrive.
-    /// The browser-meeting consent prompt depends on it, so Settings warns
-    /// there instead.
+    /// NOT folded into `HealthCheckResult`: it only matters while a watched app
+    /// asks before recording (see `BrowserConsentReadiness`), and `handle(_:)`
+    /// reports problems BY posting a notification, which cannot work when the
+    /// problem is that notifications do not arrive. The recording consent
+    /// prompt depends on it, so Settings warns there instead.
     private(set) var notificationVisibility: NotificationVisibility?
 
     private let notifier: any AppNotifying

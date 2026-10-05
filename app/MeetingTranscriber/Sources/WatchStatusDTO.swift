@@ -27,7 +27,7 @@ struct WatchStatusDTO: Codable, Equatable {
     /// Whether an app-picker recording owns the loop. Watch control is refused
     /// while this is true.
     let manualRecording: Bool
-    /// App name awaiting a browser-meeting consent answer, if one is parked.
+    /// App name awaiting a recording consent answer, if one is parked.
     let pendingConsentApp: String?
     /// False only when a permission probe has actually failed. A health check
     /// that has not run yet reports true, matching how `BadgeKind.compute`

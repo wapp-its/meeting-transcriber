@@ -8,11 +8,13 @@ struct AppMeetingPattern: Equatable {
     let idlePatterns: [String]
     let minWindowWidth: CGFloat
     let minWindowHeight: CGFloat
-    /// When true, a detected meeting for this app must be confirmed by the user
-    /// before recording starts, instead of auto-recording. Browser meetings set
-    /// this (issue #503): the WebRTC power assertion that detects them fires for
-    /// any WebRTC use, not just meetings, so a prompt is the false-positive
-    /// filter. Native desktop clients leave it false and keep auto-start.
+    /// When true, a detected meeting for this app is always confirmed by the
+    /// user before recording starts, whatever the "record without asking"
+    /// setting says. Browser meetings set this (issue #503): the WebRTC power
+    /// assertion that detects them fires for any WebRTC use, not just meetings,
+    /// so the prompt is the false-positive filter and must not be switched off.
+    /// Native desktop clients leave it false, and then the setting decides
+    /// (see `asksBeforeRecording(recordWithoutAsking:)`).
     let requiresRecordingConsent: Bool
 
     init(
@@ -149,6 +151,34 @@ extension AppMeetingPattern {
     )
 
     static let all: [AppMeetingPattern] = [teams, zoom, webex, simulator, browserMeetings, wechat, tencentMeeting, faceTime, whatsApp]
+
+    /// The apps Settings offers a "record without asking" switch for, in the
+    /// order "Apps to Watch" lists them. Browser meetings are not among them
+    /// (see `requiresRecordingConsent`), and neither is the simulator, which
+    /// never asks.
+    static let recordWithoutAskingCandidates: [AppMeetingPattern] = [
+        teams, zoom, webex, wechat, tencentMeeting, faceTime, whatsApp,
+    ]
+
+    /// Whether a meeting detected under this pattern waits for the user's
+    /// answer before it records. Every watched app asks unless the user listed
+    /// it in `recordWithoutAsking` (`AppSettings.recordWithoutAskingApps`).
+    ///
+    /// A listed name counts only when it is one of the
+    /// `recordWithoutAskingCandidates`, so a stored name that matches no such
+    /// app (a browser, or a typo) never turns a prompt off. Anything this
+    /// function does not recognise asks: failing towards the question is the
+    /// safe side, since the cost of a needless prompt is a click and the cost of
+    /// a missing one is a recording nobody agreed to.
+    func asksBeforeRecording(recordWithoutAsking: [String]) -> Bool {
+        if requiresRecordingConsent { return true }
+        // The meeting simulator is the fixture the end-to-end lanes record with
+        // (`tools/meeting-simulator`); nobody is there to answer a prompt, so it
+        // records at once. It is not a watchable app and has no switch.
+        if appName == Self.simulator.appName { return false }
+        let isCandidate = Self.recordWithoutAskingCandidates.contains { $0.appName == appName }
+        return !(isCandidate && recordWithoutAsking.contains(appName))
+    }
 
     static let byName: [String: AppMeetingPattern] = {
         var dict: [String: AppMeetingPattern] = [:]

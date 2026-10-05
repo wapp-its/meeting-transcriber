@@ -48,6 +48,7 @@ final class WatchingControllerRecordOnlyTests: XCTestCase {
             makeRecorder: { recorder },
         )
         controller.settings.recordOnly = true
+        controller.settings.recordWithoutAskingApps = [testMeetingApp]
         let chosen = try makeTempDirectory(prefix: "ChosenOutputDir")
         controller.settings.setCustomOutputDir(chosen)
         try FileManager.default.removeItem(at: chosen)

@@ -43,4 +43,15 @@ extension AppSettings {
         if watchWhatsApp { apps.append(AppMeetingPattern.whatsApp.appName) }
         return apps
     }
+
+    /// Whether at least one watched app asks before recording, so the consent
+    /// prompt has to be able to reach the user (`BrowserConsentReadiness`).
+    /// False when nothing is watched or every watched app records without
+    /// asking: then no prompt is ever posted.
+    var anyWatchedAppAsksFirst: Bool {
+        watchApps.contains { name in
+            AppMeetingPattern.forAppName(name)?
+                .asksBeforeRecording(recordWithoutAsking: recordWithoutAskingApps) ?? true
+        }
+    }
 }

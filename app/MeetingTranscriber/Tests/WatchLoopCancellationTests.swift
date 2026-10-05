@@ -123,6 +123,7 @@ final class WatchLoopCancellationTests: XCTestCase {
             endGracePeriod: 100,
             maxDuration: 100,
             noMic: true,
+            recordWithoutAskingApps: { ["Microsoft Teams"] },
             sleepProvider: sleepProvider,
         )
         loop.permissionChecker = {

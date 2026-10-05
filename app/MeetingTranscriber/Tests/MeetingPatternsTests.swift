@@ -43,12 +43,47 @@ final class AppMeetingPatternTests: XCTestCase {
     }
 
     func testNativePatternsDoNotRequireRecordingConsent() {
-        // Native desktop meeting apps keep their auto-start behaviour; only
-        // browser meetings gate behind a prompt.
+        // The flag means "always asks, whatever the settings say". Native
+        // desktop meeting apps leave it off: whether they ask is the user's
+        // per-app "record without asking" choice (see below).
         XCTAssertFalse(AppMeetingPattern.teams.requiresRecordingConsent)
         XCTAssertFalse(AppMeetingPattern.zoom.requiresRecordingConsent)
         XCTAssertFalse(AppMeetingPattern.webex.requiresRecordingConsent)
         XCTAssertFalse(AppMeetingPattern.simulator.requiresRecordingConsent)
+    }
+
+    // MARK: - Ask before recording
+
+    func testWhoAsksBeforeRecording() throws {
+        let category = try XCTUnwrap(
+            PowerAssertionDetector.defaultPatterns.first { $0.appName == AppMeetingPattern.browserMeetings.appName },
+        )
+        let chrome = PowerAssertionDetector.meetingIdentity(pattern: category, processName: "Google Chrome")
+        let unknown = AppMeetingPattern(appName: "Slack", ownerNames: ["Slack"], meetingPatterns: [])
+        let everyName = AppMeetingPattern.recordWithoutAskingCandidates.map(\.appName)
+            + ["Google Chrome", AppMeetingPattern.browserMeetings.appName, "Slack"]
+
+        let cases: [(String, AppMeetingPattern, [String], Bool)] = [
+            // Every watchable app asks by default, and stops asking once listed.
+            ("Teams by default", .teams, [], true),
+            ("Teams listed", .teams, ["Microsoft Teams"], false),
+            ("Zoom with only Teams listed", .zoom, ["Microsoft Teams"], true),
+            ("WeChat listed", .wechat, ["WeChat"], false),
+            // Browser meetings always ask, whatever is stored.
+            ("browser identity with everything listed", chrome, everyName, true),
+            ("browser category with everything listed", .browserMeetings, everyName, true),
+            // A name that matches no app with a switch is ignored.
+            ("an app without a switch, listed", unknown, everyName, true),
+            // The end-to-end fixture never asks.
+            ("simulator", .simulator, [], false),
+        ]
+        for (label, pattern, listed, asks) in cases {
+            XCTAssertEqual(pattern.asksBeforeRecording(recordWithoutAsking: listed), asks, label)
+        }
+        // Every app with a switch can be listed: none falls through to "asks".
+        for pattern in AppMeetingPattern.recordWithoutAskingCandidates {
+            XCTAssertFalse(pattern.asksBeforeRecording(recordWithoutAsking: [pattern.appName]), pattern.appName)
+        }
     }
 
     // MARK: - Simulator Pattern

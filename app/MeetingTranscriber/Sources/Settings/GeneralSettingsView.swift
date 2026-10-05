@@ -6,9 +6,9 @@ struct GeneralSettingsView: View {
     @Bindable var settings: AppSettings
 
     /// Latest notification visibility from `PermissionsController`, or nil
-    /// before the first check. Browser-meeting recording depends on it (the
-    /// consent prompt is a notification), and nothing else in the app can say so
-    /// without using the channel that is broken.
+    /// before the first check. Recording a meeting that asks first depends on
+    /// it (the consent prompt is a notification), and nothing else in the app
+    /// can say so without using the channel that is broken.
     var notificationVisibility: NotificationVisibility?
 
     /// Nil until the first permission check. The case, not just the message:
@@ -16,7 +16,7 @@ struct GeneralSettingsView: View {
     private var browserConsentReadiness: BrowserConsentReadiness? {
         guard let notificationVisibility else { return nil }
         return BrowserConsentReadiness.evaluate(
-            browserMeetingsEnabled: settings.watchBrowserMeetings,
+            anyWatchedAppAsks: settings.anyWatchedAppAsksFirst,
             visibility: notificationVisibility,
         )
     }
@@ -51,8 +51,25 @@ struct GeneralSettingsView: View {
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                browserConsentWarning
                 consentDenyList
+            }
+
+            Section("Record Without Asking") {
+                ForEach(AppMeetingPattern.recordWithoutAskingCandidates, id: \.appName) { pattern in
+                    Toggle(pattern.appName, isOn: recordWithoutAskingBinding(for: pattern.appName))
+                        .disabled(!settings.watchApps.contains(pattern.appName))
+                        .accessibilityIdentifier(A11yID.recordWithoutAskingToggle(pattern.appName))
+                }
+                Text(
+                    """
+                    Detected meetings ask before recording, with a notification offering Record, \
+                    Ignore and "Never for this app". Meetings in the apps switched on here start \
+                    recording as soon as they are detected. Browser meetings always ask.
+                    """,
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                browserConsentWarning
             }
 
             Section("Detection") {
@@ -84,12 +101,11 @@ struct GeneralSettingsView: View {
 
     /// Apps the user answered "Never for this app" about.
     ///
-    /// Shown whenever the list is non-empty, deliberately NOT gated on the
-    /// browser toggle. Today only browser meetings ask for consent, but the
-    /// gate it hangs off is `requiresRecordingConsent`, a general pattern
-    /// property, and the moment another app adopts it a denial made there would
-    /// become impossible to undo behind a browser-specific switch. An empty
-    /// list stays hidden: the only reason to come here is to take back a Never.
+    /// Shown whenever the list is non-empty, deliberately NOT gated on any
+    /// app's watch toggle: every app that asks can be denied, and a denial
+    /// hidden behind a switched-off toggle would be impossible to undo. An
+    /// empty list stays hidden: the only reason to come here is to take back a
+    /// Never.
     ///
     /// Writes go through `ConsentDenyListStore`, the same path the consent gate
     /// uses, so list semantics live in one place instead of two.
@@ -115,10 +131,10 @@ struct GeneralSettingsView: View {
         }
     }
 
-    /// Warns when browser watching is on but the consent prompt cannot reach the
-    /// user. Rendered here rather than as a notification for the obvious reason,
-    /// and kept out of the menu-bar permission badge because this permission only
-    /// matters for this one opt-in feature.
+    /// Warns when a watched app asks first but the consent prompt cannot reach
+    /// the user. Rendered here rather than as a notification for the obvious
+    /// reason, and kept out of the menu-bar permission badge because this
+    /// permission only matters for meetings that ask.
     @ViewBuilder private var browserConsentWarning: some View {
         if let readiness = browserConsentReadiness,
            let headline = readiness.headline,
@@ -144,6 +160,20 @@ struct GeneralSettingsView: View {
             .padding(8)
             .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 6))
         }
+    }
+
+    /// One app's "record without asking" switch, stored as membership in
+    /// `AppSettings.recordWithoutAskingApps`. Adding is idempotent and removing
+    /// leaves the other entries in place, so a toggle can never duplicate or
+    /// drop someone else's choice.
+    private func recordWithoutAskingBinding(for appName: String) -> Binding<Bool> {
+        Binding(
+            get: { settings.recordWithoutAskingApps.contains(appName) },
+            set: { enabled in
+                let others = settings.recordWithoutAskingApps.filter { $0 != appName }
+                settings.recordWithoutAskingApps = enabled ? others + [appName] : others
+            },
+        )
     }
 
     /// Deep link to System Settings > Notifications. Verified to land on the
