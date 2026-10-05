@@ -12,8 +12,140 @@
   "next_task": 1,
   "no_plan": true,
   "plan_review_rounds": 0,
-  "plan_review_status": "unknown",
-  "plan_reviewed_at": null,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-05T10:39:54.147541Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "2000470a57daa6be5a0c2e5c492cae0cd7e6f7bb862c971321ca433a0ec292bb",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-39dfaaa2c3fe4fa1b1bd430dfc857e71",
+            "classification": "introduced",
+            "findingId": "finding-39dfaaa2c3fe4fa1b1bd430dfc857e71",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-a3bc7f0ac4f57a4a1d562be9c0d23050",
+            "classification": "introduced",
+            "findingId": "finding-a3bc7f0ac4f57a4a1d562be9c0d23050",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-9123e142e095e169feb3307591794ba2",
+            "classification": "introduced",
+            "findingId": "finding-9123e142e095e169feb3307591794ba2",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "1ea5f599c73e3598d26dbf5df2fdd507ce55c73c",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 337872,
+      "output_sha256": "a5bba21ef1e9fd848b0e90ef48fb4a7f240ef1b62bf0f0eae3aee99fc93378d7",
+      "reservation_id": "a2f8c2af9008438c9bbc622c2202df24",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-05T10:37:23.484039Z",
+      "tool_calls": 24,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "914cc7a2831e0c436804f6a0f59c459444df096912e3ce2d30d2df8a47d41338",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-39dfaaa2c3fe4fa1b1bd430dfc857e71",
+            "classification": "introduced",
+            "findingId": "finding-39dfaaa2c3fe4fa1b1bd430dfc857e71",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-a3bc7f0ac4f57a4a1d562be9c0d23050",
+            "classification": "introduced",
+            "findingId": "finding-a3bc7f0ac4f57a4a1d562be9c0d23050",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-9123e142e095e169feb3307591794ba2",
+            "classification": "introduced",
+            "findingId": "finding-9123e142e095e169feb3307591794ba2",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "1ea5f599c73e3598d26dbf5df2fdd507ce55c73c",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 491,
+      "output_sha256": "20838c28e0d1f68e6f55213c2f3ca79f175664b2de1adf0772466e53effd43a9",
+      "reservation_id": "95ae869e19f94b158b2afcc1afde5cf8",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-05T10:39:54.111659Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
   "spec_path": ".flow/specs/gh-3-ask-before-recording-detected-meetings.md",
   "status": "open",
   "title": "Ask before recording detected meetings",
@@ -29,5 +161,5 @@
     "mergeBaseTracker": "## Problem\n\nErkennt die App ein Meeting (Teams, Zoom, Webex, Browser), fragt sie per Mitteilung nach, ob sie aufnehmen soll (Consent-Prompt, `ConsentPromptCoordinator`, Upstream-Issue pasrom/meeting-transcriber#503). Wer jedes Meeting aufnehmen will, muss jedes Mal best\u00e4tigen \u2014 und verpasst den Anfang, wenn die Mitteilung \u00fcbersehen wird.\n\n## Wunsch\n\nOption **\u201eErkannte Meetings ohne R\u00fcckfrage aufnehmen\"**, am besten **je App** einstellbar (z. B. Teams: immer, Browser: fragen) \u2014 als Gegenst\u00fcck zur bestehenden Sperrliste `consentDeniedApps`.\n\n- W\u00e4hrend der Aufnahme bleibt der Hinweis in der Men\u00fcleiste gut sichtbar (Symbol animiert), damit klar ist, dass aufgenommen wird.\n- Mit Issue #2 (Start-Dialog) abstimmen: Bei automatischem Start gilt die Standardvorlage, Vorlage und Infos lassen sich nachtr\u00e4glich \u00e4ndern.\n\n## Hinweis\n\nDie R\u00fcckfrage erinnert auch daran, dass alle Beteiligten mit der Aufnahme einverstanden sein m\u00fcssen (in der Schweiz strafrechtlich relevant, Art. 179bis ff. StGB). Beim automatischen Start liegt das ganz bei der Person, die aufnimmt \u2014 in der Einstellung kurz darauf hinweisen.\n\n## Abnahme\n\n- Option f\u00fcr Teams eingeschaltet \u2192 Teams-Meeting beginnt \u2192 Aufnahme startet ohne Mitteilung.\n- F\u00fcr andere Apps unver\u00e4ndert mit R\u00fcckfrage.\n\n",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/3"
   },
-  "updated_at": "2026-10-05T10:31:45.001655Z"
+  "updated_at": "2026-10-05T10:39:54.150380Z"
 }
