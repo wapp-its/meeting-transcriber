@@ -203,6 +203,10 @@ final class WatchLoopAskBeforeRecordingTests: XCTestCase {
                 let prompt = try XCTUnwrap(notifier.prompts.first, label)
                 XCTAssertEqual(prompt.title, "Record \(app) meeting?", label)
                 XCTAssertTrue(prompt.body.contains(app), "\(label): the prompt names the app")
+                XCTAssertTrue(
+                    prompt.body.hasSuffix(" Everyone must agree to being recorded."),
+                    "\(label): the prompt reminds that everyone in the meeting must agree",
+                )
                 XCTAssertEqual(store.isDenied(app), answer == .never, "\(label): only Never denies the app")
                 loop.stop()
             }

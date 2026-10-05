@@ -58,6 +58,35 @@ final class GeneralSettingsRecordWithoutAskingTests: XCTestCase {
         XCTAssertFalse(try toggle("Microsoft Teams", in: view).isDisabled())
     }
 
+    /// Without the prompt nothing reminds anyone at the moment recording
+    /// starts, so a switched-on app carries that reminder in Settings, and
+    /// only while its switch is on.
+    func testTheConsentNoteShowsOnlyWhileAnAppsSwitchIsOn() throws {
+        let settings = try makeSettings()
+        settings.recordWithoutAskingApps = ["Zoom"]
+        let view = GeneralSettingsView(settings: settings, notificationVisibility: nil)
+        func note(_ appName: String) throws -> String {
+            try view.inspect()
+                .find(viewWithAccessibilityIdentifier: A11yID.recordWithoutAskingConsentNote(appName))
+                .find(ViewType.Text.self)
+                .string()
+        }
+
+        XCTAssertEqual(
+            try note("Zoom"),
+            """
+            Without the prompt, making sure everyone agrees to being recorded is entirely \
+            up to you (Art. 179bis StGB, Swiss Criminal Code).
+            """,
+        )
+        XCTAssertNil(try? note("Microsoft Teams"), "a switch that is off shows no note")
+
+        try toggle("Microsoft Teams", in: view).tap()
+        XCTAssertNoThrow(try note("Microsoft Teams"), "switching on shows the note")
+        try toggle("Zoom", in: view).tap()
+        XCTAssertNil(try? note("Zoom"), "switching off hides the note")
+    }
+
     /// Browser meetings always ask, so they get no switch.
     func testBrowserMeetingsHaveNoSwitch() throws {
         let settings = try makeSettings()

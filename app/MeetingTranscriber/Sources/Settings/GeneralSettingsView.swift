@@ -59,6 +59,19 @@ struct GeneralSettingsView: View {
                     Toggle(pattern.appName, isOn: recordWithoutAskingBinding(for: pattern.appName))
                         .disabled(!settings.watchApps.contains(pattern.appName))
                         .accessibilityIdentifier(A11yID.recordWithoutAskingToggle(pattern.appName))
+                    // With the switch on, no prompt reminds anyone that everyone
+                    // must agree, so the switch carries the reminder instead.
+                    if settings.recordWithoutAskingApps.contains(pattern.appName) {
+                        Text(
+                            """
+                            Without the prompt, making sure everyone agrees to being recorded is entirely \
+                            up to you (Art. 179bis StGB, Swiss Criminal Code).
+                            """,
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier(A11yID.recordWithoutAskingConsentNote(pattern.appName))
+                    }
                 }
                 Text(
                     """

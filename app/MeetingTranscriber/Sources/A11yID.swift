@@ -40,6 +40,13 @@ enum A11yID {
         "recordWithoutAskingToggle.\(appName)"
     }
 
+    /// The consent note under one app's switch, shown only while that switch
+    /// is on. Its presence therefore says the switch is on, which the Settings
+    /// window already shows to `/screenshot`.
+    static func recordWithoutAskingConsentNote(_ appName: String) -> String {
+        "recordWithoutAskingConsentNote.\(appName)"
+    }
+
     /// Menu bar job row's Retry button, addressed by ROW INDEX like
     /// `consentDeniedAppRemove`, so every row's button has its own handle and
     /// no meeting title ends up in an identifier.
