@@ -182,6 +182,46 @@ final class WhisperTokenizerCacheTests: XCTestCase {
         XCTAssertEqual(recorder.trials, [layout.modelFolder, layout.paths[0]])
     }
 
+    /// A broken copy in the first search path, the download cache itself, with the
+    /// download records the Hub client wrote for it. The client keeps a file whose record
+    /// still names the current commit without reading it, so a fetch over it would hand
+    /// the same broken bytes back; the files and their records have to be gone before
+    /// the fetch runs, or the load fails until the user deletes the cache by hand.
+    func testABrokenCopyInTheFirstSearchPathIsRemovedWithItsRecordsBeforeTheFetch() async throws {
+        let layout = try makeLayout()
+        let cacheFolder = layout.paths[0]
+        let recordsFolder = cacheFolder.appendingPathComponent(".cache/huggingface/download")
+        var cached: [URL] = []
+        for name in WhisperTokenizerCache.files {
+            try write("not json", named: name, in: cacheFolder)
+            // The record the client writes: commit hash, etag, timestamp, one per line.
+            try write("0123456789abcdef0123456789abcdef01234567\n\"etag\"\n1.0\n", named: "\(name).metadata", in: recordsFolder)
+            cached += [cacheFolder.appendingPathComponent(name), recordsFolder.appendingPathComponent("\(name).metadata")]
+        }
+        let recorder = Recorder()
+        final class Seen: @unchecked Sendable {
+            var atFetch: [String] = []
+        }
+        let seen = Seen()
+
+        try await layout.cache.ensureLoadable(
+            token: "",
+            mayFetch: true,
+            fetch: { repository, downloadBase, token in
+                recorder.fetches.append(.init(repository: repository, downloadBase: downloadBase, token: token))
+                seen.atFetch = cached.filter { FileManager.default.fileExists(atPath: $0.path) }.map(\.lastPathComponent)
+            },
+            trialLoad: { folder, _, _ in
+                recorder.trials.append(folder)
+                if recorder.trials.count == 1 { throw TrialFailed(folder: folder) }
+            },
+        )
+
+        XCTAssertEqual(recorder.trials, [cacheFolder, cacheFolder])
+        XCTAssertEqual(recorder.fetches.count, 1)
+        XCTAssertEqual(seen.atFetch, [], "The fetch must find the broken copy and its download records gone")
+    }
+
     func testAFetchedCopyThatStillDoesNotLoadFailsTheLoad() async throws {
         let layout = try makeLayout()
         let recorder = Recorder()

@@ -134,9 +134,12 @@ struct WhisperTokenizerCache {
     /// it. When none holds one, or that one does not load, the tokenizer is fetched
     /// with `token` into the first search path, where WhisperKit looks first, and tried
     /// again. Without `mayFetch` that is a `folderNotLoadable` failure instead. Any
-    /// fetch or trial error after that fails the load. A copy whose download record
-    /// still matches the Hub is not fetched again, so a file damaged after its download
-    /// fails here too; deleting the cache folder repairs it.
+    /// fetch or trial error after that fails the load.
+    ///
+    /// The fetch writes a fresh copy: whatever of the three files already sits in the
+    /// first search path is removed first, with its download records, because the Hub
+    /// client keeps a file whose record still names the current commit without reading
+    /// it, and a fetch over a damaged copy would hand the same bytes back.
     func ensureLoadable(
         token: String,
         mayFetch: Bool,
@@ -163,8 +166,27 @@ struct WhisperTokenizerCache {
         }
         guard mayFetch else { throw WhisperKitModelError.folderNotLoadable }
 
+        try Self.removeCachedTokenizer(in: searchPaths[0])
         try await fetch(repository, downloadBase, token)
         try await trialLoad(searchPaths[0], downloadBase, token)
+    }
+
+    /// Where the Hub client keeps a downloaded file's record (commit hash, etag,
+    /// timestamp), relative to the repository folder: `HubApi.snapshot` in ArgmaxCore
+    /// builds `<repository folder>/.cache/huggingface/download/<file>.metadata`.
+    static let downloadRecordsFolder = ".cache/huggingface/download"
+
+    /// Remove the tokenizer files in `folder`, and their download records, so the next
+    /// fetch downloads them again instead of keeping a copy whose record still matches.
+    /// Only the three files are touched; a missing one is not an error.
+    static func removeCachedTokenizer(in folder: URL) throws {
+        let records = folder.appendingPathComponent(downloadRecordsFolder)
+        for name in files {
+            let urls = [folder.appendingPathComponent(name), records.appendingPathComponent("\(name).metadata")]
+            for url in urls where FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.removeItem(at: url)
+            }
+        }
     }
 
     /// Fetch the tokenizer files with exactly `token` (`""` for none).
