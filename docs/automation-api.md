@@ -290,7 +290,7 @@ state rather than failing.
 ### POST /v1/record
 
 Record the system microphone with no app audio, for a meeting happening in the
-room rather than in an app. The same thing the menu bar's *Record Microphone*
+room rather than in an app. The same thing the menu bar's *Record Microphone Only*
 item does.
 
 ```bash

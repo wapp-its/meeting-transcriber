@@ -67,13 +67,13 @@ final class MenuBarViewTests: XCTestCase {
     func testIdleShowsStartWatching() throws {
         let sut = makeView(status: makeStatus(state: .idle), isWatching: false)
         let body = try sut.inspect()
-        XCTAssertNoThrow(try body.find(text: "Start Watching"))
+        XCTAssertNoThrow(try body.find(text: "Start Watching for Meetings"))
     }
 
     func testWatchingShowsStopWatching() throws {
         let sut = makeView(status: makeStatus(state: .watching), isWatching: true)
         let body = try sut.inspect()
-        XCTAssertNoThrow(try body.find(text: "Stop Watching"))
+        XCTAssertNoThrow(try body.find(text: "Stop Watching for Meetings"))
     }
 
     // MARK: - Meeting info
@@ -173,7 +173,7 @@ final class MenuBarViewTests: XCTestCase {
     func testRecordMicrophoneButtonShownWhenIdle() throws {
         let sut = makeView(status: makeStatus(state: .idle))
         let body = try sut.inspect()
-        XCTAssertNoThrow(try body.find(button: "Record Microphone"))
+        XCTAssertNoThrow(try body.find(button: "Record Microphone Only"))
     }
 
     func testRecordMicrophoneButtonCallsCallback() throws {
@@ -181,7 +181,7 @@ final class MenuBarViewTests: XCTestCase {
         // swiftlint:disable:next trailing_closure
         let sut = makeView(status: makeStatus(state: .idle), onRecordMicrophone: { called = true })
 
-        try sut.inspect().find(button: "Record Microphone").tap()
+        try sut.inspect().find(button: "Record Microphone Only").tap()
 
         XCTAssertTrue(called)
     }
@@ -190,7 +190,7 @@ final class MenuBarViewTests: XCTestCase {
         // Same rule as Record App...: the menu offers Stop Recording instead.
         let sut = makeView(status: makeStatus(state: .recording))
         let body = try sut.inspect()
-        XCTAssertThrowsError(try body.find(button: "Record Microphone"))
+        XCTAssertThrowsError(try body.find(button: "Record Microphone Only"))
     }
 
     func testRecordMicrophoneButtonDisabledWhenNoMicIsSet() throws {
@@ -199,7 +199,7 @@ final class MenuBarViewTests: XCTestCase {
         // anyway would record nothing.
         let sut = makeView(status: makeStatus(state: .idle), noMic: true)
 
-        let button = try sut.inspect().find(button: "Record Microphone")
+        let button = try sut.inspect().find(button: "Record Microphone Only")
         XCTAssertTrue(button.isDisabled())
     }
 
@@ -209,7 +209,7 @@ final class MenuBarViewTests: XCTestCase {
         // enabled and the click silently dropped by the ownership guard.
         let sut = makeView(status: makeStatus(state: .idle), manualRecordingPendingOrActive: true)
 
-        let button = try sut.inspect().find(button: "Record Microphone")
+        let button = try sut.inspect().find(button: "Record Microphone Only")
         XCTAssertTrue(button.isDisabled())
     }
 
@@ -218,7 +218,7 @@ final class MenuBarViewTests: XCTestCase {
         // disabled would pass just as well.
         let sut = makeView(status: makeStatus(state: .idle), noMic: false)
 
-        let button = try sut.inspect().find(button: "Record Microphone")
+        let button = try sut.inspect().find(button: "Record Microphone Only")
         XCTAssertFalse(button.isDisabled())
     }
 
@@ -247,7 +247,7 @@ final class MenuBarViewTests: XCTestCase {
             onQuit: {},
         )
         let body = try sut.inspect()
-        try body.find(button: "Start Watching").tap()
+        try body.find(button: "Start Watching for Meetings").tap()
         XCTAssertTrue(called)
     }
 
@@ -682,13 +682,13 @@ final class MenuBarViewTests: XCTestCase {
     func testRecordAppButtonExistsWhenIdle() throws {
         let sut = makeView(status: makeStatus(state: .idle))
         let body = try sut.inspect()
-        XCTAssertNoThrow(try body.find(text: "Record App..."))
+        XCTAssertNoThrow(try body.find(text: "Record App + Microphone..."))
     }
 
     func testRecordAppButtonHiddenDuringRecording() throws {
         let sut = makeView(status: makeStatus(state: .recording))
         let body = try sut.inspect()
-        XCTAssertThrowsError(try body.find(text: "Record App..."))
+        XCTAssertThrowsError(try body.find(text: "Record App + Microphone..."))
     }
 
     func testRecordAppButtonCallsCallback() throws {
@@ -714,7 +714,7 @@ final class MenuBarViewTests: XCTestCase {
             onQuit: {},
         )
         let body = try sut.inspect()
-        try body.find(button: "Record App...").tap()
+        try body.find(button: "Record App + Microphone...").tap()
         XCTAssertTrue(called)
     }
 
@@ -841,7 +841,7 @@ final class MenuBarViewTests: XCTestCase {
     func testRecordAppAndStopBothHiddenDuringAutoRecording() throws {
         let sut = makeView(status: makeStatus(state: .recording), onStopManualRecording: nil)
         let body = try sut.inspect()
-        XCTAssertThrowsError(try body.find(text: "Record App..."))
+        XCTAssertThrowsError(try body.find(text: "Record App + Microphone..."))
         XCTAssertThrowsError(try body.find(text: "Stop Recording"))
     }
 
@@ -850,7 +850,7 @@ final class MenuBarViewTests: XCTestCase {
         let sut = makeView(status: makeStatus(state: .idle), onStopManualRecording: {})
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Stop Recording"))
-        XCTAssertThrowsError(try body.find(text: "Record App..."))
+        XCTAssertThrowsError(try body.find(text: "Record App + Microphone..."))
     }
 
     // MARK: - Job state labels
