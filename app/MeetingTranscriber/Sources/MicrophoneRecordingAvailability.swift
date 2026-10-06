@@ -1,6 +1,6 @@
 import Foundation
 
-/// Whether the menu bar's "Record Microphone" item can start a recording, and
+/// Whether the menu bar's "Record Microphone Only" item can start a recording, and
 /// if not, why.
 ///
 /// Mirrors `AppPickerStartState`: the menu asks one value what to render rather
