@@ -164,9 +164,11 @@ extension AppMeetingPattern {
     /// answer before it records. Every watched app asks unless the user listed
     /// it in `recordWithoutAsking` (`AppSettings.recordWithoutAskingApps`).
     ///
-    /// A listed name counts only when it is one of the
-    /// `recordWithoutAskingCandidates`, so a stored name that matches no such
-    /// app (a browser, or a typo) never turns a prompt off. Anything this
+    /// A listed name counts only for the built-in pattern itself, compared
+    /// whole and not by name: a stored name that matches no such app (a
+    /// browser, or a typo) never turns a prompt off, and neither does an app
+    /// added through "Add App…" that happens to carry a built-in's name,
+    /// since its synthesised pattern differs from the built-in one. Anything this
     /// function does not recognise asks: failing towards the question is the
     /// safe side, since the cost of a needless prompt is a click and the cost of
     /// a missing one is a recording nobody agreed to.
@@ -175,8 +177,8 @@ extension AppMeetingPattern {
         // The meeting simulator is the fixture the end-to-end lanes record with
         // (`tools/meeting-simulator`); nobody is there to answer a prompt, so it
         // records at once. It is not a watchable app and has no switch.
-        if appName == Self.simulator.appName { return false }
-        let isCandidate = Self.recordWithoutAskingCandidates.contains { $0.appName == appName }
+        if self == Self.simulator { return false }
+        let isCandidate = Self.recordWithoutAskingCandidates.contains(self)
         return !(isCandidate && recordWithoutAsking.contains(appName))
     }
 

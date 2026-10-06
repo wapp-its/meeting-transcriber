@@ -1,5 +1,5 @@
+import AppKit
 import CoreAudio
-import Foundation
 import os.log
 
 private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "MicInputDetector")
@@ -32,6 +32,27 @@ class MicInputDetector: MeetingDetecting {
         /// Bundle IDs whose audio processes count as this app (main app +
         /// helper/conference-daemon processes).
         let bundleIDs: [String]
+        /// Also match `<bundleID>.*`: Electron/Chromium apps capture the mic in
+        /// a helper bundle such as `com.example.callapp.helper`.
+        var matchesHelpers = false
+        var usesBuiltInMeetingPattern = true
+
+        func matches(bundleID: String) -> Bool {
+            bundleIDs.contains { $0 == bundleID || (matchesHelpers && bundleID.hasPrefix($0 + ".")) }
+        }
+
+        /// An app added through "Add App…" always asks before recording: it
+        /// has no "record without asking" switch, and its display name can
+        /// equal a built-in app's, whose switch must not carry over to it.
+        var meetingPattern: AppMeetingPattern {
+            guard usesBuiltInMeetingPattern else {
+                return AppMeetingPattern(
+                    appName: appName, ownerNames: [appName], meetingPatterns: [], requiresRecordingConsent: true,
+                )
+            }
+            return AppMeetingPattern.forAppName(appName)
+                ?? AppMeetingPattern(appName: appName, ownerNames: [appName], meetingPatterns: [])
+        }
     }
 
     static let defaultPatterns: [MicPattern] = [
@@ -67,9 +88,23 @@ class MicInputDetector: MeetingDetecting {
 
     /// The `defaultPatterns` subset selected by the user's "Apps to Watch"
     /// toggles — same contract as `PowerAssertionDetector.patterns(watching:)`.
-    static func patterns(watching watchedAppNames: [String]) -> [MicPattern] {
+    static func patterns(watching watchedAppNames: [String], customBundleIDs: [String] = []) -> [MicPattern] {
         let watched = Set(watchedAppNames)
-        return defaultPatterns.filter { watched.contains($0.appName) }
+        return defaultPatterns.filter { watched.contains($0.appName) } + customBundleIDs.map(customPattern(bundleID:))
+    }
+
+    static func customPattern(bundleID: String) -> MicPattern {
+        MicPattern(
+            appName: appDisplayName(bundleID: bundleID),
+            bundleIDs: [bundleID],
+            matchesHelpers: true,
+            usesBuiltInMeetingPattern: false,
+        )
+    }
+
+    static func appDisplayName(bundleID: String) -> String {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return bundleID }
+        return url.deletingPathExtension().lastPathComponent
     }
 
     private let patterns: [MicPattern]
@@ -94,6 +129,10 @@ class MicInputDetector: MeetingDetecting {
     /// app's confirmation count.
     var isIdentityDenied: (String) -> Bool = { _ in false }
 
+    var mainAppPIDProvider: (String) -> pid_t? = { bundleID in
+        NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first?.processIdentifier
+    }
+
     private let matchers: [String: MeetingTitleMatcher]
 
     struct AudioProcessSnapshot {
@@ -109,13 +148,7 @@ class MicInputDetector: MeetingDetecting {
         self.patterns = patterns
         self.confirmationCount = confirmationCount
         matchers = patterns.reduce(into: [:]) { dict, pattern in
-            guard let meetingPattern = AppMeetingPattern.forAppName(pattern.appName) else {
-                logger.error(
-                    "No AppMeetingPattern for watched app \(pattern.appName, privacy: .public); its meeting titles fall back to the placeholder",
-                )
-                return
-            }
-            dict[pattern.appName] = MeetingTitleMatcher(pattern: meetingPattern)
+            dict[pattern.meetingPattern.appName] = MeetingTitleMatcher(pattern: pattern.meetingPattern)
         }
     }
 
@@ -133,27 +166,29 @@ class MicInputDetector: MeetingDetecting {
         let processes = processProvider()
         var hitsThisRound: Set<String> = []
         var firstMatch: [String: pid_t] = [:]
+        // The pattern that matched, kept rather than looked up again by name:
+        // an added app can share a built-in's name, and a lookup by name
+        // returns the built-in one with its consent setting.
+        var matchedPattern: [String: AppMeetingPattern] = [:]
 
         for process in processes where process.isRunningInput {
-            guard let pattern = patterns.first(where: { $0.bundleIDs.contains(process.bundleID) }) else {
+            guard let pattern = patterns.first(where: { $0.matches(bundleID: process.bundleID) }) else {
                 logUnmatchedRunningInput(bundleID: process.bundleID)
                 continue
             }
-            if isIdentityDenied(pattern.appName) { continue }
-            if let until = cooldownUntil[pattern.appName], Date() < until { continue }
-            guard !hitsThisRound.contains(pattern.appName) else { continue }
-            hitsThisRound.insert(pattern.appName)
-            firstMatch[pattern.appName] = process.pid
-            consecutiveHits[pattern.appName, default: 0] += 1
+            let appName = pattern.meetingPattern.appName
+            if isIdentityDenied(appName) { continue }
+            if let until = cooldownUntil[appName], Date() < until { continue }
+            guard !hitsThisRound.contains(appName) else { continue }
+            hitsThisRound.insert(appName)
+            firstMatch[appName] = tapRootPID(for: process, pattern: pattern)
+            matchedPattern[appName] = pattern.meetingPattern
+            consecutiveHits[appName, default: 0] += 1
         }
 
         for (appName, hits) in consecutiveHits where !excludedApps.contains(appName) {
-            if hits >= confirmationCount, let pid = firstMatch[appName] {
-                let meetingPattern = AppMeetingPattern.forAppName(appName) ?? AppMeetingPattern(
-                    appName: appName,
-                    ownerNames: [appName],
-                    meetingPatterns: [],
-                )
+            if hits >= confirmationCount, let pid = firstMatch[appName],
+               let meetingPattern = matchedPattern[appName] {
                 let title = matchers[appName]?.selectWindowTitle(from: windowListProvider())
                     ?? PowerAssertionDetector.placeholderTitle(appName: appName)
                 return DetectedMeeting(
@@ -173,10 +208,19 @@ class MicInputDetector: MeetingDetecting {
     }
 
     func isMeetingActive(_ meeting: DetectedMeeting) -> Bool {
-        guard let pattern = patterns.first(where: { $0.appName == meeting.pattern.appName }) else {
-            return false
+        let candidates = patterns.filter { $0.meetingPattern.appName == meeting.pattern.appName }
+        guard !candidates.isEmpty else { return false }
+        return processProvider().contains { process in
+            process.isRunningInput && candidates.contains { $0.matches(bundleID: process.bundleID) }
         }
-        return processProvider().contains { $0.isRunningInput && pattern.bundleIDs.contains($0.bundleID) }
+    }
+
+    /// A helper holding the mic is swapped for its main app, whose bundle the
+    /// recorder expands to the whole process tree; tapping the helper's own
+    /// nested bundle would miss the renderer playing the call audio.
+    private func tapRootPID(for process: AudioProcessSnapshot, pattern: MicPattern) -> pid_t {
+        guard !pattern.bundleIDs.contains(process.bundleID) else { return process.pid }
+        return pattern.bundleIDs.lazy.compactMap(mainAppPIDProvider).first ?? process.pid
     }
 
     func reset(appName: String? = nil) {

@@ -56,4 +56,18 @@ final class AppSettingsRecordWithoutAskingTests: XCTestCase {
         settings.consentDeniedApps = ["Microsoft Teams", "Google Chrome"]
         XCTAssertTrue(settings.anyWatchedAppAsksFirst)
     }
+
+    /// An app added through "Add App…" always asks, so with it as the only
+    /// watched app the prompt still has to reach the user; denied, it does not.
+    func testAnAddedAppCountsAsAskingUntilDenied() throws {
+        let settings = try AppSettings(defaults: makeDefaults())
+        settings.watchTeams = false
+        settings.watchZoom = false
+        settings.watchWebex = false
+        settings.watchCustomApps = ["com.example.not-installed"]
+        XCTAssertTrue(settings.anyWatchedAppAsksFirst, "the added app asks")
+
+        settings.consentDeniedApps = ["com.example.not-installed"]
+        XCTAssertFalse(settings.anyWatchedAppAsksFirst, "the added app is denied under its display name")
+    }
 }
