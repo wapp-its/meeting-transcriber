@@ -296,7 +296,7 @@ final class ManagedCounter {
 // MARK: - Shared Mock Classes
 
 /// A `MeetingDetecting` stub that never detects a meeting and reports any given
-/// meeting as inactive — so a `WatchLoop.handleMeeting(...)` ends immediately.
+/// meeting as inactive — so `WatchLoop.handleMeeting(...)` ends once grace and countdown run out.
 /// Shared so per-test files don't each redeclare it.
 final class ImmediatelyInactiveDetector: MeetingDetecting {
     func checkOnce() -> DetectedMeeting? {

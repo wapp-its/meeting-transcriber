@@ -159,6 +159,8 @@ final class WatchLoopAskBeforeRecordingTests: XCTestCase {
             recorderFactory: { recorders.make() },
             pollInterval: 0.05,
             endGracePeriod: 0.05,
+            // Short, so a call ended in a test stops its recording in time.
+            meetingEndCountdown: 0.05,
             recordOnly: { recordOnly },
             // Never the production staging directory: a stopped recording is
             // finalised, and record-only writes it out.

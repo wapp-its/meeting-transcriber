@@ -39,6 +39,18 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
     /// UNUserNotificationCenter add + delegate callback to it.
     private let consentCoordinator = ConsentPromptCoordinator(timeout: NotificationManager.consentPromptTimeout)
 
+    // MARK: - Meeting-end question
+
+    /// Category + action identifiers for "the meeting seems to have ended".
+    /// Its own category rather than the consent prompt's answers: a stop, a
+    /// dismissal and an expiry have to stay distinguishable, and Record /
+    /// Ignore / Never mean none of them.
+    static let meetingEndCategoryID = "MEETING_END_QUESTION"
+    static let keepRecordingActionID = "MEETING_END_KEEP_RECORDING"
+    static let stopNowActionID = "MEETING_END_STOP_NOW"
+
+    private let meetingEndQuestions = MeetingEndQuestions()
+
     #if !APPSTORE
         /// Bounded in-memory log of every notification posted through
         /// `notify(...)`, read by the dev-only debug RPC `/state.notifications`
@@ -83,7 +95,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
         }
         isSetUp = true
         scheduler.setDelegate(self)
-        scheduler.setCategories([Self.makeConsentCategory()])
+        scheduler.setCategories([Self.makeConsentCategory(), Self.makeMeetingEndCategory()])
         scheduler.requestAuthorization()
     }
 
@@ -350,13 +362,94 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
         )
     }
 
-    // Handle a tapped consent action (or a dismiss) → resolve the prompt.
-    // swiftlint:disable:next async_without_await
-    func userNotificationCenter(_: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        resolveConsent(
-            responseIdentifier: response.notification.request.identifier,
-            actionIdentifier: response.actionIdentifier,
+    // MARK: - Meeting-end question
+
+    /// The "meeting seems to have ended" category with Keep recording / Stop
+    /// now. No `.foreground` on either, for the consent prompt's reasons: the
+    /// answer arrives without activating the app, and pulling the user out of
+    /// a call they just said is still running would be the opposite of help.
+    static func makeMeetingEndCategory() -> UNNotificationCategory {
+        let keep = UNNotificationAction(identifier: keepRecordingActionID, title: "Keep recording", options: [])
+        let stop = UNNotificationAction(identifier: stopNowActionID, title: "Stop now", options: [])
+        return UNNotificationCategory(
+            identifier: meetingEndCategoryID,
+            actions: [keep, stop],
+            intentIdentifiers: [],
+            options: [],
         )
+    }
+
+    /// Pure mapping from the tapped action to an answer. Only the two actions
+    /// answer; a tap on the body, a dismissal or anything unrecognised is no
+    /// answer at all and leaves the countdown running, so nothing but an
+    /// explicit "Keep recording" can keep the room recorded.
+    static func meetingEndAnswer(for actionIdentifier: String) -> MeetingEndAnswer? {
+        switch actionIdentifier {
+        case keepRecordingActionID: .keepRecording
+        case stopNowActionID: .stopNow
+        default: nil
+        }
+    }
+
+    /// Post the question and return. Time sensitive for the same reason as the
+    /// consent prompt: it carries a deadline, and an ordinary banner is gone
+    /// in seconds and hidden by any Focus. When it cannot be posted nothing is
+    /// registered and nothing ever answers; the caller's countdown ends the
+    /// recording, which is the whole safety argument.
+    @MainActor
+    func askBeforeEndingRecording(
+        id: String,
+        title: String,
+        body: String,
+        onAnswer: @escaping MeetingEndQuestionHandler,
+    ) {
+        let deliverable = deliverableOrLogDrop()
+        #if !APPSTORE
+            // Recorded before the delivery guard, like every other notification,
+            // so "never asked" and "asked but could not show it" stay apart.
+            recentNotificationsLog.record(title: title, body: body, posted: deliverable)
+        #endif
+        guard deliverable else { return }
+
+        // Registered before posting, so a fast tap cannot race ahead of it.
+        meetingEndQuestions.register(id: id, handler: onAnswer)
+        let urgency = NotificationUrgency.timeSensitive
+        scheduler.add(UNNotificationRequest(
+            identifier: id,
+            content: Self.makeNotificationContent(
+                title: title, body: body, categoryID: Self.meetingEndCategoryID, urgency: urgency,
+            ),
+            trigger: nil,
+        ))
+        logPosted(id: id, urgency: urgency)
+    }
+
+    /// Forget the question and take it out of Notification Center, which keeps
+    /// a notification that was answered on screen, expired or overtaken by a
+    /// returning signal from offering a choice about a moment that has passed.
+    func withdrawMeetingEndQuestion(id: String) {
+        _ = meetingEndQuestions.take(id: id)
+        scheduler.removeDelivered(withIdentifiers: [id])
+    }
+
+    /// Deliver a tap on a meeting-end question, from a response's primitives so
+    /// it stays testable without a real `UNNotificationResponse`. A question
+    /// is answered at most once; a withdrawn one is not answered at all.
+    func answerMeetingEndQuestion(id: String, actionIdentifier: String) async {
+        guard let answer = Self.meetingEndAnswer(for: actionIdentifier),
+              let handler = meetingEndQuestions.take(id: id) else { return }
+        await handler(answer)
+    }
+
+    // Handle a tapped action (or a dismiss): a meeting-end question by its
+    // category, everything else is the consent prompt.
+    func userNotificationCenter(_: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        let request = response.notification.request
+        if request.content.categoryIdentifier == Self.meetingEndCategoryID {
+            await answerMeetingEndQuestion(id: request.identifier, actionIdentifier: response.actionIdentifier)
+            return
+        }
+        resolveConsent(responseIdentifier: request.identifier, actionIdentifier: response.actionIdentifier)
     }
 
     // Show notifications even when app is in foreground

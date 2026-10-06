@@ -57,6 +57,7 @@ final class WatchLoopActiveRecorderTests: XCTestCase {
             pollInterval: 0.01,
             endGracePeriod: 0.01,
             maxDuration: 10,
+            meetingEndCountdown: 0.01,
             noMic: true,
         )
         loop.permissionChecker = {
@@ -93,6 +94,7 @@ final class WatchLoopActiveRecorderTests: XCTestCase {
             pollInterval: 0.01,
             endGracePeriod: 0.01,
             maxDuration: 10,
+            meetingEndCountdown: 0.01,
             noMic: true,
         )
         loop.permissionChecker = {

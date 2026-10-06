@@ -44,6 +44,10 @@ class WatchLoop {
     let pollInterval: TimeInterval
     let endGracePeriod: TimeInterval
     let maxDuration: TimeInterval
+    /// How long the "meeting seems to have ended" question stays open before
+    /// the recording ends anyway. Fixed at `meetingEndQuestionCountdown` in the
+    /// app; injectable so tests need not wait it out.
+    let meetingEndCountdown: TimeInterval
     let noMic: Bool
     let micDeviceUID: String?
     /// Dynamic accessor — read at recording-start time so toggling the setting
@@ -62,6 +66,14 @@ class WatchLoop {
     /// Surface user-facing failures (e.g. sidecar write errors) that don't
     /// transition state to `.error`. Defaults to a silent no-op for tests.
     let notifier: any AppNotifying
+    /// Where the automatic-stop lines go (`WatchLoop+MeetingEnd.swift`).
+    let diagnostics: any DiagnosticsLogging
+
+    /// The open "meeting seems to have ended" question and the answer parked
+    /// for the next poll. Internal for `WatchLoop+MeetingEnd.swift`, which owns
+    /// both, the way the consent extension owns `pendingConsentApp`.
+    var meetingEndQuestionID: String?
+    var meetingEndAnswer: MeetingEndAnswer?
 
     /// Wall-clock source. Defaults to `Date()`; tests inject a `TestClock`
     /// so timing-sensitive paths become deterministic instead of racing
@@ -128,6 +140,7 @@ class WatchLoop {
         pollInterval: TimeInterval = 3.0,
         endGracePeriod: TimeInterval = 15.0,
         maxDuration: TimeInterval = 14400,
+        meetingEndCountdown: TimeInterval = WatchLoop.meetingEndQuestionCountdown,
         noMic: Bool = false,
         micDeviceUID: String? = nil,
         verboseDiagnostics: @escaping () -> Bool = { false },
@@ -137,6 +150,7 @@ class WatchLoop {
         },
         recordWithoutAskingApps: @escaping () -> [String] = { [] },
         notifier: any AppNotifying = SilentNotifier(),
+        diagnostics: any DiagnosticsLogging = OSLogDiagnostics(category: "WatchLoop"),
         nowProvider: @escaping () -> Date = Date.init,
         sleepProvider: @escaping (TimeInterval) async throws -> Void = { interval in
             try await Task.sleep(for: .seconds(interval))
@@ -151,12 +165,14 @@ class WatchLoop {
         self.pollInterval = pollInterval
         self.endGracePeriod = endGracePeriod
         self.maxDuration = maxDuration
+        self.meetingEndCountdown = meetingEndCountdown
         self.noMic = noMic
         self.micDeviceUID = micDeviceUID
         self.verboseDiagnostics = verboseDiagnostics
         self.recordOnly = recordOnly
         self.recordOnlyDestination = recordOnlyDestination
         self.notifier = notifier
+        self.diagnostics = diagnostics
         self.nowProvider = nowProvider
         self.sleepProvider = sleepProvider
         self.pidAliveCheck = pidAliveCheck
@@ -392,6 +408,10 @@ class WatchLoop {
         )
         activeRecorder = recorder
         defer { activeRecorder = nil }
+        // Taken once capture runs, so every saved track's first frame is at or
+        // before it, and a cut measured from here never keeps audio past its
+        // cut point.
+        let recordingStartedAt = nowProvider()
 
         // Read participants (Teams)
         var participants: [String] = []
@@ -402,23 +422,20 @@ class WatchLoop {
             participants = names
         }
 
-        // Wait for meeting to end. If the watch task is cancelled mid-recording
-        // — the user clicked Stop Watching, or started a manual recording, both
-        // of which call `stop()` → `watchTask.cancel()` — treat it like a
-        // natural meeting end: fall through and finalize the recording rather
-        // than letting `CancellationError` discard it. The original bug lost
-        // the entire recording here (no WAV finalization, no PipelineJob, no
-        // naming dialog) because the cancellation propagated past `stop()` and
-        // `enqueueRecording()`. `recorder.stop()` + `enqueueRecording()` below
-        // are synchronous, so they still run to completion on the cancelled task.
-        do {
-            try await waitForMeetingEnd(meeting)
-        } catch is CancellationError {
-            logger.info("Watch cancelled mid-recording — finalizing in-flight recording")
-        }
+        // Wait for the meeting to end. A cancelled watch task (Stop Watching,
+        // which calls `stop()` → `watchTask.cancel()`) comes back here like a
+        // natural end, so the recording is finalized rather than discarded
+        // (see `waitForMeetingEnd`). `recorder.stop()`, the cut and
+        // `enqueueRecording()` below are synchronous, so they run to completion
+        // on the cancelled task, and nothing else can start a recording while
+        // they do.
+        let cutAt = try await waitForMeetingEnd(meeting)
 
         // Stop recording
-        let recording = try recorder.stop()
+        var recording = try recorder.stop()
+        if let cutAt {
+            recording.recordedUntil = cutBack(recording, to: cutAt, startedAt: recordingStartedAt)
+        }
 
         // --- Enqueue for background processing ---
         enqueueRecording(
@@ -428,39 +445,6 @@ class WatchLoop {
             trigger: .auto,
             participants: participants,
         )
-    }
-
-    // MARK: - Meeting End Detection
-
-    func waitForMeetingEnd(_ meeting: DetectedMeeting) async throws {
-        var graceStart: Date?
-        let startTime = nowProvider()
-        let config = WatchLoopEndConfig(
-            maxDuration: maxDuration,
-            endGracePeriod: endGracePeriod,
-        )
-
-        while !Task.isCancelled {
-            let decision = WatchLoopEndPolicy.step(
-                config: config,
-                now: nowProvider(),
-                startTime: startTime,
-                graceStart: graceStart,
-                meetingActive: detector.isMeetingActive(meeting),
-            )
-            switch decision {
-            case .stopMaxDurationExceeded:
-                logger.info("Max recording duration reached (\(Int(self.maxDuration))s)")
-                return
-
-            case .stopGraceExpired:
-                return
-
-            case let .continuePolling(newGraceStart):
-                graceStart = newGraceStart
-            }
-            try await sleepProvider(pollInterval)
-        }
     }
 
     // MARK: - Helpers
