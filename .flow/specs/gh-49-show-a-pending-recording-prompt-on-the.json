@@ -1,0 +1,148 @@
+{
+  "branch_name": "feat/gh-49-pending-prompt-icon",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-06T20:19:46.646530Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-49-show-a-pending-recording-prompt-on-the",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-06T20:37:55.051529Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "f4249532d53e8f05a1b35c73b49ca78adf2d707bd8ce5b572a494bb1d10fbb18",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-1767f5bc1d5b409cbf9d9fb369427112",
+            "classification": "introduced",
+            "findingId": "finding-1767f5bc1d5b409cbf9d9fb369427112",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-25ec874788ad4a9dbb106dd3ffbea399",
+            "classification": "introduced",
+            "findingId": "finding-25ec874788ad4a9dbb106dd3ffbea399",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 283230,
+      "output_sha256": "dd65fb384178f3789410c1a13de0267362659004aff7ea0bf3be0875d76b6139",
+      "reservation_id": "4c9b20fcac6a46a2bce4981980e9bed6",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:32:23.109446Z",
+      "tool_calls": 16,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "d71ffbf5bf84bd2f88c99cf458c868dd6e97d10ebaff264cc0723ea0e05d6a65",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-1767f5bc1d5b409cbf9d9fb369427112",
+            "classification": "introduced",
+            "findingId": "finding-1767f5bc1d5b409cbf9d9fb369427112",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-25ec874788ad4a9dbb106dd3ffbea399",
+            "classification": "introduced",
+            "findingId": "finding-25ec874788ad4a9dbb106dd3ffbea399",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 909,
+      "output_sha256": "9ce99ff713db237490bbc7cbda758ae4fd54afbcb9506bfa3e0b259626e31f68",
+      "reservation_id": "4fbc46a63d2e42e6bf93e0c7b78b77b4",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:37:55.024048Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-49-show-a-pending-recording-prompt-on-the.md",
+  "status": "open",
+  "title": "Show a pending recording prompt on the menu bar icon",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABVaV7TA",
+    "identifier": "#49",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/49"
+  },
+  "updated_at": "2026-10-06T20:37:55.052765Z"
+}
