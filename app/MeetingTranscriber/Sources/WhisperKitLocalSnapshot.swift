@@ -39,10 +39,10 @@ enum WhisperKitLocalSnapshot {
     /// present directory proves nothing while a file at its final path is whole.
     static let requiredFiles = ["coremldata.bin", "model.mil", "weights/weight.bin"]
 
-    /// What `WhisperKit.loadTokenizerIfNeeded` reads from a model folder before it
-    /// falls back to fetching the tokenizer from the Hub. Only a picked folder has to
-    /// carry them: it is never downloaded, so without them a load needs the network
-    /// after all. A Hub variant is not checked for them, because the stock ones do
+    /// What the tokenizer load reads from a model folder before it turns to the Hub
+    /// (`HubTokenScopedWhisperKit`). Only a picked folder has to carry them: it is
+    /// never downloaded and its pipe never fetches a tokenizer, so without them the
+    /// load fails. A Hub variant is not checked for them, because the stock ones do
     /// not ship them and get the tokenizer through the download cache instead.
     static let requiredTokenizerFiles = ["tokenizer.json", "tokenizer_config.json"]
 
@@ -65,11 +65,11 @@ enum WhisperKitLocalSnapshot {
     /// required is missing. Pure path and existence checks, never the network.
     ///
     /// "Complete" means the CoreML bundles, not everything a load needs. The tokenizer
-    /// lives in a separate `models/openai/whisper-*` folder that `WhisperKit.init`
-    /// resolves on its own and fetches from the Hub when it is absent, so a model
-    /// folder copied in by hand without that cache still fails offline, and the
-    /// warning will blame the local model. Both normally arrive together, because the
-    /// same download writes them.
+    /// lives in a separate `models/openai/whisper-*` folder that the pipe resolves on
+    /// its own and fetches from the Hub, with the app's token, when it is absent
+    /// (`HubTokenScopedWhisperKit`), so a model folder copied in by hand without that
+    /// cache still fails offline, and the warning will blame the local model. Both
+    /// normally arrive together, because the same load writes them.
     ///
     /// Deliberately stricter than the library in two ways, both of which only ever
     /// cost a download that would have happened anyway. The variant is an exact

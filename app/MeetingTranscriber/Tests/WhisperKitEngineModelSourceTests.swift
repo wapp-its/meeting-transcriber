@@ -135,6 +135,29 @@ final class WhisperKitEngineModelSourceTests: XCTestCase {
         XCTAssertEqual(recorder.pipeFolders, [downloaded])
     }
 
+    /// The token provider is read only by the production source, right before a Hub
+    /// request. A test source must never call it, so no test engine can reach the
+    /// Keychain through it.
+    func testAnInstalledSourceNeverAsksForTheHubToken() async throws {
+        let engine = WhisperKitEngine()
+        engine.hubToken = {
+            XCTFail("An installed test source must not read the Hugging Face token")
+            return ""
+        }
+        let downloaded = try makeTempDirectory(prefix: "wk-downloaded")
+        let recorder = try await installRecordingSource(
+            on: engine,
+            local: nil,
+            download: .success(downloaded),
+            pipe: .success(makeIdlePipe()),
+        )
+
+        await engine.loadModel()
+
+        XCTAssertEqual(engine.modelState, .loaded)
+        XCTAssertEqual(recorder.order, ["download", "pipe"], "Both Hub-facing steps must have run")
+    }
+
     /// A complete-looking but unusable local copy (corrupt weights, a layout CoreML
     /// rejects) must not strand the user: the download repairs it.
     func testLoadModelFallsBackToDownloadWhenTheLocalInitFails() async throws {

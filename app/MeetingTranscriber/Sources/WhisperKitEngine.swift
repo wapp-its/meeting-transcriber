@@ -79,10 +79,15 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
     /// Test-only loader override used to count content reads on cache hits.
     private var vocabularyTermsLoaderOverride: ((String, WhisperVocabularyPrompt.FileRevision) -> WhisperVocabularyPrompt.VocabularyTermsLoadResult)?
     private let modelLoad = SingleFlight<LoadAttempt>()
+    /// The Hugging Face token every Hub request of a load carries, `""` for none. Read
+    /// by the production source when it downloads or builds a pipe, never by a test
+    /// source. Anonymous by default, so an engine built in a test never reads the Keychain.
+    var hubToken: @MainActor () -> String = { "" }
     /// The model-resolution boundary, per origin. Tests replace it wholesale; nothing
     /// needs to tell an override from the default, so this is a value rather than an
     /// optional beside a computed accessor.
-    private var modelSource: @MainActor (WhisperKitModelOrigin) -> WhisperKitModelSource = WhisperKitModelSource.production(for:)
+    private var modelSource: @MainActor (WhisperKitModelOrigin, @escaping @MainActor () -> String) -> WhisperKitModelSource =
+        WhisperKitModelSource.production(for:hubToken:)
     private var vocabularyPromptCache = WhisperVocabularyPrompt.TokenCache()
     /// Debug/quality diagnostic for the effective prompt budget of the most
     /// recent decode. Zero means the decode ran without a vocabulary hint.
@@ -214,7 +219,7 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
         // `source` are read once for the same reason.
         let variant = modelVariant
         let origin = modelOrigin
-        let source = modelSource(origin)
+        let source = modelSource(origin, hubToken)
 
         if await loadFromLocalSnapshot(variant: variant, origin: origin, source: source) {
             return LoadAttempt(variant: variant, origin: origin, builtPipe: true)
@@ -310,13 +315,14 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
 
     /// Installs a model-resolution boundary for focused load tests, so a test can
     /// observe whether the Hub was contacted without downloading a speech model.
+    /// The installed source never sees `hubToken`.
     func installModelSourceForTesting(_ source: WhisperKitModelSource) {
-        modelSource = { _ in source }
+        modelSource = { _, _ in source }
     }
 
     /// Same, for a test that needs to see which origin a load resolved.
     func installModelSourceForTesting(_ makeSource: @escaping @MainActor (WhisperKitModelOrigin) -> WhisperKitModelSource) {
-        modelSource = makeSource
+        modelSource = { origin, _ in makeSource(origin) }
     }
 
     /// Installs a vocabulary-content loader for focused cache tests. Metadata

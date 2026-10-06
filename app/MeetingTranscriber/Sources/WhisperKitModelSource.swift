@@ -29,35 +29,6 @@ struct WhisperKitModelSource {
         folder.path(percentEncoded: false)
     }
 
-    /// Run a Hub download with the token WhisperKit finds on its own, and once more
-    /// without any token when the Hub turns that token away.
-    ///
-    /// WhisperKit's downloader sends whatever Hugging Face token the machine carries
-    /// (`HF_TOKEN`, `~/.cache/huggingface/token`, and a few more places) with every
-    /// request, and the Hub answers a revoked or expired token with 401 even for a
-    /// public repository. A token left behind by some other tool would then fail
-    /// every download with "authentication required", for a model that needs no
-    /// authentication at all. The token is still tried first, so a private or gated
-    /// repository keeps working with a valid one. When the anonymous attempt fails
-    /// too, the first error is the one reported, because it names the actual problem.
-    ///
-    /// `attempt` receives nil to let WhisperKit look the token up, and `""` for no
-    /// token: WhisperKit only falls back to its lookup for nil, and sends no
-    /// `Authorization` header for an empty token.
-    static func downloadRetryingAnonymously(
-        _ attempt: (String?) async throws -> URL,
-    ) async throws -> URL {
-        do {
-            return try await attempt(nil)
-        } catch where isRejectedToken(error) {
-            do {
-                return try await attempt("")
-            } catch _ {
-                throw error
-            }
-        }
-    }
-
     /// Whether `error` is the Hub refusing the request's credentials. WhisperKit
     /// keeps its Hub error type internal, so it is matched by its fully qualified
     /// name, which `testRejectedTokenMatchesWhisperKitsOwnError` pins against the
@@ -67,17 +38,26 @@ struct WhisperKitModelSource {
     }
 
     /// Resolve every step against WhisperKit itself, for the model's origin.
-    static func production(for origin: WhisperKitModelOrigin) -> Self {
+    ///
+    /// `hubToken` is the Hugging Face token every Hub request carries, `""` for none,
+    /// read as the download or the pipe construction starts. Never nil: WhisperKit
+    /// sends the machine's own token (`HF_TOKEN`, `~/.cache/huggingface/token` and four
+    /// more places) when it is handed nil, and the Hub refuses some stale ones, an old
+    /// `hf` CLI OAuth token for one, with 401 even for a public model.
+    static func production(
+        for origin: WhisperKitModelOrigin,
+        hubToken: @escaping @MainActor () -> String = { "" },
+    ) -> Self {
         switch origin {
         case let .hub(repoID):
-            hub(repoID: repoID)
+            hub(repoID: repoID, hubToken: hubToken)
 
         case let .localFolder(path, bookmark):
-            localFolder(path: path, bookmark: bookmark)
+            localFolder(path: path, bookmark: bookmark, hubToken: hubToken)
         }
     }
 
-    private static func hub(repoID: String) -> Self {
+    private static func hub(repoID: String, hubToken: @escaping @MainActor () -> String) -> Self {
         Self(
             locateLocal: { variant in
                 WhisperKitLocalSnapshot.locate(variant: variant, in: WhisperKitLocalSnapshot.repoRoot(for: repoID))
@@ -87,17 +67,19 @@ struct WhisperKitModelSource {
                 // for the stock models: the locator derives its root from the same
                 // id, and a changed default would otherwise have the two point at
                 // different repositories, which shows up as "the model is never found".
-                try await downloadRetryingAnonymously { token in
-                    try await WhisperKit.download(
-                        variant: variant,
-                        from: repoID,
-                        token: token,
-                        progressCallback: progress,
-                    )
-                }
+                try await WhisperKit.download(
+                    variant: variant,
+                    from: repoID,
+                    token: hubToken(),
+                    progressCallback: progress,
+                )
             },
             makePipe: { variant, folder in
-                try await WhisperKit(WhisperKitConfig(model: variant, modelFolder: modelFolderArgument(folder)))
+                try await HubTokenScopedWhisperKit(
+                    WhisperKitConfig(model: variant, modelFolder: modelFolderArgument(folder)),
+                    hubToken: hubToken(),
+                    mayFetchTokenizer: true,
+                )
             },
         )
     }
@@ -106,11 +88,11 @@ struct WhisperKitModelSource {
     /// so the locator is the only way in, and the download step reports what the
     /// folder lacks instead: that is the error the engine logs when the load fails.
     ///
-    /// The folder is checked for the tokenizer too, unlike a Hub variant, because
-    /// WhisperKit fetches a tokenizer it cannot find locally from the Hub, and a
-    /// picked folder is expected to load offline. Sandbox access goes through
-    /// `VocabularyFileAccess`, whose two helpers are not specific to vocabulary.
-    private static func localFolder(path: String, bookmark: Data?) -> Self {
+    /// The folder is checked for the tokenizer too, unlike a Hub variant, because its
+    /// pipe never fetches one (`mayFetchTokenizer: false`): a picked folder is expected
+    /// to load offline. Sandbox access goes through `VocabularyFileAccess`, whose two
+    /// helpers are not specific to vocabulary.
+    private static func localFolder(path: String, bookmark: Data?, hubToken: @escaping @MainActor () -> String) -> Self {
         Self(
             locateLocal: { _ in
                 guard let folder = VocabularyFileAccess.resolve(path: path, bookmark: bookmark) else { return nil }
@@ -134,7 +116,11 @@ struct WhisperKitModelSource {
                 defer {
                     if accessing { folder.stopAccessingSecurityScopedResource() }
                 }
-                return try await WhisperKit(WhisperKitConfig(model: variant, modelFolder: modelFolderArgument(folder)))
+                return try await HubTokenScopedWhisperKit(
+                    WhisperKitConfig(model: variant, modelFolder: modelFolderArgument(folder)),
+                    hubToken: hubToken(),
+                    mayFetchTokenizer: false,
+                )
             },
         )
     }
