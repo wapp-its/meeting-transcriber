@@ -1,7 +1,7 @@
 {
   "branch_name": "fix/gh-44-mic-restart-loop",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-06T22:32:15.183651Z",
   "created_at": "2026-10-06T20:19:59.489371Z",
   "default_impl": null,
   "default_review": null,
@@ -212,6 +212,42 @@
       "task": "gh-44-stop-the-microphone-restart-loop-on-a.3",
       "timestamp": "2026-10-06T22:26:04.983687Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "b3a1db88537d5f329bb431c39c644664d163c4205196885cf35e2845d916f50e",
+      "backend": "codex",
+      "base_sha": "ad16a05f9a904667b3bc9038947172e2d361bd86",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "c14a878bb931c01b15133841ea017c52821f1d76",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 413952,
+      "output_sha256": "d2fd4c5a614400524d1b4a08962f9ecc2bb14b4795a3e8089e7e656f9100c6b9",
+      "reservation_id": "4644b7e86c7b4b918833b82b1619dc5d",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T22:32:15.151358Z",
+      "tool_calls": 21,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -219,12 +255,13 @@
     "impl:gh-44-stop-the-microphone-restart-loop-on-a.2": 1,
     "impl:gh-44-stop-the-microphone-restart-loop-on-a.3": 1,
     "plan": 2,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-44-stop-the-microphone-restart-loop-on-a.1": 0,
     "impl:gh-44-stop-the-microphone-restart-loop-on-a.2": 0,
     "impl:gh-44-stop-the-microphone-restart-loop-on-a.3": 0,
@@ -245,5 +282,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/44"
   },
-  "updated_at": "2026-10-06T22:26:14.238004Z"
+  "updated_at": "2026-10-06T22:32:15.186381Z"
 }
