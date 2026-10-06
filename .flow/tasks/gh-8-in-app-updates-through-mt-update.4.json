@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-06T20:29:47.090053Z",
+  "depends_on": [
+    "gh-8-in-app-updates-through-mt-update.3"
+  ],
+  "id": "gh-8-in-app-updates-through-mt-update.4",
+  "priority": null,
+  "review": "codex:gpt-5.6-sol:xhigh",
+  "spec": "gh-8-in-app-updates-through-mt-update",
+  "spec_path": ".flow/tasks/gh-8-in-app-updates-through-mt-update.4.md",
+  "status": "todo",
+  "title": "About and menu controls for mt-update installs",
+  "updated_at": "2026-10-06T20:29:47.090053Z"
+}
