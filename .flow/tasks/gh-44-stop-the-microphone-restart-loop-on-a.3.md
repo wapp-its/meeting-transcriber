@@ -45,9 +45,64 @@ Route every `AVAudioEngineConfigurationChange` through `MicConfigChangePolicy` (
 - [ ] The info line "engine configuration changed (format/route change)" is gone; the new lines are notice/error level, public, and UID-free.
 - [ ] `MicCaptureHandler.swift` stays under 600 lines; the existing audiotap suites pass without edits; the full audiotap suite and `swift build` of `app/MeetingTranscriber` succeed (log files read); `./scripts/lint.sh` clean with the pinned tools.
 ## Done summary
-TBD
+A configuration change can no longer spin the microphone capture in a restart loop. `MicCaptureHandler` sends every `AVAudioEngineConfigurationChange` through `MicConfigChangePolicy`. A change after every engine start (the 21:51 pattern) now builds 1 + 3 sessions in a 60 s window. After that, the stall watchdog restarts the capture once its 15 s grace and its 10 s stall time have passed.
 
+What changed (commits 36e5ed5b fix and ebe6acea test, all files inside the task's Touches):
+- New file `tools/audiotap/Sources/MicCaptureHandler+ConfigChange.swift`.
+  - It holds `installConfigChangeObserver()` (moved) and `handleEngineConfigChange()` (moved, now internal), plus the new `cancelPendingConfigChangeRestart()`.
+  - A `.restart(0)` decision launches at once. A `.restart(d)` decision schedules one `DispatchWorkItem` on the main queue, which clears the pending slot and then launches.
+  - An ignore decision only logs, and only when the policy asks for a line.
+- `handleDeviceChange` is now `@discardableResult -> Bool`. The handler calls `restartLaunched(at:)` only when it returns true, so a launch the arbiter declines charges nothing. Existing call sites compile unchanged.
+- `start(deviceUID:)` and `adopt` record `engineStarted(at:)`. `adopt` also drops a pending restart. `stop()`, `handleAttemptTimeout` and the `.giveUp` arm of `scheduleRestartRetry` drop it through the same helper.
+- Log lines (R5) use the policy's `logLine(for:at:)`, rendered right after `decide` and before `restartLaunched`.
+  - The restart line and the pending line go out at notice, the cap line at error. All are `privacy: .public` and carry no UID.
+  - The info line "engine configuration changed (format/route change)" is deleted. "listening for engine configuration changes" stays.
+- `MicCaptureHandler.swift` is 576 lines (was 583). The test-seam `init` gains `configChangeLimits:` as its last parameter, defaulting to `.production`. The public convenience init is unchanged.
+- Doc comments on `handleDeviceChange` and `MicRestartTrigger.configurationChanged` say that these restarts are paced and capped, and why.
+
+Tests are in `tools/audiotap/Tests/MicCaptureHandlerConfigChangeTests.swift`, 10 cases:
+1. `testAChangeAfterEveryStartStopsAtTheCapAndTheStallWatchdogThenRestarts`: the 21:51 loop (R2, R3)
+2. `testTheFirstChangeInAWindowRestartsAtOnce`: production limits (R2)
+3. `testASecondChangeInTheWindowWaitsForItsBackoff` (R2)
+4. `testAChangeWhileARestartIsPendingAddsNothing` (R2)
+5. `testStopDropsAPendingRestart`: R2 error case, stop
+6. `testAnAdoptionDropsAPendingRestart`: R2 error case, adoption. It also covers R6, since a default-input restart is not charged.
+7. `testEveryConfigChangeRestartTargetsAPresentPinnedDevice`: R4, immediate and delayed
+8. `testTheEnginesNotificationReachesThePolicy`: the real notification, posted from a background queue on the session's `notificationObject`
+9. `testAChangeDuringAStallRestartLaunchesAndChargesNothing`: R2 error case, only arbiter-launched restarts count
+10. `testEitherGiveUpDropsAPendingRestart`: R2 error case, give-up. It runs both paths, retry budget spent and attempt never returns. It takes about 5 s because `RestartArbiter.attemptTimeout` is a fixed constant.
+
+Measured:
+- baseline: green. Before any edit, at 78d923c9, the focused filter exited 0 with 73 tests and lint exited 0 (/private/tmp/gh44-t3-baseline.log, /private/tmp/gh44-t3-lint-baseline.log).
+- Red run before the fix. Cases 1 to 9 ran against today's behaviour plus only the seams they need to compile (the stored state, the init parameter, and `handleEngineConfigChange` made internal with its old body).
+  - The run exited 1, with 7 of 9 tests failing.
+  - The loop test failed with `("5") is not equal to ("4") - 1 + 3 sessions: the fourth change in the window builds nothing`.
+  - The stall watchdog returned nil at last adoption + 15 s (/private/tmp/gh44-t3-red.log).
+- Mutation check for case 10. With the cancel call removed from both give-up paths, the test failed on both (/private/tmp/gh44-t3-giveup-mutant.log). The source was restored before the commit.
+- Green on the final tree:
+  - The focused filter `MicCaptureHandler|MicConfigChangePolicyTests|MicEngineSessionSeamTests|RestartArbiterTests` exited 0 with 83 tests (/private/tmp/gh44-t3.log).
+  - Cases 1 to 9 passed 3 repeat runs (/private/tmp/gh44-t3-repeat-1.log to -3.log).
+  - The full audiotap suite exited 0 with 516 tests (/private/tmp/gh44-t3-full.log).
+  - `./scripts/lint.sh` with SwiftFormat 0.63.0 and SwiftLint 0.65.1 exited 0 with 0 violations (/private/tmp/gh44-t3-lint.log).
+  - The `app/MeetingTranscriber` `swift build` exited 0 on 36e5ed5b. The later commit only adds a test (/private/tmp/gh44-t3-app-build.log).
+- R6: these suites pass without edits: `MicCaptureHandlerStallWatchdogTests`, `MicCaptureHandlerWedgeTests`, `MicCaptureHandlerStopTests`, `MicEngineSessionSeamTests` and `RestartArbiterTests`.
+
+Not run: the owner's pinned-headset check from the spec's Verification. It needs the owner's Jabra and a real call.
+
+Decisions:
+- I added case 10 beyond the task's nine cases. R2's errors and the AC name both give-up paths, and no listed case would catch a missing call there.
+- The fix, the move and cases 1 to 9 land in one commit. A test-only commit would not compile without the seams, and the red run above is the proof that the loop test failed first. Case 10 is its own commit.
+- Case 2 holds the candidate inside `hardwareFormat` before it asserts `.attemptInFlight`. The red run showed that an instant fake can reach `.committing` before the main thread reads the phase.
+- I read the Phase 1b bridge reference only after implementing. The implementer was the in-host session model, so the bridge branch was inert and the late read changed nothing.
+
+stage: impl-review - ran [2026-10-06T22:19Z..2026-10-06T22:27Z] SHIP, 3-lens panel, no findings (model: codex gpt-5.6-sol xhigh)
+
+Tier: session (jev-unavailable(no_key)) · actual model: claude-opus-5-5
+
+Integrated onto fix/gh-44-mic-restart-loop as b381e300 + 498b858e (cherry-picks of 36e5ed5b + ebe6acea; identical tree 65a3b80b). Integrated verify: cd tools/audiotap && swift test --parallel --filter MicCaptureHandler|MicConfigChangePolicyTests|MicEngineSessionSeamTests|RestartArbiterTests|MicPinSettleTests (93 tests, exit 0; /private/tmp/gh44-int3.log).
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: b381e30082cb6f7c10f0a575b5ec1dcfc773946b, 498b858eaa8025b263a5c717f1068530fbcedaf5
+- Tests: cd tools/audiotap && CFFIXED_USER_HOME=/private/tmp/gh44-home swift test --parallel --filter 'MicCaptureHandler|MicConfigChangePolicyTests|MicEngineSessionSeamTests|RestartArbiterTests|MicPinSettleTests' (93 tests, exit 0), cd tools/audiotap && swift test --parallel (full audiotap suite, 516 tests, exit 0; worker run on the identical tree 65a3b80b), cd app/MeetingTranscriber && swift build (exit 0; worker run on the identical tree), PATH=/private/tmp/gh44-lint-tools/bin:$PATH ./scripts/lint.sh (exit 0, 0 violations; worker run on the identical tree)
 - PRs:
