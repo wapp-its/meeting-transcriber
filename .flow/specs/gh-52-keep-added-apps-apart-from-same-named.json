@@ -1,0 +1,156 @@
+{
+  "branch_name": "fix/gh-52-added-app-identity",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-06T20:20:31.727861Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-52-keep-added-apps-apart-from-same-named",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-06T20:33:55.302967Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "e66dfce49c6d98395fec0bbdd2404af506d38613ea4c4381810829960538e89e",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-778ccb3171ee922b2e49d66e837961f7",
+            "classification": "introduced",
+            "findingId": "finding-778ccb3171ee922b2e49d66e837961f7",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-f229d3ba907069f003d661d0ad717cb6",
+            "classification": "introduced",
+            "findingId": "finding-f229d3ba907069f003d661d0ad717cb6",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 331917,
+      "output_sha256": "b0373481f8db92117e1d02a9daa410919d73313f5dbf6717b70242170f04966a",
+      "reservation_id": "04dbfde6b5864562bf4515878e7d97e8",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:30:13.255003Z",
+      "tool_calls": 19,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "872e9607f3607894529ddf2e8612ecf5beea9bcfde15fc32c9e96f77ea5eca5c",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-778ccb3171ee922b2e49d66e837961f7",
+            "classification": "introduced",
+            "findingId": "finding-778ccb3171ee922b2e49d66e837961f7",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-f229d3ba907069f003d661d0ad717cb6",
+            "classification": "introduced",
+            "findingId": "finding-f229d3ba907069f003d661d0ad717cb6",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-212845a68df9dcf957e92d70d660e16d",
+            "classification": "introduced",
+            "findingId": "finding-212845a68df9dcf957e92d70d660e16d",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1287,
+      "output_sha256": "68c04c28da02d59ee64b6121b2cf77aaa38f691b3ed29105ab8b5f2f36a31d09",
+      "reservation_id": "15660c46cc5d43728341988337eeab02",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:33:28.234119Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-52-keep-added-apps-apart-from-same-named.md",
+  "status": "open",
+  "title": "Keep added apps apart from same-named apps",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABVawBUg",
+    "identifier": "#52",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/52"
+  },
+  "updated_at": "2026-10-06T20:33:55.303103Z"
+}
