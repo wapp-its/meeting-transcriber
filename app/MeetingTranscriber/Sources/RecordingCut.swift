@@ -10,21 +10,66 @@ import Foundation
 /// end back where the automatic stop used to put it.
 ///
 /// All or nothing. Every track is first copied up to its cut point beside the
-/// original; only once every copy exists are they swapped in, by renames inside
-/// the track's own directory, and a failed swap renames the tracks already
-/// swapped back. So a failure leaves every original exactly as it was, and no
-/// track ends up cut while another is not or cut at a different point.
+/// original; only once every copy exists are they swapped in, and a failed swap
+/// puts the tracks already swapped back. Each swap and each restore is one
+/// atomic `rename`, which replaces its target, with the original kept under a
+/// second name until every track is in, so a track's path always holds a whole
+/// file, the cut copy or the original. A failure leaves every original as it
+/// was, and no track ends up cut while another is not or cut at a different
+/// point; in the one case where an original cannot be put back on its path, the
+/// error says where it is, so the recording is still processed uncut.
 enum RecordingCut {
     enum CutError: LocalizedError {
         /// The cut point lies at or before the recording's start. Cutting
         /// there would discard the whole recording, which no end may do.
         case nothingToKeep(TimeInterval)
+        /// The swap failed and some originals could not be renamed back onto
+        /// their paths. They are intact under the second name in `uncut`, keyed
+        /// by their path; `redirect(_:to:)` points a recording at them.
+        case rollbackIncomplete(uncut: [URL: URL])
 
         var errorDescription: String? {
             switch self {
             case let .nothingToKeep(seconds): "Cut point \(seconds) s is not after the recording's start"
+            case let .rollbackIncomplete(uncut): "\(uncut.count) original track(s) could not be put back on their paths"
             }
         }
+    }
+
+    /// Where on the recording's own timeline `cutAt` falls, in seconds from
+    /// its first frame.
+    ///
+    /// The timeline's origin is not known exactly, so it is estimated twice,
+    /// and each estimate is wrong where the other is right. From the start: the
+    /// moment capture was running, which can lie after the first frame (the
+    /// microphone opens before the app tap, whose first start is unbounded), so
+    /// on its own it can cut into the meeting. From the end: the stop minus the
+    /// mix's length, exact while the tracks kept pace with the clock (gaps are
+    /// filled with silence), but early when a track stopped delivering and left
+    /// the mix short, which would cut into the meeting too. The later point
+    /// wins: it never cuts meeting audio, and the two agree on an ordinary
+    /// recording.
+    static func keptSeconds(cutAt: Date, startedAt: Date, stoppedAt: Date, mixDuration: TimeInterval?) -> TimeInterval {
+        let fromStart = cutAt.timeIntervalSince(startedAt)
+        guard let mixDuration else { return fromStart }
+        return max(fromStart, mixDuration - stoppedAt.timeIntervalSince(cutAt))
+    }
+
+    /// The length of the audio at `url`, nil when it cannot be read.
+    static func duration(of url: URL) -> TimeInterval? {
+        guard let file = try? AVAudioFile(forReading: url), file.fileFormat.sampleRate > 0 else { return nil }
+        return Double(file.length) / file.fileFormat.sampleRate
+    }
+
+    /// `recording` with every track `uncut` names pointing at its original.
+    static func redirect(_ recording: RecordingResult, to uncut: [URL: URL]) -> RecordingResult {
+        RecordingResult(
+            mixPath: uncut[recording.mixPath] ?? recording.mixPath,
+            appPath: recording.appPath.map { uncut[$0] ?? $0 },
+            micPath: recording.micPath.map { uncut[$0] ?? $0 },
+            micDelay: recording.micDelay,
+            recordingStartDate: recording.recordingStartDate,
+        )
     }
 
     /// One saved track and where its first frame sits on the recording's
@@ -56,12 +101,12 @@ enum RecordingCut {
     /// Keep the first `seconds` of the recording's timeline in every track.
     /// A track that already ends before the cut point is left as it is.
     ///
-    /// - Parameter move: the rename primitive, injectable so a test can fail
-    ///   the swap half way and watch it being undone.
+    /// - Parameter rename: the atomic rename, injectable so a test can fail the
+    ///   swap or its undoing and watch what is left.
     static func apply(
         to recording: RecordingResult,
         keepingFirst seconds: TimeInterval,
-        move: (URL, URL) throws -> Void = { try FileManager.default.moveItem(at: $0, to: $1) },
+        rename: (URL, URL) throws -> Void = Self.rename,
     ) throws {
         guard seconds > 0 else { throw CutError.nothingToKeep(seconds) }
 
@@ -80,7 +125,15 @@ enum RecordingCut {
         guard !cuts.isEmpty else { return }
 
         let staged = try stageCopies(of: cuts)
-        try swapIn(staged, move: move)
+        try swapIn(staged, rename: rename)
+    }
+
+    /// POSIX `rename`: atomically replaces `destination`, unlike
+    /// `FileManager.moveItem`, which refuses an existing one.
+    static func rename(_ source: URL, _ destination: URL) throws {
+        guard Darwin.rename(source.path, destination.path) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
     }
 
     /// Write each track's kept frames beside it. On any failure every copy
@@ -105,34 +158,44 @@ enum RecordingCut {
         return staged
     }
 
-    /// Swap every copy in, keeping each original aside until all are in. A
-    /// failed rename puts the tracks already swapped back, newest first.
+    /// Swap every copy in, keeping each original under a second name (a hard
+    /// link, so nothing is copied) until all are in. A failed swap puts the
+    /// tracks already swapped back, newest first; one that cannot be put back
+    /// keeps its original under that second name, and its path, which still
+    /// holds the cut copy, is cleared so nothing mistakes it for the recording.
     private static func swapIn(
         _ staged: [(original: URL, staged: URL)],
-        move: (URL, URL) throws -> Void,
+        rename: (URL, URL) throws -> Void,
     ) throws {
-        var swapped: [(original: URL, staged: URL, backup: URL)] = []
+        var swapped: [(original: URL, backup: URL)] = []
         do {
             for entry in staged {
                 let backup = sibling(of: entry.original, suffix: "uncut")
                 try? FileManager.default.removeItem(at: backup)
-                try move(entry.original, backup)
+                try FileManager.default.linkItem(at: entry.original, to: backup)
                 do {
-                    try move(entry.staged, entry.original)
+                    try rename(entry.staged, entry.original)
                 } catch {
-                    try? move(backup, entry.original)
+                    // Nothing was renamed, so the path still holds the original.
+                    try? FileManager.default.removeItem(at: backup)
                     throw error
                 }
-                swapped.append((entry.original, entry.staged, backup))
+                swapped.append((entry.original, backup))
             }
         } catch {
+            var uncut: [URL: URL] = [:]
             for entry in swapped.reversed() {
-                try? move(entry.original, entry.staged)
-                try? move(entry.backup, entry.original)
+                do {
+                    try rename(entry.backup, entry.original)
+                } catch {
+                    uncut[entry.original] = entry.backup
+                    try? FileManager.default.removeItem(at: entry.original)
+                }
             }
             for entry in staged {
                 try? FileManager.default.removeItem(at: entry.staged)
             }
+            if !uncut.isEmpty { throw CutError.rollbackIncomplete(uncut: uncut) }
             throw error
         }
         for entry in swapped {

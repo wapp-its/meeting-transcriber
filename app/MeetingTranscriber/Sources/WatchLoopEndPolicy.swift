@@ -50,6 +50,14 @@ enum MeetingEndAnswer: Equatable {
     case stopNow
 }
 
+/// An answer and when it arrived. The time matters because a poll can come up
+/// to a poll interval after the tap, and only an answer given before the
+/// deadline may change what the deadline does.
+struct ReceivedMeetingEndAnswer: Equatable {
+    let answer: MeetingEndAnswer
+    let receivedAt: Date
+}
+
 /// Why a recording ended without the person stopping it by hand. The raw value
 /// is what the diagnostic log line names.
 enum AutoStopReason: String {
@@ -115,7 +123,7 @@ struct MeetingEndPoll: Equatable {
     /// The answer to the open question, if one arrived since the last poll.
     /// The caller passes only answers to the question that is open now, so an
     /// answer to a withdrawn one never reaches the policy.
-    var answer: MeetingEndAnswer?
+    var answer: ReceivedMeetingEndAnswer?
 }
 
 /// Static configuration for `WatchLoopEndPolicy.step`, re-used across every
@@ -145,7 +153,7 @@ enum WatchLoopEndPolicy {
     ) -> WatchLoopEndDecision {
         let now = poll.now
         if now.timeIntervalSince(startTime) > config.maxDuration {
-            return .stop(capStop(phase: phase, now: now, meetingActive: poll.meetingActive))
+            return .stop(capStop(phase: phase, poll: poll))
         }
         switch phase {
         case let .listening(signalLostAt):
@@ -162,18 +170,27 @@ enum WatchLoopEndPolicy {
     }
 
     /// The duration cap stays a hard stop in every phase. It cuts only when it
-    /// lands on an open question with the signal still gone; with the signal
-    /// back, the audio after the cut point is the meeting again.
-    private static func capStop(phase: MeetingEndPhase, now: Date, meetingActive: Bool) -> MeetingEndStop {
+    /// lands on a question that is still open: one this poll ends anyway keeps
+    /// its own reason, and one the signal or a Keep has just settled ends uncut,
+    /// because the audio after the cut point is the meeting again.
+    private static func capStop(phase: MeetingEndPhase, poll: MeetingEndPoll) -> MeetingEndStop {
         let signalLostAt: Date? = switch phase {
         case let .listening(lost): lost
         case let .askingToEnd(pending): pending.signalLostAt
         case let .kept(lost): lost
         }
+        var cutAt: Date?
+        if case let .askingToEnd(pending) = phase {
+            switch ask(pending: pending, poll: poll) {
+            case let .stop(stop): return stop
+            case .continuePolling: cutAt = pending.cutAt
+            case .askToEnd, .withdrawQuestion: cutAt = nil
+            }
+        }
         return MeetingEndStop(
             reason: .maxDuration,
-            cutAt: meetingActive ? nil : phase.pendingCutAt,
-            signalAbsentFor: meetingActive ? nil : signalLostAt.map { now.timeIntervalSince($0) },
+            cutAt: cutAt,
+            signalAbsentFor: poll.meetingActive ? nil : signalLostAt.map { poll.now.timeIntervalSince($0) },
         )
     }
 
@@ -199,11 +216,19 @@ enum WatchLoopEndPolicy {
         ))
     }
 
-    /// An answer comes first: it was given to the question that is open now,
-    /// so the person saw it before this poll could take it back.
+    /// Only what happened before the deadline counts: an answer that arrived in
+    /// time, a signal this poll saw in time. Once the two minutes are up the
+    /// recording ends, unless the person answered within them. A signal seen in
+    /// time outranks "Stop now": the tap may have come while the call was
+    /// coming back, and the cut would then discard the resumed meeting.
     private static func ask(pending: PendingMeetingEnd, poll: MeetingEndPoll) -> WatchLoopEndDecision {
+        let inTime = poll.now < pending.deadline
+        if inTime, poll.meetingActive {
+            return .withdrawQuestion(then: .listening(signalLostAt: nil))
+        }
         let absentFor: TimeInterval? = poll.meetingActive ? nil : poll.now.timeIntervalSince(pending.signalLostAt)
-        switch poll.answer {
+        let answer = poll.answer.flatMap { $0.receivedAt < pending.deadline ? $0.answer : nil }
+        switch answer {
         case .stopNow:
             return .stop(MeetingEndStop(reason: .stopNow, cutAt: pending.cutAt, signalAbsentFor: absentFor))
 
@@ -215,10 +240,7 @@ enum WatchLoopEndPolicy {
         case nil:
             break
         }
-        if poll.meetingActive {
-            return .withdrawQuestion(then: .listening(signalLostAt: nil))
-        }
-        if poll.now >= pending.deadline {
+        guard inTime else {
             return .stop(MeetingEndStop(reason: .countdownExpired, cutAt: pending.cutAt, signalAbsentFor: absentFor))
         }
         return .continuePolling(.askingToEnd(pending))

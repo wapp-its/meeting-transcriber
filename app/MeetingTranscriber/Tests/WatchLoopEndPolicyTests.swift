@@ -13,18 +13,24 @@ final class WatchLoopEndPolicyTests: XCTestCase {
         t0.addingTimeInterval(seconds)
     }
 
+    /// `answeredAt` is when the answer arrived; by default at this poll.
     private func step(
         _ phase: MeetingEndPhase,
         meetingActive: Bool,
         at seconds: TimeInterval,
         answer: MeetingEndAnswer? = nil,
+        answeredAt: TimeInterval? = nil,
         config: WatchLoopEndConfig = defaultConfig,
     ) -> WatchLoopEndDecision {
         WatchLoopEndPolicy.step(
             config: config,
             startTime: t0,
             phase: phase,
-            poll: MeetingEndPoll(now: at(seconds), meetingActive: meetingActive, answer: answer),
+            poll: MeetingEndPoll(
+                now: at(seconds),
+                meetingActive: meetingActive,
+                answer: answer.map { ReceivedMeetingEndAnswer(answer: $0, receivedAt: at(answeredAt ?? seconds)) },
+            ),
         )
     }
 
@@ -109,13 +115,46 @@ final class WatchLoopEndPolicyTests: XCTestCase {
         )
     }
 
-    /// A signal seen back at the deadline poll keeps the recording: the
-    /// meeting is on again, so nothing may be cut.
-    func testReturningSignalAtTheDeadlineStillWithdraws() {
+    /// R2 / R3: once the two minutes are up the recording ends, so a signal
+    /// first seen at or after the deadline no longer cancels the stop.
+    func testASignalFirstSeenAtOrAfterTheDeadlineDoesNotCancelTheStop() {
+        for seconds in [136.0, 137.0] {
+            XCTAssertEqual(
+                step(.askingToEnd(pending), meetingActive: true, at: seconds),
+                .stop(MeetingEndStop(reason: .countdownExpired, cutAt: at(15), signalAbsentFor: nil)),
+                "seen at \(seconds) s",
+            )
+        }
+    }
+
+    /// R3: a signal seen in time outranks a Stop now tapped while the call was
+    /// coming back; the cut would discard the resumed meeting.
+    func testAReturningSignalOutranksStopNow() {
         XCTAssertEqual(
-            step(.askingToEnd(pending), meetingActive: true, at: 136),
+            step(.askingToEnd(pending), meetingActive: true, at: 40, answer: .stopNow, answeredAt: 39),
             .withdrawQuestion(then: .listening(signalLostAt: nil)),
         )
+    }
+
+    /// R2: only an answer given before the deadline counts, even when the poll
+    /// that sees it comes after it.
+    func testOnlyAnAnswerGivenBeforeTheDeadlineCounts() {
+        let expired = WatchLoopEndDecision.stop(
+            MeetingEndStop(reason: .countdownExpired, cutAt: at(15), signalAbsentFor: 132),
+        )
+        let cases: [(answer: MeetingEndAnswer, answeredAt: TimeInterval, expected: WatchLoopEndDecision)] = [
+            (.keepRecording, 135.9, .withdrawQuestion(then: .kept(signalLostAt: at(5)))),
+            (.stopNow, 135.9, .stop(MeetingEndStop(reason: .stopNow, cutAt: at(15), signalAbsentFor: 132))),
+            (.keepRecording, 136, expired),
+            (.keepRecording, 137, expired),
+        ]
+        for (answer, answeredAt, expected) in cases {
+            XCTAssertEqual(
+                step(.askingToEnd(pending), meetingActive: false, at: 137, answer: answer, answeredAt: answeredAt),
+                expected,
+                "\(answer) at \(answeredAt) s",
+            )
+        }
     }
 
     /// R4: "Keep recording" keeps the recording and asks nothing more while
@@ -151,14 +190,18 @@ final class WatchLoopEndPolicyTests: XCTestCase {
 
     // MARK: - Duration cap
 
-    /// The cap is a hard stop in every phase. It cuts only when it lands on an
-    /// open question with the signal still gone.
+    /// The cap is a hard stop in every phase. It cuts only when it lands on a
+    /// question that is still open; one whose countdown also ran out keeps
+    /// that reason.
     func testCapStopsInEveryPhaseAndCutsOnlyAnOpenQuestion() {
+        // Lost at 950, asked at 960, deadline after the cap.
+        let open = PendingMeetingEnd(signalLostAt: at(950), cutAt: at(960), deadline: at(1080))
         let cases: [(phase: MeetingEndPhase, active: Bool, expected: MeetingEndStop)] = [
             (.listening(signalLostAt: nil), true, MeetingEndStop(reason: .maxDuration, cutAt: nil, signalAbsentFor: nil)),
             (.listening(signalLostAt: at(995)), false, MeetingEndStop(reason: .maxDuration, cutAt: nil, signalAbsentFor: 6)),
-            (.askingToEnd(pending), false, MeetingEndStop(reason: .maxDuration, cutAt: at(15), signalAbsentFor: 996)),
-            (.askingToEnd(pending), true, MeetingEndStop(reason: .maxDuration, cutAt: nil, signalAbsentFor: nil)),
+            (.askingToEnd(open), false, MeetingEndStop(reason: .maxDuration, cutAt: at(960), signalAbsentFor: 51)),
+            (.askingToEnd(open), true, MeetingEndStop(reason: .maxDuration, cutAt: nil, signalAbsentFor: nil)),
+            (.askingToEnd(pending), false, MeetingEndStop(reason: .countdownExpired, cutAt: at(15), signalAbsentFor: 996)),
             (.kept(signalLostAt: at(5)), false, MeetingEndStop(reason: .maxDuration, cutAt: nil, signalAbsentFor: 996)),
         ]
         for (phase, active, expected) in cases {

@@ -96,7 +96,9 @@ final class RecordOnlyE2ETests: XCTestCase { // swiftlint:disable:this balanced_
             pollInterval: 0.5,
             endGracePeriod: 2,
             maxDuration: 100,
-            meetingEndCountdown: 1,
+            // Long enough that the virtual clock outlasts the fixture (about
+            // 50 s), as a real clock outlasts the audio it captured.
+            meetingEndCountdown: 60,
             recordOnly: { true },
             recordOnlyDestination: { .unscoped(outputDir) },
             notifier: notifier,

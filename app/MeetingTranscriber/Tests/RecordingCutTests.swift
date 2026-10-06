@@ -113,28 +113,81 @@ final class RecordingCutTests: XCTestCase { // swiftlint:disable:this balanced_x
         XCTAssertEqual(try leftovers(), [])
     }
 
-    /// A rename that fails after the first track is already swapped in puts
-    /// that track back: no track stays cut while another is not.
+    /// A rename that fails from the `failingFrom`th call on.
+    private func renameFailing(from failingFrom: Int, only: Bool) -> (URL, URL) throws -> Void {
+        var calls = 0
+        return { source, destination in
+            calls += 1
+            if calls == failingFrom || (!only && calls > failingFrom) { throw POSIXError(.EIO) }
+            try RecordingCut.rename(source, destination)
+        }
+    }
+
+    /// The second track's swap fails after the first is in: the first is put
+    /// back, so no track stays cut while another is not.
     func testAFailedSwapPutsEveryTrackBack() throws {
         let mix = try makeTrack("r_mix.wav", seconds: 10)
         let app = try makeTrack("r_app.wav", seconds: 10)
         let mic = try makeTrack("r_mic.wav", seconds: 10)
         let before = try contents([mix, app, mic])
-        var renames = 0
-        // Renames 1–2 swap the mix in; 3 sets the app's original aside; 4,
-        // moving the app's copy into place, fails.
-        let failingFourth: (URL, URL) throws -> Void = { from, to in
-            renames += 1
-            if renames == 4 { throw CocoaError(.fileWriteUnknown) }
-            try FileManager.default.moveItem(at: from, to: to)
-        }
 
-        XCTAssertThrowsError(
-            try RecordingCut.apply(to: recording(mix: mix, app: app, mic: mic), keepingFirst: 4, move: failingFourth),
-        )
+        XCTAssertThrowsError(try RecordingCut.apply(
+            to: recording(mix: mix, app: app, mic: mic), keepingFirst: 4, rename: renameFailing(from: 2, only: true),
+        ))
 
         XCTAssertEqual(try contents([mix, app, mic]), before, "every track as recorded")
         XCTAssertEqual(try leftovers(), [])
+    }
+
+    /// Renames keep failing, so the mix, already swapped in, cannot be put
+    /// back. Its original survives under its second name, the error names it,
+    /// and the redirected recording reads every track as recorded.
+    func testAnOriginalThatCannotBePutBackIsKeptAndNamed() throws {
+        let mix = try makeTrack("r_mix.wav", seconds: 10)
+        let app = try makeTrack("r_app.wav", seconds: 10)
+        let mic = try makeTrack("r_mic.wav", seconds: 10)
+        let before = try contents([mix, app, mic])
+        let cut = recording(mix: mix, app: app, mic: mic)
+
+        var uncut: [URL: URL] = [:]
+        XCTAssertThrowsError(
+            try RecordingCut.apply(to: cut, keepingFirst: 4, rename: renameFailing(from: 2, only: false)),
+        ) { error in
+            if case let RecordingCut.CutError.rollbackIncomplete(moved) = error { uncut = moved }
+        }
+
+        XCTAssertEqual(Array(uncut.keys), [mix], "only the swapped-in mix could not be put back")
+        let redirected = RecordingCut.redirect(cut, to: uncut)
+        let paths = try [redirected.mixPath, XCTUnwrap(redirected.appPath), XCTUnwrap(redirected.micPath)]
+        XCTAssertEqual(try contents(paths), before, "the recording is processed uncut")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: mix.path), "the cut copy is not left posing as the mix")
+    }
+
+    // MARK: - Where the cut falls
+
+    /// The later of the two estimates wins, so neither a capture that started
+    /// before the recorder returned nor a track that stopped delivering cuts
+    /// into the meeting. Started at 0, cut at 10, stopped at 130 (s).
+    func testTheCutPointIsTheLaterOfTheStartAndEndEstimates() {
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        let cases: [(mix: TimeInterval?, kept: TimeInterval)] = [
+            (130, 10), // the two agree
+            (140, 20), // audio began 10 s before capture reported running
+            (60, 10), // a track stopped delivering, leaving the mix short
+            (nil, 10), // no readable mix
+        ]
+        for (mix, kept) in cases {
+            XCTAssertEqual(
+                RecordingCut.keptSeconds(
+                    cutAt: start.addingTimeInterval(10),
+                    startedAt: start,
+                    stoppedAt: start.addingTimeInterval(130),
+                    mixDuration: mix,
+                ),
+                kept,
+                "mix \(mix.map(String.init(describing:)) ?? "unreadable")",
+            )
+        }
     }
 
     func testACutAtOrBeforeTheStartIsRefused() throws {

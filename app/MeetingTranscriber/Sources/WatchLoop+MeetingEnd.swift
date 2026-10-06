@@ -72,21 +72,34 @@ extension WatchLoop {
     }
 
     /// Cut the stopped recording back to `cutAt`, every track at the same
-    /// point, and return where its audio now ends on the recording's own wall
-    /// clock. A failed cut leaves every track as recorded and returns nil, so
-    /// the recording is processed uncut rather than lost.
-    func cutBack(_ recording: RecordingResult, to cutAt: Date, startedAt: Date) -> Date? {
-        let seconds = cutAt.timeIntervalSince(startedAt)
+    /// point, and return it with `recordedUntil` saying where its audio now
+    /// ends. `startedAt` and `stoppedAt` are when capture was running and when
+    /// it was stopped, on the loop's clock, which is how `cutAt` is placed on
+    /// the audio's own timeline (`RecordingCut.keptSeconds`). A failed cut
+    /// returns the recording uncut, never lost: as recorded, or, when an
+    /// original could not be put back on its path, pointing at it where it is.
+    func cutBack(_ recording: RecordingResult, to cutAt: Date, startedAt: Date, stoppedAt: Date) -> RecordingResult {
+        let seconds = RecordingCut.keptSeconds(
+            cutAt: cutAt,
+            startedAt: startedAt,
+            stoppedAt: stoppedAt,
+            mixDuration: RecordingCut.duration(of: recording.mixPath),
+        )
         do {
             try RecordingCut.apply(to: recording, keepingFirst: seconds)
+        } catch let RecordingCut.CutError.rollbackIncomplete(uncut) {
+            diagnostics.warning("recording_cut_failed rollback_incomplete tracks_moved=\(uncut.count)")
+            return RecordingCut.redirect(recording, to: uncut)
         } catch {
             // Domain and code only: a file error's description names the path.
             let nsError = error as NSError
             diagnostics.warning("recording_cut_failed domain=\(nsError.domain) code=\(nsError.code)")
-            return nil
+            return recording
         }
         diagnostics.notice("recording_cut kept_s=\(Int(seconds.rounded()))")
-        return recording.recordingStartDate.addingTimeInterval(seconds)
+        var cut = recording
+        cut.recordedUntil = recording.recordingStartDate.addingTimeInterval(seconds)
+        return cut
     }
 
     /// Ask the person, under a fresh id, so an answer to an earlier question
@@ -117,10 +130,10 @@ extension WatchLoop {
             logger.info("Answer to a meeting-end question that is no longer open — ignored")
             return
         }
-        meetingEndAnswer = answer
+        meetingEndAnswer = ReceivedMeetingEndAnswer(answer: answer, receivedAt: nowProvider())
     }
 
-    private func takeMeetingEndAnswer() -> MeetingEndAnswer? {
+    private func takeMeetingEndAnswer() -> ReceivedMeetingEndAnswer? {
         defer { meetingEndAnswer = nil }
         return meetingEndAnswer
     }

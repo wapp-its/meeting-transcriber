@@ -86,7 +86,8 @@ final class NotificationManagerMeetingEndTests: XCTestCase {
         manager.withdrawMeetingEndQuestion(id: "q1")
         await manager.answerMeetingEndQuestion(id: "q1", actionIdentifier: NotificationManager.stopNowActionID)
 
-        XCTAssertEqual(fake.removedIdentifiers, ["q1"])
+        XCTAssertEqual(fake.removedIdentifiers, ["q1"], "out of Notification Center")
+        XCTAssertEqual(fake.removedPendingIdentifiers, ["q1"], "and never shown if it had not appeared yet")
         XCTAssertEqual(answers.received, [])
     }
 

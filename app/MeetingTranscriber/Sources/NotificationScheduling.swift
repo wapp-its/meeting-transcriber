@@ -13,11 +13,16 @@ import UserNotifications
 protocol NotificationScheduling: AnyObject, Sendable {
     func add(_ request: UNNotificationRequest)
 
-    /// Withdraw already-delivered notifications. Only the consent prompt needs
+    /// Withdraw already-delivered notifications. Only the two questions need
     /// it: macOS clears a notification the user tapped, but not one that
     /// expired or was answered out of band, so without this the dead prompts
     /// pile up in Notification Center.
     func removeDelivered(withIdentifiers identifiers: [String])
+
+    /// Withdraw requests not yet delivered. `add` is asynchronous, so a
+    /// question taken back right after it was asked can still be waiting to
+    /// appear; removing only the delivered ones would let it show up later.
+    func removePending(withIdentifiers identifiers: [String])
 
     func setCategories(_ categories: Set<UNNotificationCategory>)
     func setDelegate(_ delegate: (any UNUserNotificationCenterDelegate)?)
@@ -60,6 +65,10 @@ final class SystemNotificationScheduler: NotificationScheduling, Sendable {
 
     func removeDelivered(withIdentifiers identifiers: [String]) {
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: identifiers)
+    }
+
+    func removePending(withIdentifiers identifiers: [String]) {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiers)
     }
 
     func setCategories(_ categories: Set<UNNotificationCategory>) {

@@ -73,7 +73,7 @@ class WatchLoop {
     /// for the next poll. Internal for `WatchLoop+MeetingEnd.swift`, which owns
     /// both, the way the consent extension owns `pendingConsentApp`.
     var meetingEndQuestionID: String?
-    var meetingEndAnswer: MeetingEndAnswer?
+    var meetingEndAnswer: ReceivedMeetingEndAnswer?
 
     /// Wall-clock source. Defaults to `Date()`; tests inject a `TestClock`
     /// so timing-sensitive paths become deterministic instead of racing
@@ -408,9 +408,7 @@ class WatchLoop {
         )
         activeRecorder = recorder
         defer { activeRecorder = nil }
-        // Taken once capture runs, so every saved track's first frame is at or
-        // before it, and a cut measured from here never keeps audio past its
-        // cut point.
+        // Where a cut is measured from, with the stop below (see `cutBack`).
         let recordingStartedAt = nowProvider()
 
         // Read participants (Teams)
@@ -432,9 +430,10 @@ class WatchLoop {
         let cutAt = try await waitForMeetingEnd(meeting)
 
         // Stop recording
+        let stoppedAt = nowProvider()
         var recording = try recorder.stop()
         if let cutAt {
-            recording.recordedUntil = cutBack(recording, to: cutAt, startedAt: recordingStartedAt)
+            recording = cutBack(recording, to: cutAt, startedAt: recordingStartedAt, stoppedAt: stoppedAt)
         }
 
         // --- Enqueue for background processing ---

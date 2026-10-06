@@ -429,6 +429,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
     /// returning signal from offering a choice about a moment that has passed.
     func withdrawMeetingEndQuestion(id: String) {
         _ = meetingEndQuestions.take(id: id)
+        scheduler.removePending(withIdentifiers: [id])
         scheduler.removeDelivered(withIdentifiers: [id])
     }
 

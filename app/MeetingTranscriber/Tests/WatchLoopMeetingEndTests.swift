@@ -109,10 +109,11 @@ final class WatchLoopMeetingEndTests: XCTestCase { // swiftlint:disable:this bal
 
     // MARK: - Helpers
 
-    /// Three 30 s, 16 kHz tracks shaped like a dual-source recording.
-    private func makeRecorderWithTracks() throws -> MockRecorder {
+    /// Three 16 kHz tracks shaped like a dual-source recording, 30 s unless
+    /// a test needs them to outlast the virtual clock.
+    private func makeRecorderWithTracks(seconds: Int = 30) throws -> MockRecorder {
         let recorder = MockRecorder()
-        let samples = (0 ..< 480_000).map { Float($0 % 1000) / 2000 }
+        let samples = (0 ..< seconds * 16000).map { Float($0 % 1000) / 2000 }
         var urls: [URL] = []
         for suffix in [RecordingFileSuffix.mix, RecordingFileSuffix.app, RecordingFileSuffix.mic] {
             let url = tmpDir.appendingPathComponent("20261006_100000\(suffix)")
@@ -168,6 +169,20 @@ final class WatchLoopMeetingEndTests: XCTestCase { // swiftlint:disable:this bal
         // Exact lines, so nothing else, a title least of all, rides along.
         XCTAssertEqual(harness.autoStopLines, ["recording_auto_stop trigger=auto reason=countdown_expired signal_absent_s=130"])
         XCTAssertEqual(harness.diagnostics.lines(.notice, startingWith: "recording_cut"), ["recording_cut kept_s=10"])
+    }
+
+    /// The audio began 10 s before capture reported running (the microphone
+    /// opens before the app tap): the tracks run 140 s to the virtual clock's
+    /// 130. The cut follows the audio, keeping 20 s, not the 10 s the clock
+    /// alone would say, which would have cut into the meeting.
+    func testTheCutFollowsTheAudioWhenItBeganBeforeCaptureReportedRunning() async throws {
+        let harness = Harness()
+        let recorder = try makeRecorderWithTracks(seconds: 140)
+
+        try await harness.makeLoop(recorder: recorder).handleMeeting(meeting)
+
+        XCTAssertEqual(try trackFrames(recorder), [320_000, 320_000, 320_000])
+        XCTAssertEqual(harness.diagnostics.lines(.notice, startingWith: "recording_cut"), ["recording_cut kept_s=20"])
     }
 
     /// R2 error: a cut that fails leaves every track as recorded, the recording
