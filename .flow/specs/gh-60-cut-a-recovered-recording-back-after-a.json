@@ -1,0 +1,345 @@
+{
+  "branch_name": "feat/gh-60-recovered-cut",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-06T22:37:30.592359Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-60-cut-a-recovered-recording-back-after-a",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-06T23:15:57.550211Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "a9e814c7078cf668ab7efb3f964634291dddc02bd0146d51e8a30e348cd2a42e",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-19f164c514aec759af1a5b13e00b4ab6",
+            "classification": "introduced",
+            "findingId": "finding-19f164c514aec759af1a5b13e00b4ab6",
+            "firstSeenThisRound": true,
+            "severity": "P0",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-77d62c697c46c2038b97f4589373519c",
+            "classification": "introduced",
+            "findingId": "finding-77d62c697c46c2038b97f4589373519c",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-7693a66f274e1a54e7b8919f929da686",
+            "classification": "introduced",
+            "findingId": "finding-7693a66f274e1a54e7b8919f929da686",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-4ffd675b06c2bd038fc25384a4d19dd7",
+            "classification": "introduced",
+            "findingId": "finding-4ffd675b06c2bd038fc25384a4d19dd7",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-c5d1ada68bd934cc05a9e2d8648169e0",
+            "classification": "introduced",
+            "findingId": "finding-c5d1ada68bd934cc05a9e2d8648169e0",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-bfbc749eb558355c2cdf5a6dc09b4ae6",
+            "classification": "introduced",
+            "findingId": "finding-bfbc749eb558355c2cdf5a6dc09b4ae6",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "01064e9a300e18188ceb56b7f55379e30acedd1b",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 376546,
+      "output_sha256": "33876427db382b62fc9e4e57890e3d8c95f47f1d09aa1629e08ebf6fdf94d7a6",
+      "reservation_id": "8a1ea7a90527428189a95fcf268411a2",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T23:02:03.575043Z",
+      "tool_calls": 21,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "321a517994c49aa2105757fc4468cbd3a28a101582524b12bea3af3e2bcc7fae",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-19f164c514aec759af1a5b13e00b4ab6",
+            "classification": "introduced",
+            "findingId": "finding-19f164c514aec759af1a5b13e00b4ab6",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-96c2a1b2ee114431401e22408e629c3e",
+            "classification": "introduced",
+            "findingId": "finding-96c2a1b2ee114431401e22408e629c3e",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-77d62c697c46c2038b97f4589373519c",
+            "classification": "introduced",
+            "findingId": "finding-77d62c697c46c2038b97f4589373519c",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-7693a66f274e1a54e7b8919f929da686",
+            "classification": "introduced",
+            "findingId": "finding-7693a66f274e1a54e7b8919f929da686",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-4ffd675b06c2bd038fc25384a4d19dd7",
+            "classification": "introduced",
+            "findingId": "finding-4ffd675b06c2bd038fc25384a4d19dd7",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-c5d1ada68bd934cc05a9e2d8648169e0",
+            "classification": "introduced",
+            "findingId": "finding-c5d1ada68bd934cc05a9e2d8648169e0",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-bfbc749eb558355c2cdf5a6dc09b4ae6",
+            "classification": "introduced",
+            "findingId": "finding-bfbc749eb558355c2cdf5a6dc09b4ae6",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "not_fixed"
+          },
+          {
+            "chainRoot": "finding-4af8a9c1245d0aee36b777a1013f9de0",
+            "classification": "introduced",
+            "findingId": "finding-4af8a9c1245d0aee36b777a1013f9de0",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-9be4daa0eb2d12029adc1663cacf993e",
+            "classification": "introduced",
+            "findingId": "finding-9be4daa0eb2d12029adc1663cacf993e",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "01064e9a300e18188ceb56b7f55379e30acedd1b",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 3332,
+      "output_sha256": "bdf06d720738eb41a3e3a6ed657899bc8c7fed732bb81049ebb77488b16ba0da",
+      "reservation_id": "37ec2796c18640f8bc79f2c8a506a7f5",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T23:11:44.073830Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "f0bd5cc94e2e5be0b69f1023a8294af9db17d38a701d7d6cfa196a9ba41d710c",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-19f164c514aec759af1a5b13e00b4ab6",
+            "classification": "introduced",
+            "findingId": "finding-19f164c514aec759af1a5b13e00b4ab6",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-96c2a1b2ee114431401e22408e629c3e",
+            "classification": "introduced",
+            "findingId": "finding-96c2a1b2ee114431401e22408e629c3e",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-77d62c697c46c2038b97f4589373519c",
+            "classification": "introduced",
+            "findingId": "finding-77d62c697c46c2038b97f4589373519c",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-7693a66f274e1a54e7b8919f929da686",
+            "classification": "introduced",
+            "findingId": "finding-7693a66f274e1a54e7b8919f929da686",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-4ffd675b06c2bd038fc25384a4d19dd7",
+            "classification": "introduced",
+            "findingId": "finding-4ffd675b06c2bd038fc25384a4d19dd7",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-c5d1ada68bd934cc05a9e2d8648169e0",
+            "classification": "introduced",
+            "findingId": "finding-c5d1ada68bd934cc05a9e2d8648169e0",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-bfbc749eb558355c2cdf5a6dc09b4ae6",
+            "classification": "introduced",
+            "findingId": "finding-bfbc749eb558355c2cdf5a6dc09b4ae6",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-4af8a9c1245d0aee36b777a1013f9de0",
+            "classification": "introduced",
+            "findingId": "finding-4af8a9c1245d0aee36b777a1013f9de0",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-9be4daa0eb2d12029adc1663cacf993e",
+            "classification": "introduced",
+            "findingId": "finding-9be4daa0eb2d12029adc1663cacf993e",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "01064e9a300e18188ceb56b7f55379e30acedd1b",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 844,
+      "output_sha256": "1e44adce19e85e89e02fd600e90857103ccc0a8afbfd70654925301c6c393c65",
+      "reservation_id": "46ae96995df3415f8907b268c217d934",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T23:15:57.503732Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-60-cut-a-recovered-recording-back-after-a.md",
+  "status": "open",
+  "title": "Cut a recovered recording back after a crash during the countdown",
+  "tracker": {
+    "baseHashFlow": "1db8107491204296b68fa83b3105249fef865417e37f58be41c7630f0c26763c",
+    "baseHashTracker": "d712bdae38da2ff18a0a0c77f903684eecdd04c37b796536a1ce9b36c145ffe2",
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABVdjRfw",
+    "identifier": "#60",
+    "lastSyncedAt": "2026-10-06T22:37:44.728899Z",
+    "linkState": "linked",
+    "mergeBaseFlow": "# Cut a recovered recording back when the app died during the meeting-end countdown\n\n## Conversation Evidence\n\n> issue #60 (filed 2026-10-06 from the gh-54 build): \"St\u00fcrzt die App ab oder wird sie beendet, w\u00e4hrend der 2-Minuten-Countdown aus #54 l\u00e4uft, holt die Wiederherstellung beim n\u00e4chsten Start die Aufnahme **ungeschnitten** zur\u00fcck. Damit landen die Countdown-Minuten (Raumaudio nach dem Meeting) doch im Transkript und Protokoll, entgegen der Entscheidung in #54\"\n> issue #60, Wunsch: \"Den ausstehenden Schnittpunkt neben der Markierung der laufenden Aufnahme speichern, sobald der Countdown beginnt, und bei der Wiederherstellung anwenden; nach \u201eWeiter aufnehmen\u201c oder zur\u00fcckkehrendem Signal wieder entfernen.\"\n> user (2026-10-07, selected): \"A \u2014 Spec #60 + #73 now (Recommended)\"\n\n## Goal & Context\n\nSince gh-54, a detected meeting whose signal disappears is not stopped at once: the app asks \"Meeting seems to have ended\" and records on for up to 2 minutes. If nobody answers, the saved recording is cut back to where the old automatic stop would have ended it (signal loss plus end grace), so the room audio recorded while asking is neither kept nor transcribed (owner decision D2 of gh-54). That guarantee holds only when the app is still running at the end of the countdown. If it crashes, is force-quit, loses power or is quit normally while the question is open, the next launch recovers the in-progress recording uncut, and the countdown minutes reach the transcript and protocol after all. This spec makes the cut point survive the process. [paraphrase]\n\n<!-- Source: 30% user / 50% [paraphrase] / 20% [inferred] -->\n\n## Architecture & Data Models\n\n- The pending cut point is a fact about one in-progress recording, so it is stored with that recording's in-progress state, written when the meeting-end question opens and removed when the question is settled without a cut. [paraphrase]\n- Recovery of an interrupted recording reads it and applies the same all-or-nothing cut gh-54 uses for an unanswered countdown, before the recording is queued. [inferred]\n\n## Edge Cases & Constraints\n\n- A stored cut point that belongs to another recording, or that cannot be read, is never applied; the recording is recovered uncut and the fact is logged. [inferred]\n- A cut point stored during a countdown whose signal then returned, or that the person answered with \"Keep recording\", must already be gone when a crash follows, so the whole recording is recovered. [paraphrase]\n\n## Acceptance Criteria\n\n- **R1:** When the meeting-end question opens, the pending cut point is stored durably with the recording in progress before the countdown starts. Errors: a failed write is logged and the countdown proceeds as today (no worse than before this spec). [paraphrase]\n- **R2:** When the app ends for any reason while the question is open, the next launch's recovery cuts the recovered recording back to the stored cut point before it is processed, with the same result as an unanswered countdown: every saved track cut at the same point, and a record-only sidecar's stop time at the cut. Errors: if the cut fails, the recording is processed uncut and the failure is logged; the recording is never discarded. [paraphrase]\n- **R3:** \"Keep recording\" and a returning signal remove the stored cut point durably, so a crash afterwards recovers the whole recording. Errors: a failed removal is logged; recovery must then not cut a recording whose question was settled with Keep or a returning signal. [paraphrase]\n- **R4:** Every normal end of the recording (countdown expiry, \"Stop now\", Stop Watching, the 4-hour cap) leaves no stored cut point behind once the recording is finalized. Errors: no error surface beyond R3's logging. [inferred]\n- **R5:** Recovery logs whether it applied a stored cut point, with the length of audio removed, and never meeting content. Errors: no error surface beyond the log write. [inferred]\n\n## Boundaries\n\n- The live countdown, its notification and its answers stay exactly as gh-54 built them; this spec only adds persistence and its use at recovery. [inferred]\n- Recordings started manually have no meeting-end question and are untouched. [inferred]\n\n## Decision Context\n\n- **D1 \u00b7 An unanswered countdown cuts the recording back to signal loss plus end grace, and this holds across a crash.** why: owner decision D2 of gh-54 (room audio after a meeting is neither kept nor transcribed) would otherwise fail exactly when the app dies during the 2 minutes. \u00b7 status: active [owner-ratified 2026-10-07]\n- **A1 \u00b7 A cut point whose removal failed after \"Keep recording\" must not be applied at recovery.** flip at: plan finds the removal cannot fail independently of the recording's own state \u00b7 test: R3's error case \u00b7 status: active [agent-assumed 2026-10-07]\n",
+    "mergeBaseTracker": "Folgearbeit zu #54.\n\n## Problem\nSt\u00fcrzt die App ab oder wird sie beendet, w\u00e4hrend der 2-Minuten-Countdown aus #54 l\u00e4uft, holt die Wiederherstellung beim n\u00e4chsten Start die Aufnahme **ungeschnitten** zur\u00fcck. Damit landen die Countdown-Minuten (Raumaudio nach dem Meeting) doch im Transkript und Protokoll, entgegen der Entscheidung in #54 (ohne Antwort wird auf Signalverlust + Nachlaufzeit zur\u00fcckgeschnitten).\n\nHeute (vor #54) war das Fenster nur die Nachlaufzeit von 15 s, jetzt bis zu gut 2 Minuten.\n\n## Wunsch\nDen ausstehenden Schnittpunkt neben der Markierung der laufenden Aufnahme speichern, sobald der Countdown beginnt, und bei der Wiederherstellung anwenden; nach \u201eWeiter aufnehmen\u201c oder zur\u00fcckkehrendem Signal wieder entfernen.\n\n## Abnahme\nCountdown l\u00e4uft, App wird hart beendet \u2192 nach Neustart wird die Aufnahme verarbeitet und endet am selben Punkt wie bei abgelaufenem Countdown.",
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/60"
+  },
+  "updated_at": "2026-10-06T23:16:03.193838Z"
+}

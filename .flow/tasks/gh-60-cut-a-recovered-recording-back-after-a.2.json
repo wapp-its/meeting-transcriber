@@ -1,0 +1,18 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-06T22:55:15.736163Z",
+  "depends_on": [
+    "gh-60-cut-a-recovered-recording-back-after-a.1",
+    "gh-60-cut-a-recovered-recording-back-after-a.4"
+  ],
+  "id": "gh-60-cut-a-recovered-recording-back-after-a.2",
+  "priority": null,
+  "review": "codex:gpt-5.6-sol:xhigh",
+  "spec": "gh-60-cut-a-recovered-recording-back-after-a",
+  "spec_path": ".flow/tasks/gh-60-cut-a-recovered-recording-back-after-a.2.md",
+  "status": "todo",
+  "title": "Let the recorder store, hold and clear the pending cut beside its marker",
+  "updated_at": "2026-10-06T23:14:49.401268Z"
+}
