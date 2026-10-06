@@ -20,14 +20,15 @@ private final class ConfigChangeTestClock: @unchecked Sendable {
 
 /// A session that never touches audio hardware. It records the device every
 /// bring-up was asked for, keeps the handler's tap block as an engine would,
-/// and can hold a bring-up inside `hardwareFormat` until released, which keeps
-/// a restart attempt in flight.
+/// can fail its bring-up, and can hold one inside `hardwareFormat` until
+/// released, which keeps a restart attempt in flight.
 private final class ConfigChangeTestSession: MicEngineSessionProviding, @unchecked Sendable {
     private let stateLock = NSLock()
     private var recordedDeviceUIDs: [String?] = []
     private var installedTapBlock: AVAudioNodeTapBlock?
     private let gate = DispatchSemaphore(value: 0)
 
+    var shouldFail = false
     var holdInHardwareFormat = false
     let entered = XCTestExpectation(description: "the attempt entered hardwareFormat")
 
@@ -43,8 +44,9 @@ private final class ConfigChangeTestSession: MicEngineSessionProviding, @uncheck
         gate.signal()
     }
 
-    func hardwareFormat(deviceUID: String?) -> AVAudioFormat {
+    func hardwareFormat(deviceUID: String?) throws -> AVAudioFormat {
         stateLock.withLock { recordedDeviceUIDs.append(deviceUID) }
+        if shouldFail { throw MicCaptureError.noInputDevice }
         if holdInHardwareFormat {
             entered.fulfill()
             // Bounded, so a test that goes wrong fails instead of hanging.
@@ -126,6 +128,7 @@ final class MicCaptureHandlerConfigChangeTests: XCTestCase {
     private func makeFixture(
         _ sessions: [ConfigChangeTestSession],
         limits: MicConfigChangePolicy.Limits = shortLimits,
+        decideRetry: @escaping @Sendable (Int) -> CaptureRestartRetryAction = CaptureRestartRetryPolicy.decide,
         isDevicePresent: @escaping @Sendable (String) -> Bool = { _ in false },
     ) -> ConfigChangeTestFixture {
         let url = FileManager.default.temporaryDirectory
@@ -139,6 +142,7 @@ final class MicCaptureHandlerConfigChangeTests: XCTestCase {
         let handler = MicCaptureHandler(
             outputURL: url,
             sessionFactory: factory,
+            decideRetry: decideRetry,
             stallWatchdogLimits: Self.manualStallLimits,
             stallClock: manualNow,
             isDevicePresent: isDevicePresent,
@@ -308,6 +312,33 @@ final class MicCaptureHandlerConfigChangeTests: XCTestCase {
         XCTAssertTrue(pending.isCancelled, "the newer session supersedes the pending restart")
         XCTAssertNil(handler.pendingConfigChangeRestart)
         XCTAssertEqual(launched(fixture), 1, "a default-input restart is not charged to the configuration-change budget")
+    }
+
+    func testEitherGiveUpDropsAPendingRestart() throws {
+        // The two ways the arbiter abandons the track: the retry budget runs
+        // out on attempts that fail, or an attempt never returns.
+        for neverReturns in [false, true] {
+            let sessions = (0 ..< 3).map { _ in ConfigChangeTestSession() }
+            sessions[2].shouldFail = !neverReturns
+            sessions[2].holdInHardwareFormat = neverReturns
+            let giveUpAtOnce: @Sendable (Int) -> CaptureRestartRetryAction = { _ in .giveUp }
+            let fixture = makeFixture(sessions, limits: Self.longBackoffLimits, decideRetry: giveUpAtOnce)
+            let handler = fixture.handler
+            defer { handler.stop(); sessions[2].release(); try? FileManager.default.removeItem(at: fixture.url) }
+            let gaveUp = expectation(description: "give-up reported (attempt never returns: \(neverReturns))")
+            handler.onGiveUp = { gaveUp.fulfill() }
+
+            try handler.start()
+            handler.handleEngineConfigChange()
+            waitUntil("the first restart adopted") { isLive(sessions[1], in: handler) }
+            handler.handleEngineConfigChange()
+            let pending = try XCTUnwrap(handler.pendingConfigChangeRestart)
+
+            handler.handleDeviceChange(.defaultInputChanged)
+            wait(for: [gaveUp], timeout: RestartArbiter.attemptTimeout + 5)
+            XCTAssertTrue(pending.isCancelled, "attempt never returns: \(neverReturns)")
+            XCTAssertNil(handler.pendingConfigChangeRestart, "attempt never returns: \(neverReturns)")
+        }
     }
 
     // MARK: - Which device
