@@ -12,7 +12,10 @@ extension AppNotifying {
         id _: String,
         title _: String,
         body _: String,
-        onAnswer _: MeetingEndQuestionHandler,
+        // Spelled exactly as the requirement, or the analyzer reads this
+        // default as an unused overload rather than its witness.
+        // swiftlint:disable:next unneeded_escaping
+        onAnswer _: @escaping MeetingEndQuestionHandler,
     ) {}
 
     func withdrawMeetingEndQuestion(id _: String) {}
