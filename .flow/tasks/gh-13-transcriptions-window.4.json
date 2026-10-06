@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-06T20:26:01.659221Z",
+  "depends_on": [
+    "gh-13-transcriptions-window.3"
+  ],
+  "id": "gh-13-transcriptions-window.4",
+  "priority": null,
+  "review": "codex:gpt-5.6-sol:xhigh",
+  "spec": "gh-13-transcriptions-window",
+  "spec_path": ".flow/tasks/gh-13-transcriptions-window.4.md",
+  "status": "todo",
+  "title": "Transcriptions window and its menu item",
+  "updated_at": "2026-10-06T20:32:48.709861Z"
+}
