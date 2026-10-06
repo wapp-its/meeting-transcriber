@@ -28,6 +28,16 @@ Recording people after a meeting has ended is not free in Switzerland (everyone 
 - The signal flapping (lost, back, lost again) inside one countdown: a return cancels the countdown (R3); the next loss starts a fresh end-grace period. [inferred]
 - A click on a notification that belongs to an episode that has already ended (signal returned, recording already stopped) changes nothing. [inferred]
 - Notification permission denied, alert style "None" or Focus hiding the banner: the countdown still runs (R5). [paraphrase]
+- The 4-hour cap reached while a countdown is pending ends the recording as in R2 (cut back, notification withdrawn); reached after "Keep recording", it ends the recording uncut as today. [inferred]
+- Record-only mode: the saved files are cut the same way, and the sidecar's stop time is the cut point, so the sidecar never claims audio the files no longer hold. [inferred]
+- A failed cut leaves every original track in place and untouched; a track is never left half-cut or cut at a different point from the others. [inferred]
+
+### Verification
+
+- The countdown length and the clock are injectable, so tests drive countdown expiry, "Stop now", "Keep recording", a returning signal, stale answers, notifications that cannot be shown, cancellation by Stop Watching and the cap during a countdown deterministically, without waiting two real minutes. [inferred]
+- WAV-fixture tests check the cut: every saved track (app, microphone, mix, and the record-only output) ends at the same timeline point, and a forced cut failure leaves the originals intact and processed. [inferred]
+- Existing end-to-end tests that end a recording through a short maximum duration or the end grace are adjusted so the end condition they meant to exercise still fires, with a short injected countdown where the meeting-end path is under test. [inferred]
+- A live check in the shipped app (meeting simulator or a real call ended mid-run) confirms the notification appears, "Keep recording" and a returning signal keep one recording, and an unanswered countdown yields a recording no longer than today's. [inferred]
 
 ## Acceptance Criteria
 
@@ -36,7 +46,7 @@ Recording people after a meeting has ended is not free in Switzerland (everyone 
 - **R3:** When the detection signal returns before the countdown ends, the pending stop is cancelled, the notification is withdrawn, and the recording continues as one recording with no gap; a later loss of the signal starts a fresh end-grace period and, after it, a fresh notification. Errors: an answer to the withdrawn notification changes nothing. [paraphrase]
 - **R4:** "Keep recording" keeps the whole recording uncut and posts no further end notification while the signal stays absent; the recording then runs until the person stops it or the 4-hour cap ends it. If the signal returns, R1–R3 apply again to the next loss. Errors: an answer arriving after the recording has already ended changes nothing. [paraphrase]
 - **R5:** When notifications are denied, switched off or not shown, the same countdown runs and ends the recording as in R2; the app never keeps recording because a notification went unseen. Errors: no error surface beyond R2. [paraphrase]
-- **R6:** Stopping meeting watching, or starting a manual recording, while a countdown is pending ends the recording as in R2 and withdraws the notification. Errors: no error surface beyond R2. [inferred]
+- **R6:** Stopping meeting watching while a countdown is pending ends the recording as in R2 and withdraws the notification. Starting a manual recording stays refused while any recording runs, a pending countdown included, exactly as today. Errors: no error surface beyond R2. [inferred]
 - **R7:** Every automatic stop writes its reason to the diagnostic log the app keeps on disk: countdown expired, "Stop now", maximum duration reached, or (manual recordings) monitored app exited, with how long the signal had been absent where that applies. These lines carry no meeting title, participant name or transcript content. Errors: no error surface beyond the log write itself. [paraphrase]
 
 ## Boundaries
@@ -44,6 +54,7 @@ Recording people after a meeting has ended is not free in Switzerland (everyone 
 - Only automatically detected meetings get the notification; manual recordings keep their current stop rules (target app exits, 4-hour cap), apart from R7's log line. [paraphrase]
 - The 4-hour cap stays a hard stop. A warning before it, a notice when a manual recording stops because its app quit, and a menu-bar indication of a pending countdown belong to a follow-up spec that depends on this one. [paraphrase]
 - The end-grace setting keeps its meaning (time without a signal before the notification appears); the 2-minute countdown is fixed and gets no setting. [inferred]
+- R2 governs the saved recording and everything made from it (transcript, protocol, record-only files). Live captions, an opt-in on-screen display that is never saved, keep running during the countdown as during any part of a recording. [inferred]
 
 ## Decision Context
 
