@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-06T20:20:15.842759Z",
+  "depends_on": [
+    "gh-58-notices-for-the-remaining-automatic.1"
+  ],
+  "id": "gh-58-notices-for-the-remaining-automatic.2",
+  "priority": null,
+  "review": "codex:gpt-5.6-sol:xhigh",
+  "spec": "gh-58-notices-for-the-remaining-automatic",
+  "spec_path": ".flow/tasks/gh-58-notices-for-the-remaining-automatic.2.md",
+  "status": "todo",
+  "title": "Pulse the menu bar icon while a meeting-end countdown runs",
+  "updated_at": "2026-10-06T20:26:26.445074Z"
+}
