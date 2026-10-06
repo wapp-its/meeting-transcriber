@@ -1,0 +1,15 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-06T20:38:11.394033Z",
+  "depends_on": [],
+  "id": "gh-43-microphone-in-the-menu-and-the-meeting.1",
+  "priority": null,
+  "review": "codex:gpt-5.6-sol:xhigh",
+  "spec": "gh-43-microphone-in-the-menu-and-the-meeting",
+  "spec_path": ".flow/tasks/gh-43-microphone-in-the-menu-and-the-meeting.1.md",
+  "status": "todo",
+  "title": "Switch a running microphone capture to another device and report the device in use (AudioTapLib)",
+  "updated_at": "2026-10-06T20:45:11.586253Z"
+}
