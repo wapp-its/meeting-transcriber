@@ -16,9 +16,11 @@ enum KeychainHelper {
         ]
     }
 
-    /// Store or update a value in the Keychain.
-    static func save(key: String, value: String) {
-        guard let data = value.data(using: .utf8) else { return }
+    /// Store or update a value in the Keychain. Returns whether the value is
+    /// now stored.
+    @discardableResult
+    static func save(key: String, value: String) -> Bool {
+        guard let data = value.data(using: .utf8) else { return false }
         var query = baseQuery(for: key)
         query[kSecValueData as String] = data
 
@@ -29,9 +31,12 @@ enum KeychainHelper {
             if updateStatus != errSecSuccess {
                 logger.error("Failed to update \(key): \(updateStatus)")
             }
-        } else if addStatus != errSecSuccess {
+            return updateStatus == errSecSuccess
+        }
+        if addStatus != errSecSuccess {
             logger.error("Failed to save \(key): \(addStatus)")
         }
+        return addStatus == errSecSuccess
     }
 
     /// Read a value from the Keychain. Returns `nil` if not found.
@@ -46,9 +51,16 @@ enum KeychainHelper {
         return String(data: data, encoding: .utf8)
     }
 
-    /// Delete a value from the Keychain.
-    static func delete(key: String) {
-        SecItemDelete(baseQuery(for: key) as CFDictionary)
+    /// Delete a value from the Keychain. Returns whether no value is left, so
+    /// deleting one that was never stored counts as success.
+    @discardableResult
+    static func delete(key: String) -> Bool {
+        let status = SecItemDelete(baseQuery(for: key) as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            logger.error("Failed to delete \(key): \(status)")
+            return false
+        }
+        return true
     }
 
     /// Check whether a value exists in the Keychain.
