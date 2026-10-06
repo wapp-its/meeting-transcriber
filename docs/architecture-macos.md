@@ -93,6 +93,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `LivenessMarker.swift` | Process-lifetime marker (issue #703): written at launch, touched once a minute, removed by a clean AppKit quit; the next launch reads it as `PreviousExit` to tell a crash, kill or power loss from a quit, which the per-recording marker cannot do for an idle app |
 | `PreviousExitNotice.swift` | Wording of the launch-time notification for a run that ended without a quit: the window in which nothing was watching for meetings |
 | `MenuBarView.swift` | Menu bar dropdown (state, actions, meeting info) |
+| `JobMenuSummary.swift` | Status text and symbol of a job's single line in the menu bar dropdown |
 | `MenuBarIcon.swift` | Renders the animated waveform icon + badge overlays (permission, record-only, channel-silent) |
 | `AppPickerView.swift` | App picker sheet for manual recording of any running app |
 | `AudioImportTypes.swift` | File types offered by the batch-import and voice-enrollment `NSOpenPanel`s — single source of truth so the ffmpeg-gated vs. natively-decoded format lists stay pinned and testable |
@@ -236,7 +237,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `ManualRecordingInfo.swift` | Info about a manually started recording session, as opposed to one a detector started |
 | `ManualRecordingRequest.swift` | What the user asked `WatchingController` to record by hand (app-picker vs. microphone-only) |
 | `AppPickerStartState.swift` | Whether the app picker can start a recording, and if not, why |
-| `MicrophoneRecordingAvailability.swift` | Whether the menu bar's "Record Microphone" item can start a recording, and if not, why |
+| `MicrophoneRecordingAvailability.swift` | Whether the menu bar's "Record Microphone Only" item can start a recording, and if not, why |
 | `ConsentDenyList.swift` | Persisted "Never for this app" consent denials (issue #503 follow-up), checked before the decline cooldown and before "record without asking" |
 
 ### Audio Processing

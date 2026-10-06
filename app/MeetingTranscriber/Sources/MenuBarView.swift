@@ -125,9 +125,9 @@ struct MenuBarView: View {
             onStartStop()
         } label: {
             if isWatching {
-                Label("Stop Watching", systemImage: "stop.fill")
+                Label("Stop Watching for Meetings", systemImage: "stop.fill")
             } else {
-                Label("Start Watching", systemImage: "play.fill")
+                Label("Start Watching for Meetings", systemImage: "play.fill")
             }
         }
         .keyboardShortcut("s")
@@ -143,7 +143,7 @@ struct MenuBarView: View {
             Button {
                 onRecordMicrophone()
             } label: {
-                Label("Record Microphone", systemImage: "mic.circle")
+                Label("Record Microphone Only", systemImage: "mic.circle")
             }
             .keyboardShortcut("m")
             .disabled(!microphoneAvailability.allowsStart)
@@ -152,7 +152,7 @@ struct MenuBarView: View {
             Button {
                 onRecordApp()
             } label: {
-                Label("Record App...", systemImage: "record.circle")
+                Label(Self.recordAppLabel(noMic: noMic), systemImage: "record.circle")
             }
             .keyboardShortcut("r")
         }
@@ -239,37 +239,50 @@ struct MenuBarView: View {
 
     // MARK: - Helpers
 
+    /// "Record App..." alone reads as app audio only, while the recording
+    /// also takes the microphone unless "No Microphone" is set.
+    static func recordAppLabel(noMic: Bool) -> String {
+        noMic ? "Record App Audio..." : "Record App + Microphone..."
+    }
+
+    /// One menu item per job, its actions in a submenu. A menu-style
+    /// `MenuBarExtra` cannot lay anything out side by side: an `HStack` row
+    /// came out as one menu item per part, so the status dot and the spacer
+    /// became empty lines and the buttons stood one below the other.
     private func jobRow(_ job: PipelineJob, index: Int) -> some View {
-        HStack {
-            Circle()
-                .fill(jobColor(job))
-                .frame(width: 8, height: 8)
-            VStack(alignment: .leading) {
-                Text(job.meetingTitle)
-                    .font(.caption)
-                jobStateLabel(job)
-            }
-            Spacer()
-            if job.state == .done, let path = job.protocolPath ?? job.transcriptPath {
-                Button("Open") { onOpenProtocol(path) }
-                    .font(.caption2)
-            }
-            if job.state == .speakerNamingPending {
-                Button("Name Speakers") { onNameSpeakers?() }
-                    .font(.caption2)
-            }
-            if job.state == .waiting || job.state == .transcribing
-                || job.state == .diarizing || job.state == .generatingProtocol {
-                Button("Cancel") { pipelineQueue.cancelJob(id: job.id) }
-                    .font(.caption2)
-            }
-            retryButton(job, index: index)
-            if job.state == .done || job.state == .error || job.state == .speakerNamingPending {
-                Button("Dismiss") { onDismissJob(job.id) }
-                    .font(.caption2)
-            }
+        Menu {
+            Text(job.meetingTitle)
+            jobStateLabel(job)
+            Divider()
+            jobActions(job, index: index)
+        } label: {
+            Label(jobMenuTitle(job), systemImage: JobMenuSummary.symbol(of: job))
         }
-        .padding(.horizontal, 4)
+    }
+
+    /// Hoisted out of the `ViewBuilder` for the type-check budget (see the
+    /// note on `body`).
+    private func jobMenuTitle(_ job: PipelineJob) -> String {
+        let status = JobMenuSummary.status(of: job, progress: stageProgressText(job))
+        return "\(job.meetingTitle) — \(status)"
+    }
+
+    @ViewBuilder
+    private func jobActions(_ job: PipelineJob, index: Int) -> some View {
+        if job.state == .done, let path = job.protocolPath ?? job.transcriptPath {
+            Button("Open") { onOpenProtocol(path) }
+        }
+        if job.state == .speakerNamingPending {
+            Button("Name Speakers") { onNameSpeakers?() }
+        }
+        if job.state == .waiting || job.state == .transcribing
+            || job.state == .diarizing || job.state == .generatingProtocol {
+            Button("Cancel") { pipelineQueue.cancelJob(id: job.id) }
+        }
+        retryButton(job, index: index)
+        if job.state == .done || job.state == .error || job.state == .speakerNamingPending {
+            Button("Dismiss") { onDismissJob(job.id) }
+        }
     }
 
     /// Runs a failed job again from its audio, instead of the user having to
@@ -278,7 +291,6 @@ struct MenuBarView: View {
     private func retryButton(_ job: PipelineJob, index: Int) -> some View {
         if pipelineQueue.canRetryJob(id: job.id) {
             Button("Retry") { pipelineQueue.retryJob(id: job.id) }
-                .font(.caption2)
                 .accessibilityIdentifier(A11yID.jobRetryButton(index))
         }
     }
@@ -319,17 +331,5 @@ struct MenuBarView: View {
 
     private func formattedElapsed(_ seconds: TimeInterval) -> String {
         formattedTime(seconds)
-    }
-
-    private func jobColor(_ job: PipelineJob) -> Color {
-        switch job.state {
-        case .waiting: .gray
-        case .transcribing: .blue
-        case .diarizing: .purple
-        case .generatingProtocol: .orange
-        case .speakerNamingPending: .purple
-        case .done: job.warnings.isEmpty ? .green : .yellow
-        case .error: .red
-        }
     }
 }
