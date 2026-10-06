@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-54-ask-before-auto-stop",
-  "completion_review_status": "needs_work",
-  "completion_reviewed_at": "2026-10-06T20:58:51.374935Z",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-06T21:05:59.646199Z",
   "created_at": "2026-10-06T19:35:36.299075Z",
   "default_impl": null,
   "default_review": null,
@@ -13,7 +13,7 @@
   },
   "next_task": 1,
   "no_plan": true,
-  "plan_review_rounds": 1,
+  "plan_review_rounds": 0,
   "plan_review_status": "ship",
   "plan_reviewed_at": "2026-10-06T19:51:00.313147Z",
   "review_attempts": [
@@ -350,12 +350,80 @@
       "timestamp": "2026-10-06T20:58:51.346437Z",
       "tool_calls": 22,
       "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "47f925441d9368f77a7cb0f1ce96d262f15578dbf3603f7356463705fad5e2db",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-63b16610a927a39353db0e3a0b859fd9",
+            "classification": "introduced",
+            "findingId": "finding-63b16610a927a39353db0e3a0b859fd9",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-60eb39bad6f08f550745cc7ea13dbd64",
+            "classification": "introduced",
+            "findingId": "finding-60eb39bad6f08f550745cc7ea13dbd64",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-bc6b08f99401fa3fbee97995dc81791a",
+            "classification": "introduced",
+            "findingId": "finding-bc6b08f99401fa3fbee97995dc81791a",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "not_fixed"
+          },
+          {
+            "chainRoot": "finding-9a6d3eace3cfb8e253e530a64dfdcc42",
+            "classification": "introduced",
+            "findingId": "finding-9a6d3eace3cfb8e253e530a64dfdcc42",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "f77da73f7f4e5e983cbbd1de7cd3a0b947f809d3",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 6493,
+      "output_sha256": "7948cbbfc75f3efcd2bf3a95020e1d9d8fb241b426c1840b6fac04141023dd01",
+      "reservation_id": "8675728f1714447aaf9998269980c6f0",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T21:05:59.618368Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-54-ask-before-auto-stopping-a-meeting.1": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -380,5 +448,5 @@
     "mergeBaseTracker": "## Problem\n\nEin automatisch erkanntes Meeting wird heute **ohne R\u00fcckfrage** beendet, sobald die Erkennung das Meeting 15 Sekunden lang nicht mehr sieht (Einstellung \u201eEnd grace\u201c, 1\u2013120 s). Signale: die Meeting-App h\u00e4lt ihre \u201eAnruf l\u00e4uft\u201c-Energiesperre nicht mehr, gibt das Mikrofon frei oder das Meeting-Fenster ist weg.\n\nErkennt die App das Ende f\u00e4lschlich (Teams gibt den Ton kurz frei: Halten, Ger\u00e4tewechsel, \u00dcbergabe aufs Telefon), geht etwas verloren:\n\n- Die Aufnahme wird abgeschlossen und verarbeitet; kommt das Meeting zur\u00fcck, startet eine **neue** Aufnahme (Pause, Best\u00e4tigungs-Abfragen, ggf. R\u00fcckfrage \u201eRecord \u2026 meeting?\u201c). Ein Meeting wird so zu zwei Transkripten, die L\u00fccke dazwischen fehlt.\n- Kommt das Signal nicht zur\u00fcck, fehlt der ganze Rest.\n\nWeitere automatische Stopps, ebenfalls ohne R\u00fcckfrage:\n\n| Ausl\u00f6ser | gilt f\u00fcr | heute |\n|---|---|---|\n| Meeting nicht mehr erkannt | automatische Aufnahmen | Stopp nach 15 s, ohne Mitteilung |\n| 4-Stunden-Grenze (fest, nicht einstellbar) | alle Aufnahmen | Stopp ohne Mitteilung |\n| Ziel-App beendet | manuelle Aufnahme \u201eApp + Mikrofon\u201c | Stopp sofort |\n\nBefund aus den Diagnose-Logs (28.9.\u20136.10., nur Zeiten, kein Inhalt): 8 Teams-Aufnahmen endeten von selbst, jede rund 15 s nachdem alle Teams-Prozesse keinen Ton mehr ausgaben. Das passt zu echten Gespr\u00e4chsenden; ob einmal ein laufendes Gespr\u00e4ch abgeschnitten wurde, l\u00e4sst sich daraus nicht unterscheiden. **Der Stopp selbst wird nicht geloggt** (der Zweig \u201eNachlaufzeit abgelaufen\u201c schreibt keine Zeile), die 4-Stunden-Grenze griff in dieser Zeit nicht.\n\n## Wunsch\n\nVor dem automatischen Beenden nachfragen, statt still zu stoppen.\n\n**Vorschlag (B, R\u00fcckfrage mit Countdown):** Sieht die App das Meeting nicht mehr, nimmt sie weiter auf und zeigt eine Mitteilung: **\u201eDas Meeting scheint beendet. Aufnahme endet in 2 Minuten.\u201c** mit **Weiter aufnehmen** / **Jetzt beenden**.\n\n- Ohne Antwort endet die Aufnahme nach dem Countdown; die Stille am Ende wird abgeschnitten.\n- Kommt das Meeting-Signal w\u00e4hrend des Countdowns zur\u00fcck, wird der Stopp abgebrochen und die Mitteilung zur\u00fcckgezogen: eine Aufnahme, keine L\u00fccke.\n- **Weiter aufnehmen** gilt f\u00fcr diese Phase ohne Signal: keine erneute R\u00fcckfrage, bis man selbst stoppt oder die 4-Stunden-Grenze greift. Kommt das Signal zur\u00fcck, gilt wieder der normale Ablauf.\n- Sind Mitteilungen aus oder unsichtbar, l\u00e4uft derselbe Countdown; das Men\u00fcleisten-Symbol zeigt ihn an.\n- 4-Stunden-Grenze bleibt, aber mit Vorwarnung (z. B. 10 min vorher) und Mitteilung danach.\n- Stopp bei beendeter Ziel-App (manuelle Aufnahme) bleibt sofort, mit Mitteilung: ohne die App gibt es keinen App-Ton mehr, und still nur mit dem Mikrofon weiterzumachen w\u00e4re eine unerwartete Aufnahme.\n- Jeder automatische Stopp schreibt seinen Grund ins Diagnose-Log (welcher Ausl\u00f6ser, wie lange ohne Signal).\n\n**Alternative (A, warten bis zur Antwort):** Ohne Antwort weiter aufnehmen, Stopp erst durch Klick, die Stille-R\u00fcckfrage aus #45 oder die 4-Stunden-Grenze. Nachteil: Wer nach einem echten Meeting-Ende die Mitteilung \u00fcbersieht, nimmt den Raum weiter auf, also Personen ohne Einwilligung (siehe #32).\n\nEntscheidung A/B ist offen. Die eigene Mitteilungs-Kategorie wird nicht mit der Start-R\u00fcckfrage (\u201eRecord/Ignore/Never\u201c) geteilt, weil sonst \u201ebeenden\u201c, \u201everworfen\u201c und \u201eabgelaufen\u201c nicht mehr zu unterscheiden sind.\n\nVerwandt: #45 (R\u00fcckfrage bei l\u00e4ngerer Stille), #49 (offene R\u00fcckfrage am Men\u00fcleisten-Symbol), #46 (Pausieren).\n\n## Abnahme\n\n- Laufende Teams-Aufnahme, Meeting-Signal f\u00e4llt weg \u2192 Mitteilung mit Countdown erscheint, Aufnahme l\u00e4uft weiter.\n- Signal kommt innerhalb des Countdowns zur\u00fcck \u2192 keine zweite Aufnahme, ein Transkript ohne L\u00fccke.\n- \u201eWeiter aufnehmen\u201c \u2192 Aufnahme l\u00e4uft bis zum manuellen Stopp; keine weitere R\u00fcckfrage f\u00fcr diese Phase.\n- Keine Antwort \u2192 Aufnahme endet nach dem Countdown und wird verarbeitet wie heute.\n- Im Diagnose-Log steht f\u00fcr jeden automatischen Stopp der Grund.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/54"
   },
-  "updated_at": "2026-10-06T20:58:51.377581Z"
+  "updated_at": "2026-10-06T21:05:59.647706Z"
 }
