@@ -103,14 +103,22 @@ enum MenuBarIcon {
     /// Pre-rendered frames keyed by BadgeKind. Populated once eagerly when
     /// the type is first referenced. The type is `@MainActor`, so the
     /// initialiser runs on MainActor and can safely read NSApp/NSAppearance.
-    private static let cache: [BadgeKind: [NSImage]] = {
+    private static let cache: [BadgeKind: [NSImage]] = renderAllFrames(watchingOverlay: false)
+
+    /// The same frames with the watching dot, so watching keeps the cached,
+    /// template path.
+    private static let watchingCache: [BadgeKind: [NSImage]] = renderAllFrames(watchingOverlay: true)
+
+    private static func renderAllFrames(watchingOverlay: Bool) -> [BadgeKind: [NSImage]] {
         var result: [BadgeKind: [NSImage]] = [:]
         for badge in BadgeKind.allCases {
             let count = badge.isAnimated ? frameCount : 1
-            result[badge] = (0 ..< count).map { frame in renderImage(badge: badge, frame: frame) }
+            result[badge] = (0 ..< count).map { frame in
+                renderImage(badge: badge, frame: frame, watchingOverlay: watchingOverlay)
+            }
         }
         return result
-    }()
+    }
 
     // MARK: - Public
 
@@ -123,9 +131,15 @@ enum MenuBarIcon {
     /// independent; if both are true, both halves are red (effectively all-red bars).
     /// Any of these bypass the pre-rendered cache and force a non-template image, because red
     /// would not survive template rendering.
+    ///
+    /// `watchingOverlay` adds a small dot at the top right while watching for meetings is on,
+    /// so the icon tells "watching, nothing going on" from "not watching". It is drawn in the
+    /// icon's own colour, so it keeps the template path and needs no colour of its own, and it
+    /// sits clear of the bottom-right corner the other badges use.
     static func image(
         badge: BadgeKind,
         animationFrame: Int = 0,
+        watchingOverlay: Bool = false,
         permissionOverlay: Bool = false,
         recordOnlyOverlay: Bool = false,
         micSilentOverlay: Bool = false,
@@ -138,13 +152,16 @@ enum MenuBarIcon {
             let frame = badge.isAnimated ? animationFrame : 0
             return renderImage(
                 badge: badge, frame: frame,
+                watchingOverlay: watchingOverlay,
                 permissionOverlay: permissionOverlay,
                 recordOnlyOverlay: recordOnlyOverlay,
                 micSilentOverlay: micSilentOverlay,
                 appSilentOverlay: appSilentOverlay,
             )
         }
-        guard let frames = cache[badge] else { return renderImage(badge: badge, frame: animationFrame) }
+        guard let frames = (watchingOverlay ? watchingCache : cache)[badge] else {
+            return renderImage(badge: badge, frame: animationFrame, watchingOverlay: watchingOverlay)
+        }
         return frames[animationFrame % frames.count]
     }
 
@@ -153,6 +170,7 @@ enum MenuBarIcon {
     private static func renderImage(
         badge: BadgeKind,
         frame: Int,
+        watchingOverlay: Bool = false,
         permissionOverlay: Bool = false,
         recordOnlyOverlay: Bool = false,
         micSilentOverlay: Bool = false,
@@ -175,11 +193,8 @@ enum MenuBarIcon {
         let isDark = NSApp?.effectiveAppearance
             .bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         let image = NSImage(size: size, flipped: false) { rect in
-            if needsExplicitForeground {
-                (isDark ? NSColor.white : NSColor.black).setFill()
-            } else {
-                NSColor.black.setFill()
-            }
+            let foreground = needsExplicitForeground && isDark ? NSColor.white : NSColor.black
+            foreground.setFill()
 
             drawBadgeBody(badge: badge, in: rect, frame: frame)
 
@@ -195,6 +210,10 @@ enum MenuBarIcon {
                 drawTintedHalf(in: rect, half: .bottom) {
                     drawBadgeBody(badge: badge, in: rect, frame: frame)
                 }
+            }
+
+            if watchingOverlay {
+                drawWatchingDot(in: rect, color: foreground)
             }
 
             // Overlay precedence: permission errors win over record-only because a permission
@@ -376,6 +395,28 @@ enum MenuBarIcon {
         let dotSize: CGFloat = 1.3
         let dotY = cy - size / 2 + 1.0
         NSBezierPath(ovalIn: NSRect(x: cx - dotSize / 2, y: dotY, width: dotSize, height: dotSize)).fill()
+    }
+
+    // MARK: - Watching Dot (small dot in top-right, in the icon's colour)
+
+    /// Clears a ring around the dot first, so the dot reads as a badge of its
+    /// own and not as part of a waveform bar or text line running into it.
+    private static func drawWatchingDot(in rect: NSRect, color: NSColor) {
+        guard let ctx = NSGraphicsContext.current else { return }
+        let size: CGFloat = 4.4
+        let gap: CGFloat = 1.2
+        let center = NSPoint(x: rect.maxX - size / 2 - 0.3, y: rect.maxY - size / 2 - 0.3)
+        func circle(_ diameter: CGFloat) -> NSBezierPath {
+            NSBezierPath(ovalIn: NSRect(
+                x: center.x - diameter / 2, y: center.y - diameter / 2, width: diameter, height: diameter,
+            ))
+        }
+        ctx.saveGraphicsState()
+        ctx.compositingOperation = .clear
+        circle(size + 2 * gap).fill()
+        ctx.restoreGraphicsState()
+        color.setFill()
+        circle(size).fill()
     }
 
     // MARK: - Record-Only Badge (solid red dot in bottom-right)

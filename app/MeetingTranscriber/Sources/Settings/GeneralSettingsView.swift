@@ -21,6 +21,13 @@ struct GeneralSettingsView: View {
         )
     }
 
+    /// Without it watching is off after every launch, an update included,
+    /// and nothing is detected until someone notices and turns it back on.
+    private var watchAtLaunchToggle: some View {
+        Toggle("Watch for meetings when the app starts", isOn: $settings.autoWatch)
+            .accessibilityIdentifier(A11yID.watchAtLaunchToggle)
+    }
+
     var body: some View {
         // swiftlint:disable:next closure_body_length
         Form {
@@ -86,6 +93,8 @@ struct GeneralSettingsView: View {
             }
 
             Section("Detection") {
+                watchAtLaunchToggle
+
                 HStack {
                     Text("Poll Interval")
                     Spacer()
