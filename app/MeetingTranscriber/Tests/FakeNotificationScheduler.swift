@@ -11,6 +11,7 @@ final class FakeNotificationScheduler: NotificationScheduling, @unchecked Sendab
     private let lock = NSLock()
     private var _added: [UNNotificationRequest] = []
     private var _removedIdentifiers: [String] = []
+    private var _removedPendingIdentifiers: [String] = []
     private(set) var categories: Set<UNNotificationCategory> = []
     private(set) weak var delegate: (any UNUserNotificationCenterDelegate)?
     private(set) var authRequested = false
@@ -41,12 +42,20 @@ final class FakeNotificationScheduler: NotificationScheduling, @unchecked Sendab
         lock.lock(); defer { lock.unlock() }; return _removedIdentifiers
     }
 
+    var removedPendingIdentifiers: [String] {
+        lock.lock(); defer { lock.unlock() }; return _removedPendingIdentifiers
+    }
+
     func add(_ request: UNNotificationRequest) {
         lock.lock(); _added.append(request); lock.unlock()
     }
 
     func removeDelivered(withIdentifiers identifiers: [String]) {
         lock.lock(); _removedIdentifiers.append(contentsOf: identifiers); lock.unlock()
+    }
+
+    func removePending(withIdentifiers identifiers: [String]) {
+        lock.lock(); _removedPendingIdentifiers.append(contentsOf: identifiers); lock.unlock()
     }
 
     func setCategories(_ categories: Set<UNNotificationCategory>) {

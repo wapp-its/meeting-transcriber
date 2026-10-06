@@ -16,9 +16,11 @@ final class WatchLoopMonitorTests: XCTestCase {
         let clock = TestClock()
         let recorder = MockRecorder()
         recorder.mixPath = URL(fileURLWithPath: "/tmp/test_mix.wav")
+        let diagnostics = RecordingDiagnostics()
         let loop = WatchLoop(
             recorderFactory: { recorder },
             pollInterval: 0.05,
+            diagnostics: diagnostics,
             nowProvider: { clock.now },
             sleepProvider: { await clock.sleep(for: $0) },
             pidAliveCheck: { _ in false }, // simulated process already exited
@@ -33,6 +35,11 @@ final class WatchLoopMonitorTests: XCTestCase {
         XCTAssertEqual(loop.snapshot.phase, .idle)
         XCTAssertNil(loop.snapshot.manualRecordingInfo)
         XCTAssertTrue(recorder.stopCalled, "Recorder.stop must be called when pid dies")
+        XCTAssertEqual(
+            diagnostics.lines(.notice, startingWith: "recording_auto_stop"),
+            ["recording_auto_stop trigger=manual reason=app_exited pid=42"],
+            "the stop and its reason reach the diagnostic log",
+        )
     }
 
     /// When the process stays alive past `maxDuration` virtual time, the
@@ -42,10 +49,12 @@ final class WatchLoopMonitorTests: XCTestCase {
         let clock = TestClock()
         let recorder = MockRecorder()
         recorder.mixPath = URL(fileURLWithPath: "/tmp/test_mix.wav")
+        let diagnostics = RecordingDiagnostics()
         let loop = WatchLoop(
             recorderFactory: { recorder },
             pollInterval: 0.05,
             maxDuration: 0.05,
+            diagnostics: diagnostics,
             nowProvider: { clock.now },
             sleepProvider: { await clock.sleep(for: $0) },
             pidAliveCheck: { _ in true }, // process never dies
@@ -60,5 +69,9 @@ final class WatchLoopMonitorTests: XCTestCase {
         XCTAssertEqual(loop.snapshot.phase, .idle)
         XCTAssertNil(loop.snapshot.manualRecordingInfo)
         XCTAssertTrue(recorder.stopCalled, "Recorder.stop must be called when maxDuration hits")
+        XCTAssertEqual(
+            diagnostics.lines(.notice, startingWith: "recording_auto_stop"),
+            ["recording_auto_stop trigger=manual reason=max_duration"],
+        )
     }
 }

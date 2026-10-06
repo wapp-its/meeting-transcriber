@@ -81,6 +81,78 @@ final class RecordOnlyE2ETests: XCTestCase { // swiftlint:disable:this balanced_
         XCTAssertEqual(notifier.calls.first?.title, "Record-only output failed")
     }
 
+    /// A meeting ended through the "seems to have ended" question is cut back
+    /// in record-only mode too: every written track ends at the cut point, and
+    /// the sidecar stops there rather than claiming audio the files lost.
+    func test_handleMeeting_recordOnly_cutBackEndsFilesAndSidecarAtTheCutPoint() async throws {
+        let outputDir = tmpDir.appendingPathComponent("output", isDirectory: true)
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        recorder.recordingStartDate = start
+        let clock = TestClock()
+        let loop = WatchLoop(
+            detector: ImmediatelyInactiveDetector(),
+            recorderFactory: { self.recorder },
+            pipelineQueue: queue,
+            pollInterval: 0.5,
+            endGracePeriod: 2,
+            maxDuration: 100,
+            // Long enough that the virtual clock outlasts the fixture (about
+            // 50 s), as a real clock outlasts the audio it captured.
+            meetingEndCountdown: 60,
+            recordOnly: { true },
+            recordOnlyDestination: { .unscoped(outputDir) },
+            notifier: notifier,
+            nowProvider: { clock.now },
+            sleepProvider: { await clock.sleep(for: $0) },
+        )
+
+        try await loop.handleMeeting(makeMeeting())
+
+        // The signal is gone from the first poll, at the recording's start, so
+        // the cut keeps the grace period: 2 s at 16 kHz.
+        for suffix in [RecordingFileSuffix.mix, RecordingFileSuffix.app, RecordingFileSuffix.mic] {
+            let file = try AVAudioFile(forReading: outputDir.appendingPathComponent("\(Self.basename)\(suffix)"))
+            XCTAssertEqual(file.length, 32000, "\(suffix) must end at the cut point")
+        }
+        let sidecar = try XCTUnwrap(RecordingSidecar.read(fromDirectory: outputDir, basename: Self.basename))
+        XCTAssertEqual(sidecar.stoppedAt, start.addingTimeInterval(2), "the sidecar stops at the cut")
+    }
+
+    /// The audio began before capture reported running: the fixture (about
+    /// 50 s) outlasts the 32 virtual seconds from start to stop. The cut keeps
+    /// the audio up to the cut point on the audio's own timeline, and the
+    /// sidecar still stops at the requested cut point, 2 s after the start,
+    /// not at the start plus the audio kept.
+    func test_handleMeeting_recordOnly_earlyCaptureSidecarStopsAtTheRequestedCutPoint() async throws {
+        let outputDir = tmpDir.appendingPathComponent("output", isDirectory: true)
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        recorder.recordingStartDate = start
+        let fixtureFrames = try AVAudioFile(forReading: fixtureURL()).length
+        let clock = TestClock()
+        let loop = WatchLoop(
+            detector: ImmediatelyInactiveDetector(),
+            recorderFactory: { self.recorder },
+            pipelineQueue: queue,
+            pollInterval: 0.5,
+            endGracePeriod: 2,
+            maxDuration: 100,
+            meetingEndCountdown: 30,
+            recordOnly: { true },
+            recordOnlyDestination: { .unscoped(outputDir) },
+            notifier: notifier,
+            nowProvider: { clock.now },
+            sleepProvider: { await clock.sleep(for: $0) },
+        )
+
+        try await loop.handleMeeting(makeMeeting())
+
+        // Stopped 30 s after the cut point, so the last 30 s of audio go.
+        let mix = try AVAudioFile(forReading: outputDir.appendingPathComponent("\(Self.basename)\(RecordingFileSuffix.mix)"))
+        XCTAssertEqual(Double(mix.length), Double(fixtureFrames - 30 * 16000), accuracy: 1)
+        let sidecar = try XCTUnwrap(RecordingSidecar.read(fromDirectory: outputDir, basename: Self.basename))
+        XCTAssertEqual(sidecar.stoppedAt, start.addingTimeInterval(2), "the sidecar stops at the requested cut point")
+    }
+
     // MARK: - Helpers
 
     /// Copy the canonical two-speaker fixture into tmpDir under three
@@ -108,18 +180,16 @@ final class RecordOnlyE2ETests: XCTestCase { // swiftlint:disable:this balanced_
         return recorder
     }
 
+    /// Ended by the duration cap so the fixture arrives whole: a lost signal
+    /// cuts the recording back (the cut-back test above).
     private func makeRecordOnlyLoop(outputDir: URL) -> WatchLoop {
-        let detector = PowerAssertionDetector()
-        // Empty assertion list → meeting "ends" on first poll.
-        detector.assertionProvider = { [:] }
-
         let loop = WatchLoop(
-            detector: detector,
+            detector: FixedMeetingDetector(),
             recorderFactory: { self.recorder },
             pipelineQueue: queue,
             pollInterval: 0.05,
             endGracePeriod: 0.1,
-            maxDuration: 10,
+            maxDuration: 0.1,
             noMic: false,
             recordOnly: { true },
             recordOnlyDestination: { .unscoped(outputDir) },

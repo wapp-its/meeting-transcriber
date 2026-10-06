@@ -16,9 +16,12 @@ final class WatchLoopTimingTests: XCTestCase {
         )
     }
 
-    // MARK: - Grace period
+    // MARK: - Grace period and question countdown
 
-    func testWaitForMeetingEndGracePeriod() async throws {
+    /// A lost signal waits out the grace period and then the unanswered
+    /// question's countdown, and the end it returns is cut back to the loss
+    /// plus the grace period.
+    func testWaitForMeetingEndWaitsGraceAndCountdownAndCutsBackToGrace() async throws {
         let detector = PowerAssertionDetector()
         detector.assertionProvider = { [:] }
 
@@ -28,17 +31,20 @@ final class WatchLoopTimingTests: XCTestCase {
             pollInterval: 0.05,
             endGracePeriod: 0.1,
             maxDuration: 10,
+            meetingEndCountdown: 0.3,
             nowProvider: { clock.now },
             sleepProvider: { await clock.sleep(for: $0) },
         )
 
         let virtualStart = clock.now
-        try await loop.waitForMeetingEnd(makeMeeting())
+        let cutAt = try await loop.waitForMeetingEnd(makeMeeting())
         let elapsed = clock.now.timeIntervalSince(virtualStart)
 
         XCTAssertGreaterThanOrEqual(
-            elapsed, 0.1, "Should wait at least the grace period (virtual time)",
+            elapsed, 0.4, "Should wait the grace period and then the countdown (virtual time)",
         )
+        let cut = try XCTUnwrap(cutAt, "an unanswered question ends the recording cut back")
+        XCTAssertEqual(cut.timeIntervalSince(virtualStart), 0.1, accuracy: 1e-6, "signal lost at the first poll, plus grace")
     }
 
     // MARK: - Max duration
@@ -83,23 +89,26 @@ final class WatchLoopTimingTests: XCTestCase {
             1234: [["Process Name": "MSTeams", "AssertName": "Microsoft Teams Call in progress"]],
         ]
         // Sequence: inactive, ACTIVE, inactive, inactive, …
-        // Without grace-reset the loop returns at poll 3 (graceStart from
-        // poll 1 would have ≥ grace elapsed by virtual t=0.10). With reset
-        // the loop returns no earlier than poll 5 because poll 2 clears
-        // graceStart and the fresh grace started at poll 3 only expires
-        // once virtual time advances by another full grace window.
+        // Without grace-reset the loop asks at poll 3 (graceStart from poll 1
+        // would have ≥ grace elapsed by virtual t=0.10) and returns at poll 4.
+        // With reset it asks no earlier than poll 5 because poll 2 clears
+        // graceStart and the fresh grace started at poll 3 only expires once
+        // virtual time advances by another full grace window.
         let callCount = ManagedCounter()
         detector.assertionProvider = {
             let n = callCount.increment()
             return n == 2 ? activeAssertions : [:]
         }
 
+        // No countdown, so the loop returns one poll after the grace expires
+        // and the poll count still tells the two behaviours apart.
         let clock = TestClock()
         let loop = WatchLoop(
             detector: detector,
             pollInterval: 0.05,
             endGracePeriod: 0.1,
             maxDuration: 30,
+            meetingEndCountdown: 0,
             nowProvider: { clock.now },
             sleepProvider: { await clock.sleep(for: $0) },
         )
@@ -109,8 +118,8 @@ final class WatchLoopTimingTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(
             callCount.value, 5,
             "Grace must reset on resume; observed only \(callCount.value) polls — "
-                + "without reset the loop would return at poll 3 once the original "
-                + "grace window had elapsed.",
+                + "without reset the loop would ask at poll 3 once the original "
+                + "grace window had elapsed, and return at poll 4.",
         )
     }
 }

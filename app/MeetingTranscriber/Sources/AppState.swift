@@ -31,6 +31,17 @@ protocol AppNotifying {
     /// (no prompt) for notifiers without a real coordinator.
     func resolveBrowserConsent(granted: Bool) -> Bool
 
+    /// Ask whether a detected meeting whose signal is gone has ended ("Keep
+    /// recording" / "Stop now"), returning at once. `onAnswer` runs when an
+    /// action is tapped, never after the question is withdrawn. Defaults (and
+    /// rationale) in `MeetingEndQuestions.swift`.
+    @MainActor
+    func askBeforeEndingRecording(id: String, title: String, body: String, onAnswer: @escaping MeetingEndQuestionHandler)
+
+    /// Take the question back: out of Notification Center, and no answer to
+    /// it is delivered afterwards.
+    func withdrawMeetingEndQuestion(id: String)
+
     /// How a posted notification would be presented. On the same seam as
     /// `askToRecord` because it answers whether that prompt could be SEEN, which
     /// decides whether a meeting that asks can be recorded at all (see

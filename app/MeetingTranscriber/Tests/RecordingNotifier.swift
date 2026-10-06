@@ -39,4 +39,35 @@ final class RecordingNotifier: AppNotifying {
     }
 
     // swiftlint:enable async_without_await
+
+    // MARK: - Meeting-end question
+
+    /// Every "meeting seems to have ended" question asked, in order.
+    private(set) var meetingEndQuestions: [(id: String, title: String, body: String)] = []
+    /// The ids taken back, in order.
+    private(set) var withdrawnMeetingEndQuestions: [String] = []
+    /// Kept after a withdrawal on purpose, unlike the real notifier: a test can
+    /// then deliver a stale answer and show the loop itself ignores it.
+    private var meetingEndHandlers: [String: MeetingEndQuestionHandler] = [:]
+
+    @MainActor
+    func askBeforeEndingRecording(
+        id: String,
+        title: String,
+        body: String,
+        onAnswer: @escaping MeetingEndQuestionHandler,
+    ) {
+        meetingEndQuestions.append((id: id, title: title, body: body))
+        meetingEndHandlers[id] = onAnswer
+    }
+
+    func withdrawMeetingEndQuestion(id: String) {
+        withdrawnMeetingEndQuestions.append(id)
+    }
+
+    /// Answer question `id` the way a tap on one of its actions would.
+    @MainActor
+    func answerMeetingEndQuestion(_ id: String, with answer: MeetingEndAnswer) {
+        meetingEndHandlers[id]?(answer)
+    }
 }

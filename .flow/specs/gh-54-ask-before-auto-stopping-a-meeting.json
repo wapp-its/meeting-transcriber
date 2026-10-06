@@ -1,0 +1,452 @@
+{
+  "branch_name": "feat/gh-54-ask-before-auto-stop",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-06T21:05:59.646199Z",
+  "created_at": "2026-10-06T19:35:36.299075Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-54-ask-before-auto-stopping-a-meeting",
+  "impl_review_rounds": {
+    "gh-54-ask-before-auto-stopping-a-meeting.1": 0
+  },
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-06T19:51:00.313147Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "046bb00673c6b5ff1be858d9d86c4256179fca17391c991119ac10ab01fad919",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-cf6096af8a0a5554260686ce00cce252",
+            "classification": "introduced",
+            "findingId": "finding-cf6096af8a0a5554260686ce00cce252",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-476a8b462d058b851d4db681b51b6cbc",
+            "classification": "introduced",
+            "findingId": "finding-476a8b462d058b851d4db681b51b6cbc",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-f05c30556e3df0d3671c77d53777ae47",
+            "classification": "introduced",
+            "findingId": "finding-f05c30556e3df0d3671c77d53777ae47",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "1475251384d9c52098ebd0630e35d5855ded1de8",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 328795,
+      "output_sha256": "4685007995396b291347ab0318a98cb3ae5fdd6223b92892c2ffc18fa07514b1",
+      "reservation_id": "cc42e468c7ba4ad5b4798da7458145b2",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T19:49:17.863375Z",
+      "tool_calls": 23,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "7ef6093a257ca793a847cfdb353104290309b951c9b8cb537f6890320ef1e8bc",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-cf6096af8a0a5554260686ce00cce252",
+            "classification": "introduced",
+            "findingId": "finding-cf6096af8a0a5554260686ce00cce252",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-476a8b462d058b851d4db681b51b6cbc",
+            "classification": "introduced",
+            "findingId": "finding-476a8b462d058b851d4db681b51b6cbc",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-f05c30556e3df0d3671c77d53777ae47",
+            "classification": "introduced",
+            "findingId": "finding-f05c30556e3df0d3671c77d53777ae47",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "1475251384d9c52098ebd0630e35d5855ded1de8",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 920,
+      "output_sha256": "77837164ef686532025fe3ac43b9b36324cc59fa106a4c6b75f52500d6f3d523",
+      "reservation_id": "b01c5a95e4724e179d06b66797ac2d1f",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T19:51:00.282731Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "96bc2d38b27f2c67ad682912cbb11c5de5795e5750bc5184f48665070f691862",
+      "backend": "codex",
+      "base_sha": "bf6f5d4fa9824479c4cf066b08feb95c7fd8ba35",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-e680f0dcc22e4c6e5580cdccae352180",
+            "classification": "introduced",
+            "findingId": "finding-e680f0dcc22e4c6e5580cdccae352180",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-79f51dd3c61d968de2456cd513f96e4e",
+            "classification": "introduced",
+            "findingId": "finding-79f51dd3c61d968de2456cd513f96e4e",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-f1dbd45e730b1693d65f4a88d1053f68",
+            "classification": "introduced",
+            "findingId": "finding-f1dbd45e730b1693d65f4a88d1053f68",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-a41f48b29e7b8b9523443a5c27225534",
+            "classification": "introduced",
+            "findingId": "finding-a41f48b29e7b8b9523443a5c27225534",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-d3189e21df1a291775fa91d44d2f1b43",
+            "classification": "introduced",
+            "findingId": "finding-d3189e21df1a291775fa91d44d2f1b43",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "998fcc6603d6aaa8acd8abda4929c9e489a0f516",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 5169,
+      "output_sha256": "266e97e6681ae5f2a7135775bd7ede0f165e29a265bc83a726fd2a0b92a48010",
+      "reservation_id": "fda3026b07f44aa595a91e79d32bd94e",
+      "round_consumed": true,
+      "scope": "impl:gh-54-ask-before-auto-stopping-a-meeting.1",
+      "superseded_by": null,
+      "task": "gh-54-ask-before-auto-stopping-a-meeting.1",
+      "timestamp": "2026-10-06T20:39:08.012092Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "1555b0135e7a542896cb3f7fb146197083df387905fe30ce7e7a08a9c035983d",
+      "backend": "codex",
+      "base_sha": "bf6f5d4fa9824479c4cf066b08feb95c7fd8ba35",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-e680f0dcc22e4c6e5580cdccae352180",
+            "classification": "introduced",
+            "findingId": "finding-e680f0dcc22e4c6e5580cdccae352180",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-79f51dd3c61d968de2456cd513f96e4e",
+            "classification": "introduced",
+            "findingId": "finding-79f51dd3c61d968de2456cd513f96e4e",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-f1dbd45e730b1693d65f4a88d1053f68",
+            "classification": "introduced",
+            "findingId": "finding-f1dbd45e730b1693d65f4a88d1053f68",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-a41f48b29e7b8b9523443a5c27225534",
+            "classification": "introduced",
+            "findingId": "finding-a41f48b29e7b8b9523443a5c27225534",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-d3189e21df1a291775fa91d44d2f1b43",
+            "classification": "introduced",
+            "findingId": "finding-d3189e21df1a291775fa91d44d2f1b43",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "eb03caf7887af76bef1c7d90111cd0e4f77e5c9c",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1343,
+      "output_sha256": "34e0a5b82f70ddad681a805210ae5e6b0b8952f785061f694e0c17f2d8480b35",
+      "reservation_id": "2d642d69b14948988bdfee820eec7e52",
+      "round_consumed": true,
+      "scope": "impl:gh-54-ask-before-auto-stopping-a-meeting.1",
+      "superseded_by": null,
+      "task": "gh-54-ask-before-auto-stopping-a-meeting.1",
+      "timestamp": "2026-10-06T20:48:51.842665Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "24feabcc0590d99bfd2e53e9ff2c9519f392b4a746e917a7e5932d6bf5a2569f",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-63b16610a927a39353db0e3a0b859fd9",
+            "classification": "introduced",
+            "findingId": "finding-63b16610a927a39353db0e3a0b859fd9",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-60eb39bad6f08f550745cc7ea13dbd64",
+            "classification": "introduced",
+            "findingId": "finding-60eb39bad6f08f550745cc7ea13dbd64",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-bc6b08f99401fa3fbee97995dc81791a",
+            "classification": "introduced",
+            "findingId": "finding-bc6b08f99401fa3fbee97995dc81791a",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "259362498a2565d042600fb6cabcc83a208d7245",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 507002,
+      "output_sha256": "01957a8699ae38b55e207b5f4440ae041672ae35ca6190db2cb93fbceeec7293",
+      "reservation_id": "759cc27d9e51414584c8040542f37138",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:58:51.346437Z",
+      "tool_calls": 22,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "47f925441d9368f77a7cb0f1ce96d262f15578dbf3603f7356463705fad5e2db",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-63b16610a927a39353db0e3a0b859fd9",
+            "classification": "introduced",
+            "findingId": "finding-63b16610a927a39353db0e3a0b859fd9",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-60eb39bad6f08f550745cc7ea13dbd64",
+            "classification": "introduced",
+            "findingId": "finding-60eb39bad6f08f550745cc7ea13dbd64",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-bc6b08f99401fa3fbee97995dc81791a",
+            "classification": "introduced",
+            "findingId": "finding-bc6b08f99401fa3fbee97995dc81791a",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "not_fixed"
+          },
+          {
+            "chainRoot": "finding-9a6d3eace3cfb8e253e530a64dfdcc42",
+            "classification": "introduced",
+            "findingId": "finding-9a6d3eace3cfb8e253e530a64dfdcc42",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "f77da73f7f4e5e983cbbd1de7cd3a0b947f809d3",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 6493,
+      "output_sha256": "7948cbbfc75f3efcd2bf3a95020e1d9d8fb241b426c1840b6fac04141023dd01",
+      "reservation_id": "8675728f1714447aaf9998269980c6f0",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T21:05:59.618368Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "impl:gh-54-ask-before-auto-stopping-a-meeting.1": 1,
+    "plan": 1,
+    "plan#completion": 1
+  },
+  "review_pending_rounds": {},
+  "review_phase_leases": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-54-ask-before-auto-stopping-a-meeting.1": 0,
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-54-ask-before-auto-stopping-a-meeting.md",
+  "status": "done",
+  "title": "Ask before auto-stopping a meeting recording",
+  "tracker": {
+    "baseHashFlow": "8be5a3accd725e5bf04949dacfbbca3428a53a791d4bb783836d8d380515564c",
+    "baseHashTracker": "4d47d709dc5ca41f9aec5aab76ccd8d1a05dfbb609a69f93476931b4ab3aef2b",
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABVa57aw",
+    "identifier": "#54",
+    "lastSyncedAt": "2026-10-06T19:35:42.927942Z",
+    "linkState": "linked",
+    "mergeBaseFlow": "# Ask before auto-stopping a meeting recording\n\n## Conversation Evidence\n\n> user (turn 1): \"Can you check the current auto stop feature of a meeting recording? So it seems like it stops auto recording after a while. It should ask for m maybe before it stops the recording, not automatically. Because otherwise maybe it stops recording and then parts get lost.\"\n> user (turn 2, selected): \"B \u2014 2-min countdown (Recommended)\"\n> issue #54 (owner decision comment, 2026-10-06): \"Entscheidung (Owner, 2026-10-06): **B** \u2013 R\u00fcckfrage mit 2-Minuten-Countdown, ohne Antwort endet die Aufnahme. A und C verworfen (A: Raum wird nach \u00fcbersehener Mitteilung weiter aufgenommen; C: bleibt still, Aussetzer \u00fcber 2 min teilen das Meeting weiterhin).\"\n\n## Goal & Context\n\nToday an automatically detected meeting is stopped silently once the app has seen no sign of the call for the end-grace period (15 s by default): no \"call in progress\" signal from the meeting app, no microphone held by it, no meeting window. When that signal drops while the call is still going (hold, device switch, a hand-off to the phone), the recording is finished and processed, and a call that comes back becomes a second recording with a gap in between; if it never comes back, the rest of the meeting is lost. The person recording wants to be asked before the app stops, so a wrong stop can be prevented and no part of a meeting is lost. [paraphrase]\n\nThe diagnostic logs of the last nine days show eight Teams recordings that ended on their own, each about 15 s after Teams stopped all audio output, which fits real hang-ups; whether any of them cut a live call cannot be told from the logs, partly because the stop itself is not logged. [paraphrase]\n\nRecording people after a meeting has ended is not free in Switzerland (everyone recorded must agree, see the fork's consent reminder), so the fix must not leave the room being recorded because a notification went unseen. [paraphrase]\n\n<!-- Source: 15% user / 60% [paraphrase] / 25% [inferred] -->\n\n## Architecture & Data Models\n\n- The meeting-end decision gains a third state between \"keep polling\" and \"stop\": an end that is pending, with the time the signal was lost and a deadline. It goes back to polling when the signal returns, resolves to a stop on the deadline or on \"Stop now\", and resolves to a kept episode on \"Keep recording\". [inferred]\n- The person's answer arrives out of band, the way the \"Record \u2026 meeting?\" start prompt's answer already does, so detection keeps polling while the question is open. [paraphrase]\n- The end notification is its own kind of notification with its own two actions; it does not reuse the start prompt's answers (Record / Ignore / Never), because a stop, a dismissal and an expiry must stay distinguishable. [paraphrase]\n- The cut-back of R2 applies to every saved track of the recording at the same point on the recording's timeline, after the recorder stops and before the job is queued. [inferred]\n\n## Edge Cases & Constraints\n\n- The signal flapping (lost, back, lost again) inside one countdown: a return cancels the countdown (R3); the next loss starts a fresh end-grace period. [inferred]\n- A click on a notification that belongs to an episode that has already ended (signal returned, recording already stopped) changes nothing. [inferred]\n- Notification permission denied, alert style \"None\" or Focus hiding the banner: the countdown still runs (R5). [paraphrase]\n\n## Acceptance Criteria\n\n- **R1:** When an automatically detected meeting has shown no detection signal for the end-grace period, the recording keeps running and the app posts a notification saying the meeting seems to have ended and the recording will end in 2 minutes, with the actions \"Keep recording\" and \"Stop now\". Errors: a notification that cannot be posted or is not shown is handled by R5. [paraphrase]\n- **R2:** When the 2 minutes pass without an answer, or on \"Stop now\", the recording ends and is processed as today, and the saved audio ends where today's automatic stop would have ended it: the moment the signal was lost plus the end-grace period. Audio after that point is neither kept nor transcribed. Errors: if cutting the audio fails, the recording is processed uncut and the failure is logged; the recording is never discarded. [inferred]\n- **R3:** When the detection signal returns before the countdown ends, the pending stop is cancelled, the notification is withdrawn, and the recording continues as one recording with no gap; a later loss of the signal starts a fresh end-grace period and, after it, a fresh notification. Errors: an answer to the withdrawn notification changes nothing. [paraphrase]\n- **R4:** \"Keep recording\" keeps the whole recording uncut and posts no further end notification while the signal stays absent; the recording then runs until the person stops it or the 4-hour cap ends it. If the signal returns, R1\u2013R3 apply again to the next loss. Errors: an answer arriving after the recording has already ended changes nothing. [paraphrase]\n- **R5:** When notifications are denied, switched off or not shown, the same countdown runs and ends the recording as in R2; the app never keeps recording because a notification went unseen. Errors: no error surface beyond R2. [paraphrase]\n- **R6:** Stopping meeting watching, or starting a manual recording, while a countdown is pending ends the recording as in R2 and withdraws the notification. Errors: no error surface beyond R2. [inferred]\n- **R7:** Every automatic stop writes its reason to the diagnostic log the app keeps on disk: countdown expired, \"Stop now\", maximum duration reached, or (manual recordings) monitored app exited, with how long the signal had been absent where that applies. These lines carry no meeting title, participant name or transcript content. Errors: no error surface beyond the log write itself. [paraphrase]\n\n## Boundaries\n\n- Only automatically detected meetings get the notification; manual recordings keep their current stop rules (target app exits, 4-hour cap), apart from R7's log line. [paraphrase]\n- The 4-hour cap stays a hard stop. A warning before it, a notice when a manual recording stops because its app quit, and a menu-bar indication of a pending countdown belong to a follow-up spec that depends on this one. [paraphrase]\n- The end-grace setting keeps its meaning (time without a signal before the notification appears); the 2-minute countdown is fixed and gets no setting. [inferred]\n\n## Decision Context\n\n- **D1 \u00b7 Ask with a 2-minute countdown; no answer ends the recording (option B).** why: a wrong end happens while the person is in the call at the screen and sees the banner, and a real end needs no click; the room is never recorded unnoticed. alternatives: A (record until answered) rejected because a missed banner keeps recording people who did not agree; C (only raise the end-grace setting) rejected because it stays silent and drops longer than 2 minutes still split the meeting \u00b7 status: active [owner-ratified 2026-10-06]\n- **A1 \u00b7 An unanswered countdown or \"Stop now\" cuts the recording back to today's end point (signal lost plus end grace).** flip at: the owner wants the extra minutes kept \u00b7 test: a real meeting end produces audio of the same length as today, and nothing recorded during the countdown reaches the transcript \u00b7 status: active [agent-assumed 2026-10-06]\n- **A2 \u00b7 The 4-hour cap stays absolute; its warning, the app-exit notice and a menu-bar countdown go to a follow-up spec.** flip at: the owner asks to fold them in \u00b7 test: this spec's diff leaves the cap's stop behaviour unchanged apart from R7's log line \u00b7 status: active [agent-inferred 2026-10-06] (a Codex second opinion on 2026-10-06 also kept the cap absolute and the app-exit stop immediate)\n- **A3 \u00b7 The countdown is a fixed 2 minutes, with no setting.** flip at: the owner asks for a setting \u00b7 test: Settings gains no new control \u00b7 status: active [agent-assumed 2026-10-06]\n",
+    "mergeBaseTracker": "## Problem\n\nEin automatisch erkanntes Meeting wird heute **ohne R\u00fcckfrage** beendet, sobald die Erkennung das Meeting 15 Sekunden lang nicht mehr sieht (Einstellung \u201eEnd grace\u201c, 1\u2013120 s). Signale: die Meeting-App h\u00e4lt ihre \u201eAnruf l\u00e4uft\u201c-Energiesperre nicht mehr, gibt das Mikrofon frei oder das Meeting-Fenster ist weg.\n\nErkennt die App das Ende f\u00e4lschlich (Teams gibt den Ton kurz frei: Halten, Ger\u00e4tewechsel, \u00dcbergabe aufs Telefon), geht etwas verloren:\n\n- Die Aufnahme wird abgeschlossen und verarbeitet; kommt das Meeting zur\u00fcck, startet eine **neue** Aufnahme (Pause, Best\u00e4tigungs-Abfragen, ggf. R\u00fcckfrage \u201eRecord \u2026 meeting?\u201c). Ein Meeting wird so zu zwei Transkripten, die L\u00fccke dazwischen fehlt.\n- Kommt das Signal nicht zur\u00fcck, fehlt der ganze Rest.\n\nWeitere automatische Stopps, ebenfalls ohne R\u00fcckfrage:\n\n| Ausl\u00f6ser | gilt f\u00fcr | heute |\n|---|---|---|\n| Meeting nicht mehr erkannt | automatische Aufnahmen | Stopp nach 15 s, ohne Mitteilung |\n| 4-Stunden-Grenze (fest, nicht einstellbar) | alle Aufnahmen | Stopp ohne Mitteilung |\n| Ziel-App beendet | manuelle Aufnahme \u201eApp + Mikrofon\u201c | Stopp sofort |\n\nBefund aus den Diagnose-Logs (28.9.\u20136.10., nur Zeiten, kein Inhalt): 8 Teams-Aufnahmen endeten von selbst, jede rund 15 s nachdem alle Teams-Prozesse keinen Ton mehr ausgaben. Das passt zu echten Gespr\u00e4chsenden; ob einmal ein laufendes Gespr\u00e4ch abgeschnitten wurde, l\u00e4sst sich daraus nicht unterscheiden. **Der Stopp selbst wird nicht geloggt** (der Zweig \u201eNachlaufzeit abgelaufen\u201c schreibt keine Zeile), die 4-Stunden-Grenze griff in dieser Zeit nicht.\n\n## Wunsch\n\nVor dem automatischen Beenden nachfragen, statt still zu stoppen.\n\n**Vorschlag (B, R\u00fcckfrage mit Countdown):** Sieht die App das Meeting nicht mehr, nimmt sie weiter auf und zeigt eine Mitteilung: **\u201eDas Meeting scheint beendet. Aufnahme endet in 2 Minuten.\u201c** mit **Weiter aufnehmen** / **Jetzt beenden**.\n\n- Ohne Antwort endet die Aufnahme nach dem Countdown; die Stille am Ende wird abgeschnitten.\n- Kommt das Meeting-Signal w\u00e4hrend des Countdowns zur\u00fcck, wird der Stopp abgebrochen und die Mitteilung zur\u00fcckgezogen: eine Aufnahme, keine L\u00fccke.\n- **Weiter aufnehmen** gilt f\u00fcr diese Phase ohne Signal: keine erneute R\u00fcckfrage, bis man selbst stoppt oder die 4-Stunden-Grenze greift. Kommt das Signal zur\u00fcck, gilt wieder der normale Ablauf.\n- Sind Mitteilungen aus oder unsichtbar, l\u00e4uft derselbe Countdown; das Men\u00fcleisten-Symbol zeigt ihn an.\n- 4-Stunden-Grenze bleibt, aber mit Vorwarnung (z. B. 10 min vorher) und Mitteilung danach.\n- Stopp bei beendeter Ziel-App (manuelle Aufnahme) bleibt sofort, mit Mitteilung: ohne die App gibt es keinen App-Ton mehr, und still nur mit dem Mikrofon weiterzumachen w\u00e4re eine unerwartete Aufnahme.\n- Jeder automatische Stopp schreibt seinen Grund ins Diagnose-Log (welcher Ausl\u00f6ser, wie lange ohne Signal).\n\n**Alternative (A, warten bis zur Antwort):** Ohne Antwort weiter aufnehmen, Stopp erst durch Klick, die Stille-R\u00fcckfrage aus #45 oder die 4-Stunden-Grenze. Nachteil: Wer nach einem echten Meeting-Ende die Mitteilung \u00fcbersieht, nimmt den Raum weiter auf, also Personen ohne Einwilligung (siehe #32).\n\nEntscheidung A/B ist offen. Die eigene Mitteilungs-Kategorie wird nicht mit der Start-R\u00fcckfrage (\u201eRecord/Ignore/Never\u201c) geteilt, weil sonst \u201ebeenden\u201c, \u201everworfen\u201c und \u201eabgelaufen\u201c nicht mehr zu unterscheiden sind.\n\nVerwandt: #45 (R\u00fcckfrage bei l\u00e4ngerer Stille), #49 (offene R\u00fcckfrage am Men\u00fcleisten-Symbol), #46 (Pausieren).\n\n## Abnahme\n\n- Laufende Teams-Aufnahme, Meeting-Signal f\u00e4llt weg \u2192 Mitteilung mit Countdown erscheint, Aufnahme l\u00e4uft weiter.\n- Signal kommt innerhalb des Countdowns zur\u00fcck \u2192 keine zweite Aufnahme, ein Transkript ohne L\u00fccke.\n- \u201eWeiter aufnehmen\u201c \u2192 Aufnahme l\u00e4uft bis zum manuellen Stopp; keine weitere R\u00fcckfrage f\u00fcr diese Phase.\n- Keine Antwort \u2192 Aufnahme endet nach dem Countdown und wird verarbeitet wie heute.\n- Im Diagnose-Log steht f\u00fcr jeden automatischen Stopp der Grund.",
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/54"
+  },
+  "updated_at": "2026-10-06T21:07:22.558683Z"
+}

@@ -1,7 +1,4 @@
 import Foundation
-import os.log
-
-private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "WatchLoop")
 
 /// The poll loop that decides when a manually started recording ends, split out
 /// of `WatchLoop.swift` to keep that file under the line cap.
@@ -27,12 +24,12 @@ extension WatchLoop {
                 break
 
             case .stopPidExited:
-                logger.info("Monitored app (PID \(pid ?? 0)) exited — stopping manual recording")
+                diagnostics.notice(AutoStopReason.appExited.logLine(trigger: .manual, pid: pid))
                 stopManualRecording()
                 return
 
             case .stopMaxDurationExceeded:
-                logger.info("Max recording duration reached — stopping manual recording")
+                diagnostics.notice(AutoStopReason.maxDuration.logLine(trigger: .manual))
                 stopManualRecording()
                 return
             }
