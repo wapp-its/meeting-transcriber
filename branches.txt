@@ -4,6 +4,8 @@
 # aufnehmen, sonst löscht GitHub ihn beim Merge eines Fork-PRs von ihm automatisch.
 # Heim-Branch: alle im Fork gemergten Features (flow-next-PRs)
 wapp/main
-feat/custom-whisperkit-model
+# feat/custom-whisperkit-model entfernt (2026-10-06): sein Inhalt ist vollständig in
+# wapp/main (PR #22); seine eigenen SHAs würden mit jeder späteren Änderung an denselben
+# Zeilen in wapp/main kollidieren (erstmals gh-12). Der Branch bleibt für PR #759 bestehen.
 feat/nemotron-diarization
 local/diagnostics
