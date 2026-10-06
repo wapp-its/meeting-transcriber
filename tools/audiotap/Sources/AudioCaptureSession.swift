@@ -43,6 +43,12 @@ public class AudioCaptureSession {
     /// restarts. Read from the polling path that already watches channel levels.
     public private(set) var appCaptureGaveUp = false
     public private(set) var micCaptureGaveUp = false
+
+    /// Set when the opt-in silent-track watchdog stopped rebuilding the app tap
+    /// because its rebuilds did not restore signal (issue #672). Not terminal,
+    /// unlike `appCaptureGaveUp`: the channel still captures, it captures
+    /// zeros. Read from the same polling path.
+    public private(set) var appSilentTrackWatchdogGaveUp = false
     private var appFileHandle: FileHandle?
 
     /// Whether the microphone's output path was free when this start reached it.
@@ -236,19 +242,34 @@ public class AudioCaptureSession {
     private func startAppCapture(writingTo handle: FileHandle?) throws {
         guard let handle else { return }
 
-        let capture = AppAudioCapture(
+        let capture = Self.makeAppCapture(config, fileDescriptor: handle.fileDescriptor, attemptBody: appAttemptBody)
+        try capture.start()
+        appFileHandle = handle
+        capture.onGiveUp = { [weak self] in self?.appCaptureGaveUp = true }
+        capture.onSilentTrackWatchdogGaveUp = { [weak self] in self?.appSilentTrackWatchdogGaveUp = true }
+        appCapture = capture
+    }
+
+    /// The app capture a configuration describes. Split out so the mapping from
+    /// configuration to capture options is assertable without starting a tap:
+    /// an option dropped here falls back to its default for every real
+    /// recording, which is the failure `AudioCaptureConfiguration` exists to
+    /// make visible.
+    static func makeAppCapture(
+        _ config: AudioCaptureConfiguration,
+        fileDescriptor: Int32,
+        attemptBody: (() throws -> AppTapSession?)?,
+    ) -> AppAudioCapture {
+        AppAudioCapture(
             pids: config.pids,
-            outputFileDescriptor: handle.fileDescriptor,
+            outputFileDescriptor: fileDescriptor,
             sampleRate: config.sampleRate,
             channels: config.channels,
             debugLogging: config.debugLogging,
             liveSink: config.appLiveSink,
-            attemptBody: appAttemptBody,
+            attemptBody: attemptBody,
+            silentTrackWatchdog: config.silentTrackWatchdog,
         )
-        try capture.start()
-        appFileHandle = handle
-        capture.onGiveUp = { [weak self] in self?.appCaptureGaveUp = true }
-        appCapture = capture
     }
 
     /// Stop a microphone this start opened and remove the file it created.

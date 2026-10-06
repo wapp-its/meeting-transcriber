@@ -28,6 +28,7 @@ final class DualSourceRecorderLifecycleTests: XCTestCase {
         var micLevelDBFS: Double = -120
         var appCaptureGaveUp = false
         var micCaptureGaveUp = false
+        var appSilentTrackWatchdogGaveUp = false
         var appSignalAges: ChannelSignalAges = .unknown
         var micSignalAges: ChannelSignalAges = .unknown
         /// The configuration the recorder handed the factory, so a test can
@@ -191,6 +192,7 @@ final class DualSourceRecorderLifecycleTests: XCTestCase {
         session.micLevelDBFS = -30
         session.appCaptureGaveUp = true
         session.micCaptureGaveUp = false
+        session.appSilentTrackWatchdogGaveUp = true
         session.appSignalAges = ChannelSignalAges(secondsSinceLastBuffer: 1, secondsSinceLastEnergy: 2)
         session.micSignalAges = ChannelSignalAges(secondsSinceLastBuffer: 3, secondsSinceLastEnergy: 4)
 
@@ -201,6 +203,7 @@ final class DualSourceRecorderLifecycleTests: XCTestCase {
         XCTAssertEqual(recorder.micLevelDBFS, -120, accuracy: 0.001)
         XCTAssertFalse(recorder.appCaptureGaveUp)
         XCTAssertFalse(recorder.micCaptureGaveUp)
+        XCTAssertFalse(recorder.appSilentTrackWatchdogGaveUp)
         // Never opened, not "opened and long silent": the fault monitor reads
         // the two apart, so the no-session answer has to be the absent one.
         XCTAssertEqual(recorder.appSignalAges, .unknown)
@@ -212,9 +215,59 @@ final class DualSourceRecorderLifecycleTests: XCTestCase {
         XCTAssertEqual(recorder.micLevelDBFS, -30, accuracy: 0.001)
         XCTAssertTrue(recorder.appCaptureGaveUp)
         XCTAssertFalse(recorder.micCaptureGaveUp)
+        XCTAssertTrue(recorder.appSilentTrackWatchdogGaveUp)
+        // Its own flag, not the give-up one read under another name.
+        session.appCaptureGaveUp = false
+        XCTAssertTrue(recorder.appSilentTrackWatchdogGaveUp)
+        session.appCaptureGaveUp = true
         XCTAssertEqual(recorder.appSignalAges.secondsSinceLastBuffer, 1)
         XCTAssertEqual(recorder.appSignalAges.secondsSinceLastEnergy, 2)
         XCTAssertEqual(recorder.micSignalAges.secondsSinceLastBuffer, 3)
         XCTAssertEqual(recorder.micSignalAges.secondsSinceLastEnergy, 4)
+    }
+
+    // MARK: - Silent-track watchdog option (issue #672)
+
+    /// The option has to travel from the setting to the capture configuration
+    /// a recording opens with. Two hops live in this module: the recorder
+    /// factory reads the setting into the recorder, and the recorder writes it
+    /// into `AudioCaptureConfiguration`. The hop from there into the tap is
+    /// pinned in AudioTapLib. A dropped hop would leave the switch reading "on"
+    /// while every recording ran without the watchdog.
+    func testTheRecorderOpensWithoutTheWatchdogByDefault() throws {
+        let dir = try makeTempDirectory(prefix: "lifecycle_watchdog_default")
+        let (recorder, session) = makeRecorder(dir: dir)
+        try recorder.start(source: .micOnly)
+        XCTAssertEqual(session.lastConfiguration?.silentTrackWatchdog, false)
+    }
+
+    func testTheRecorderHandsTheWatchdogToTheCapture() throws {
+        let dir = try makeTempDirectory(prefix: "lifecycle_watchdog_on")
+        let (recorder, session) = makeRecorder(dir: dir)
+        recorder.silentTrackWatchdogEnabled = true
+        try recorder.start(source: .micOnly)
+        XCTAssertEqual(session.lastConfiguration?.silentTrackWatchdog, true)
+    }
+
+    /// The setting reaches a recording that `WatchingController` starts, read
+    /// when that recording starts rather than when watching was set up.
+    func testTheSettingReachesARecordingTheControllerStarts() async throws {
+        let dir = try makeTempDirectory(prefix: "lifecycle_watchdog_controller")
+        let (recorder, session) = makeRecorder(dir: dir.appendingPathComponent("staging", isDirectory: true))
+        let controller = makeWatchingController(
+            logDir: dir, permissionHealth: .allHealthy,
+            // Labelled on purpose: as a trailing closure it would bind to the
+            // first closure parameter, not to `makeRecorder`.
+            // swiftlint:disable:next trailing_closure
+            makeRecorder: { recorder },
+        )
+        controller.settings.silentTrackWatchdogEnabled = true
+
+        // This process, so the target is alive for the length of the test.
+        controller.startManualRecording(pid: getpid(), appName: "Chrome", title: "Standup")
+        addTeardownBlock { controller.stopManualRecording() }
+        await waitFor(controller.watchLoop?.state == .recording, timeout: .seconds(2))
+
+        XCTAssertEqual(session.lastConfiguration?.silentTrackWatchdog, true)
     }
 }
