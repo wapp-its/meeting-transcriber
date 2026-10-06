@@ -1,0 +1,75 @@
+---
+satisfies: [R2, R4]
+---
+# gh-49-show-a-pending-recording-prompt-on-the.1 Carry the open prompt as a question and answer it through the existing coordinator
+
+## Description
+Carry the open recording prompt as a `ConsentQuestion` value with a per-prompt id, post and park it under that id, let only a prompt's own completion clear it, and add the menu's answer call `WatchLoop.answerParkedConsent(_:granted:)`, which answers exactly that prompt by id through `ConsentPromptCoordinator.resolve(id:answer:)` (the call a notification tap makes). Expose the open question and the answer call on `AppState`. No UI in this task; it is the spec's early proof point (spec "Architecture & Data Models" bullets 3-5, "Edge Cases & Constraints", decision A1).
+
+**Size:** M
+**Files:** `app/MeetingTranscriber/Sources/AppNotifying.swift` (new, moved out of `AppState.swift`), `Sources/AppState.swift`, `Sources/ConsentQuestion.swift` (new), `Sources/ConsentPromptCoordinator.swift`, `Sources/NotificationManager.swift`, `Sources/WatchLoop.swift`, `Sources/WatchLoop+Consent.swift`, `Sources/AppState+ConsentPrompt.swift` (new), `Tests/WatchLoopAskBeforeRecordingTests.swift`, `Tests/WatchLoopAskBeforeRecordingTests+Menu.swift` (new), `Tests/NotificationManagerSchedulingTests.swift`, `Tests/ConsentPromptCoordinatorTests.swift`, `Tests/AppStateConsentPromptTests.swift` (new)
+**Touches:** [app/MeetingTranscriber/Sources/AppNotifying.swift, app/MeetingTranscriber/Sources/AppState.swift, app/MeetingTranscriber/Sources/ConsentQuestion.swift, app/MeetingTranscriber/Sources/ConsentPromptCoordinator.swift, app/MeetingTranscriber/Sources/NotificationManager.swift, app/MeetingTranscriber/Sources/WatchLoop.swift, app/MeetingTranscriber/Sources/WatchLoop+Consent.swift, app/MeetingTranscriber/Sources/AppState+ConsentPrompt.swift, app/MeetingTranscriber/Tests/WatchLoopAskBeforeRecordingTests.swift, app/MeetingTranscriber/Tests/WatchLoopAskBeforeRecordingTests+Menu.swift, app/MeetingTranscriber/Tests/NotificationManagerSchedulingTests.swift, app/MeetingTranscriber/Tests/ConsentPromptCoordinatorTests.swift, app/MeetingTranscriber/Tests/AppStateConsentPromptTests.swift]
+
+All paths below are relative to `app/MeetingTranscriber/`.
+
+### Approach
+Test first: the contract is clear. Write the tests below, see them fail for the stated reason (missing API; the two-prompt test answering both or the wrong one; the own-completion test red against an unguarded `finishConsent`), then implement.
+
+0. Pure move first, its own commit: `AppState.swift` is at 583 lines and SwiftLint runs `--strict` with a 600-line `file_length` warning. Move the `AppNotifying` protocol and its two extensions (`Sources/AppState.swift:7-100`) unchanged into `Sources/AppNotifying.swift`; the build and the existing tests are the check that nothing else changed.
+1. `Sources/ConsentQuestion.swift`: `struct ConsentQuestion: Equatable, Sendable` with `let id: UUID` (default `UUID()` in its init), `let app: String`, `let title: String`, `let body: String`. Header comment in the repo's style: what it is, that the id is also the prompt's coordinator id and notification identifier, and that it makes a later prompt about the same app a different question.
+2. `AppNotifying` (now in `Sources/AppNotifying.swift`): two new requirements next to `askToRecord(title:body:)` and `resolveBrowserConsent(granted:)`, each with a fail-closed default in the existing extension: `@MainActor func askToRecord(_ question: ConsentQuestion) async -> ConsentAnswer` (default: `await askToRecord(title: question.title, body: question.body)`, so every existing notifier and test spy keeps working) and `func answerConsentPrompt(id: UUID, granted: Bool) -> Bool` (default: `false`). Doc comments: the menu's answer path; answers only the prompt with that id; false when that prompt is not waiting (not yet registered, already resolved, unknown id).
+3. `Sources/ConsentPromptCoordinator.swift:66-75`: `resolve(id:answer:)` becomes `@discardableResult ... -> Bool`, true when a continuation was waiting under that id; `resolve(id:granted:)` passes the result through. Existing callers ignore it.
+4. `Sources/NotificationManager.swift:265-293`: move the body of `askToRecord(title:body:)` into one private method that takes the prompt id as a parameter (today it makes `let id = UUID().uuidString` inline). `askToRecord(title:body:)` calls it with a fresh UUID string (its tests stay unchanged), `askToRecord(_ question:)` with `question.id.uuidString`. Add `answerConsentPrompt(id:granted:)` next to `resolveBrowserConsent` (`:310-318`): `consentCoordinator.resolve(id: id.uuidString, answer: granted ? .granted : .declined)`. Like `resolveBrowserConsent` it touches only the lock-guarded coordinator and needs no main-actor hop.
+5. `Sources/WatchLoop.swift:89-94`: replace the stored `var pendingConsentApp: String?` with a stored, internal-settable `var pendingConsentQuestion: ConsentQuestion?` (reword the existing comment in place). `clearConsentState()` (`:112-117`) clears it. This file is at 597 lines and must not grow: the computed `var pendingConsentApp: String? { pendingConsentQuestion?.app }` and every new method go in `WatchLoop+Consent.swift`.
+6. `Sources/WatchLoop+Consent.swift:52-70`: build the question before the `Task`, with `app: app` (the pattern's `appName`, not `appLabel`, so detection exclusion and the cooldowns keep keying on the same name) and exactly today's strings (`"Record \(appLabel) meeting?"`, `"A meeting is active in \(appLabel). Everyone must agree to being recorded."`). Assign `pendingConsentQuestion = question`, call `notifier.askToRecord(question)`, and hand `question` to `finishConsent`.
+7. `finishConsent` (`:103-106`): replace the unconditional `clearConsentState()` with a clear only when `pendingConsentQuestion == question`; the rest of the answer handling stays as it is. Comment the reason: `declineParkedConsent` (`:92-99`) clears at once, a declined prompt's completion lands later, and a prompt can even register after Stop Watching (registration runs off the main actor); none of these may wipe a newer question.
+8. `answerParkedConsent(_ question: ConsentQuestion, granted: Bool) -> Bool`, next to `declineParkedConsent`: return false unless `pendingConsentQuestion == question`, else return `notifier.answerConsentPrompt(id: question.id, granted: granted)`. Doc comment: the menu's Record/Ignore path; by id, like a notification tap, so it can never resolve another prompt. Leave `declineParkedConsent` and the automation hook on `resolveBrowserConsent`.
+9. `Sources/AppState+ConsentPrompt.swift` (new): an `AppState` extension with `var pendingConsentQuestion: ConsentQuestion?` (reads `watching.watchLoop?.pendingConsentQuestion`) and `func answerConsentQuestion(_ question: ConsentQuestion, granted: Bool)` (forwards to `answerParkedConsent`, result discarded). Follow the single-member-accessor comment style at `Sources/AppState.swift:487-509` (line numbers before step 0's move).
+
+Tests:
+- `Tests/NotificationManagerSchedulingTests.swift` (pattern `testResolvedConsentPromptIsWithdrawn`, :140-155, with `makeManager` and `firstPostedRequest`): (a) `askToRecord(q)` posts under `q.id.uuidString`; `answerConsentPrompt(id: q.id, granted: true)` returns true, the task returns `.granted`, `fake.removedIdentifiers == [q.id.uuidString]`; same with false → `.declined`. (b) Two prompts Q1 and Q2 parked (wait until both requests were added): `answerConsentPrompt(id: Q2.id, granted: true)` resolves only Q2; Q1's task has not finished and its identifier was not removed; then answer Q1 to finish it. (c) With Q1 parked, `answerConsentPrompt(id: UUID(), granted: true)` returns false and Q1 stays parked.
+- `Tests/ConsentPromptCoordinatorTests.swift`: `resolve(id:answer:)` returns true for a waiting id and false for an unknown or already-resolved one.
+- Poll-loop tests, without copying helpers: in `Tests/WatchLoopAskBeforeRecordingTests.swift` drop `private` from `ScriptedDetector` (:15), `ParkingNotifier` (:68), `Recorders` (:99), `meeting`/`teams` (:116-122), `makeLoop` (:147) and `severalPolls` (:175); give `ParkingNotifier` an `askToRecord(_ question:)` that appends to `prompts` and parks exactly like its title/body variant and also keeps the parked question's id (the existing tests then run through it unchanged), and an `answerConsentPrompt(id:granted:)` that resumes only when the id matches the parked one. Put the new tests in `Tests/WatchLoopAskBeforeRecordingTests+Menu.swift` as an `extension WatchLoopAskBeforeRecordingTests` (the class body is about 310 counted lines against SwiftLint's 400 `type_body_length` warning). Drive the real `start()` poll loop with a Teams meeting and wait for `notifier.isParked`. Cases:
+  - Record: `answerParkedConsent(loop.pendingConsentQuestion!, granted: true)` returns true, one recording starts (`waitFor(recorders.starts == 1)`), the question is nil afterwards.
+  - Ignore: returns true, no recording after `severalPolls()`, still exactly one prompt posted (decline cooldown).
+  - Posted text and id: the parked prompt's title, body and id equal the stored question's; `loop.pendingConsentApp` equals the meeting's `pattern.appName`.
+  - Not the open question, each returning false with the prompt still parked (or nothing changed): a question with the same app, title and body but a new id; the old question after the prompt was answered through `notifier.answer(.declined)`; any question after `loop.stop()`.
+  - Own completion: with Q1 parked, call `loop.stop()` (its `declineParkedConsent` resumes Q1's continuation through `ParkingNotifier.resolveBrowserConsent`) and in the same synchronous turn set `loop.pendingConsentQuestion = Q2`; then `await severalPolls()` and assert the question is still Q2.
+- `Tests/AppStateConsentPromptTests.swift`: `AppState` built as in `Tests/AppStateTests.swift:15-45` (setUp with its own settings suite and log dir; copy that setUp, it is short), loop from `makeTestWatchLoop(notifier:)` (`Tests/TestHelpers.swift:229`) with a small notifier stub that records `answerConsentPrompt` calls. Cases: nil without a loop; follows `loop.pendingConsentQuestion`; `answerConsentQuestion` with the open question calls `answerConsentPrompt(id: question.id, granted: true)` once; with another question it is not called.
+
+### Investigation targets
+**Required** (read before coding):
+- `Sources/WatchLoop+Consent.swift` (whole file, 154 lines) — the consent gate, `declineParkedConsent`, `finishConsent`
+- `Sources/WatchLoop.swift:80-118` — consent state and `clearConsentState()`
+- `Sources/ConsentPromptCoordinator.swift` (whole file) — `awaitDecision`, `resolve`, `resolvePending`
+- `Sources/NotificationManager.swift:255-350` — `askToRecord`, `resolveBrowserConsent`, `resolveConsent`
+- `Tests/WatchLoopAskBeforeRecordingTests.swift:1-180` — helpers to reuse
+
+**Optional:**
+- `Sources/AppState+RPC.swift:85-125` — readers of `pendingConsentApp` (must stay unchanged)
+- `Tests/NotificationManagerSchedulingTests.swift:1-40, 90-160` — fake scheduler and `makeManager`
+
+### Key context
+- `ConsentPromptCoordinator.awaitDecision` is a nonisolated async method on a plain class, and the package builds in Swift 6 mode without nonisolated-nonsending, so registration runs off the main actor even though `askToRecord` is `@MainActor`. Do not rely on main-actor ordering between setting the question and parking it; the id is what makes the menu answer exact.
+- `ParkingNotifier.resolveBrowserConsent` and the production coordinator resume the continuation synchronously; the completion (`finishConsent`) then runs on a later main-actor hop. The own-completion test relies on that ordering.
+- The `AppNotifying` doc comment warns against a requirement plus a defaulted variant that silently downgrades; here both defaults fail closed (a notifier without the id variant cannot be answered from the menu, nothing is granted). Say so in the doc comment.
+- Verification (literal paths; a shell hook blocks redirects to `$VAR` paths):
+  - `mkdir -p /private/tmp/mt-gh49/home`
+  - `cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh49/home swift test --parallel --filter 'WatchLoopAskBeforeRecordingTests|WatchLoopBrowserConsentTests|NotificationManager|ConsentPromptCoordinatorTests|AppStateConsentPromptTests|AppStateTests|DebugRPCServerIntegrationTests' > /private/tmp/mt-gh49/t1.log 2>&1` and read the log (never pipe a test run into tail/head/grep).
+  - `./scripts/lint.sh` with SwiftFormat 0.63.0 / SwiftLint 0.65.1 (`scripts/tool-versions.sh`). If they are not on PATH, fetch the pinned release assets with their SHA-256 into a temp dir and run `PATH="<dir>:$PATH" ./scripts/lint.sh`; never `brew install`.
+  - `./scripts/pre-push.sh --with-appstore` (release builds of both variants; catches the type-check budget and Sendable diagnostics).
+## Acceptance
+- [ ] With two prompts parked in the real coordinator, answering one by id resolves only that one and withdraws only its notification; an id that is not parked returns false and resolves nothing (R4 errors).
+- [ ] A menu answer (`answerParkedConsent`) with the open question and Record starts the recording; with Ignore it records nothing and is not re-asked within the decline cooldown; the question is cleared after either (R4).
+- [ ] A question that is not the open one (same app/title/body with a new id, already answered, after Stop Watching) returns false and leaves a parked prompt untouched (R4 errors).
+- [ ] A declined prompt's late completion leaves a newer `pendingConsentQuestion` in place; the test is red with the unconditional `clearConsentState()` in `finishConsent` (R2 errors).
+- [ ] The parked prompt's id, title and body equal the stored question's, and `pendingConsentApp` still reports the app name to every existing reader (existing consent, notification and RPC tests green, unchanged apart from the helpers losing `private`).
+- [ ] `AppState.pendingConsentQuestion` and `answerConsentQuestion` route to the current loop.
+- [ ] `AppNotifying` lives in its own file after a behaviour-neutral move; `Sources/WatchLoop.swift` stays at or under 597 lines and `Sources/AppState.swift` under 600; `./scripts/lint.sh` and `./scripts/pre-push.sh --with-appstore` pass.
+## Done summary
+TBD
+
+## Evidence
+- Commits:
+- Tests:
+- PRs:
