@@ -47,9 +47,24 @@ Spend the configuration change that pinning the microphone causes before the eng
 
 
 ## Done summary
-TBD
+A pinned microphone's engine start now waits up to 0.5 s for the configuration change that the pin itself causes, so that change lands on an engine that has not started yet and never reaches the restart path. The new `MicPinSettle` registers a one-shot observer on the session's engine before the pin runs, waits only when the set returned `noErr` and the unit was on another device before it, and logs the outcome at notice level without any device identifier. `MicEngineSession.hardwareFormat` runs the existing pin inside it, keeps the pin-outcome line unchanged and still reads the format after the settle.
 
+- Tests: `tools/audiotap/Tests/MicPinSettleTests.swift` has 10 tests. They cover a change posted from another queue (settled), no change (timedOut), a change for another object (ignored), a change posted inside the pin (settled), and a pin that did not move the unit (`notNeeded`, returns well under a 5 s timeout). They also cover the injected clock, observer removal on all three paths (by recorded tokens and a later post that reaches nothing), the `pinMovedUnit` rule table (nothing pinned, unresolvable UID, refused, already on the device, moved, unreadable before-device), the exact log wording, and that no line carries the UID given to the pin.
+- Red run before implementation: build failed with `cannot find 'MicPinSettle' in scope` (`/private/tmp/gh44-t1-red.log`). A mutation check that registered the observer after the pin failed `testAChangePostedInsideThePinCounts`, `testTheDurationComesFromTheInjectedClock` and `testTheObserverIsRemovedOnEveryPath` (`/private/tmp/gh44-t1-mutant.log`). The code was then restored.
+- baseline: green via handoff (conductor baseline at b4fa8059, `MicPinSettleTests|MicConfigChangePolicyTests|MicCaptureHandlerConfigChangeTests|MicCaptureHandlerStallWatchdogTests`, exit 0). No path outside `.flow/` had changed since then.
+- The full audiotap suite (491 tests, exit 0) ran once before the lint fixes. Those fixes touched only the test file's style, one blank line between switch cases and one comment. The focused suites, the spec's Quick command, a release build and lint all re-ran green afterwards. The Quick command and lint ran on the commit.
+- Decision: a unit whose device could not be read before the set counts as moved. Waiting then costs at most 0.5 s, while a missed change stops the engine.
+- Not verified here: no test may construct `MicEngineSession`, so whether the settle makes the pinned Jabra deliver is still the owner's headset check from the spec's Verification section.
+- No feature-map route changed.
+
+Tier: session (jev-unavailable(no_key))
+
+stage: impl-review - ran [2026-10-06T21:43Z..2026-10-06T21:51Z] SHIP, 3-lens panel, no findings (model: codex gpt-5.6-sol xhigh)
+
+Integrated onto fix/gh-44-mic-restart-loop as 2f1e12bd (cherry-pick of 02aeb262; identical tree). Integrated verify: cd tools/audiotap && swift test --parallel --filter MicPinSettleTests|MicEngineSessionSeamTests|MicDeviceDiagnosticsTests|MicCaptureHandlerStallWatchdogTests (45 tests, exit 0; /private/tmp/gh44-int1.log).
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 2f1e12bd30560ed3e96eb9e1d684439f725908a6
+- Tests: cd tools/audiotap && CFFIXED_USER_HOME=/private/tmp/gh44-home swift test --parallel --filter 'MicPinSettleTests|MicEngineSessionSeamTests|MicDeviceDiagnosticsTests|MicCaptureHandlerStallWatchdogTests' (45 tests, exit 0), PATH=/private/tmp/gh44-lint-tools/bin:$PATH ./scripts/lint.sh (exit 0, 0 violations; worker run on the same tree), cd tools/audiotap && swift test --parallel (full audiotap suite, 491 tests, exit 0; worker run on the same tree)
 - PRs:
