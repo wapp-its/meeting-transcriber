@@ -96,6 +96,8 @@ Task gh-44-stop-the-microphone-restart-loop-on-a.1 validates the core approach (
 - **A4 · New log lines are notice level or higher and carry durations, counts and decisions only, never a device UID or name.** flip at: the log-line functions of `MicPinSettle.Outcome` and `MicConfigChangePolicy` · test: unit tests assert the exact wording contains no UID · status: active [agent-inferred 2026-10-06]
 - **A5 · One handler helper owns cancelling a pending configuration-change restart, called from stop, adoption and both give-up paths.** flip at: `MicCaptureHandler+ConfigChange` · test: `MicCaptureHandlerConfigChangeTests` stop and adoption cases · why: Maintainability (plan review): duplication - pending-restart cancellation repeated in four places; structure - none identified · status: active [agent-inferred 2026-10-06]
 
+FIT: GO · 2026-10-06 · base ad16a05f · engine flow-next 8.1.0 · planned and plan-reviewed earlier today; since then only sibling specs were planned (gh-43 and gh-5 build on this one, none takes its scope) and tools/audiotap is unchanged
+
 ## Resolved via Research
 <!-- provenance: plan (research done inline by the planning agent: docs and practice lookups, no scout subagents) on 2026-10-06 -->
 
