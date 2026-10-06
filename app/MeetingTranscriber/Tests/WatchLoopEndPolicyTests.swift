@@ -188,6 +188,32 @@ final class WatchLoopEndPolicyTests: XCTestCase {
         )
     }
 
+    // MARK: - Watching stops
+
+    /// R6 / R4: stopping watching cuts only an open question, and an answer
+    /// that arrived before the deadline but before any poll saw it has already
+    /// settled that question.
+    func testStoppingWatchingCutsOnlyAQuestionNoTimelyKeepHasSettled() {
+        let cases: [(phase: MeetingEndPhase, answer: MeetingEndAnswer?, answeredAt: TimeInterval, cut: Date?)] = [
+            (.askingToEnd(pending), nil, 0, at(15)),
+            (.askingToEnd(pending), .keepRecording, 40, nil),
+            (.askingToEnd(pending), .keepRecording, 136, at(15)), // after the deadline: no answer
+            (.askingToEnd(pending), .stopNow, 40, at(15)),
+            (.listening(signalLostAt: at(5)), nil, 0, nil),
+            (.kept(signalLostAt: at(5)), nil, 0, nil),
+        ]
+        for (phase, answer, answeredAt, cut) in cases {
+            XCTAssertEqual(
+                WatchLoopEndPolicy.cutWhenWatchingStops(
+                    phase: phase,
+                    answer: answer.map { ReceivedMeetingEndAnswer(answer: $0, receivedAt: at(answeredAt)) },
+                ),
+                cut,
+                "\(phase), \(answer.map(String.init(describing:)) ?? "no answer") at \(answeredAt) s",
+            )
+        }
+    }
+
     // MARK: - Duration cap
 
     /// The cap is a hard stop in every phase. It cuts only when it lands on a

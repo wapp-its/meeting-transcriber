@@ -68,7 +68,7 @@ extension WatchLoop {
             }
         } catch is CancellationError {}
         logger.info("Watch cancelled mid-recording — finalizing in-flight recording")
-        return phase.pendingCutAt
+        return WatchLoopEndPolicy.cutWhenWatchingStops(phase: phase, answer: takeMeetingEndAnswer())
     }
 
     /// Cut the stopped recording back to `cutAt`, every track at the same

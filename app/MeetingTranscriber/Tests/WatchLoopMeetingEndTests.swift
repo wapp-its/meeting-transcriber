@@ -329,6 +329,34 @@ final class WatchLoopMeetingEndTests: XCTestCase { // swiftlint:disable:this bal
         XCTAssertTrue(harness.autoStopLines.isEmpty, "stopping by hand is not an automatic stop")
     }
 
+    /// R4: a Keep recording that arrived in time stands even when watching
+    /// stops before the next poll could act on it, so the recording is kept
+    /// whole rather than cut as an unanswered question would be.
+    func testKeepRecordingAnsweredJustBeforeStopWatchingKeepsTheRecordingUncut() async throws {
+        let harness = Harness()
+        let recorder = try makeRecorderWithTracks()
+        let queue = PipelineQueue(logDir: tmpDir)
+        let loop = harness.makeLoop(recorder: recorder, queue: queue)
+        harness.signal.detectable = meeting
+        harness.signal.active = true
+        // Lost at 5 s, asked at 15 s; at 20 s Keep is tapped and watching stops
+        // before any poll sees the answer.
+        harness.onTick = { [weak loop] h, t in
+            if t == 5 { h.signal.active = false }
+            if t == 20 {
+                h.answerFirstQuestion(.keepRecording)
+                loop?.stop()
+            }
+        }
+
+        loop.start()
+        await waitFor(recorder.stopCalled, timeout: .seconds(5))
+
+        XCTAssertEqual(queue.jobs.count, 1)
+        XCTAssertEqual(try trackFrames(recorder), [480_000, 480_000, 480_000], "kept whole, as the person chose")
+        XCTAssertTrue(harness.diagnostics.lines(.notice, startingWith: "recording_cut").isEmpty, "nothing was cut")
+    }
+
     // MARK: - The cap during the question
 
     func testTheCapReachedDuringTheQuestionEndsCutBack() async throws {

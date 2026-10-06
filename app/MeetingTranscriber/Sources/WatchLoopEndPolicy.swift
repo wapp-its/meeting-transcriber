@@ -19,14 +19,6 @@ enum MeetingEndPhase: Equatable {
     /// signal stays away, and the recording runs until it is stopped by hand
     /// or reaches the duration cap.
     case kept(signalLostAt: Date)
-
-    /// Where the saved audio ends if the recording stops now. Only a stop out
-    /// of an open question cuts: the recording was kept running past the point
-    /// where it used to stop, and those extra minutes are not the meeting's.
-    var pendingCutAt: Date? {
-        if case let .askingToEnd(pending) = self { return pending.cutAt }
-        return nil
-    }
 }
 
 /// An end the person was asked about and has not settled yet.
@@ -167,6 +159,20 @@ enum WatchLoopEndPolicy {
             // asked about again; until then the person's answer stands.
             return .continuePolling(poll.meetingActive ? .listening(signalLostAt: nil) : phase)
         }
+    }
+
+    /// Where the saved audio ends when watching stops during the wait, before
+    /// another poll. Only an open question cuts, as an unanswered one would:
+    /// the recording ran past the point where it used to stop, and those extra
+    /// minutes are not the meeting's. An answer that arrived in time but that
+    /// no poll has seen yet has already settled the question, so a Keep
+    /// recording keeps the whole recording; a late one counts for nothing.
+    static func cutWhenWatchingStops(phase: MeetingEndPhase, answer: ReceivedMeetingEndAnswer?) -> Date? {
+        guard case let .askingToEnd(pending) = phase else { return nil }
+        if let answer, answer.answer == .keepRecording, answer.receivedAt < pending.deadline {
+            return nil
+        }
+        return pending.cutAt
     }
 
     /// The duration cap stays a hard stop in every phase. It cuts only when it
