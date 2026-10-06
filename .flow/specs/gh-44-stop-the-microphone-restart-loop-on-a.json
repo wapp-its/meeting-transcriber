@@ -1,0 +1,132 @@
+{
+  "branch_name": "fix/gh-44-mic-restart-loop",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-06T20:19:59.489371Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-44-stop-the-microphone-restart-loop-on-a",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-06T20:30:27.759467Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "efc95ae6081d211f953be0ef393224732d23cfde559feb0a2b2949203d5e613f",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-9894d48a97e320b8f0a2e6d8eec0d223",
+            "classification": "introduced",
+            "findingId": "finding-9894d48a97e320b8f0a2e6d8eec0d223",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 320825,
+      "output_sha256": "4dda6b0e4f899208824fdc82949fcb76444895aa6e3c64ca07e01e34e7873225",
+      "reservation_id": "2523da8996da402ebcb6f10bbd532ccf",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:28:26.535482Z",
+      "tool_calls": 15,
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "38802a67d30a29687308200b4af16f07ae5f1bcd3e606ed9f094ba7b9364b9ff",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-9894d48a97e320b8f0a2e6d8eec0d223",
+            "classification": "introduced",
+            "findingId": "finding-9894d48a97e320b8f0a2e6d8eec0d223",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 520,
+      "output_sha256": "a984997755b26794017f219a53abe925987e881d16660921bee4cdd253fa52ec",
+      "reservation_id": "cd7cbc458d8f4db9a90da200cfbf7cb1",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:30:27.740100Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 2,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-44-stop-the-microphone-restart-loop-on-a.md",
+  "status": "open",
+  "title": "Stop the microphone restart loop on a pinned headset",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABVTWorg",
+    "identifier": "#44",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/44"
+  },
+  "updated_at": "2026-10-06T20:30:27.760741Z"
+}
