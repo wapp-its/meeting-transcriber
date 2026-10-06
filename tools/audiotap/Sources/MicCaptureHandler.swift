@@ -98,6 +98,19 @@ public class MicCaptureHandler: @unchecked Sendable {
     /// channels default to the same shared policy; injected only so a test can
     /// use a schedule that does not spend six seconds proving a give-up.
     let decideRetry: @Sendable (Int) -> CaptureRestartRetryAction
+    /// The stall watchdog's judgement (see `+StallWatchdog`). Lock-guarded
+    /// because the render thread reports every buffer and the main-queue timer
+    /// ticks it.
+    let stallWatchdog: OSAllocatedUnfairLock<MicStallWatchdogPolicy>
+    /// Monotonic seconds for the watchdog; injected so a test can cross the
+    /// ten-second trigger without waiting for it.
+    let stallClock: @Sendable () -> TimeInterval
+    /// Main-queue confined, like `session`. Nil when not watching.
+    var stallTimer: (any DispatchSourceTimer)?
+    /// Whether a pinned device is still on the system. Injected so the rule
+    /// that a present pinned device is never swapped for the default is
+    /// testable on a runner that has no audio device at all.
+    let isDevicePresent: @Sendable (String) -> Bool
     private var deviceChangeListener: AudioObjectPropertyListenerBlock?
     var configChangeObserver: (any NSObjectProtocol)?
     var selectedDeviceUID: String?
@@ -166,8 +179,14 @@ public class MicCaptureHandler: @unchecked Sendable {
         sessionFactory: @escaping () -> any MicEngineSessionProviding,
         decideRetry: @escaping @Sendable (Int) -> CaptureRestartRetryAction
             = CaptureRestartRetryPolicy.decide,
+        stallWatchdogLimits: MicStallWatchdogPolicy.Limits = .production,
+        stallClock: @escaping @Sendable () -> TimeInterval = MicStallWatchdogPolicy.monotonicNow,
+        isDevicePresent: @escaping @Sendable (String) -> Bool = MicCaptureHandler.isDevicePresentOnSystem,
     ) {
         self.decideRetry = decideRetry
+        stallWatchdog = OSAllocatedUnfairLock(initialState: MicStallWatchdogPolicy(limits: stallWatchdogLimits))
+        self.stallClock = stallClock
+        self.isDevicePresent = isDevicePresent
         self.outputURL = outputURL
         self.debugLogging = debugLogging
         self.liveSink = liveSink
@@ -186,6 +205,7 @@ public class MicCaptureHandler: @unchecked Sendable {
         _ = arbiter.withLock { $0.handle(.startSucceeded) }
         installDeviceChangeListener()
         installConfigChangeObserver()
+        startStallWatchdog()
     }
 
     /// Validate the live hardware format and derive a tap format that MATCHES
@@ -292,6 +312,8 @@ public class MicCaptureHandler: @unchecked Sendable {
             if self.firstFrameTime == 0 {
                 self.firstFrameTime = mach_absolute_time()
             }
+            // Every buffer, whatever it carries: zeros are a working input.
+            self.noteBufferForStallWatchdog()
             self.accumulateDebugRMS(buffer: buffer)
             self.publishCurrentLevel()
             self.maybeReportDebugRMS()
@@ -370,12 +392,12 @@ public class MicCaptureHandler: @unchecked Sendable {
 
     private func handleEngineConfigChange() {
         logger.info("Mic: engine configuration changed (format/route change)")
-        handleDeviceChange()
+        handleDeviceChange(.configurationChanged)
     }
 
     private func handleDefaultInputDeviceChanged() {
         logger.info("Mic: default input device changed")
-        handleDeviceChange()
+        handleDeviceChange(.defaultInputChanged)
     }
 
     public func stop() {
@@ -386,6 +408,7 @@ public class MicCaptureHandler: @unchecked Sendable {
         // the mutex that attempt holds, and stopping a recording would freeze the
         // caller (issue #588).
         let decision = arbiter.withLock { $0.handle(.stopRequested) }
+        stopStallWatchdog()
         if let listener = deviceChangeListener {
             AudioObjectRemovePropertyListenerBlock(
                 AudioObjectID(kAudioObjectSystemObject),
