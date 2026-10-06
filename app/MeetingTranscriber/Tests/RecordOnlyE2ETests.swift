@@ -118,6 +118,41 @@ final class RecordOnlyE2ETests: XCTestCase { // swiftlint:disable:this balanced_
         XCTAssertEqual(sidecar.stoppedAt, start.addingTimeInterval(2), "the sidecar stops at the cut")
     }
 
+    /// The audio began before capture reported running: the fixture (about
+    /// 50 s) outlasts the 32 virtual seconds from start to stop. The cut keeps
+    /// the audio up to the cut point on the audio's own timeline, and the
+    /// sidecar still stops at the requested cut point, 2 s after the start,
+    /// not at the start plus the audio kept.
+    func test_handleMeeting_recordOnly_earlyCaptureSidecarStopsAtTheRequestedCutPoint() async throws {
+        let outputDir = tmpDir.appendingPathComponent("output", isDirectory: true)
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        recorder.recordingStartDate = start
+        let fixtureFrames = try AVAudioFile(forReading: fixtureURL()).length
+        let clock = TestClock()
+        let loop = WatchLoop(
+            detector: ImmediatelyInactiveDetector(),
+            recorderFactory: { self.recorder },
+            pipelineQueue: queue,
+            pollInterval: 0.5,
+            endGracePeriod: 2,
+            maxDuration: 100,
+            meetingEndCountdown: 30,
+            recordOnly: { true },
+            recordOnlyDestination: { .unscoped(outputDir) },
+            notifier: notifier,
+            nowProvider: { clock.now },
+            sleepProvider: { await clock.sleep(for: $0) },
+        )
+
+        try await loop.handleMeeting(makeMeeting())
+
+        // Stopped 30 s after the cut point, so the last 30 s of audio go.
+        let mix = try AVAudioFile(forReading: outputDir.appendingPathComponent("\(Self.basename)\(RecordingFileSuffix.mix)"))
+        XCTAssertEqual(Double(mix.length), Double(fixtureFrames - 30 * 16000), accuracy: 1)
+        let sidecar = try XCTUnwrap(RecordingSidecar.read(fromDirectory: outputDir, basename: Self.basename))
+        XCTAssertEqual(sidecar.stoppedAt, start.addingTimeInterval(2), "the sidecar stops at the requested cut point")
+    }
+
     // MARK: - Helpers
 
     /// Copy the canonical two-speaker fixture into tmpDir under three

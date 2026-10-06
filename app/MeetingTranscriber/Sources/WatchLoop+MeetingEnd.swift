@@ -97,8 +97,11 @@ extension WatchLoop {
             return recording
         }
         diagnostics.notice("recording_cut kept_s=\(Int(seconds.rounded()))")
+        // The cut point itself, moved onto the recorder's clock. Not the start
+        // plus `seconds`: that is audio kept, which runs from the audio's first
+        // frame, and that frame can predate the recorder's start date.
         var cut = recording
-        cut.recordedUntil = recording.recordingStartDate.addingTimeInterval(seconds)
+        cut.recordedUntil = recording.recordingStartDate.addingTimeInterval(cutAt.timeIntervalSince(startedAt))
         return cut
     }
 
