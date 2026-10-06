@@ -537,18 +537,18 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
             return
         }
 
-        guard let audioPath = data.audioPath else { return }
-
-        // Pick the longest pure segment to avoid cross-voice contamination.
-        guard let chosen = Self.selectSampleSegment(for: label, in: data.segments) else { return }
+        // Pick the longest pure segment to avoid cross-voice contamination,
+        // and play it from the speaker's own track where there is one.
+        guard let chosen = Self.selectSampleSegment(for: label, in: data.segments),
+              let source = data.sampleSource(for: chosen) else { return }
 
         // Perform file I/O off the main thread
-        Task.detached { [audioPath, chosen] in
+        Task.detached { [source] in
             do {
-                let (samples, sampleRate) = try await AudioMixer.loadAudioAsFloat32(url: audioPath)
+                let (samples, sampleRate) = try await AudioMixer.loadAudioAsFloat32(url: source.url)
                 guard let range = Self.sampleRange(
-                    start: chosen.start,
-                    end: chosen.end,
+                    start: source.start,
+                    end: source.end,
                     sampleRate: sampleRate,
                     totalSamples: samples.count,
                 ) else { return }

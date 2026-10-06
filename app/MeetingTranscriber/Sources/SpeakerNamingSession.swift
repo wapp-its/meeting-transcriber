@@ -311,9 +311,9 @@ final class SpeakerNamingSession {
         logger.info("[recognition] \(matched.count) speakers, \(autoMatched) auto, \(matched.count - autoMatched) unknown")
 
         // Use persisted 16kHz path (survives workDir cleanup).
-        let persistedAudioPath = outputDir.appendingPathComponent("recordings")
-            .appendingPathComponent("\(slug)_16k.wav")
-        let namingData = SpeakerNamingData(
+        let recordingsDir = outputDir.appendingPathComponent("recordings")
+        let persistedAudioPath = recordingsDir.appendingPathComponent("\(slug)_16k.wav")
+        var namingData = SpeakerNamingData(
             jobID: jobID,
             meetingTitle: title,
             mapping: autoNames,
@@ -326,6 +326,15 @@ final class SpeakerNamingSession {
             participants: participants,
             isDualSource: isDualSource,
         )
+        // The per-track files are persisted next to the mix (same slug) for
+        // late re-diarization, and live as long as the naming data does.
+        if isDualSource, let micDelay = delegate?.job(withID: jobID)?.micDelay {
+            namingData.tracks = SpeakerNamingData.TrackAudio(
+                app: recordingsDir.appendingPathComponent("\(slug)_app_16k.wav"),
+                mic: recordingsDir.appendingPathComponent("\(slug)_mic_16k.wav"),
+                micDelay: micDelay,
+            )
+        }
 
         // Persist naming data and set slug + mode early.
         saveNamingData(namingData, slug: slug)
