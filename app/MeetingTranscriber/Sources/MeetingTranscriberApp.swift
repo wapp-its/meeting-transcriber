@@ -19,6 +19,7 @@ extension Notification.Name {
 /// every open Window.
 private struct AnimatedMenuBarIcon: View {
     let badge: BadgeKind
+    let watchingOverlay: Bool
     let permissionOverlay: Bool
     let recordOnlyOverlay: Bool
     let micSilentOverlay: Bool
@@ -35,6 +36,7 @@ private struct AnimatedMenuBarIcon: View {
         Image(nsImage: MenuBarIcon.image(
             badge: badge,
             animationFrame: animationFrame,
+            watchingOverlay: watchingOverlay,
             permissionOverlay: permissionOverlay,
             recordOnlyOverlay: recordOnlyOverlay,
             micSilentOverlay: micSilentOverlay,
@@ -163,6 +165,7 @@ struct MeetingTranscriberApp: App {
         } icon: {
             AnimatedMenuBarIcon(
                 badge: appState.currentBadge,
+                watchingOverlay: appState.isWatching,
                 permissionOverlay: appState.hasPermissionProblem,
                 recordOnlyOverlay: appState.settings.recordOnly,
                 // `recordingSilentActive` paints both halves; folded into the
