@@ -1,0 +1,180 @@
+{
+  "branch_name": "feat/gh-7-cli-protocol-providers",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-06T20:22:25.790731Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-7-protocol-via-codex-cli-and-a-custom",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-06T20:36:29.030045Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "af6c7163d27f203261290cbfe7d5c208679fae5be4eb2ee2e3ebf67bacddbcce",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-85e835fc04e3f9d9aae1c24df8191f21",
+            "classification": "introduced",
+            "findingId": "finding-85e835fc04e3f9d9aae1c24df8191f21",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-e28ecb2f5eade0e960affa1c0f136704",
+            "classification": "introduced",
+            "findingId": "finding-e28ecb2f5eade0e960affa1c0f136704",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-195e5b5df693f008e21b0ed2db48ead0",
+            "classification": "introduced",
+            "findingId": "finding-195e5b5df693f008e21b0ed2db48ead0",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-b9cdbb67dc98b84eea4803e578eb51a6",
+            "classification": "introduced",
+            "findingId": "finding-b9cdbb67dc98b84eea4803e578eb51a6",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 286893,
+      "output_sha256": "1b4e7bdb44bdd1597cd47aa29c9f37adfc635d86c615b15093712827eb527a6a",
+      "reservation_id": "ac354872fba6432987cae5e2319f8324",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:33:20.030927Z",
+      "tool_calls": 25,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "3c151f9cf40df76df7e278595a84241612d142f8a8e3ac4af9ad0c71be2507d8",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-85e835fc04e3f9d9aae1c24df8191f21",
+            "classification": "introduced",
+            "findingId": "finding-85e835fc04e3f9d9aae1c24df8191f21",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-e28ecb2f5eade0e960affa1c0f136704",
+            "classification": "introduced",
+            "findingId": "finding-e28ecb2f5eade0e960affa1c0f136704",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-195e5b5df693f008e21b0ed2db48ead0",
+            "classification": "introduced",
+            "findingId": "finding-195e5b5df693f008e21b0ed2db48ead0",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-b9cdbb67dc98b84eea4803e578eb51a6",
+            "classification": "introduced",
+            "findingId": "finding-b9cdbb67dc98b84eea4803e578eb51a6",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 952,
+      "output_sha256": "8d9d073c9050b8b5d88505d4fe80637b0b6b7f1bed786e2919ea9b0d9f3661b7",
+      "reservation_id": "2a821948d4c04ce9906fd0e63144c699",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:36:29.004250Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-7-protocol-via-codex-cli-and-a-custom.md",
+  "status": "open",
+  "title": "Protocol via Codex CLI and a custom command",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABUOA30Q",
+    "identifier": "#7",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/7"
+  },
+  "updated_at": "2026-10-06T20:36:29.031145Z"
+}
