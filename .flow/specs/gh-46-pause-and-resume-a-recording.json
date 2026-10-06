@@ -1,0 +1,184 @@
+{
+  "branch_name": "feat/gh-46-pause-recording",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-06T20:28:05.930565Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [
+    "gh-45-ask-to-stop-after-long-silence",
+    "gh-54-ask-before-auto-stopping-a-meeting"
+  ],
+  "id": "gh-46-pause-and-resume-a-recording",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-06T20:59:36.094765Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "9c033efa4736ed288a14cbae2abb4286fe58ab941241a8af249eb3900e47a341",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-723def811e5c2cc26c80543ac20420f6",
+            "classification": "introduced",
+            "findingId": "finding-723def811e5c2cc26c80543ac20420f6",
+            "firstSeenThisRound": true,
+            "severity": "P0",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-15d8053046afe71eac43bc66f7a22157",
+            "classification": "introduced",
+            "findingId": "finding-15d8053046afe71eac43bc66f7a22157",
+            "firstSeenThisRound": true,
+            "severity": "P0",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-d11099db8cd2bb596bcc4618f42d1af9",
+            "classification": "introduced",
+            "findingId": "finding-d11099db8cd2bb596bcc4618f42d1af9",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-55350f5b18ab13df48219a51d4cb1c4b",
+            "classification": "introduced",
+            "findingId": "finding-55350f5b18ab13df48219a51d4cb1c4b",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 608612,
+      "output_sha256": "f025b495a71a579dfac9514f1e5668b690363c97406eb02c85b01d4682685361",
+      "reservation_id": "d9ff5fbbcb594ba7b10728991a90501a",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:52:34.409076Z",
+      "tool_calls": 34,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "203ef61178412121d686ab557019f7bc779433537f64806cbe7e68552472e5c5",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-723def811e5c2cc26c80543ac20420f6",
+            "classification": "introduced",
+            "findingId": "finding-723def811e5c2cc26c80543ac20420f6",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-15d8053046afe71eac43bc66f7a22157",
+            "classification": "introduced",
+            "findingId": "finding-15d8053046afe71eac43bc66f7a22157",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-d11099db8cd2bb596bcc4618f42d1af9",
+            "classification": "introduced",
+            "findingId": "finding-d11099db8cd2bb596bcc4618f42d1af9",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-55350f5b18ab13df48219a51d4cb1c4b",
+            "classification": "introduced",
+            "findingId": "finding-55350f5b18ab13df48219a51d4cb1c4b",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 592,
+      "output_sha256": "f8cc1e0ce31903be55e54cc49332a286aeaa55726451c6539c63a27ad3b73fcd",
+      "reservation_id": "b5aac6b38b02434aaeaa753680c8d043",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:59:14.194110Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-46-pause-and-resume-a-recording.md",
+  "status": "open",
+  "title": "Pause and resume a recording",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABVW2UjA",
+    "identifier": "#46",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/46"
+  },
+  "updated_at": "2026-10-06T21:00:53.520824Z"
+}
