@@ -1,0 +1,164 @@
+{
+  "branch_name": "feat/gh-12-hf-token",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-06T20:23:47.392025Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-12-hugging-face-token-in-settings",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-06T20:42:44.620799Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "64a55ae8fa7beae3ba58b004a4ea972efebf55133401d8e0f28a89b47b21d3c4",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-a2ef8a8a8ef9ad1cc357374f83d13097",
+            "classification": "introduced",
+            "findingId": "finding-a2ef8a8a8ef9ad1cc357374f83d13097",
+            "firstSeenThisRound": true,
+            "severity": "P0",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-a37d76b1d1ed0416f7adfb1e69aec025",
+            "classification": "introduced",
+            "findingId": "finding-a37d76b1d1ed0416f7adfb1e69aec025",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-4beeb97cb416b97d30b4caff14edbc3a",
+            "classification": "introduced",
+            "findingId": "finding-4beeb97cb416b97d30b4caff14edbc3a",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 473586,
+      "output_sha256": "393aeea4675577778b76bba4f91c757d97af1c7a707cd1499c9b75b3baef7527",
+      "reservation_id": "fc06fef94625480f99d840e38bf7e4d3",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:36:19.677140Z",
+      "tool_calls": 29,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "1bda165d128101bfc1b58b950d1edfa577e39d390d4f59dc1b4354402cb5441a",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-a2ef8a8a8ef9ad1cc357374f83d13097",
+            "classification": "introduced",
+            "findingId": "finding-a2ef8a8a8ef9ad1cc357374f83d13097",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-a37d76b1d1ed0416f7adfb1e69aec025",
+            "classification": "introduced",
+            "findingId": "finding-a37d76b1d1ed0416f7adfb1e69aec025",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-4beeb97cb416b97d30b4caff14edbc3a",
+            "classification": "introduced",
+            "findingId": "finding-4beeb97cb416b97d30b4caff14edbc3a",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 754,
+      "output_sha256": "b707f2be3cafea55a1390d9055422331db98bb6a51e573e43cd2f82805908069",
+      "reservation_id": "ac4ee672c9d04f4e94e56117794428e0",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:42:44.595265Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-12-hugging-face-token-in-settings.md",
+  "status": "open",
+  "title": "Hugging Face token in Settings",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABUeSczA",
+    "identifier": "#12",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/12"
+  },
+  "updated_at": "2026-10-06T20:42:44.622858Z"
+}
