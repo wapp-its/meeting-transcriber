@@ -1,7 +1,9 @@
 {
   "branch_name": "feat/gh-6-profiles",
   "created_at": "2026-10-06T20:27:47.351648Z",
-  "depends_on_epics": [],
+  "depends_on_epics": [
+    "gh-7-protocol-via-codex-cli-and-a-custom"
+  ],
   "id": "gh-6-profiles-a-configuration-per-use-case",
   "next_task": 1,
   "plan_review_status": "unknown",
@@ -21,5 +23,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/6"
   },
-  "updated_at": "2026-10-06T20:27:47.375559Z"
+  "updated_at": "2026-10-06T20:49:06.727227Z"
 }

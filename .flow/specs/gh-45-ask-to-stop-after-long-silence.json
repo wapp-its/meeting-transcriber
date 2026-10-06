@@ -6,7 +6,9 @@
   "default_impl": null,
   "default_review": null,
   "default_sync": null,
-  "depends_on_epics": [],
+  "depends_on_epics": [
+    "gh-54-ask-before-auto-stopping-a-meeting"
+  ],
   "id": "gh-45-ask-to-stop-after-long-silence",
   "impl_review_rounds": {},
   "next_task": 1,

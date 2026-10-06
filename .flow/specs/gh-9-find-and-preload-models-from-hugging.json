@@ -6,7 +6,9 @@
   "default_impl": null,
   "default_review": null,
   "default_sync": null,
-  "depends_on_epics": [],
+  "depends_on_epics": [
+    "gh-12-hugging-face-token-in-settings"
+  ],
   "id": "gh-9-find-and-preload-models-from-hugging",
   "impl_review_rounds": {},
   "next_task": 1,
@@ -144,5 +146,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/9"
   },
-  "updated_at": "2026-10-06T20:33:54.382836Z"
+  "updated_at": "2026-10-06T20:49:05.517708Z"
 }

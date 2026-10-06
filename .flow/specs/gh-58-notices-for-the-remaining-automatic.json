@@ -6,7 +6,10 @@
   "default_impl": null,
   "default_review": null,
   "default_sync": null,
-  "depends_on_epics": [],
+  "depends_on_epics": [
+    "gh-49-show-a-pending-recording-prompt-on-the",
+    "gh-54-ask-before-auto-stopping-a-meeting"
+  ],
   "id": "gh-58-notices-for-the-remaining-automatic",
   "impl_review_rounds": {},
   "next_task": 1,
@@ -196,5 +199,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/58"
   },
-  "updated_at": "2026-10-06T20:28:49.026296Z"
+  "updated_at": "2026-10-06T20:49:06.008604Z"
 }
