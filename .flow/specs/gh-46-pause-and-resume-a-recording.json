@@ -6,13 +6,17 @@
   "default_impl": null,
   "default_review": null,
   "default_sync": null,
-  "depends_on_epics": [],
+  "depends_on_epics": [
+    "gh-45-ask-to-stop-after-long-silence",
+    "gh-54-ask-before-auto-stopping-a-meeting"
+  ],
   "id": "gh-46-pause-and-resume-a-recording",
   "impl_review_rounds": {},
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
   "plan_reviewed_at": "2026-10-06T20:59:36.094765Z",
+  "ready": true,
   "review_attempts": [
     {
       "artifact_sha256": "9c033efa4736ed288a14cbae2abb4286fe58ab941241a8af249eb3900e47a341",
@@ -176,5 +180,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/46"
   },
-  "updated_at": "2026-10-06T20:59:36.094916Z"
+  "updated_at": "2026-10-06T21:00:53.520824Z"
 }
