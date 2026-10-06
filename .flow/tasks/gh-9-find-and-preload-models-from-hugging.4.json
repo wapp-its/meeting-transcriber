@@ -1,0 +1,18 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-06T20:27:54.690786Z",
+  "depends_on": [
+    "gh-9-find-and-preload-models-from-hugging.2",
+    "gh-9-find-and-preload-models-from-hugging.3"
+  ],
+  "id": "gh-9-find-and-preload-models-from-hugging.4",
+  "priority": null,
+  "review": "codex:gpt-5.6-sol:xhigh",
+  "spec": "gh-9-find-and-preload-models-from-hugging",
+  "spec_path": ".flow/tasks/gh-9-find-and-preload-models-from-hugging.4.md",
+  "status": "todo",
+  "title": "Wire the browser into the model picker, use a variant, docs",
+  "updated_at": "2026-10-06T20:32:54.579557Z"
+}
