@@ -40,6 +40,36 @@ final class CustomWatchedAppConsentTests: XCTestCase {
         XCTAssertTrue(zoom.asksBeforeRecording(recordWithoutAsking: []))
     }
 
+    /// FaceTime's and WhatsApp's built-in patterns carry nothing but their
+    /// name, so an added app with the same name must differ from them by
+    /// something other than its fields' values.
+    func testCustomAppNamedLikeABareBuiltInStillAsks() {
+        for name in ["FaceTime", "WhatsApp"] {
+            let pattern = customPattern(appName: name, bundleID: "com.example.\(name)").meetingPattern
+            XCTAssertTrue(pattern.asksBeforeRecording(recordWithoutAsking: [name]), name)
+        }
+    }
+
+    /// Built-in WeChat is watched and set to record without asking; an added
+    /// app also called "WeChat" holds the microphone. The meeting reported
+    /// must carry the added app's pattern, not the built-in one found by name.
+    func testDetectedCustomAppKeepsItsOwnPatternWhenABuiltInSharesItsName() throws {
+        let detector = MicInputDetector(
+            patterns: MicInputDetector.patterns(watching: ["WeChat"])
+                + [customPattern(appName: "WeChat", bundleID: "com.example.wechat")],
+            confirmationCount: 1,
+        )
+        detector.windowListProvider = { [] }
+        detector.mainAppPIDProvider = { _ in nil }
+        detector.processProvider = {
+            [MicInputDetector.AudioProcessSnapshot(bundleID: "com.example.wechat", pid: 555, isRunningInput: true)]
+        }
+
+        let meeting = try XCTUnwrap(detector.checkOnce())
+
+        XCTAssertTrue(meeting.pattern.asksBeforeRecording(recordWithoutAsking: ["WeChat"]))
+    }
+
     func testDeniedCustomAppIsNotDetected() {
         let detector = MicInputDetector(
             patterns: [customPattern(appName: "CallApp", bundleID: "com.example.callapp")],

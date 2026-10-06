@@ -49,12 +49,16 @@ extension AppSettings {
     /// False when nothing is watched or every watched app records without
     /// asking or is on the deny list: then no prompt is ever posted. Browser
     /// watching always counts, because its denials name concrete browsers and
-    /// any other one can still ask.
+    /// any other one can still ask. An app added through "Add App…" always
+    /// asks unless it is on the deny list, which names it by display name.
     var anyWatchedAppAsksFirst: Bool {
-        watchApps.contains { name in
+        let builtInAsks = watchApps.contains { name in
             !consentDeniedApps.contains(name)
                 && AppMeetingPattern.forAppName(name)?
                 .asksBeforeRecording(recordWithoutAsking: recordWithoutAskingApps) ?? true
+        }
+        return builtInAsks || watchCustomApps.contains { bundleID in
+            !consentDeniedApps.contains(MicInputDetector.appDisplayName(bundleID: bundleID))
         }
     }
 }

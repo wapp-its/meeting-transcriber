@@ -41,10 +41,17 @@ class MicInputDetector: MeetingDetecting {
             bundleIDs.contains { $0 == bundleID || (matchesHelpers && bundleID.hasPrefix($0 + ".")) }
         }
 
+        /// An app added through "Add App…" always asks before recording: it
+        /// has no "record without asking" switch, and its display name can
+        /// equal a built-in app's, whose switch must not carry over to it.
         var meetingPattern: AppMeetingPattern {
-            let synthesized = AppMeetingPattern(appName: appName, ownerNames: [appName], meetingPatterns: [])
-            guard usesBuiltInMeetingPattern else { return synthesized }
-            return AppMeetingPattern.forAppName(appName) ?? synthesized
+            guard usesBuiltInMeetingPattern else {
+                return AppMeetingPattern(
+                    appName: appName, ownerNames: [appName], meetingPatterns: [], requiresRecordingConsent: true,
+                )
+            }
+            return AppMeetingPattern.forAppName(appName)
+                ?? AppMeetingPattern(appName: appName, ownerNames: [appName], meetingPatterns: [])
         }
     }
 
@@ -159,6 +166,10 @@ class MicInputDetector: MeetingDetecting {
         let processes = processProvider()
         var hitsThisRound: Set<String> = []
         var firstMatch: [String: pid_t] = [:]
+        // The pattern that matched, kept rather than looked up again by name:
+        // an added app can share a built-in's name, and a lookup by name
+        // returns the built-in one with its consent setting.
+        var matchedPattern: [String: AppMeetingPattern] = [:]
 
         for process in processes where process.isRunningInput {
             guard let pattern = patterns.first(where: { $0.matches(bundleID: process.bundleID) }) else {
@@ -171,12 +182,13 @@ class MicInputDetector: MeetingDetecting {
             guard !hitsThisRound.contains(appName) else { continue }
             hitsThisRound.insert(appName)
             firstMatch[appName] = tapRootPID(for: process, pattern: pattern)
+            matchedPattern[appName] = pattern.meetingPattern
             consecutiveHits[appName, default: 0] += 1
         }
 
         for (appName, hits) in consecutiveHits where !excludedApps.contains(appName) {
             if hits >= confirmationCount, let pid = firstMatch[appName],
-               let meetingPattern = patterns.first(where: { $0.meetingPattern.appName == appName })?.meetingPattern {
+               let meetingPattern = matchedPattern[appName] {
                 let title = matchers[appName]?.selectWindowTitle(from: windowListProvider())
                     ?? PowerAssertionDetector.placeholderTitle(appName: appName)
                 return DetectedMeeting(
