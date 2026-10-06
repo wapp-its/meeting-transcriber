@@ -1,0 +1,149 @@
+{
+  "branch_name": "feat/gh-1-request-permissions",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-06T20:15:55.044894Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-1-request-permissions-from-settings",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-06T20:25:21.780244Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "d9a0d51efca848322d7e49e581f0ba276af2c4c992d410f409965bd354420d10",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-1002b0d678d129d532daabff8c47b84c",
+            "classification": "introduced",
+            "findingId": "finding-1002b0d678d129d532daabff8c47b84c",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-9100c5ae1f63896004074fa4a2db74f3",
+            "classification": "introduced",
+            "findingId": "finding-9100c5ae1f63896004074fa4a2db74f3",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 307588,
+      "output_sha256": "26481cf3f6e31e904d67f1bd7cc543503f21b9d2b43c94b5ecfb4de565f6a295",
+      "reservation_id": "a8e1e17268da4354988433f002ce926a",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:23:50.667654Z",
+      "tool_calls": 17,
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "6d37347f9e840b1545cf640de1d644b9d36dae87ac8d7da5419dc10947895a46",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-1002b0d678d129d532daabff8c47b84c",
+            "classification": "introduced",
+            "findingId": "finding-1002b0d678d129d532daabff8c47b84c",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-9100c5ae1f63896004074fa4a2db74f3",
+            "classification": "introduced",
+            "findingId": "finding-9100c5ae1f63896004074fa4a2db74f3",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 774,
+      "output_sha256": "ad0c8bfb4511252cd5b3e1497cbdfba94e8cec4f17ece0067fa09d5cc8aa100d",
+      "reservation_id": "839abaad3142423f9d764d6c30d65bd8",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:25:08.334390Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 2,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-1-request-permissions-from-settings.md",
+  "status": "open",
+  "title": "Request permissions from Settings",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABUN8wTw",
+    "identifier": "#1",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/1"
+  },
+  "updated_at": "2026-10-06T20:54:51.672895Z"
+}

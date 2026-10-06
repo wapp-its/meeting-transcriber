@@ -1,0 +1,15 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-06T20:26:01.658879Z",
+  "depends_on": [],
+  "id": "gh-13-transcriptions-window.1",
+  "priority": null,
+  "review": "codex:gpt-5.6-sol:xhigh",
+  "spec": "gh-13-transcriptions-window",
+  "spec_path": ".flow/tasks/gh-13-transcriptions-window.1.md",
+  "status": "todo",
+  "title": "History record with app, dates, duration and participants",
+  "updated_at": "2026-10-06T20:26:01.658879Z"
+}

@@ -1,0 +1,28 @@
+{
+  "branch_name": "feat/gh-6-profiles",
+  "created_at": "2026-10-06T20:27:47.351648Z",
+  "depends_on_epics": [
+    "gh-7-protocol-via-codex-cli-and-a-custom",
+    "gh-2-protocol-templates-and-background-info"
+  ],
+  "id": "gh-6-profiles-a-configuration-per-use-case",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/gh-6-profiles-a-configuration-per-use-case.md",
+  "status": "open",
+  "title": "Profiles: a configuration per use case",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABUOA24w",
+    "identifier": "#6",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/6"
+  },
+  "updated_at": "2026-10-06T20:54:27.173929Z"
+}

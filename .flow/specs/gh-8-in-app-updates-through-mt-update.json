@@ -1,0 +1,149 @@
+{
+  "branch_name": "local/gh-8-self-update",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-06T20:23:38.220779Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-8-in-app-updates-through-mt-update",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-06T20:39:05.766273Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "d07b4f1fffb9fef8588e48e465598c7e4550f74454f7c9359059d1a86e7688f9",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-6509d599c2fe0b7e61bcba2af04f0ffa",
+            "classification": "introduced",
+            "findingId": "finding-6509d599c2fe0b7e61bcba2af04f0ffa",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-eed39b3d04f795a8d7e571447f6eae12",
+            "classification": "introduced",
+            "findingId": "finding-eed39b3d04f795a8d7e571447f6eae12",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 360782,
+      "output_sha256": "a1b87a12e54c09066716d8b7bc7632ec3ad8ed60b6889b5fc8bc41933a9a3bd4",
+      "reservation_id": "7f4b34b2ad3a4083aea91fdbb7172ac2",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:35:41.113722Z",
+      "tool_calls": 18,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "bfd844625ee7c4a818cd03f987fdbcd225644560811ecaa23af48070ffc68924",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-6509d599c2fe0b7e61bcba2af04f0ffa",
+            "classification": "introduced",
+            "findingId": "finding-6509d599c2fe0b7e61bcba2af04f0ffa",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-eed39b3d04f795a8d7e571447f6eae12",
+            "classification": "introduced",
+            "findingId": "finding-eed39b3d04f795a8d7e571447f6eae12",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 928,
+      "output_sha256": "85c5ddcbadea78da4de6e7dec70967d90ac56129ff2a86fdfc467ec1ec2c2436",
+      "reservation_id": "fef2a70ac9f041ba98dba17177fa10a6",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:38:53.179355Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-8-in-app-updates-through-mt-update.md",
+  "status": "open",
+  "title": "In-app updates through mt-update",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABUOBwOQ",
+    "identifier": "#8",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/8"
+  },
+  "updated_at": "2026-10-06T20:54:54.038504Z"
+}

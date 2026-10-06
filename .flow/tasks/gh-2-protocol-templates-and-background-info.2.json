@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-06T20:40:58.524147Z",
+  "depends_on": [
+    "gh-2-protocol-templates-and-background-info.1"
+  ],
+  "id": "gh-2-protocol-templates-and-background-info.2",
+  "priority": null,
+  "review": "codex:gpt-5.6-sol:xhigh",
+  "spec": "gh-2-protocol-templates-and-background-info",
+  "spec_path": ".flow/tasks/gh-2-protocol-templates-and-background-info.2.md",
+  "status": "todo",
+  "title": "Protocol templates section in Settings \u2192 Output",
+  "updated_at": "2026-10-06T20:49:38.192977Z"
+}

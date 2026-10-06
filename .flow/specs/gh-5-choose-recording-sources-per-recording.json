@@ -1,0 +1,27 @@
+{
+  "branch_name": "feat/gh-5-recording-sources",
+  "created_at": "2026-10-06T20:29:37.574241Z",
+  "depends_on_epics": [
+    "gh-6-profiles-a-configuration-per-use-case"
+  ],
+  "id": "gh-5-choose-recording-sources-per-recording",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/gh-5-choose-recording-sources-per-recording.md",
+  "status": "open",
+  "title": "Choose recording sources per recording",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABUN90_Q",
+    "identifier": "#5",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/5"
+  },
+  "updated_at": "2026-10-06T20:49:06.250368Z"
+}

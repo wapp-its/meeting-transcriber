@@ -1,0 +1,165 @@
+{
+  "branch_name": "feat/gh-10-remote-vocabulary",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-06T20:18:22.941395Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-10-vocabulary-from-a-central-url",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-06T20:35:31.966231Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "b548a8619a19a11dabcabca5de7cc1dae33e02cfa71e714024cc3d348415af0c",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-8d9943f825230cb37d880dc8eab81ad2",
+            "classification": "introduced",
+            "findingId": "finding-8d9943f825230cb37d880dc8eab81ad2",
+            "firstSeenThisRound": true,
+            "severity": "P0",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-e49cb2db45b90c7b08d5a02ccc196e09",
+            "classification": "introduced",
+            "findingId": "finding-e49cb2db45b90c7b08d5a02ccc196e09",
+            "firstSeenThisRound": true,
+            "severity": "P0",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-728f8400b087b7f02655071ca95ca0ce",
+            "classification": "introduced",
+            "findingId": "finding-728f8400b087b7f02655071ca95ca0ce",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 287275,
+      "output_sha256": "58770f8182a7ecb5db2678f6a4b710399d1f080728f478cdae0ffe2cf53e4941",
+      "reservation_id": "53258cb274144dcc804cd0c5133fa67a",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:32:13.728101Z",
+      "tool_calls": 22,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "d34c4a437e42e9d0ff9bb7bbf089a864b15bfa673cde37a712d2e8a1abb7f67b",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-8d9943f825230cb37d880dc8eab81ad2",
+            "classification": "introduced",
+            "findingId": "finding-8d9943f825230cb37d880dc8eab81ad2",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-e49cb2db45b90c7b08d5a02ccc196e09",
+            "classification": "introduced",
+            "findingId": "finding-e49cb2db45b90c7b08d5a02ccc196e09",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-728f8400b087b7f02655071ca95ca0ce",
+            "classification": "introduced",
+            "findingId": "finding-728f8400b087b7f02655071ca95ca0ce",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 567,
+      "output_sha256": "4ffdeaad49615795b134b6c826626341e5a02520659141300ee11e95f38fdb33",
+      "reservation_id": "afc94173184c40d59c4ad8b3a2b0dfe8",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:35:31.939122Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-10-vocabulary-from-a-central-url.md",
+  "status": "open",
+  "title": "Vocabulary from a central URL",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABUOERdQ",
+    "identifier": "#10",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/10"
+  },
+  "updated_at": "2026-10-06T20:54:53.329832Z"
+}

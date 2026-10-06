@@ -11,7 +11,7 @@
     "enabled": true
   },
   "land": {
-    "mergeVerdictCommand": "",
+    "mergeVerdictCommand": "$HOME/.claude/skills/flow-next-loop/scripts/merge-verdict.sh",
     "patienceMinutes": 10
   },
   "memory": {

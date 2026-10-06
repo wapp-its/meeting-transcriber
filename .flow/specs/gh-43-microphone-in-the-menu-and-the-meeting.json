@@ -1,0 +1,167 @@
+{
+  "branch_name": "feat/gh-43-mic-menu",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-06T20:29:21.055422Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [
+    "gh-44-stop-the-microphone-restart-loop-on-a"
+  ],
+  "id": "gh-43-microphone-in-the-menu-and-the-meeting",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-06T20:46:57.139649Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "e49e11ada14abba886117bc27ff847453e1a171db34c672c95fbc4c0c3286a48",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-fde951687b2c383b58c28945126e03df",
+            "classification": "introduced",
+            "findingId": "finding-fde951687b2c383b58c28945126e03df",
+            "firstSeenThisRound": true,
+            "severity": "P0",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-dfb585a9b1d9e7cf4bc02b269c0e7bd4",
+            "classification": "introduced",
+            "findingId": "finding-dfb585a9b1d9e7cf4bc02b269c0e7bd4",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-feecb76854119d2b6eb18daac9840cf3",
+            "classification": "introduced",
+            "findingId": "finding-feecb76854119d2b6eb18daac9840cf3",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 406620,
+      "output_sha256": "0b7d1ec100a117da7fd5928dcff851b9fef7e75fd5c673daa4111b2b7313fd8b",
+      "reservation_id": "07da4090395644e49e96bcf78b4dc677",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:43:03.120387Z",
+      "tool_calls": 32,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "d60ae027155a94d49a6101f539499f56045cdd338e1f64989b3dc3538266b41d",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-fde951687b2c383b58c28945126e03df",
+            "classification": "introduced",
+            "findingId": "finding-fde951687b2c383b58c28945126e03df",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-dfb585a9b1d9e7cf4bc02b269c0e7bd4",
+            "classification": "introduced",
+            "findingId": "finding-dfb585a9b1d9e7cf4bc02b269c0e7bd4",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-feecb76854119d2b6eb18daac9840cf3",
+            "classification": "introduced",
+            "findingId": "finding-feecb76854119d2b6eb18daac9840cf3",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 762,
+      "output_sha256": "195e816df92fc1dc5b29df509d3938f768fc2d7c22c2fcdafe2a4620ce5ab9d9",
+      "reservation_id": "ad13ae6a8b49426dbe086d946598191f",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:46:32.369549Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-43-microphone-in-the-menu-and-the-meeting.md",
+  "status": "open",
+  "title": "Microphone in the menu and the meeting app's input",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABVNRGlg",
+    "identifier": "#43",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/43"
+  },
+  "updated_at": "2026-10-06T20:54:53.092358Z"
+}

@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-06T20:20:18.404878Z",
+  "depends_on": [
+    "gh-1-request-permissions-from-settings.1"
+  ],
+  "id": "gh-1-request-permissions-from-settings.2",
+  "priority": null,
+  "review": "codex:gpt-5.6-sol:xhigh",
+  "spec": "gh-1-request-permissions-from-settings",
+  "spec_path": ".flow/tasks/gh-1-request-permissions-from-settings.2.md",
+  "status": "todo",
+  "title": "Request buttons, restart note and popover change in Settings \u2192 Advanced \u2192 Permissions",
+  "updated_at": "2026-10-06T20:24:20.083305Z"
+}

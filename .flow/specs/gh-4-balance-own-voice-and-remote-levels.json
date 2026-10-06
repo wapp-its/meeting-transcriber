@@ -1,0 +1,165 @@
+{
+  "branch_name": "feat/gh-4-level-balance",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-06T20:19:52.495155Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-4-balance-own-voice-and-remote-levels",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-06T20:35:04.477187Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "9308282da6198912bd8fe22c390728faabc3f2ecbf44396eb738196aab889dc4",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-80508b8c5812830251f59548fecf4c41",
+            "classification": "introduced",
+            "findingId": "finding-80508b8c5812830251f59548fecf4c41",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-d02d662e5b856f563ec8104af90fe05f",
+            "classification": "introduced",
+            "findingId": "finding-d02d662e5b856f563ec8104af90fe05f",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-2786590bf83ac8cdc44e564b85a42ec1",
+            "classification": "introduced",
+            "findingId": "finding-2786590bf83ac8cdc44e564b85a42ec1",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 326580,
+      "output_sha256": "88df0bd7c55e3eccb2608557c07c56ce84f51c909531ee987496720f8db9fb85",
+      "reservation_id": "0b31295956f4468198644b27787ec6a3",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:32:24.118413Z",
+      "tool_calls": 23,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "ac827700ab7d48f6197433566347a954d6e8d74434a8a23ef81d23ade8cd4f0d",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-80508b8c5812830251f59548fecf4c41",
+            "classification": "introduced",
+            "findingId": "finding-80508b8c5812830251f59548fecf4c41",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-d02d662e5b856f563ec8104af90fe05f",
+            "classification": "introduced",
+            "findingId": "finding-d02d662e5b856f563ec8104af90fe05f",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-2786590bf83ac8cdc44e564b85a42ec1",
+            "classification": "introduced",
+            "findingId": "finding-2786590bf83ac8cdc44e564b85a42ec1",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 675,
+      "output_sha256": "94536c70df1d872c5c4f9ce64d0df91853af09bd9cc6b0b0624a827419f095de",
+      "reservation_id": "b37a6a9d497e417bac873677634423f4",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:35:04.458365Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-4-balance-own-voice-and-remote-levels.md",
+  "status": "open",
+  "title": "Balance own voice and remote levels",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABUN9zmQ",
+    "identifier": "#4",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/4"
+  },
+  "updated_at": "2026-10-06T20:54:51.904632Z"
+}

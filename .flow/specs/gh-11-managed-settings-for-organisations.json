@@ -1,0 +1,27 @@
+{
+  "branch_name": "feat/gh-11-managed-settings",
+  "created_at": "2026-10-06T20:31:25.482096Z",
+  "depends_on_epics": [
+    "gh-6-profiles-a-configuration-per-use-case"
+  ],
+  "id": "gh-11-managed-settings-for-organisations",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/gh-11-managed-settings-for-organisations.md",
+  "status": "open",
+  "title": "Managed settings for organisations",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABUOESTw",
+    "identifier": "#11",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/11"
+  },
+  "updated_at": "2026-10-06T20:49:06.488483Z"
+}

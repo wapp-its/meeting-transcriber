@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-06T20:26:01.659094Z",
+  "depends_on": [
+    "gh-13-transcriptions-window.1"
+  ],
+  "id": "gh-13-transcriptions-window.2",
+  "priority": null,
+  "review": "codex:gpt-5.6-sol:xhigh",
+  "spec": "gh-13-transcriptions-window",
+  "spec_path": ".flow/tasks/gh-13-transcriptions-window.2.md",
+  "status": "todo",
+  "title": "Transcription list logic and controller actions",
+  "updated_at": "2026-10-06T20:35:05.193835Z"
+}

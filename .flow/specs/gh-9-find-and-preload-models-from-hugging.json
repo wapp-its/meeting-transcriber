@@ -1,0 +1,151 @@
+{
+  "branch_name": "feat/gh-9-hf-model-search",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-06T20:21:03.816784Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [
+    "gh-12-hugging-face-token-in-settings"
+  ],
+  "id": "gh-9-find-and-preload-models-from-hugging",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-06T20:33:54.381506Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "f6ea7867a8a2e434a74176c28c4b3a4c59a34ab718081ca93ec0edf3f714f7c9",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-49ac6fe8b03fd8f6415df0712136dbf8",
+            "classification": "introduced",
+            "findingId": "finding-49ac6fe8b03fd8f6415df0712136dbf8",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-92611a9d8bb95bb909714fda002f2f75",
+            "classification": "introduced",
+            "findingId": "finding-92611a9d8bb95bb909714fda002f2f75",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 316236,
+      "output_sha256": "0874c5758f1c676497e95d1b5c0ef5a9696c47c89eb06b27617fca7bfab722c9",
+      "reservation_id": "4a0ea71014524e4c91f691e5afb3f691",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:32:23.068525Z",
+      "tool_calls": 20,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "4e5f9e7bb5eed60f15e0794b00a180cf124b8f0ba08b3908139d2aa54a946fd8",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-49ac6fe8b03fd8f6415df0712136dbf8",
+            "classification": "introduced",
+            "findingId": "finding-49ac6fe8b03fd8f6415df0712136dbf8",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-92611a9d8bb95bb909714fda002f2f75",
+            "classification": "introduced",
+            "findingId": "finding-92611a9d8bb95bb909714fda002f2f75",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65888b53802115851aacbfc52bd9a54c5f00ee3d",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 681,
+      "output_sha256": "ea180f0a1f1087ab67c514a6d89e4cfb6b8ccf4bfddc2acf0759eb459967570f",
+      "reservation_id": "031660043b4542a1a0c43eed8aebcf2c",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T20:33:54.357495Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-9-find-and-preload-models-from-hugging.md",
+  "status": "open",
+  "title": "Find and preload models from Hugging Face",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABUOEQrw",
+    "identifier": "#9",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/9"
+  },
+  "updated_at": "2026-10-06T20:54:53.563758Z"
+}

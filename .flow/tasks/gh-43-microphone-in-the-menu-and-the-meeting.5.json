@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-06T20:38:11.394401Z",
+  "depends_on": [
+    "gh-43-microphone-in-the-menu-and-the-meeting.4"
+  ],
+  "id": "gh-43-microphone-in-the-menu-and-the-meeting.5",
+  "priority": null,
+  "review": "codex:gpt-5.6-sol:xhigh",
+  "spec": "gh-43-microphone-in-the-menu-and-the-meeting",
+  "spec_path": ".flow/tasks/gh-43-microphone-in-the-menu-and-the-meeting.5.md",
+  "status": "todo",
+  "title": "Meeting-app microphone probe and mismatch warning",
+  "updated_at": "2026-10-06T20:45:12.116122Z"
+}
