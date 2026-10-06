@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-06T20:26:09.175524Z",
+  "depends_on": [
+    "gh-52-keep-added-apps-apart-from-same-named.1"
+  ],
+  "id": "gh-52-keep-added-apps-apart-from-same-named.2",
+  "priority": null,
+  "review": "codex:gpt-5.6-sol:xhigh",
+  "spec": "gh-52-keep-added-apps-apart-from-same-named",
+  "spec_path": ".flow/tasks/gh-52-keep-added-apps-apart-from-same-named.2.md",
+  "status": "todo",
+  "title": "Deny list: keyed rows in Settings, readiness warning and one-shot migration",
+  "updated_at": "2026-10-06T20:26:09.175524Z"
+}
