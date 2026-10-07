@@ -392,7 +392,9 @@
             }
 
             struct ProtocolGeneration: Codable {
-                /// `ProtocolProvider` raw value ("claudeCLI" | "openAICompatible" | "none").
+                /// `ProtocolProvider` raw value ("claudeCLI" | "codexCLI" | "customCommand" |
+                /// "openAICompatible" | "none"). No command or model is exposed: a
+                /// command line can carry a key.
                 let provider: String
                 let language: String
                 let openAIEndpoint: String

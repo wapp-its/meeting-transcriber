@@ -98,6 +98,8 @@ enum DiarizerMode: String, CaseIterable, Codable {
 enum ProtocolProvider: String, CaseIterable {
     #if !APPSTORE
         case claudeCLI
+        case codexCLI
+        case customCommand
     #endif
     case openAICompatible
     case none // swiftlint:disable:this discouraged_none_name
@@ -106,6 +108,10 @@ enum ProtocolProvider: String, CaseIterable {
         switch self {
         #if !APPSTORE
             case .claudeCLI: "Claude CLI"
+
+            case .codexCLI: "Codex CLI"
+
+            case .customCommand: "Custom Command"
         #endif
 
         case .openAICompatible: "OpenAI-Compatible API"
@@ -569,6 +575,18 @@ final class AppSettings {
         var claudeBin: String {
             didSet { defaults.set(claudeBin, forKey: "claudeBin") }
         }
+
+        /// The custom command, one entry per line the user typed, kept as
+        /// typed; the first entry is the program. `CommandTemplate` trims the
+        /// entries and drops empty ones when the command runs.
+        var customCommandArguments: [String] {
+            didSet { defaults.set(customCommandArguments, forKey: "customCommandArguments") }
+        }
+
+        /// The value of `{model}` in the custom command.
+        var customCommandModel: String {
+            didSet { defaults.set(customCommandModel, forKey: "customCommandModel") }
+        }
     #endif
 
     /// Default OpenAI-compatible endpoint — Ollama's base URL. Both the base
@@ -738,6 +756,8 @@ final class AppSettings {
         #else
             protocolProvider = storedProvider ?? .claudeCLI
             claudeBin = defaults.object(forKey: "claudeBin") as? String ?? "claude"
+            customCommandArguments = defaults.stringArray(forKey: "customCommandArguments") ?? []
+            customCommandModel = defaults.string(forKey: "customCommandModel") ?? ""
         #endif
         protocolLanguage = defaults.string(forKey: "protocolLanguage") ?? "German"
         includeFullTranscriptInProtocol = defaults.object(forKey: "includeFullTranscriptInProtocol") as? Bool ?? true
@@ -773,6 +793,17 @@ final class AppSettings {
         refreshWhisperKitCustomModelValidation()
     }
 }
+
+#if !APPSTORE
+    extension AppSettings {
+        /// `customCommandArguments` as text, one entry per line, for the
+        /// command editor. Text set here reads back unchanged.
+        var customCommandText: String {
+            get { customCommandArguments.joined(separator: "\n") }
+            set { customCommandArguments = newValue.components(separatedBy: "\n") }
+        }
+    }
+#endif
 
 extension AppSettings {
     /// Bag of values used during init to read all 5 tuning knobs in one go.

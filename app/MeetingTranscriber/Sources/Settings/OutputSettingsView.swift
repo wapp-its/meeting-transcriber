@@ -137,6 +137,16 @@ struct OutputSettingsView: View {
                 Text("Only set this if that session can't stay signed in. An explicit key here is billed separately from your subscription.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+            case .codexCLI:
+                Text("Configured in the next step.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+            case .customCommand:
+                Text("Configured in the next step.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
         #endif
 
         case .openAICompatible:
