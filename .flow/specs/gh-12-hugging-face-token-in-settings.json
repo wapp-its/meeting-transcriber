@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-12-hf-token",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-10-07T00:36:29.465897Z",
+  "completion_reviewed_at": "2026-10-07T01:30:39.090707Z",
   "created_at": "2026-10-06T20:23:47.392025Z",
   "default_impl": null,
   "default_review": null,
@@ -386,6 +386,41 @@
       "timestamp": "2026-10-07T00:36:29.219375Z",
       "tool_calls": 40,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "c8d2ddf32b7002682f48352c4caceb7dc6a14b2125f3d4924660cbe911cfc2d2",
+      "backend": "codex",
+      "base_sha": "1a406c91233e022cd135f3082da5a9f4d92654a8",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "b1fc845141e3b886d88657177aaef6312dd691b3",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 6469,
+      "output_sha256": "1b1b3dafb9da13931ccc0af7d70541d2d0d905f34f16579b83d78157652e1d15",
+      "reservation_id": "ef6daae10c1d4b44bcfdadfb7757d88f",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-07T01:30:39.050502Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -393,7 +428,7 @@
     "impl:gh-12-hugging-face-token-in-settings.2": 1,
     "impl:gh-12-hugging-face-token-in-settings.3": 1,
     "plan": 1,
-    "plan#completion": 1
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -420,5 +455,5 @@
     "mergeBaseTracker": "## Problem\n\nWhisperKits Downloader schickt bei jeder Anfrage an Hugging Face den Token mit, den er selbst auf dem Rechner findet: `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, `HF_TOKEN_PATH`, `$HF_HOME/token`, `~/.cache/huggingface/token`, `~/.huggingface/token` (`HubApi.hfTokenFromEnv()` in ArgmaxCore). Die App hat darauf keinen Einfluss.\n\nIst dieser Token abgelaufen oder widerrufen (z. B. ein alter OAuth-Token der `hf`-CLI), antwortet Hugging Face mit 401 \u2013 auch f\u00fcr \u00f6ffentliche Repositories. Folge: Ein \u00f6ffentliches eigenes Modell (gemessen mit `spert/flix-swissgerman-whisperkit`) l\u00e4dt nicht, im Log steht nur `HubClientError.authorizationRequired`, in der App \u201eLoad Model\u201c ohne Erkl\u00e4rung. Ohne Token liefert dieselbe Anfrage 200.\n\nUmgekehrt gibt es keinen Weg, in der App selbst einen Token f\u00fcr ein privates oder gated Repository zu hinterlegen. Daf\u00fcr muss man heute die `hf`-CLI installieren oder eine Umgebungsvariable setzen.\n\n## Wunsch\n\nUnter **Settings \u2192 Transcribe \u2192 Model** ein optionales Feld **\u201eHugging Face token\u201c** (`SecureField`) mit \u201eRemove\u201c:\n\n- **Leer = anonym.** Die App \u00fcbergibt WhisperKit ausdr\u00fccklich keinen Token (`token: \"\"` bzw. `modelToken: \"\"` \u2013 ein leerer String unterdr\u00fcckt die eigene Suche, `nil` nicht). Fremde Tokens auf dem Rechner spielen dann keine Rolle mehr.\n- **Ausgef\u00fcllt = dieser Token** f\u00fcr Download (`WhisperKit.download(\u2026, token:)`) und Laden (`WhisperKitConfig(modelToken:)`, betrifft u. a. den Tokenizer).\n- Gespeichert in der **Keychain**, nicht in UserDefaults.\n- Weist Hugging Face den Token ab, sagt die App das klar (\u201eHugging Face hat den Token abgelehnt\u201c) statt eines allgemeinen Ladefehlers.\n\nKeine neue Abh\u00e4ngigkeit: WhisperKit bringt den Hub-Client von Hugging Face bereits mit (`ArgmaxCore/External/Hub`); die `hf`-CLI wird nicht gebraucht. Ein \u201eMit Hugging Face anmelden\u201c per OAuth w\u00e4re m\u00f6glich (eigene OAuth-App, Redirect), lohnt sich aber gegen\u00fcber dem Einf\u00fcgen eines Tokens nicht.\n\n## Hinweise\n\n- **Verhaltens\u00e4nderung:** Wer heute per `HF_TOKEN` einen Token mitgibt, verliert das mit \u201eleer = anonym\u201c. Im PR erw\u00e4hnen; Alternative w\u00e4re ein Schalter \u201eToken aus der Umgebung verwenden\u201c.\n- FluidAudio (Parakeet, Diarisierung) liest nur `HF_TOKEN` aus der Umgebung, nicht die Token-Datei \u2013 sein Download ist hiervon nicht betroffen, sollte f\u00fcr ein einheitliches Verhalten aber mitbedacht werden.\n- Bezug zu PR #759 (pasrom): Dort kommt vorerst nur ein kleiner Fix ohne UI hinein \u2013 wird der Token abgewiesen, versucht der Download es einmal ohne Token (Branch `fix/hub-stale-token`). Mit dieser Einstellung wird dieser R\u00fcckfall \u00fcberfl\u00fcssig und kann wieder entfallen.\n- Verwandt: #9 (Modelle direkt von Hugging Face suchen) \u2013 die Suche br\u00e4uchte f\u00fcr private Repositories denselben Token.\n\n## Abnahme\n\n- Abgelaufener Token in `~/.cache/huggingface/token`, Feld leer: ein \u00f6ffentliches eigenes Modell l\u00e4dt.\n- G\u00fcltiger Token im Feld: ein privates Repository l\u00e4dt; Feld leeren \u2192 es l\u00e4dt nicht mehr, mit verst\u00e4ndlicher Meldung.\n- Ung\u00fcltiger Token im Feld: klare Meldung, kein stilles \u201eLoad Model\u201c.\n- \u201eRemove\u201c l\u00f6scht den Keychain-Eintrag.\n\nKandidat f\u00fcrs Original (eigener `feat/\u2026`-Branch).",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/12"
   },
-  "updated_at": "2026-10-07T00:59:37.120287Z"
+  "updated_at": "2026-10-07T01:30:39.092163Z"
 }
