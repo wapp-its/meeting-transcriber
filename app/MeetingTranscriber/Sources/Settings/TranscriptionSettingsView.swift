@@ -445,6 +445,18 @@ struct TranscriptionSettingsView: View {
                 }
                 Task { await engine.loadModel() }
             }
+            whisperKitLoadFailureLine
+        }
+    }
+
+    /// Why the last WhisperKit load failed, when Hugging Face refused it. Nothing for
+    /// any other failure, and nothing while Parakeet is the engine.
+    @ViewBuilder private var whisperKitLoadFailureLine: some View {
+        if settings.transcriptionEngine == .whisperKit, let failure = whisperKitEngine.lastLoadFailure {
+            Text(failure.message)
+                .font(.caption)
+                .foregroundStyle(.red)
+                .accessibilityIdentifier(A11yID.whisperKitLoadFailureMessage)
         }
     }
 }

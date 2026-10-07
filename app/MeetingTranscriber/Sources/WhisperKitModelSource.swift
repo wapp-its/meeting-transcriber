@@ -29,12 +29,19 @@ struct WhisperKitModelSource {
         folder.path(percentEncoded: false)
     }
 
-    /// Whether `error` is the Hub refusing the request's credentials. WhisperKit
-    /// keeps its Hub error type internal, so it is matched by its fully qualified
-    /// name, which `testRejectedTokenMatchesWhisperKitsOwnError` pins against the
-    /// real type.
-    nonisolated static func isRejectedToken(_ error: any Error) -> Bool {
-        String(reflecting: error) == "ArgmaxCore.Hub.HubClientError.authorizationRequired"
+    /// Run one Hub-facing step with `token`, and name a refusal: a request Hugging
+    /// Face refused is rethrown as the `WhisperKitLoadFailure` for whether a token was
+    /// sent, any other error as it is. `step` receives the token, so the token sent
+    /// and the token judged are one read.
+    private static func classifyingHubFailure<T>(
+        token: String,
+        _ step: (_ token: String) async throws -> T,
+    ) async throws -> T {
+        do {
+            return try await step(token)
+        } catch {
+            throw WhisperKitLoadFailure.classify(error, tokenSent: !token.isEmpty) ?? error
+        }
     }
 
     /// Resolve every step against WhisperKit itself, for the model's origin.
@@ -67,19 +74,24 @@ struct WhisperKitModelSource {
                 // for the stock models: the locator derives its root from the same
                 // id, and a changed default would otherwise have the two point at
                 // different repositories, which shows up as "the model is never found".
-                try await WhisperKit.download(
-                    variant: variant,
-                    from: repoID,
-                    token: hubToken(),
-                    progressCallback: progress,
-                )
+                try await classifyingHubFailure(token: hubToken()) { token in
+                    try await WhisperKit.download(
+                        variant: variant,
+                        from: repoID,
+                        token: token,
+                        progressCallback: progress,
+                    )
+                }
             },
             makePipe: { variant, folder in
-                try await HubTokenScopedWhisperKit(
-                    WhisperKitConfig(model: variant, modelFolder: modelFolderArgument(folder)),
-                    hubToken: hubToken(),
-                    mayFetchTokenizer: true,
-                )
+                // The tokenizer is fetched inside the init when none is cached.
+                try await classifyingHubFailure(token: hubToken()) { token in
+                    try await HubTokenScopedWhisperKit(
+                        WhisperKitConfig(model: variant, modelFolder: modelFolderArgument(folder)),
+                        hubToken: token,
+                        mayFetchTokenizer: true,
+                    )
+                }
             },
         )
     }
@@ -116,11 +128,13 @@ struct WhisperKitModelSource {
                 defer {
                     if accessing { folder.stopAccessingSecurityScopedResource() }
                 }
-                return try await HubTokenScopedWhisperKit(
-                    WhisperKitConfig(model: variant, modelFolder: modelFolderArgument(folder)),
-                    hubToken: hubToken(),
-                    mayFetchTokenizer: false,
-                )
+                return try await classifyingHubFailure(token: hubToken()) { token in
+                    try await HubTokenScopedWhisperKit(
+                        WhisperKitConfig(model: variant, modelFolder: modelFolderArgument(folder)),
+                        hubToken: token,
+                        mayFetchTokenizer: false,
+                    )
+                }
             },
         )
     }

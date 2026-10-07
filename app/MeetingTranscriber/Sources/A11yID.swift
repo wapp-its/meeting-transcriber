@@ -91,6 +91,7 @@ enum A11yID {
     static let huggingFaceTokenSaveButton = "huggingFaceTokenSaveButton"
     static let huggingFaceTokenRemoveButton = "huggingFaceTokenRemoveButton"
     static let huggingFaceTokenProblem = "huggingFaceTokenProblem"
+    static let whisperKitLoadFailureMessage = "whisperKitLoadFailureMessage"
     static let terminologyRulesEditor = "terminologyRulesEditor"
 
     /// Settings sidebar row for one tab (`settings-tab-<rawValue>`). The detail

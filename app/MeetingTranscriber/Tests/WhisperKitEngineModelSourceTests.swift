@@ -521,4 +521,72 @@ final class WhisperKitEngineModelSourceTests: XCTestCase {
             "The reconcile dropped the pipe built for the superseded variant, and the cancel stopped the retry that would have replaced it",
         )
     }
+
+    // MARK: - A request Hugging Face refused
+
+    private let noAudio = URL(fileURLWithPath: "/nonexistent/wk-audio.wav")
+
+    /// A refusal is kept as the load's failure and is what a transcription needing the
+    /// model throws, so a failed job names it. Either Hub-facing step can be refused:
+    /// the variant download, or the pipe, which is where the tokenizer is fetched.
+    func testARefusedRequestIsTheLoadFailureAndWhatTranscriptionThrows() async throws {
+        let downloaded = try makeTempDirectory(prefix: "wk-downloaded")
+        let cases: [(Result<URL, any Error>, Result<WhisperKit, any Error>, WhisperKitLoadFailure)] = [
+            (.failure(WhisperKitLoadFailure.tokenRejected), .failure(WhisperError.modelsUnavailable()), .tokenRejected),
+            (.success(downloaded), .failure(WhisperKitLoadFailure.tokenRequired), .tokenRequired),
+        ]
+        for (download, pipe, failure) in cases {
+            let engine = WhisperKitEngine()
+            _ = installRecordingSource(on: engine, local: nil, download: download, pipe: pipe)
+            await engine.loadModel()
+            XCTAssertEqual(engine.lastLoadFailure, failure)
+            XCTAssertEqual(engine.modelState, .unloaded)
+
+            do {
+                _ = try await engine.transcribeSegments(audioPath: noAudio)
+                XCTFail("A transcription without a model must throw")
+            } catch {
+                XCTAssertEqual(error as? WhisperKitLoadFailure, failure)
+                XCTAssertEqual(error.localizedDescription, failure.message)
+            }
+        }
+    }
+
+    /// The failure describes the last attempt only, so a change of model clears it,
+    /// and so does the next load that succeeds.
+    func testAModelChangeAndASuccessfulLoadEachClearTheLoadFailure() async throws {
+        let engine = WhisperKitEngine()
+        let unusable: Result<WhisperKit, any Error> = .failure(WhisperError.modelsUnavailable())
+        _ = installRecordingSource(on: engine, local: nil, download: .failure(WhisperKitLoadFailure.tokenRejected), pipe: unusable)
+        await engine.loadModel()
+        XCTAssertEqual(engine.lastLoadFailure, .tokenRejected, "Precondition: the load was refused")
+        engine.applyModelVariant("openai_whisper-tiny")
+        XCTAssertNil(engine.lastLoadFailure, "A model change must clear it")
+
+        await engine.loadModel()
+        XCTAssertEqual(engine.lastLoadFailure, .tokenRejected, "Precondition: refused again")
+        let downloaded = try makeTempDirectory(prefix: "wk-downloaded")
+        _ = try await installRecordingSource(on: engine, local: nil, download: .success(downloaded), pipe: .success(makeIdlePipe()))
+        await engine.loadModel()
+        XCTAssertEqual(engine.modelState, .loaded)
+        XCTAssertNil(engine.lastLoadFailure, "A successful load must clear it")
+    }
+
+    /// Any other failure keeps the generic error, and records no refusal.
+    func testAnotherLoadFailureStillThrowsModelNotLoaded() async {
+        let engine = WhisperKitEngine()
+        _ = installRecordingSource(
+            on: engine,
+            local: nil,
+            download: .failure(URLError(.networkConnectionLost)),
+            pipe: .failure(WhisperError.modelsUnavailable()),
+        )
+        do {
+            _ = try await engine.transcribeSegments(audioPath: noAudio)
+            XCTFail("A transcription without a model must throw")
+        } catch {
+            XCTAssertEqual(error as? TranscriptionError, .modelNotLoaded)
+        }
+        XCTAssertNil(engine.lastLoadFailure)
+    }
 }

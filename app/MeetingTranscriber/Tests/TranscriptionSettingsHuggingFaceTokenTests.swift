@@ -2,9 +2,10 @@
 import ViewInspector
 import XCTest
 
-/// Wiring of the Hugging Face token row. What saving and removing do is pinned in
-/// `AppSettingsHuggingFaceTokenTests`; every view here is built with
-/// `HuggingFaceTokenStoreFake`, so no test touches the token saved in the app.
+/// Wiring of the Hugging Face token row, and of the line naming a load Hugging Face
+/// refused. What saving and removing do is pinned in `AppSettingsHuggingFaceTokenTests`;
+/// every view here is built with `HuggingFaceTokenStoreFake`, so no test touches the
+/// token saved in the app.
 @MainActor
 final class TranscriptionSettingsHuggingFaceTokenTests: XCTestCase {
     // swiftlint:disable implicitly_unwrapped_optional
@@ -32,10 +33,10 @@ final class TranscriptionSettingsHuggingFaceTokenTests: XCTestCase {
         try await super.tearDown()
     }
 
-    private func makeView() -> TranscriptionSettingsView {
+    private func makeView(whisperKitEngine: WhisperKitEngine = WhisperKitEngine()) -> TranscriptionSettingsView {
         TranscriptionSettingsView(
             settings: settings,
-            whisperKitEngine: WhisperKitEngine(),
+            whisperKitEngine: whisperKitEngine,
             parakeetEngine: ParakeetEngine(),
         )
     }
@@ -119,5 +120,41 @@ final class TranscriptionSettingsHuggingFaceTokenTests: XCTestCase {
 
         settings.transcriptionEngine = .parakeet
         XCTAssertThrowsError(try makeView().inspect().find(viewWithAccessibilityIdentifier: A11yID.huggingFaceTokenField), "Parakeet")
+    }
+
+    /// An engine whose load Hugging Face refused, without any download or CoreML.
+    private func makeEngineWhoseLoadWasRefused() async -> WhisperKitEngine {
+        let engine = WhisperKitEngine()
+        engine.installModelSourceForTesting(
+            WhisperKitModelSource(
+                locateLocal: { _ in nil },
+                download: { _, _ in throw WhisperKitLoadFailure.tokenRejected },
+                makePipe: { _, _ in throw WhisperKitLoadFailure.tokenRejected },
+            ),
+        )
+        await engine.loadModel()
+        return engine
+    }
+
+    func testTheLoadFailureLineNamesARefusalForWhisperKitOnly() async throws {
+        let refused = await makeEngineWhoseLoadWasRefused()
+        let line = try makeView(whisperKitEngine: refused).inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.whisperKitLoadFailureMessage)
+            .find(ViewType.Text.self)
+            .string()
+        XCTAssertEqual(line, WhisperKitLoadFailure.tokenRejected.message)
+
+        XCTAssertThrowsError(
+            try makeView().inspect().find(viewWithAccessibilityIdentifier: A11yID.whisperKitLoadFailureMessage),
+            "No failure, no line",
+        )
+
+        settings.transcriptionEngine = .parakeet
+        let parakeetView = try makeView(whisperKitEngine: refused).inspect()
+        XCTAssertNoThrow(try parakeetView.find(button: "Load Model"), "Precondition: Parakeet's status shows Load Model")
+        XCTAssertThrowsError(
+            try parakeetView.find(viewWithAccessibilityIdentifier: A11yID.whisperKitLoadFailureMessage),
+            "Parakeet",
+        )
     }
 }

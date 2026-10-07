@@ -64,9 +64,27 @@ final class WhisperKitHubTokenLiveTests: XCTestCase {
             _ = try await source.download(variant) { _ in }
             XCTFail("The Hub must refuse a made-up token")
         } catch {
-            XCTAssertTrue(WhisperKitModelSource.isRejectedToken(error), "got \(String(reflecting: error))")
-            print("[HFLive] made-up token: refused=\(WhisperKitModelSource.isRejectedToken(error)) "
-                + "error=\(String(reflecting: error))")
+            XCTAssertEqual(error as? WhisperKitLoadFailure, .tokenRejected, "got \(String(reflecting: error))")
+            print("[HFLive] made-up token: error=\(String(reflecting: error)) message=\(error.localizedDescription)")
+        }
+    }
+
+    /// The tokenizer fetch inside the pipe construction is the other Hub request, and
+    /// its refusal is named the same way. The cached tokenizer is removed first, so
+    /// the fetch has to run.
+    func testAMadeUpTokenIsRefusedAtTheTokenizerFetch() async throws {
+        try requireOptIn()
+        let folder = try await WhisperKitModelSource.production(for: .stock).download(variant) { _ in }
+        try WhisperTokenizerCache.removeCachedTokenizer(in: tokenizerFile.deletingLastPathComponent())
+        let token = madeUpAppToken
+        let source = WhisperKitModelSource.production(for: .stock) { token }
+
+        do {
+            _ = try await source.makePipe(variant, folder)
+            XCTFail("The Hub must refuse a made-up token for the tokenizer")
+        } catch {
+            XCTAssertEqual(error as? WhisperKitLoadFailure, .tokenRejected, "got \(String(reflecting: error))")
+            print("[HFLive] tokenizer fetch, made-up token: error=\(String(reflecting: error))")
         }
     }
 }

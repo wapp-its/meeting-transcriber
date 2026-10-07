@@ -69,6 +69,11 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
     }
 
     private(set) var modelState: EngineModelState = .unloaded
+    /// Why the last load failed, when Hugging Face refused one of its requests; nil
+    /// otherwise. Settings shows it under "Load Model", and a transcription that
+    /// needed the model throws it. Cleared when the next load starts and when the
+    /// model selection changes, so it never describes an older attempt.
+    private(set) var lastLoadFailure: WhisperKitLoadFailure?
     private(set) var downloadProgress: Double = 0
     /// Transcription progress (0.0–1.0) based on WhisperKit's 30s window processing.
     private(set) var transcriptionProgress: Double = 0
@@ -220,7 +225,10 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
         let variant = modelVariant
         let origin = modelOrigin
         let source = modelSource(origin, hubToken)
+        lastLoadFailure = nil
 
+        // A refusal in the local branch is not recorded: that branch falls back to
+        // the download, which makes the same request and reports it.
         if await loadFromLocalSnapshot(variant: variant, origin: origin, source: source) {
             return LoadAttempt(variant: variant, origin: origin, builtPipe: true)
         }
@@ -242,6 +250,7 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
             logger.error(
                 "WhisperKit model load failed (\(String(describing: type(of: error)), privacy: .public): \(String(reflecting: error), privacy: .public))",
             )
+            lastLoadFailure = error as? WhisperKitLoadFailure
             // A failed *reload* keeps the prior pipe (see `unloadModel`), and the
             // state has to say so: `ensureModel` short-circuits on a non-nil pipe
             // and keeps transcribing, so reporting `.unloaded` would have Settings
@@ -273,6 +282,7 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
         guard variant != modelVariant || origin != modelOrigin else { return }
         modelVariant = variant
         modelOrigin = origin
+        lastLoadFailure = nil
         guard pipe != nil else { return }
         unloadModel()
     }
@@ -287,7 +297,9 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
         downloadProgress = 0
     }
 
-    /// Ensure model is loaded, loading it if necessary.
+    /// Ensure model is loaded, loading it if necessary. A load Hugging Face refused
+    /// throws that refusal, so a failed job says why; any other failure throws
+    /// `modelNotLoaded`.
     private func ensureModel() async throws {
         // Production state is defined by the loaded WhisperKit instance. The
         // test decoder is only a narrow decode-boundary substitute and must not
@@ -297,7 +309,7 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
         await loadModel()
         guard pipe != nil else {
             logger.error("WhisperKit: model load FAILED, state=\(String(describing: self.modelState), privacy: .public)")
-            throw TranscriptionError.modelNotLoaded
+            throw lastLoadFailure ?? TranscriptionError.modelNotLoaded
         }
         logger.info("WhisperKit: model loaded successfully")
     }
