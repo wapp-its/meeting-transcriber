@@ -97,6 +97,30 @@
             return environment
         }
 
+        /// The executable file `program` names, or nil. An absolute path is
+        /// taken as it is, a leading `~/` is expanded against `home`, and a
+        /// bare name is looked up in `searchPaths`, then in the absolute
+        /// entries of `environment`'s `PATH`. Anything else, a relative path
+        /// such as `bin/tool` included, is nil: it would resolve against the
+        /// app's working directory.
+        static func resolveProgram(_ program: String, environment: [String: String], home: String = NSHomeDirectory()) -> URL? {
+            if program.hasPrefix("/") { return executableFile(at: program) }
+            if program.hasPrefix("~/") { return executableFile(at: home + "/" + String(program.dropFirst(2))) }
+            guard !program.isEmpty, !program.contains("/") else { return nil }
+            let pathEntries = (environment["PATH"] ?? "").split(separator: ":").map(String.init)
+            for directory in searchPaths + pathEntries where directory.hasPrefix("/") {
+                if let url = executableFile(at: directory + "/" + program) { return url }
+            }
+            return nil
+        }
+
+        private static func executableFile(at path: String) -> URL? {
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), !isDirectory.boolValue,
+                  FileManager.default.isExecutableFile(atPath: path) else { return nil }
+            return URL(fileURLWithPath: path)
+        }
+
         /// Create a new, empty, owner-only (`0700`) directory under `parent`
         /// for one CLI run, and return it. The caller starts the program
         /// there and removes the directory when the run ends.
