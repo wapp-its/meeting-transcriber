@@ -1,14 +1,22 @@
 import SwiftUI
 
-/// A row showing permission status with a colored icon, info popover, and click-to-open Settings.
+/// A row showing permission status with a colored icon, an optional action
+/// button and an info popover.
 struct PermissionRow: View {
+    /// A small push button at the row's trailing edge, before the "?" button.
+    struct Action {
+        let title: String
+        let identifier: String
+        let perform: @MainActor () -> Void
+    }
+
     let label: String
     let detail: String
     var granted: Bool
     var warning: Bool = false
     var optional: Bool = false
     var help: String = ""
-    var settingsURL: String = ""
+    var action: Action?
     @State private var showingHelp = false
 
     private var icon: String {
@@ -24,7 +32,6 @@ struct PermissionRow: View {
     }
 
     var body: some View {
-        // swiftlint:disable:next closure_body_length
         HStack {
             Image(systemName: icon)
                 .foregroundStyle(iconColor)
@@ -35,6 +42,11 @@ struct PermissionRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            if let action {
+                Button(action.title, action: action.perform)
+                    .accessibilityIdentifier(action.identifier)
+                    .controlSize(.small)
+            }
             if !help.isEmpty {
                 Button {
                     showingHelp.toggle()
@@ -44,19 +56,9 @@ struct PermissionRow: View {
                 }
                 .buttonStyle(.borderless)
                 .popover(isPresented: $showingHelp) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(help)
-                            .font(.callout)
-                        if !settingsURL.isEmpty {
-                            Button("Open System Settings") {
-                                if let url = URL(string: settingsURL) {
-                                    NSWorkspace.shared.open(url)
-                                }
-                                showingHelp = false
-                            }
-                        }
-                    }
-                    .padding()
+                    Text(help)
+                        .font(.callout)
+                        .padding()
                 }
             }
         }

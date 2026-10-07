@@ -61,6 +61,22 @@ enum Permissions {
         }
     }
 
+    /// Ask macOS for Screen Recording because the user clicked for it, in
+    /// Settings → Advanced → Permissions.
+    ///
+    /// `ensureScreenRecordingAccess()` keeps its once-per-session flag because
+    /// it runs on every watch start, a moment nobody chose for a prompt. A
+    /// click is a choice, so this path asks on every click and neither reads
+    /// nor sets that flag: the button cannot use up the watch start's one ask,
+    /// and an ask spent at watch start cannot disable the button.
+    ///
+    /// Deliberately silent, like `ensureAccessibilityAccess()`: the call can
+    /// return before the user has answered, so its `false` is not a denial.
+    static func requestScreenRecordingAccess() {
+        guard !CGPreflightScreenCaptureAccess() else { return }
+        _ = CGRequestScreenCaptureAccess()
+    }
+
     static func ensureMicrophoneAccess() async -> Bool {
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
         if status == .authorized { return true }
