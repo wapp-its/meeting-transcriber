@@ -266,6 +266,9 @@ enum ProtocolError: LocalizedError {
         case cliNotFound(String)
         case cliFailed(Int, String)
         case timeout
+        /// A CLI tool wrote more to stdout than a run accepts. Names the tool
+        /// only: the output itself may hold meeting content.
+        case commandOutputTooLarge(tool: String)
     #endif
     case emptyProtocol
     case httpError(Int, String)
@@ -281,6 +284,8 @@ enum ProtocolError: LocalizedError {
             case let .cliFailed(code, stderr): "Claude CLI exited with code \(code)\(stderr.isEmpty ? "" : ": \(stderr)")"
 
             case .timeout: "Claude CLI took too long (>10 min)"
+
+            case let .commandOutputTooLarge(tool): "\(tool) wrote more output than the app accepts"
         #endif
 
         case .emptyProtocol: "Protocol is empty. Tip: Test manually: echo Hello | claude --print"

@@ -48,6 +48,68 @@
             }
         }
 
+        func testGenerateReportsACLIThatCannotStartAsNotFound() async throws {
+            let missing = NSTemporaryDirectory() + "no-such-claude-\(UUID().uuidString)"
+
+            let generator = ClaudeCLIProtocolGenerator(claudeBin: missing, language: "German")
+            do {
+                _ = try await generator.generate(transcript: "Speaker 1: hello", title: "Sync", diarized: false)
+                XCTFail("Expected generate() to throw .cliNotFound")
+            } catch let ProtocolError.cliNotFound(bin) {
+                XCTAssertEqual(bin, missing)
+            }
+        }
+
+        func testGenerateReportsACLIThatRepliesWithNothingAsEmptyProtocol() async throws {
+            let script = try Self.makeFakeClaudeScript(body: "cat > /dev/null")
+            defer { try? FileManager.default.removeItem(atPath: script) }
+
+            let generator = ClaudeCLIProtocolGenerator(claudeBin: script, language: "German")
+            do {
+                _ = try await generator.generate(transcript: "Speaker 1: hello", title: "Sync", diarized: false)
+                XCTFail("Expected generate() to throw .emptyProtocol")
+            } catch ProtocolError.emptyProtocol {}
+        }
+
+        /// The CLI's output is decoded once it has ended, so a last line
+        /// without a newline still counts.
+        func testGenerateKeepsALastLineWithoutANewline() async throws {
+            let script = try Self.makeFakeClaudeScript(
+                body: """
+                cat > /dev/null
+                printf '%s' '{"type":"content_block_delta","delta":{"type":"text_delta","text":"Protocol body"}}'
+                """,
+            )
+            defer { try? FileManager.default.removeItem(atPath: script) }
+
+            let generator = ClaudeCLIProtocolGenerator(claudeBin: script, language: "German")
+            let result = try await generator.generate(transcript: "Speaker 1: hello", title: "Sync", diarized: false)
+
+            XCTAssertEqual(result, "Protocol body")
+        }
+
+        /// Stdout beyond the runner's cap stops the CLI; the error names the
+        /// tool and nothing it printed.
+        func testGenerateFailsOnOutputOverTheCap() async throws {
+            let script = try Self.makeFakeClaudeScript(
+                body: "cat > /dev/null\nhead -c \(CLIProcessRunner.defaultMaxStdoutBytes + 1) /dev/zero",
+            )
+            defer { try? FileManager.default.removeItem(atPath: script) }
+
+            let generator = ClaudeCLIProtocolGenerator(claudeBin: script, language: "German")
+            do {
+                _ = try await generator.generate(transcript: "Speaker 1: hello", title: "Sync", diarized: false)
+                XCTFail("Expected generate() to throw .commandOutputTooLarge")
+            } catch let error as ProtocolError {
+                guard case let .commandOutputTooLarge(tool) = error else {
+                    XCTFail("Expected .commandOutputTooLarge, got \(error)")
+                    return
+                }
+                XCTAssertEqual(tool, "Claude CLI")
+                XCTAssertEqual(error.errorDescription, "Claude CLI wrote more output than the app accepts")
+            }
+        }
+
         /// A fake `claude` that answers the `--help` probe at once (so the
         /// probe never waits for `body`) and otherwise runs `body`.
         private static func makeFakeClaudeScript(body: String) throws -> String {

@@ -78,7 +78,7 @@
             let stderr: Data
         }
 
-        enum Failure: Error, Equatable {
+        enum Failure: Error {
             /// The program could not be started; carries the launch error's
             /// description, nothing the program printed.
             case couldNotStart(String)

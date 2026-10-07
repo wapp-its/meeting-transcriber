@@ -21,22 +21,20 @@
         /// Wall-clock limit for one run.
         let timeout: TimeInterval
 
-        init(claudeBin: String, language: String, anthropicAPIKey: String? = nil, timeout: TimeInterval = timeoutSeconds) {
+        init(
+            claudeBin: String,
+            language: String,
+            anthropicAPIKey: String? = nil,
+            timeout: TimeInterval = CLIProcessRunner.defaultTimeout,
+        ) {
             self.claudeBin = claudeBin
             self.language = language
             self.anthropicAPIKey = anthropicAPIKey
             self.timeout = timeout
         }
 
-        static let timeoutSeconds: TimeInterval = 600
-
-        /// Search paths for Claude CLI binaries.
-        static let searchPaths = [
-            "\(NSHomeDirectory())/.local/bin",
-            "/usr/local/bin",
-            "\(NSHomeDirectory())/.npm-global/bin",
-            "/opt/homebrew/bin",
-        ]
+        /// Search paths for Claude CLI binaries: the shared runner's.
+        static let searchPaths = CLIProcessRunner.searchPaths
 
         // MARK: - ProtocolGenerating
 
@@ -48,97 +46,56 @@
         ) async throws -> String {
             let prompt = ProtocolGenerator.buildSystemPrompt(diarized: diarized, language: language, meetingStartTime: meetingStartTime) + transcript
 
-            let process = Process()
             let launch = await Self.launchConfiguration(claudeBin: claudeBin, anthropicAPIKey: anthropicAPIKey)
-            let resolvedBin = launch.resolvedBin
-            process.executableURL = URL(fileURLWithPath: resolvedBin)
-            process.arguments = launch.arguments
-            process.environment = launch.environment
             let workingDirectory = try Self.makeWorkingDirectory()
             let projectFolder = Self.cliProjectFolder(workingDirectory: workingDirectory, environment: launch.environment)
             defer { Self.removeRunFolders(workingDirectory: workingDirectory, projectFolder: projectFolder) }
-            process.currentDirectoryURL = workingDirectory
 
-            let stdinPipe = Pipe()
-            let stdoutPipe = Pipe()
-            let stderrPipe = Pipe()
-            process.standardInput = stdinPipe
-            process.standardOutput = stdoutPipe
-            process.standardError = stderrPipe
-
-            // Set terminationHandler BEFORE process.run() to avoid race
-            // where the process exits before the handler is installed.
-            // AsyncStream buffers the yield, so even if the process exits before
-            // we iterate, the value is not lost.
-            let exitStream = AsyncStream<Void> { continuation in
-                process.terminationHandler = { _ in
-                    continuation.yield()
-                    continuation.finish()
-                }
-            }
-
-            do {
-                try process.run()
-            } catch {
-                logger.error(
-                    "claude_cli_not_found bin=\(self.claudeBin, privacy: .public) resolvedPath=\(resolvedBin, privacy: .public) error=\(error.localizedDescription, privacy: .public)",
-                )
-                throw ProtocolError.cliNotFound(claudeBin)
-            }
-
-            // Guard against process having already exited before we awaited.
-            // If the process already exited, terminationHandler may have already fired,
-            // but AsyncStream buffers the yield so we won't miss it.
-            // No additional check needed — AsyncStream handles the race.
-
-            // Write stdin in a detached task to avoid deadlock on large transcripts.
-            // The pipe buffer is finite (~64KB); if the prompt exceeds it, a synchronous
-            // write blocks until the reader drains — but we haven't started reading yet.
             let promptData = Data(prompt.utf8)
             logger.info("claude_cli_subprocess_start prompt_bytes=\(promptData.count, privacy: .public)")
-            let stdinWriteTask = Task.detached {
-                // Use the throwing `write(contentsOf:)` rather than the deprecated
-                // `write(_:)`: the latter raises an uncatchable Obj-C NSException on
-                // a write error (e.g. EPIPE when the child's stdin read end has
-                // closed — which happens on the timeout path where readStreamJSON
-                // calls process.terminate()), aborting the whole app. The throwing
-                // API turns a broken pipe into a handled Swift error so we can log
-                // and fall through to close the handle. Mirrors the write sites in
-                // RecognitionStats and PersistentDiagnosticLog.
-                do {
-                    try stdinPipe.fileHandleForWriting.write(contentsOf: promptData)
-                } catch {
-                    logger.debug(
-                        "claude_cli_stdin_write_failed error=\(error.localizedDescription, privacy: .public)",
-                    )
-                }
-                try? stdinPipe.fileHandleForWriting.close()
-            }
+            let output = try await run(
+                CLIProcessRunner.Request(
+                    executable: URL(fileURLWithPath: launch.resolvedBin),
+                    arguments: launch.arguments,
+                    environment: launch.environment,
+                    workingDirectory: workingDirectory,
+                    standardInput: promptData,
+                    timeout: timeout,
+                ),
+                resolvedBin: launch.resolvedBin,
+            )
 
-            // Read stream-json output concurrently with stdin write
-            let (text, resultEvent) = try await Self.readStreamJSON(from: stdoutPipe, process: process, timeout: timeout)
+            // The newline makes a last line the CLI did not terminate count too.
+            var buffer = output.stdout
+            buffer.append(0x0A)
+            var resultEvent: ResultEventInfo?
+            let text = Self.drainStreamJSONLines(buffer: &buffer, resultEvent: &resultEvent).joined()
 
-            // Ensure stdin write completes (should be done by now)
-            _ = await stdinWriteTask.value
-
-            // Read stderr in background to prevent pipe buffer issues
-            async let stderrRead = Task.detached {
-                stderrPipe.fileHandleForReading.readDataToEndOfFile()
-            }.value
-
-            // Await process exit via the stream installed before launch
-            for await _ in exitStream {
-                break
-            }
-
-            if process.terminationStatus != 0 {
-                let stderrData = await stderrRead
+            if output.status != 0 {
                 throw Self.handleFailure(
-                    exitCode: process.terminationStatus, stderrData: stderrData, text: text, resultEvent: resultEvent,
+                    exitCode: output.status, stderrData: output.stderr, text: text, resultEvent: resultEvent,
                 )
             }
 
             return try Self.validateGeneratedText(text)
+        }
+
+        /// Runs the CLI on the shared runner and turns its failures into the
+        /// errors and log lines this provider has always reported.
+        private func run(_ request: CLIProcessRunner.Request, resolvedBin: String) async throws -> CLIProcessRunner.Output {
+            do {
+                return try await CLIProcessRunner.run(request)
+            } catch let CLIProcessRunner.Failure.couldNotStart(reason) {
+                logger.error(
+                    "claude_cli_not_found bin=\(self.claudeBin, privacy: .public) resolvedPath=\(resolvedBin, privacy: .public) error=\(reason, privacy: .public)",
+                )
+                throw ProtocolError.cliNotFound(claudeBin)
+            } catch CLIProcessRunner.Failure.timedOut {
+                logger.error("claude_cli_timeout timeout=\(request.timeout, privacy: .public)s")
+                throw ProtocolError.timeout
+            } catch CLIProcessRunner.Failure.stdoutTooLarge {
+                throw ProtocolError.commandOutputTooLarge(tool: "Claude CLI")
+            }
         }
 
         /// Pair an already-decoded stderr string with `exitCode` as a
@@ -201,42 +158,6 @@
         }
 
         // MARK: - Stream JSON
-
-        /// Parse Claude CLI stream-json output, accumulate text, and capture
-        /// the terminal `result` event (if any) for failure diagnostics.
-        private static func readStreamJSON(
-            from pipe: Pipe, process: Process, timeout: TimeInterval,
-        ) async throws -> (text: String, resultEvent: ResultEventInfo?) {
-            let handle = pipe.fileHandleForReading
-            var parts: [String] = []
-            var resultEvent: ResultEventInfo?
-            let startTime = ProcessInfo.processInfo.systemUptime
-
-            // Read line-by-line from stdout
-            var buffer = Data()
-            while true {
-                if ProcessInfo.processInfo.systemUptime - startTime > timeout {
-                    let elapsed = ProcessInfo.processInfo.systemUptime - startTime
-                    let elapsedStr = String(format: "%.1f", elapsed)
-                    logger.error(
-                        "claude_cli_timeout elapsed=\(elapsedStr, privacy: .public)s parts_received=\(parts.count, privacy: .public)",
-                    )
-                    process.terminate()
-                    throw ProtocolError.timeout
-                }
-
-                // Wrap blocking availableData in Task.detached to avoid
-                // blocking Swift's cooperative thread pool. availableData blocks
-                // until data is available or EOF, which would starve other tasks.
-                let chunk = await Task.detached { handle.availableData }.value
-                if chunk.isEmpty { break } // EOF
-
-                buffer.append(chunk)
-                parts.append(contentsOf: drainStreamJSONLines(buffer: &buffer, resultEvent: &resultEvent))
-            }
-
-            return (parts.joined(), resultEvent)
-        }
 
         /// Drain every newline-terminated line currently in `buffer`, parsing
         /// each via `parseStreamJSONLine`. Returns the extracted text
@@ -443,10 +364,7 @@
             searchPaths: [String],
             anthropicAPIKey: String? = nil,
         ) -> [String: String] {
-            var env = baseEnvironment
-            env.removeValue(forKey: "CLAUDECODE")
-            let extraPaths = searchPaths.joined(separator: ":")
-            env["PATH"] = "\(extraPaths):\(env["PATH"] ?? "/usr/bin:/bin")"
+            var env = CLIProcessRunner.environment(base: baseEnvironment, searchPaths: searchPaths)
             if env["ANTHROPIC_API_KEY"]?.isEmpty ?? true,
                let anthropicAPIKey, !anthropicAPIKey.isEmpty {
                 env["ANTHROPIC_API_KEY"] = anthropicAPIKey
@@ -454,33 +372,12 @@
             return env
         }
 
-        /// Create a new, empty, owner-only (`0700`) directory under `parent`
-        /// for one CLI run, and return it. `generate()` starts the CLI there
-        /// and removes the directory again when it returns or throws; a
-        /// removal that fails is ignored.
-        ///
-        /// Without a working directory of its own the child inherits the
-        /// app's, which for a launched app is `/`, and Claude Code looks
-        /// around its working directory at startup, so macOS asked the user
-        /// for Desktop, Documents, Downloads and iCloud Drive on the app's
-        /// behalf. The CLI needs no folder at all: the transcript arrives on
-        /// stdin. The default parent is the per-user temporary directory,
-        /// which is private to the user and has no privacy-protected folder
-        /// on its path or beneath it.
-        ///
-        /// A new directory per run, not one shared folder, so a run never
-        /// sees what an earlier or concurrent run left there. The name is
-        /// unique and creation fails rather than reuse a directory that
-        /// already exists. Throws when the directory cannot be created;
-        /// there is deliberately no fallback to the inherited directory.
+        /// A new, empty, owner-only run folder for one CLI run (see
+        /// `CLIProcessRunner.makeRunDirectory`). The CLI needs no folder at
+        /// all, the transcript arrives on stdin; it gets one of its own so it
+        /// never starts in the app's working directory.
         static func makeWorkingDirectory(in parent: URL = FileManager.default.temporaryDirectory) throws -> URL {
-            let directory = parent.appendingPathComponent(
-                "MeetingTranscriber-claude-cli-\(UUID().uuidString)", isDirectory: true,
-            )
-            try FileManager.default.createDirectory(
-                at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700],
-            )
-            return directory
+            try CLIProcessRunner.makeRunDirectory(in: parent)
         }
     }
 
