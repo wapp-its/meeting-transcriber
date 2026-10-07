@@ -18,10 +18,14 @@
         /// previously-working install (both measured — see PR #692 review).
         let anthropicAPIKey: String?
 
-        init(claudeBin: String, language: String, anthropicAPIKey: String? = nil) {
+        /// Wall-clock limit for one run.
+        let timeout: TimeInterval
+
+        init(claudeBin: String, language: String, anthropicAPIKey: String? = nil, timeout: TimeInterval = timeoutSeconds) {
             self.claudeBin = claudeBin
             self.language = language
             self.anthropicAPIKey = anthropicAPIKey
+            self.timeout = timeout
         }
 
         static let timeoutSeconds: TimeInterval = 600
@@ -112,7 +116,7 @@
             }
 
             // Read stream-json output concurrently with stdin write
-            let (text, resultEvent) = try await Self.readStreamJSON(from: stdoutPipe, process: process)
+            let (text, resultEvent) = try await Self.readStreamJSON(from: stdoutPipe, process: process, timeout: timeout)
 
             // Ensure stdin write completes (should be done by now)
             _ = await stdinWriteTask.value
@@ -201,7 +205,7 @@
         /// Parse Claude CLI stream-json output, accumulate text, and capture
         /// the terminal `result` event (if any) for failure diagnostics.
         private static func readStreamJSON(
-            from pipe: Pipe, process: Process,
+            from pipe: Pipe, process: Process, timeout: TimeInterval,
         ) async throws -> (text: String, resultEvent: ResultEventInfo?) {
             let handle = pipe.fileHandleForReading
             var parts: [String] = []
@@ -211,7 +215,7 @@
             // Read line-by-line from stdout
             var buffer = Data()
             while true {
-                if ProcessInfo.processInfo.systemUptime - startTime > timeoutSeconds {
+                if ProcessInfo.processInfo.systemUptime - startTime > timeout {
                     let elapsed = ProcessInfo.processInfo.systemUptime - startTime
                     let elapsedStr = String(format: "%.1f", elapsed)
                     logger.error(
