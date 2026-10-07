@@ -135,6 +135,8 @@ cd app/MeetingTranscriber && swift build -Xswiftc -DAPPSTORE --scratch-path /pri
 
 Maintainability (plan review): duplication - the full-prompt assembly (`buildSystemPrompt(...) + transcript`) was repeated in the Claude and command generators, now one shared helper; structure - the command generator took its default timeout from the Claude generator, now the runner owns the default
 
+FIT: GO · 2026-10-07 · base 6e2a579f · engine flow-next 8.1.0 · every file and line anchor the spec names is unchanged on the base since the plan review; the upstream docs commit a92b5e47 left the provider lines as cited; gh-2 (planned 2026-10-06 22:53, after this review) edits the same prompt-assembly lines in ClaudeCLIProtocolGenerator and ProtocolGenerator but claims no part of this scope, so whichever lands second resolves a textual merge, nothing here changes
+
 ## Resolved via Research
 <!-- provenance: plan on 2026-10-06; the planning session could not dispatch scout subagents, so the planner ran the docs, practice and docs-gap research inline (read-only) -->
 
