@@ -406,7 +406,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-4-balance-own-voice-and-remote-levels.md",
-  "status": "open",
+  "status": "done",
   "title": "Balance own voice and remote levels",
   "tracker": {
     "baseHashFlow": null,
@@ -420,5 +420,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/4"
   },
-  "updated_at": "2026-10-07T07:54:27.257589Z"
+  "updated_at": "2026-10-07T08:03:21.112044Z"
 }
