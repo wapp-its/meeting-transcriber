@@ -52,9 +52,51 @@ Add the switch (R5) and carry it to every place that writes a `_mix.wav` from tw
 - [ ] Crash recovery balances the rebuilt mix with the flag true and leaves it as today with false. `PipelineControllerLevelBalanceTests`: a controller built with an injected `QueueEnvironment` hands its `settings.levelBalanceEnabled` (true and false) to the staged-recording recovery callback when it builds a queue; `StagedRecoveryFolderTests` still proves the production callback works in the injected staging folder.
 - [ ] `HelpBadgeTests` updated and green; `./scripts/pre-push.sh --with-appstore` passes; `./scripts/lint.sh` passes with the pinned tools.
 ## Done summary
-TBD
+The balance switch is in Settings > Audio ("Balance my voice and the meeting audio", on by default) and reaches every place that writes a two-track mix: the recorder's `stop()` through the recorder factory, launch-time crash recovery through `PipelineController`'s staging-recovery callback, and now the cut-back path. A detected meeting that ends through the end-of-meeting question gets its mix made again from the kept tracks after the cut, so loud talk in the room during the countdown no longer sets the meeting's gains.
 
+stage: impl-review - ran [2026-10-07T06:31Z..2026-10-07T07:00Z]
+
+Tier: session (jev-unavailable(no_key)); project routing block pins implementer opus at xhigh (actual: claude-opus-5-5)
+
+Review: codex gpt-5.6-sol at xhigh, receipt /tmp/impl-review-receipt-23a2c07fb458-gh-4-balance-own-voice-and-remote-levels.2.json (reads model gpt-5.6-sol, effort xhigh). Round 1 (06:31-06:41, three draws: correctness SHIP, contracts SHIP, integration NEEDS_WORK) kept one P1 on R1 after the validator pass: `stop()` balanced the whole capture and `WatchLoop.cutBack` -> `RecordingCut.apply` then only shortened the balanced mix, so gains measured on the discarded countdown tail stayed in the kept mix. The conductor widened the task to the cut-back files (spec A9). Fixed in 63be36d6. Round 2 (single re-review, 06:57-07:00) reported the prior finding fixed and returned SHIP with no findings. Both rounds ran with CODEX_SANDBOX=workspace-write as the dispatch asked (owner's standing setting; the skill's own text says never to set it, recorded here, not resolved); after each round `git status` showed only flowctl's review ledger, nothing the reviewer wrote.
+
+Baseline: green before any edit in each session. Round 1: the task's focused filter ran 284 tests with 0 failures. Round 2 (on 25334b72): the focused filter plus `WatchLoopMeetingEnd|RecordingCut` ran 314 tests, exit 0.
+
+Tests first. Round 1: with the tests written and no source change, the test build failed on the missing `levelBalanceEnabled`, `A11yID.levelBalanceToggle` and the new parameters. Round 2: with `RecordingResult.levelBalanced` and `RecordingCut.remixBalanced` in place but not called from `cutBack`, `WatchLoopMeetingEndTests.testACutBalancedMixIsMadeAgainFromTheKeptTracks` failed with a 33.1 dB gap between the two sides (limit 6); wiring the call turned it green.
+
+Acceptance, test by test:
+- Setting (R5): `LevelBalanceSettingTests` on by default, survives a fresh `AppSettings` on the same defaults, the toggle found by `A11yID.levelBalanceToggle` writes back, and it stays enabled in record-only mode.
+- `buildRecording` (R1, R3, R5): `BuildRecordingLevelBalanceTests` has a -18/-44 dBFS fixture within 6 dB with the flag (and the result reports `levelBalanced`); `_app.wav` and `_mic.wav` byte-identical with the flag on and off (and the mixes differ); with the flag off the mix equals `mixTracks` over the `suppressEcho`'d track files (and the result reports not balanced).
+- Recorder: `DualSourceRecorderLifecycleTests.testStopHandsTheLevelBalanceFlagToTheMix` (within 6 dB on, 26 dB apart as recorded off). Controller: `testTheLevelBalanceSettingReachesARecordingTheControllerStarts` (true and false, recorder seeded with the opposite).
+- Crash recovery: `DualSourceRecorderCrashRecoveryTests.testRecoveryBalancesTheRebuiltMixOnlyWithTheFlag`; `PipelineControllerLevelBalanceTests` (settings true then false reach the callback per built queue); `StagedRecoveryFolderTests` still green with the two-argument callback.
+- Cut-back path (R1, spec A9): `WatchLoopMeetingEndTests.testACutBalancedMixIsMadeAgainFromTheKeptTracks` drives `handleMeeting` through an unanswered question: 24 s of headset-gap meeting plus a 120 s tail with -10 dBFS microphone speech. The as-recorded mix is more than 6 dB apart (premise asserted); after the cut the mix is 24 s long and within 6 dB. `testAnUnbalancedOrSingleTrackMixIsOnlyCut`: a mix made without the balance and a single-track mix reported balanced come out as the first 24 s of the original, sample for sample.
+- R1 error (balancing never stops the mix being written or the recording processed): `RecordingCutTests.testAFailedRemixLeavesTheMixAsItWas`: a remix whose swap fails leaves the mix byte-identical and no staged file behind; `cutBack` logs `recording_cut_remix_failed domain= code=` and returns the cut recording, so it is processed as before.
+- `HelpBadgeTests`: Audio tab now 7 badges; `SettingsHelp.levelBalance` in the catalog and wiring tests.
+
+Mutation checks. Round 1: dropping the factory line, passing `false` from `stop()`, passing `false` in batch recovery, handing a constant `true` from the controller, dimming the section in record-only mode, and passing `false` from `buildRecording` to the mix each turned their target test red. Round 2: remixing every cut whatever the flag turned `testAnUnbalancedOrSingleTrackMixIsOnlyCut` red; writing the remix straight onto the mix path turned `testAFailedRemixLeavesTheMixAsItWas` red; `buildRecording` never reporting the balance turned `testTheFlagBringsBothSidesOfTheMixWithinSixDecibels` red. The sources were restored from backups after each and the diff checked.
+
+Verification on the committed tree (63be36d6):
+- `cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh4-home swift test --parallel --filter 'LevelBalance|BuildRecording|DualSourceRecorder|HelpBadge|SettingsInteraction|AudioMixer|StagedRecoveryFolder|PipelineController|AppState|WatchLoopMeetingEnd|RecordingCut'` exited 0 with 317 tests (314 before plus 3 new).
+- `PATH=/private/tmp/gh4/tools:$PATH ./scripts/lint.sh` (SwiftFormat 0.63.0, SwiftLint 0.65.1) exited 0: 0 of 685 files need formatting, 0 violations.
+- `./scripts/pre-push.sh --with-appstore` exited 0: release builds of the Homebrew and App Store variants completed.
+
+Decisions:
+- Whether a mix was balanced travels on `RecordingResult.levelBalanced`, set by `buildRecording` only for a two-track mix made with the flag, because `WatchLoop` holds the recorder only as `any RecordingProvider`. `RecordingCut.redirect` carries it too, so a recording pointed back at its uncut originals still describes its mix truthfully.
+- The cut still shortens the mix first and the remix runs after it, so a failed remix leaves the cut (whole-capture balanced) mix and the recording is processed, the way a failed cut leaves the uncut recording. The remix writes a hidden `.<mix>.remixing.wav` sibling and renames it over the mix.
+- The failed-remix error case is tested at `RecordingCut` level through the injectable rename; `cutBack` has no injection seam and gets none added for a test.
+- `DualSourceRecorder.swift` ends at 591 lines, under the 600 cap, so the optional pure-move commit was not needed.
+- The "not dimmed in record-only mode" constraint is pinned by a test instead of a comment.
+
+Observations, not acted on:
+- A cut-back balanced recording now gets two level-balance notice lines: the first from `stop()` over the whole capture, the second, after `recording_cut kept_s=`, for the mix that is saved. The second is the one that describes the file.
+- The remix is a second full mix pass on the main actor right after `stop()`'s own, like the mix inside `stop()` itself; for an hour-long meeting that roughly doubles the stop's blocking time on the cut path.
+
+Feature map: no user route changed; Settings > Audio gains a "Recording Levels" section.
+
+Memory: captured bug/data/whole-capture-level-balance-kept-after-2026-10-07 (NEEDS_WORK -> SHIP).
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 0fde5a46e206732a02695af01db3e224a781a357, 0a49acfd002cf8be7d1b822ba75a4dc1c7c7fd19, 25334b72d67d0e9eb7afbcdb7d6babd35fcd8fad, 63be36d6dd9ac50a711905b7eb43db1d186d167b
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh4-home swift test --parallel --filter 'LevelBalance|BuildRecording|DualSourceRecorder|HelpBadge|SettingsInteraction|AudioMixer|StagedRecoveryFolder|PipelineController|AppState|WatchLoopMeetingEnd|RecordingCut' -> exit 0, 317 tests, PATH=/private/tmp/gh4/tools:$PATH ./scripts/lint.sh -> exit 0, 0/685 files need formatting, 0 violations, ./scripts/pre-push.sh --with-appstore -> exit 0, Homebrew and App Store release builds
 - PRs:
