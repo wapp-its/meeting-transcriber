@@ -21,6 +21,9 @@ struct RecordingResult {
     /// Where the saved audio ends on the same wall clock when the tracks were
     /// cut back after the stop (`RecordingCut`), nil when they run to it.
     var recordedUntil: Date?
+    /// Whether the two tracks were mixed with the speech-level balance. Its
+    /// gains come from all of the audio, so a cut mixes the kept tracks again.
+    var levelBalanced = false
 }
 
 /// The format `buildRecording` should expect the app track to arrive in, passed

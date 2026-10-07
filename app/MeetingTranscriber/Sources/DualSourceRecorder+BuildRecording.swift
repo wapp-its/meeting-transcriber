@@ -224,6 +224,7 @@ extension DualSourceRecorder {
             micPath: micPath,
             micDelay: normalisation.reportedDelay,
             recordingStartDate: recordingStartDate,
+            levelBalanced: levelBalance && appPath != nil && micPath != nil,
         )
     }
 }

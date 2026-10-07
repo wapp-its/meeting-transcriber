@@ -77,9 +77,11 @@ final class BuildRecordingLevelBalanceTests: XCTestCase {
     }
 
     func testTheFlagBringsBothSidesOfTheMixWithinSixDecibels() throws {
-        let mix = try AudioMixer.loadAudioFileAsFloat32(url: build(levelBalance: true).mixPath)
+        let result = try build(levelBalance: true)
+        let mix = try AudioMixer.loadAudioFileAsFloat32(url: result.mixPath)
 
         XCTAssertLessThanOrEqual(abs(Fixture.gap(in: mix)), 6)
+        XCTAssertTrue(result.levelBalanced, "reported, so a cut makes the mix again")
     }
 
     func testTheTrackFilesAreByteIdenticalWithTheFlagOnAndOff() throws {
@@ -98,6 +100,7 @@ final class BuildRecordingLevelBalanceTests: XCTestCase {
     /// written, then the average, through the same 16-bit file round trip.
     func testWithoutTheFlagTheMixIsTodaysMixer() throws {
         let result = try build(levelBalance: false)
+        XCTAssertFalse(result.levelBalanced)
 
         let app = try AudioMixer.loadAudioFileAsFloat32(url: XCTUnwrap(result.appPath))
         var mic = try AudioMixer.loadAudioFileAsFloat32(url: XCTUnwrap(result.micPath))

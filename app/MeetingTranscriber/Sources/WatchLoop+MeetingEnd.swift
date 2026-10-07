@@ -78,6 +78,9 @@ extension WatchLoop {
     /// the audio's own timeline (`RecordingCut.keptSeconds`). A failed cut
     /// returns the recording uncut, never lost: as recorded, or, when an
     /// original could not be put back on its path, pointing at it where it is.
+    /// A balanced mix is then made again from the cut tracks, since its gains
+    /// were measured on the audio the cut threw away; a failed remix keeps the
+    /// cut mix.
     func cutBack(_ recording: RecordingResult, to cutAt: Date, startedAt: Date, stoppedAt: Date) -> RecordingResult {
         let seconds = RecordingCut.keptSeconds(
             cutAt: cutAt,
@@ -97,6 +100,14 @@ extension WatchLoop {
             return recording
         }
         diagnostics.notice("recording_cut kept_s=\(Int(seconds.rounded()))")
+        if recording.levelBalanced {
+            do {
+                try RecordingCut.remixBalanced(recording)
+            } catch {
+                let nsError = error as NSError
+                diagnostics.warning("recording_cut_remix_failed domain=\(nsError.domain) code=\(nsError.code)")
+            }
+        }
         // The cut point itself, moved onto the recorder's clock. Not the start
         // plus `seconds`: that is audio kept, which runs from the audio's first
         // frame, and that frame can predate the recorder's start date.
