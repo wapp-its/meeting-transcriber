@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-1-request-permissions",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-10-07T04:02:01.686843Z",
+  "completion_reviewed_at": "2026-10-07T05:26:05.642258Z",
   "created_at": "2026-10-06T20:15:55.044894Z",
   "default_impl": null,
   "default_review": null,
@@ -228,13 +228,48 @@
       "timestamp": "2026-10-07T04:02:01.648870Z",
       "tool_calls": 35,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "c012df9a80ddc98591a8ee6dab7fa99bf5aa5518d71ddf10dd868b0e8e644696",
+      "backend": "codex",
+      "base_sha": "950e9f92e8fc56bcaa68276e3ed09d59c597d6c2",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "077a26064197b642ac89740d02047809a3ac6d4e",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 6341,
+      "output_sha256": "7c62532eff7ba373b303bd8413c2e6a28eccae24aa446fab9cfc7e036afe8330",
+      "reservation_id": "5ad98e4cbde440e391fb5481ea174e1b",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-07T05:26:05.625321Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-1-request-permissions-from-settings.1": 1,
     "impl:gh-1-request-permissions-from-settings.2": 1,
     "plan": 2,
-    "plan#completion": 1
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -260,5 +295,5 @@
     "mergeBaseTracker": "## Problem\n\nUnter **Settings \u2192 Advanced \u2192 Permissions** f\u00fchrt \u201eOpen Settings\" zur richtigen Seite der macOS-Systemeinstellungen \u2014 die App steht dort aber noch nicht in der Liste. macOS tr\u00e4gt sie erst ein, wenn sie die Berechtigung einmal angefragt hat, und das passiert heute erst beim ersten Meeting bzw. der ersten Aufnahme (`Permissions.swift`: Bildschirmaufnahme beim Start der Meeting-Erkennung, Mikrofon \u201eWill prompt on first recording\"). Wer die App vorab einrichten will, muss erst ein Meeting starten.\n\n## Wunsch\n\nPro Berechtigung (Bildschirmaufnahme, Mikrofon, Bedienungshilfen) ein Knopf **\u201eAnfragen und Systemeinstellungen \u00f6ffnen\"**, der\n\n1. die Berechtigung anfragt \u2014 `CGRequestScreenCaptureAccess()`, `AVCaptureDevice.requestAccess(for: .audio)`, `AXIsProcessTrustedWithOptions` mit Prompt \u2014 und die App damit in der Liste eintr\u00e4gt,\n2. danach die passende Seite \u00f6ffnet (die Links gibt es schon: `PrivacyPane` in `AdvancedSettingsView.swift`).\n\nOptional dasselbe als Schritt beim ersten Start.\n\n## Hinweise\n\n- Bildschirmaufnahme wirkt erst nach einem Neustart der App \u2014 im UI darauf hinweisen.\n- `ensureScreenRecordingAccess()` fragt pro Sitzung nur einmal (`claimFirst`); der Knopf braucht einen eigenen, bewusst ausgel\u00f6sten Weg.\n\n## Abnahme\n\n- Frische Installation, noch kein Meeting: Knopf klicken \u2192 die App erscheint in der jeweiligen Liste der Systemeinstellungen und l\u00e4sst sich dort einschalten.\n- Bereits erteilte Berechtigung: Knopf \u00f6ffnet nur die Seite, kein zus\u00e4tzlicher Dialog.\n\nKandidat f\u00fcrs Original (eigener `feat/\u2026`-Branch).",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/1"
   },
-  "updated_at": "2026-10-07T04:38:21.031155Z"
+  "updated_at": "2026-10-07T05:26:05.643129Z"
 }
