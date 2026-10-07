@@ -106,6 +106,8 @@ mkdir -p /private/tmp/mt-gh-1-home && cd app/MeetingTranscriber && CFFIXED_USER_
 
 Maintainability (plan review): duplication - the new deliberate Screen Recording request repeats the preflight/request sequence of the watch-start request, deliberately (D4), advisory only; structure - none identified
 
+FIT: GO · 2026-10-07 · base 3c0e66d4 · engine flow-next 8.1.0 · no FIT receipt before; since plan review 2026-10-06 the files the spec names, the other specs and the design docs are unchanged, cited file:line claims still hold
+
 ## Requirement coverage
 
 | Req | Description | Task(s) | Gap justification |
