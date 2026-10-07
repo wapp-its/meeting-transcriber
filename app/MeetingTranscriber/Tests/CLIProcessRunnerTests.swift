@@ -196,6 +196,32 @@
             XCTAssertLessThan(Date().timeIntervalSince(start), 2, "a fresh run was held up after the runs")
         }
 
+        /// Nothing of a run may outlive it: once `run` has returned, the
+        /// request, and with it the transcript it carries, is released, also
+        /// when the program could not be started or was stopped at the
+        /// timeout. The input's deallocator reports the release.
+        func testRunReleasesItsRequestOnceItHasEnded() async throws {
+            let cases = try [
+                ("cannot start", scratch.appendingPathComponent("no-such-program"), TimeInterval(10)),
+                ("exits", makeProgram("cat > /dev/null"), TimeInterval(10)),
+                ("times out", makeProgram("trap '' TERM\nsleep 30"), TimeInterval(1)),
+            ]
+            for (name, program, timeout) in cases {
+                let released = expectation(description: "\(name): the request was released")
+                do {
+                    let count = 4096
+                    let bytes = UnsafeMutableRawPointer.allocate(byteCount: count, alignment: 1)
+                    bytes.initializeMemory(as: UInt8.self, repeating: 0, count: count)
+                    let input = Data(bytesNoCopy: bytes, count: count, deallocator: .custom { pointer, _ in
+                        pointer.deallocate()
+                        released.fulfill()
+                    })
+                    _ = try? await CLIProcessRunner.run(request(program, input: input, timeout: timeout))
+                }
+                await fulfillment(of: [released], timeout: 2)
+            }
+        }
+
         // MARK: - Helpers
 
         private func makeProgram(_ body: String) throws -> URL {

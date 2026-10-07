@@ -328,7 +328,6 @@
             // MARK: - Exit, deadline, end
 
             private func programExited(status: Int32) {
-                process.terminationHandler = nil
                 guard result == nil else { return }
                 exitStatus = status
                 if stdoutAtEnd, stderrAtEnd {
@@ -371,13 +370,16 @@
                 timer.resume()
             }
 
-            /// Records the outcome and cancels every timer and pipe source;
-            /// the caller is resumed once the last source has closed its
-            /// descriptor.
+            /// Records the outcome, drops the termination handler (which holds
+            /// this run, and with it the request, until the program exits, or
+            /// for good when it never started) and cancels every timer and
+            /// pipe source; the caller is resumed once the last source has
+            /// closed its descriptor.
             private func finish(_ outcome: Result<Output, Failure>) {
                 dispatchPrecondition(condition: .onQueue(queue))
                 guard result == nil else { return }
                 result = outcome
+                process.terminationHandler = nil
                 timers.forEach { $0.cancel() }
                 timers.removeAll()
                 sources.values.forEach { $0.cancel() }
