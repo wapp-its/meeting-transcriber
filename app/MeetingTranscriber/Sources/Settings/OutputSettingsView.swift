@@ -88,6 +88,7 @@ struct OutputSettingsView: View {
                         Text(provider.label).tag(provider)
                     }
                 }
+                .accessibilityIdentifier(A11yID.protocolProviderPicker)
 
                 providerConfigView
 
@@ -139,14 +140,10 @@ struct OutputSettingsView: View {
                     .foregroundStyle(.secondary)
 
             case .codexCLI:
-                Text("Configured in the next step.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                CodexProviderSettingsView()
 
             case .customCommand:
-                Text("Configured in the next step.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                CustomCommandSettingsView(settings: settings)
         #endif
 
         case .openAICompatible:
