@@ -1,7 +1,7 @@
 {
   "branch_name": "fix/gh-44-mic-restart-loop",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-10-06T22:32:15.183651Z",
+  "completion_reviewed_at": "2026-10-07T00:47:41.808856Z",
   "created_at": "2026-10-06T20:19:59.489371Z",
   "default_impl": null,
   "default_review": null,
@@ -248,6 +248,41 @@
       "timestamp": "2026-10-06T22:32:15.151358Z",
       "tool_calls": 21,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "873d9b0ecf0680d45e44f63b35fca3b0cc4b3bded6985d042697505b34813645",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "3c00a63a5ceb664e819281e31b51427ac3eb9c56",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 5608,
+      "output_sha256": "372f0d6c1b693d4e8d3a9d60f7a1c430058ef71efb3068e7f9e456d5a82ed435",
+      "reservation_id": "273c6abae3194a758022e818a447da03",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-07T00:47:41.768842Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -255,7 +290,7 @@
     "impl:gh-44-stop-the-microphone-restart-loop-on-a.2": 1,
     "impl:gh-44-stop-the-microphone-restart-loop-on-a.3": 1,
     "plan": 2,
-    "plan#completion": 1
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -282,5 +317,5 @@
     "mergeBaseTracker": "## Was passiert ist (2026-10-06, Teams-Meeting, ~10 min)\n\nSettings \u2192 Audio \u2192 Microphone fest auf ein USB-Headset (Funk-Headset \u00fcber USB-Dongle) gestellt; \u201eSystem Default\u201c war das eingebaute MacBook-Mikrofon.\n\n| Zeit | Log / Messung |\n|---|---|\n| 08:59:52 | R\u00fcckfrage \u201eRecord \u2026 meeting?\u201c erscheint; nach \u201eRecord\u201c startet die Aufnahme |\n| 09:00:02 | Aufnahme mit mic+app; erste Pr\u00fcfung: Mikrofon liefert Puffer **mit Energie** (`lastEnergy=0.1s`) |\n| ~09:01:32 | Mikrofon liefert **keine Puffer mehr** |\n| 09:03:02 | `Channel fault: channel=mic fault=noBuffers`, Mitteilung an den Nutzer; **kein Neustart der Mikrofon-Aufnahme** im Log |\n| Ergebnis | Mikrofonspur 3,4 min lang, **100 % exakte Nullen**; App-Spur 9,8 min normal (\u221216 bis \u221225 dBFS) |\n\nDie eigene Stimme fehlt damit im ganzen Meeting. Ein Wechsel des Mikrofons in den Einstellungen w\u00e4hrend der Aufnahme wirkt erst bei der n\u00e4chsten Aufnahme.\n\n## Vermutete Ursachen (zu belegen)\n\n1. **Formatumwandlung schreibt Stille:** Energie kam an, die Datei enth\u00e4lt nur Nullen. Verdacht auf den Pfad `MicChannelMap` / `MicConverterFactory` (implizites Downmix/Resampling) f\u00fcr das Format dieses Ger\u00e4ts.\n2. **Ger\u00e4t wechselt den Modus, wenn die Meeting-App es \u00fcbernimmt** (Anruf-Profil/andere Abtastrate), die Eingabe-Engine bekommt danach keine Puffer mehr, und kein Neustart greift.\n3. Ein Wechsel des Mikrofons w\u00e4hrend der Aufnahme wird nicht \u00fcbernommen.\n\n## N\u00e4chste Schritte\n\n- Ausf\u00fchrliche Audio-Diagnose einschalten (Settings \u2192 Diagnostics \u2192 Verbose Audio Logging) und eine kurze Testaufnahme \u201eRecord Microphone\u201c mit dem Headset machen, einmal ohne und einmal mit laufendem Teams-Anruf; Format (`hwRate`, `hwChannels`) und Pegel aus dem Log lesen.\n- Je nach Befund: Umwandlung reparieren; bei `noBuffers` die Mikrofon-Aufnahme neu starten (wie bei Ger\u00e4tewechseln); Mikrofonwechsel w\u00e4hrend der Aufnahme \u00fcbernehmen.\n\nBezug: #4 (eigene Stimme zu leise), #43 (Mikrofon der Meeting-App \u00fcbernehmen).",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/44"
   },
-  "updated_at": "2026-10-06T22:49:25.868277Z"
+  "updated_at": "2026-10-07T00:47:41.810471Z"
 }
