@@ -14,13 +14,17 @@ import Foundation
 /// below −90 dBFS (digital silence, gated stretches, alignment padding) are
 /// ignored. The noise floor is the 10th percentile of the remaining frames, and
 /// a frame is speech when it reaches the larger of −60 dBFS and noise floor
-/// + 10 dB. The level is the power mean of the speech frames. Not the peak and
-/// not a whole-file RMS: both move with how much of the track is speech, and
-/// this does not; a track measures the same whether speech fills half of it or
-/// a twentieth. Less speech than the minimum (5 s for
-/// a track, 0.5 s for a naming sample) is not measurable, and such a track
-/// keeps its recorded level. Energy-based: typing near a built-in microphone
-/// can be taken for speech and raised with it; the switch turns balancing off.
+/// + 10 dB. Given a non-empty `noiseReference`, the noise floor comes from its
+/// frames instead: a naming sample passes the whole file it is cut from,
+/// because a diarized sample can be speech from start to end, and its own 10th
+/// percentile would then sit inside the speech. The level is the power mean of
+/// the speech frames. Not the peak and not a whole-file RMS: both move with how
+/// much of the track is speech, and this does not; a track measures the same
+/// whether speech fills half of it or a twentieth. Less speech than the
+/// minimum (5 s for a track, 0.5 s for a naming sample) is not measurable, and
+/// such a track keeps its recorded level. Energy-based: typing near a built-in
+/// microphone can be taken for speech and raised with it; the switch turns
+/// balancing off.
 ///
 /// **Gain.** Target −20 dBFS, boost capped at +24 dB so the noise of a nearly
 /// silent track is not pumped up without bound, no lower bound because a cut
@@ -70,15 +74,19 @@ enum LevelBalance {
         fileprivate let speechFrames: [Int]
     }
 
-    static func measure(_ samples: [Float], sampleRate: Int, minimumSpeechSeconds: Double) -> Measurement {
+    static func measure(
+        _ samples: [Float],
+        sampleRate: Int,
+        minimumSpeechSeconds: Double,
+        noiseReference: [Float] = [],
+    ) -> Measurement {
         let frameLength = Int((Double(sampleRate) * frameSeconds).rounded())
         let unmeasurable = Measurement(speechLevelDBFS: nil, frameLength: frameLength, speechFrames: [])
         guard frameLength > 0 else { return unmeasurable }
 
-        let levels = (0 ..< samples.count / frameLength).map { frame in
-            Double(AudioMixer.rmsDecibels(samples: samples[frame * frameLength ..< (frame + 1) * frameLength]))
-        }
-        let audible = levels.filter { $0 > silenceFloorDBFS }.sorted()
+        let levels = frameLevels(samples, frameLength: frameLength)
+        let referenceLevels = noiseReference.isEmpty ? levels : frameLevels(noiseReference, frameLength: frameLength)
+        let audible = referenceLevels.filter { $0 > silenceFloorDBFS }.sorted()
         guard !audible.isEmpty else { return unmeasurable }
 
         let noiseFloor = audible[min(audible.count - 1, Int(Double(audible.count) * noiseFloorPercentile))]
@@ -89,6 +97,13 @@ enum LevelBalance {
 
         let meanSquare = speechFrames.reduce(0.0) { $0 + pow(10, levels[$1] / 10) } / Double(speechFrames.count)
         return Measurement(speechLevelDBFS: 10 * log10(meanSquare), frameLength: frameLength, speechFrames: speechFrames)
+    }
+
+    /// RMS in dBFS of each whole `frameLength` frame of `samples`.
+    private static func frameLevels(_ samples: [Float], frameLength: Int) -> [Double] {
+        (0 ..< samples.count / frameLength).map { frame in
+            Double(AudioMixer.rmsDecibels(samples: samples[frame * frameLength ..< (frame + 1) * frameLength]))
+        }
     }
 
     /// The gain `measurement` calls for, with both limits applied.
@@ -106,8 +121,15 @@ enum LevelBalance {
 
     /// Measures `samples`, applies the gain in place and clamps every sample
     /// to ±1.0.
-    static func balance(_ samples: inout [Float], sampleRate: Int, minimumSpeechSeconds: Double) -> Outcome {
-        let measurement = measure(samples, sampleRate: sampleRate, minimumSpeechSeconds: minimumSpeechSeconds)
+    static func balance(
+        _ samples: inout [Float],
+        sampleRate: Int,
+        minimumSpeechSeconds: Double,
+        noiseReference: [Float] = [],
+    ) -> Outcome {
+        let measurement = measure(
+            samples, sampleRate: sampleRate, minimumSpeechSeconds: minimumSpeechSeconds, noiseReference: noiseReference,
+        )
         let outcome = gain(for: measurement, in: samples)
         let factor = Float(pow(10, outcome.gainDB / 20))
         for index in samples.indices {

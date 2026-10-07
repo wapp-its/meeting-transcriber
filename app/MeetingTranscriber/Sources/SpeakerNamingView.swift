@@ -632,10 +632,12 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
     /// With `balanced`, the cut is brought to `LevelBalance.targetDBFS`
     /// speech level on its own, under the same boost cap and clip rules as the
     /// mix, so an own-voice and a far-end sample play at a similar loudness.
-    /// It is measured alone rather than given its track's gain because a
-    /// microphone track on loudspeakers carries the far end too. A cut with
-    /// less than `LevelBalance.sampleMinimumSpeechSeconds` of measurable
-    /// speech plays as it is.
+    /// Its speech level is measured on the cut alone rather than given its
+    /// track's gain, because a microphone track on loudspeakers carries the far
+    /// end too; which frames count as speech is judged against the noise floor
+    /// of the whole file, because the cut can be speech from start to end. A
+    /// cut with less than `LevelBalance.sampleMinimumSpeechSeconds` of
+    /// measurable speech plays as it is.
     nonisolated static func playbackSnippet(
         of samples: [Float],
         range: Range<Int>,
@@ -646,6 +648,7 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
         if balanced {
             _ = LevelBalance.balance(
                 &snippet, sampleRate: sampleRate, minimumSpeechSeconds: LevelBalance.sampleMinimumSpeechSeconds,
+                noiseReference: samples,
             )
         }
         return snippet

@@ -137,6 +137,24 @@ final class LevelBalanceTests: XCTestCase {
         }
     }
 
+    /// A naming sample cut from inside speech has no pause of its own, so
+    /// alone its noise floor is its speech and no frame clears the margin.
+    /// Judged against the noise floor of the track it is cut from, whose
+    /// pauses carry the room tone, it is speech and reaches the target.
+    func testAnAllSpeechSampleIsMeasuredAgainstTheNoiseFloorOfItsTrack() {
+        var track = Signal.noise(dBFS: -70, seconds: 10, seed: 5)
+        Signal.place(Signal.tone(dBFS: -40, seconds: 1.5), in: &track, at: 4)
+        let sample = Array(track[Signal.sampleIndex(at: 4) ..< Signal.sampleIndex(at: 5.5)])
+
+        var alone = sample
+        let outcome = LevelBalance.balance(&alone, sampleRate: rate, minimumSpeechSeconds: sampleMinimum)
+        XCTAssertEqual(outcome, Outcome(speechLevelDBFS: nil, gainDB: 0, limit: nil), "unmeasurable alone")
+
+        var balanced = sample
+        _ = LevelBalance.balance(&balanced, sampleRate: rate, minimumSpeechSeconds: sampleMinimum, noiseReference: track)
+        XCTAssertEqual(Double(AudioMixer.rmsDecibels(samples: balanced)), LevelBalance.targetDBFS, accuracy: 1)
+    }
+
     // MARK: - Gain
 
     func testTheGainReachesTheTargetStopsAtTheBoostCapAndCutsWithoutBound() {
