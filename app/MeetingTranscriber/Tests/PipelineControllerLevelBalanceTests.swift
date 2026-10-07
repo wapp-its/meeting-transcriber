@@ -2,9 +2,10 @@
 import XCTest
 
 /// Crash recovery at launch balances a rebuilt mix with the switch's value at
-/// that launch. The recovery runs from the staging-recovery callback of each
-/// queue the controller builds, so the controller has to hand the setting over
-/// when it builds one. What the production callback does with it is pinned in
+/// that launch. The recovery runs from the staging-recovery callback each time
+/// the controller rebuilds and installs a queue (building one alone runs no
+/// recovery), so the controller has to hand the setting over at that rebuild.
+/// What the production callback does with it is pinned in
 /// `StagedRecoveryFolderTests` and `DualSourceRecorderCrashRecoveryTests`.
 @MainActor
 final class PipelineControllerLevelBalanceTests: XCTestCase {
@@ -41,9 +42,9 @@ final class PipelineControllerLevelBalanceTests: XCTestCase {
 
         for enabled in [true, false] {
             settings.levelBalanceEnabled = enabled
-            _ = pc.makeQueue()
+            pc.rebuild()
         }
 
-        XCTAssertEqual(handed.flags, [true, false], "read when the queue is built, not when the controller was")
+        XCTAssertEqual(handed.flags, [true, false], "read when the queue is rebuilt, not when the controller was")
     }
 }

@@ -69,7 +69,9 @@ final class PipelineControllerOutputFolderTests: XCTestCase {
         }
     }
 
-    private func makeController(_ recorder: Recorder) throws -> PipelineController {
+    private func makeController(
+        _ recorder: Recorder, queue: PipelineQueue? = nil,
+    ) throws -> PipelineController {
         let staging = tmpDir.appendingPathComponent("staging", isDirectory: true)
         let logDir = tmpDir.appendingPathComponent("log", isDirectory: true)
         for dir in [staging, logDir] {
@@ -89,6 +91,7 @@ final class PipelineControllerOutputFolderTests: XCTestCase {
                     recorder.resolved.append(url)
                     return url
                 },
+                initialQueue: queue,
             ),
         )
         pc.activate { MockEngine() }
@@ -193,8 +196,8 @@ final class PipelineControllerOutputFolderTests: XCTestCase {
         XCTAssertTrue(samePath(pc.queue.outputDir, second), "the deferred rebuild never happened")
     }
 
-    /// A queue the controller did not build (a test injects one through
-    /// `queue`) is not the controller's to replace. Replacing it would swap in a
+    /// A queue the controller did not build (a test passes one at
+    /// construction) is not the controller's to replace. Replacing it would swap in a
     /// queue with the production engine, logs and snapshot, which is what the
     /// injection was there to keep out.
     func testAFolderChangeLeavesAnInjectedQueueAlone() async throws {
@@ -202,7 +205,6 @@ final class PipelineControllerOutputFolderTests: XCTestCase {
         let second = try makeFolder("second")
         settings.setCustomOutputDir(first)
         let recorder = Recorder()
-        let pc = try makeController(recorder)
         let injected = PipelineQueue(
             engine: MockEngine(),
             diarizationFactory: { MockDiarization() },
@@ -210,7 +212,10 @@ final class PipelineControllerOutputFolderTests: XCTestCase {
             outputDir: first,
             logDir: tmpDir.appendingPathComponent("log", isDirectory: true),
         )
-        pc.queue = injected
+        // Through the environment, so the controller never holds a queue the
+        // test did not choose. An initial queue is foreign either way: only
+        // `rebuild()` records one as built here.
+        let pc = try makeController(recorder, queue: injected)
 
         settings.setCustomOutputDir(second)
         await settleWithoutRebuild()
@@ -332,10 +337,40 @@ final class PipelineControllerOutputFolderTests: XCTestCase {
         )
     }
 
-    /// `makeQueue()` is also called for its return value alone, by tests and by
-    /// anything that wants a configured queue without installing it. It used to
-    /// record "this is the queue I built, from this bookmark" itself, so such a
-    /// call left the record pointing at a throwaway that died immediately. The
+    /// Building a queue only builds it. It used to load the snapshot, run the
+    /// staging recovery and refresh the known names as well, so a caller that
+    /// wanted a configured queue to look at got one that had already read the
+    /// job list, written the snapshot file back and triggered processing — on a
+    /// queue nobody installed and that died immediately.
+    ///
+    /// Not asserted on the file's bytes: `saveSnapshot` hands the write to a
+    /// detached task, so a synchronous read in the same turn cannot see it and
+    /// such an assertion would hold whether the snapshot was read or not.
+    func testBuildingAQueueReadsNoSnapshotAndRunsNoRecovery() throws {
+        let recorder = Recorder()
+        let pc = try makeController(recorder)
+        // The audio has to exist, or the restore discards the job for missing
+        // audio and an assertion on "no jobs" would hold whether the snapshot
+        // was read or not.
+        let mixPath = tmpDir.appendingPathComponent("mix.wav")
+        try Data([0]).write(to: mixPath)
+        var job = PipelineJob(
+            meetingTitle: "Interrupted", appName: "App",
+            mixPath: mixPath, appPath: nil, micPath: nil, micDelay: 0,
+        )
+        job.state = .error
+        try PipelineSnapshot.save([job], to: tmpDir.appendingPathComponent("log", isDirectory: true))
+
+        let built = try XCTUnwrap(pc.makeQueue())
+
+        XCTAssertTrue(built.jobs.isEmpty, "the snapshot was read")
+        XCTAssertEqual(recorder.recoveries, 0, "the staging recovery ran")
+    }
+
+    /// Building a queue is also done for the return value alone, by tests and by
+    /// anything that wants a configured queue without installing it. The
+    /// bookkeeping used to be recorded at build time, so such a call left the
+    /// record pointing at a throwaway that died immediately. The
     /// folder-change rebuild then never fired again for the rest of the session,
     /// while the bookmark it compares against had already advanced: a silent
     /// stop, with every job after it landing in the old folder.
