@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-12-hf-token",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-07T00:36:29.465897Z",
   "created_at": "2026-10-06T20:23:47.392025Z",
   "default_impl": null,
   "default_review": null,
@@ -350,6 +350,42 @@
       "task": "gh-12-hugging-face-token-in-settings.3",
       "timestamp": "2026-10-07T00:22:50.076482Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "788a58f30c6861fbc25e079ccf9872fc3923d1a6f5b0cac505499062d76361d1",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "86e7a54617da41a746dd60afeca70aff4c3f61e4",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 711927,
+      "output_sha256": "633a9aeb12c2737bb028c054f1c539ac88fb77f779c75e3e53f2c4d27bf843ed",
+      "reservation_id": "47b0618908c141c09e9d46750f103ae5",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-07T00:36:29.219375Z",
+      "tool_calls": 40,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -357,12 +393,13 @@
     "impl:gh-12-hugging-face-token-in-settings.2": 1,
     "impl:gh-12-hugging-face-token-in-settings.3": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-12-hugging-face-token-in-settings.1": 0,
     "impl:gh-12-hugging-face-token-in-settings.2": 0,
     "impl:gh-12-hugging-face-token-in-settings.3": 0,
@@ -383,5 +420,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/12"
   },
-  "updated_at": "2026-10-07T00:22:50.103905Z"
+  "updated_at": "2026-10-07T00:36:29.471342Z"
 }
