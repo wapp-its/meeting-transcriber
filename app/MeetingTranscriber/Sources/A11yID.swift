@@ -77,6 +77,14 @@ enum A11yID {
     static let experimentalTuningDisclosure = "experimentalTuningDisclosure"
     static let speakerCapHint = "speaker-cap-hint"
 
+    /// One permission row's request button in Settings → Advanced → Permissions.
+    static func permissionRequestButton(_ kind: PermissionKind) -> String {
+        "permissionRequestButton.\(kind.rawValue)"
+    }
+
+    /// The note under the Screen Recording row, shown only while it is not granted.
+    static let screenRecordingRestartNote = "screenRecordingRestartNote"
+
     /// Mic speaker-name field (Settings → Speakers). The `/ui/type` allowlist's
     /// only entry: a plain, non-secret text field whose write-back is readable in
     /// `/state`, which is what makes it a usable text-entry probe.

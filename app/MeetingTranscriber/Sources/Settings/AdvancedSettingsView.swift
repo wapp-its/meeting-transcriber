@@ -7,18 +7,11 @@ import SwiftUI
 
 private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "AdvancedSettingsView")
 
-private enum PrivacyPane: String {
-    case screenCapture = "Privacy_ScreenCapture"
-    case microphone = "Privacy_Microphone"
-    case accessibility = "Privacy_Accessibility"
-
-    var url: String {
-        "x-apple.systempreferences:com.apple.preference.security?\(rawValue)"
-    }
-}
-
 struct AdvancedSettingsView: View {
     @Bindable var settings: AppSettings
+    /// Runs one permission row's button. Injected so a test never raises a
+    /// TCC prompt or opens System Settings.
+    var requestAccess: @MainActor (PermissionKind) async -> Void = { await PermissionAccessRequester.live.run($0) }
 
     @State private var micPermission: AVAuthorizationStatus = .notDetermined
     @State private var screenRecordingOK = false
@@ -33,38 +26,7 @@ struct AdvancedSettingsView: View {
     var body: some View {
         // swiftlint:disable:next closure_body_length
         Form {
-            Section("Permissions") {
-                PermissionRow(
-                    label: "Screen Recording",
-                    detail: Self.screenRecordingDetail,
-                    granted: screenRecordingOK,
-                    help: "\(SystemSettingsPaths.screenRecording) → enable Meeting Transcriber",
-                    settingsURL: PrivacyPane.screenCapture.url,
-                )
-                PermissionRow(
-                    label: "Microphone",
-                    detail: micPermission == .authorized ? "Granted"
-                        : micPermission == .notDetermined ? "Will prompt on first recording"
-                        : "Denied — click to open Settings",
-                    granted: micPermission == .authorized,
-                    warning: micPermission == .notDetermined,
-                    help: "System Settings → Privacy & Security → Microphone → enable Meeting Transcriber",
-                    settingsURL: PrivacyPane.microphone.url,
-                )
-                PermissionRow(
-                    label: "Accessibility",
-                    detail: "Optional — enables mute detection and meeting naming",
-                    granted: accessibilityOK,
-                    optional: true,
-                    help: "System Settings → Privacy & Security → Accessibility → enable Meeting Transcriber",
-                    settingsURL: PrivacyPane.accessibility.url,
-                )
-
-                Button("Refresh") {
-                    refreshPermissions()
-                }
-                .font(.caption)
-            }
+            permissionsSection
 
             // swiftlint:disable:next closure_body_length
             Section("Diagnostics") {
@@ -127,6 +89,66 @@ struct AdvancedSettingsView: View {
         }
         .formStyle(.grouped)
         .onAppear { refreshPermissions() }
+    }
+
+    /// A named property rather than inline in `body`, which is already among
+    /// the slowest bodies to type-check against the 300 ms limit CI enforces.
+    private var permissionsSection: some View {
+        // swiftlint:disable:next closure_body_length
+        Section("Permissions") {
+            PermissionRow(
+                label: "Screen Recording",
+                detail: Self.screenRecordingDetail,
+                granted: screenRecordingOK,
+                help: "\(SystemSettingsPaths.screenRecording) → enable Meeting Transcriber",
+                action: requestAction(.screenRecording, state: screenRecordingOK ? .granted : .notGranted),
+            )
+            if !screenRecordingOK {
+                Text("Screen Recording takes effect only after you quit and reopen Meeting Transcriber.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier(A11yID.screenRecordingRestartNote)
+            }
+            PermissionRow(
+                label: "Microphone",
+                detail: micPermission == .authorized ? "Granted"
+                    : micPermission == .notDetermined ? "Not requested yet"
+                    : "Denied — click to open Settings",
+                granted: micPermission == .authorized,
+                warning: micPermission == .notDetermined,
+                help: "System Settings → Privacy & Security → Microphone → enable Meeting Transcriber",
+                action: requestAction(.microphone, state: PermissionAccessState(microphone: micPermission)),
+            )
+            PermissionRow(
+                label: "Accessibility",
+                detail: "Optional — enables mute detection and meeting naming",
+                granted: accessibilityOK,
+                optional: true,
+                help: "System Settings → Privacy & Security → Accessibility → enable Meeting Transcriber",
+                action: requestAction(.accessibility, state: accessibilityOK ? .granted : .notGranted),
+            )
+
+            Button("Refresh") {
+                refreshPermissions()
+            }
+            .font(.caption)
+        }
+    }
+
+    /// The row's button, titled for what a click does given the status the
+    /// row last read; the click itself asks macOS again before deciding.
+    private func requestAction(_ kind: PermissionKind, state: PermissionAccessState) -> PermissionRow.Action {
+        let step = PermissionAccessStep.decide(
+            kind: kind,
+            state: state,
+            canRequestAccessibility: PermissionAccessRequester.live.canRequestAccessibility,
+        )
+        return PermissionRow.Action(title: step.buttonTitle, identifier: A11yID.permissionRequestButton(kind)) {
+            Task {
+                await requestAccess(kind)
+                refreshPermissions()
+            }
+        }
     }
 
     #if APPSTORE
