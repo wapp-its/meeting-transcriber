@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-1-request-permissions",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-07T04:02:01.686843Z",
   "created_at": "2026-10-06T20:15:55.044894Z",
   "default_impl": null,
   "default_review": null,
@@ -192,18 +192,55 @@
       "task": "gh-1-request-permissions-from-settings.2",
       "timestamp": "2026-10-07T03:50:37.070089Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "4d83cea9c0023e1f18f17f85062fd6895226f99e8bdd3f181f5b9e212fac0fb6",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "e7cef92d5c6ef385901fbde502b8247619b39635",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 490390,
+      "output_sha256": "fc76f3a09ce308660eb090c9abd6cad17cdb278edfc59375b78a5ffe4f10b3be",
+      "reservation_id": "80b5d714bbfc4d27aa0980963d9c298a",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-07T04:02:01.648870Z",
+      "tool_calls": 35,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-1-request-permissions-from-settings.1": 1,
     "impl:gh-1-request-permissions-from-settings.2": 1,
     "plan": 2,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-1-request-permissions-from-settings.1": 0,
     "impl:gh-1-request-permissions-from-settings.2": 0,
     "plan": 0
@@ -223,5 +260,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/1"
   },
-  "updated_at": "2026-10-07T03:50:42.092588Z"
+  "updated_at": "2026-10-07T04:02:01.690107Z"
 }
