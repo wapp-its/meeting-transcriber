@@ -9,7 +9,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-12-hugging-face-token-in-settings",
   "spec_path": ".flow/tasks/gh-12-hugging-face-token-in-settings.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Keychain-backed Hugging Face token and its Settings row",
   "updated_at": "2026-10-06T20:40:50.988628Z"
 }

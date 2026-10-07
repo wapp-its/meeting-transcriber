@@ -137,6 +137,11 @@ final class AppSettings {
     /// specifically, rather than reusing a credential another tool manages.
     @ObservationIgnored private let claudeAPIKeyAccount: String
 
+    /// Keychain item backing `huggingFaceToken`. Production callers pass
+    /// nothing → the account `huggingFaceToken`; tests inject an in-memory or
+    /// failing store, for the reason given at `apiKeyAccount`.
+    @ObservationIgnored let huggingFaceTokenStore: HuggingFaceTokenStore
+
     // MARK: - Apps to Watch
 
     var watchTeams: Bool {
@@ -345,6 +350,19 @@ final class AppSettings {
 
     /// Not persisted: derived from the fields above and the folder's contents.
     var whisperKitCustomModelValidation: WhisperKitCustomModelValidation
+
+    /// What is being typed into the Hugging Face token field. Not persisted and
+    /// never filled from the saved token. Kept here rather than in view state so
+    /// a view test sees what the field writes.
+    var huggingFaceTokenDraft = ""
+
+    /// Whether a Hugging Face token is saved, as last asked of the store. Not
+    /// persisted; false until `refreshHuggingFaceTokenSaved()` asks.
+    var huggingFaceTokenSaved = false
+
+    /// Why the last save or removal of the Hugging Face token failed, nil after
+    /// one succeeds. Not persisted.
+    var huggingFaceTokenProblem: String?
 
     /// Whisper transcription language. Empty string = auto-detect (maps to nil on WhisperKitEngine).
     var whisperLanguage: String {
@@ -635,11 +653,13 @@ final class AppSettings {
         defaults: UserDefaults = .standard,
         apiKeyAccount: String = "openAIAPIKey",
         claudeAPIKeyAccount: String = "claudeAPIKey",
+        huggingFaceTokenStore: HuggingFaceTokenStore = .keychain(account: "huggingFaceToken"),
         defaultOutputDir: URL = AppPaths.downloadsProtocolsDir,
     ) {
         self.defaults = defaults
         self.apiKeyAccount = apiKeyAccount
         self.claudeAPIKeyAccount = claudeAPIKeyAccount
+        self.huggingFaceTokenStore = huggingFaceTokenStore
         self.defaultOutputDir = defaultOutputDir
 
         watchTeams = defaults.object(forKey: "watchTeams") as? Bool ?? true
@@ -742,7 +762,9 @@ final class AppSettings {
         refreshCustomVocabularyValidation()
         refreshWhisperKitCustomModelValidation()
     }
+}
 
+extension AppSettings {
     /// Bag of values used during init to read all 5 tuning knobs in one go.
     /// Keeps the init body under the lint length budget without duplicating
     /// the lookup pattern five times.

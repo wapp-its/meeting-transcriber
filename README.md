@@ -260,6 +260,8 @@ Open Settings via the menu bar item or ⌘,.
 
 Settings → Transcribe → Model → **Custom model…** loads a fine-tuned WhisperKit model instead of a stock one, for example a Swiss German fine-tune. Enter a Hugging Face repository laid out like [`argmaxinc/whisperkit-coreml`](https://huggingface.co/argmaxinc/whisperkit-coreml) (one folder per variant) plus the variant folder name, e.g. `spert/flix-swissgerman-whisperkit` and `flix-swissgerman-large-v3_8bit`; it downloads on first use and loads offline afterwards. Alternatively choose a model folder on disk: it must contain `AudioEncoder.mlmodelc`, `TextDecoder.mlmodelc`, `MelSpectrogram.mlmodelc`, `tokenizer.json` and `tokenizer_config.json`, and is never downloaded. Until a custom model is filled in, the previously selected stock model is used.
 
+A private or gated model needs a Hugging Face token: save it in the optional **Hugging Face token** field below the model picker, which keeps it in the macOS Keychain. With the field empty, WhisperKit models download anonymously, and a token found elsewhere on the Mac (`HF_TOKEN`, `~/.cache/huggingface/token` and the like) is not used.
+
 ---
 
 ## Output

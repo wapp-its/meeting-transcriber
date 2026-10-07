@@ -140,6 +140,8 @@ cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh12-qc/home swift t
 
 Maintainability (plan review): duplication - Task 3 repeated token-error classification in the Hub download and both pipe constructions (now one shared helper); structure - WhisperKitModelSource called WhisperKitLoadFailure.classify, which called back into WhisperKitModelSource.isRejectedToken (now moved onto WhisperKitLoadFailure).
 
+FIT: GO · 2026-10-07 · base 1a406c91 · engine flow-next 8.1.0 · specs planned since the plan review (gh-2, gh-43, gh-46, gh-44 fit, gh-54 close) claim none of this scope; gh-9 depends on this spec and consumes its token accessor, gh-10 keeps a separate token under its own Keychain account; the files tasks .1 to .3 name and the WhisperKit 1.1.0 pin are unchanged between 65888b53 and wapp/main 1a406c91
+
 ## Requirement coverage
 
 | Req | Description | Task(s) | Gap justification |
