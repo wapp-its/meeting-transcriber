@@ -74,6 +74,22 @@ final class EngineSettingsRuntimeSyncTests: XCTestCase {
         XCTAssertEqual(engines.whisperKit.modelVariant, "openai_whisper-small")
     }
 
+    /// The engine asks for the token saved in Settings each time it makes a Hub
+    /// request, so a removed token is no longer sent. The store is in memory, so
+    /// nothing here touches the token saved in the app.
+    func test_whisperKitHubToken_isTheSavedToken() {
+        let fake = HuggingFaceTokenStoreFake()
+        let tokenSettings = AppSettings(defaults: defaults, huggingFaceTokenStore: fake.store)
+        tokenSettings.huggingFaceTokenDraft = "hf_saved"
+        tokenSettings.saveHuggingFaceTokenDraft()
+        let engines = EngineController(settings: tokenSettings)
+        XCTAssertEqual(engines.whisperKit.hubToken(), "hf_saved")
+
+        tokenSettings.removeHuggingFaceToken()
+
+        XCTAssertEqual(engines.whisperKit.hubToken(), "")
+    }
+
     // MARK: - Runtime propagation
 
     func test_runtimeChange_whisperLanguage_propagatesToEngine() async {

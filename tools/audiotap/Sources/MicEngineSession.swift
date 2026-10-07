@@ -40,6 +40,11 @@ protocol MicEngineSessionProviding: AnyObject {
     /// Bring the engine up far enough to report the live hardware format,
     /// pinning `deviceUID` when one is given and still present.
     ///
+    /// A pin that moves the input unit waits up to `MicPinSettle.timeoutSeconds`
+    /// for the configuration change the move causes. By AVFAudio's header the
+    /// engine stops itself when its I/O unit sees the hardware's channel count
+    /// or sample rate change, so that change has to land before `start()`.
+    ///
     /// This is the call that can wedge. Everything after it is cheap.
     func hardwareFormat(deviceUID: String?) throws -> AVAudioFormat
 
@@ -142,7 +147,15 @@ final class MicEngineSession: MicEngineSessionProviding {
 
         let inputNode = engine.inputNode
 
-        pinOutcome = pin(deviceUID: deviceUID, on: inputNode)
+        // Unpinned and unresolved-UID starts never wait: `pin` returns before
+        // any set there, so `pinMovedUnit` is false and the settle returns at
+        // once. Neither does a set that was refused, or one that found the
+        // unit already on the device.
+        let settle = MicPinSettle.run(observing: engine) {
+            let pinned = pin(deviceUID: deviceUID, on: inputNode)
+            pinOutcome = pinned.outcome
+            return MicPinSettle.pinMovedUnit(pinned.outcome, deviceBefore: pinned.deviceBefore)
+        }
         if let line = pinOutcome.logLine {
             // A pin that was refused, or accepted and then not adopted, means
             // the recording is running on a microphone the user did not choose.
@@ -155,6 +168,10 @@ final class MicEngineSession: MicEngineSessionProviding {
             // the note on `logLine`.
             logger.log(level: pinOutcome.level, "\(line, privacy: .public)")
         }
+        if let line = settle.logLine {
+            // Public for the same reason: durations only, no device.
+            logger.notice("\(line, privacy: .public)")
+        }
 
         return inputNode.outputFormat(forBus: 0)
     }
@@ -163,10 +180,18 @@ final class MicEngineSession: MicEngineSessionProviding {
     /// actually is. Asking is the point: `AudioUnitSetProperty` returning
     /// `noErr` says the call was accepted, not that the unit moved, and this is
     /// the one place that difference can still be seen.
-    private func pin(deviceUID: String?, on inputNode: AVAudioInputNode) -> MicDevicePinOutcome {
-        guard let uid = deviceUID else { return .notRequested }
+    ///
+    /// The device the unit was on before the set comes back too, because
+    /// whether the set moved the unit decides whether a configuration change
+    /// is on its way (`MicPinSettle.pinMovedUnit`).
+    private func pin(
+        deviceUID: String?,
+        on inputNode: AVAudioInputNode,
+    ) -> (outcome: MicDevicePinOutcome, deviceBefore: AudioDeviceID?) {
+        guard let uid = deviceUID else { return (.notRequested, nil) }
         var deviceID = Self.deviceIDForUID(uid)
-        guard deviceID != kAudioObjectUnknown else { return .unresolvedUID(uid) }
+        guard deviceID != kAudioObjectUnknown else { return (.unresolvedUID(uid), nil) }
+        let deviceBefore = Self.currentDeviceID(of: inputNode)
         let audioUnit = inputNode.audioUnit! // swiftlint:disable:this force_unwrapping
         let status = AudioUnitSetProperty(
             audioUnit,
@@ -174,10 +199,11 @@ final class MicEngineSession: MicEngineSessionProviding {
             kAudioUnitScope_Global, 0,
             &deviceID, UInt32(MemoryLayout<AudioDeviceID>.size),
         )
-        return .set(
+        let outcome = MicDevicePinOutcome.set(
             uid: uid, requested: deviceID, status: status,
             actual: Self.currentDeviceID(of: inputNode),
         )
+        return (outcome, deviceBefore)
     }
 
     /// The device the unit is currently on. Optional rather than force-unwrapped

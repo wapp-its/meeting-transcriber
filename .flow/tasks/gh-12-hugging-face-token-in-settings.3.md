@@ -60,9 +60,57 @@ Lint: `./scripts/lint.sh` with the pinned tools on `PATH`. Release parity: `./sc
 - [ ] The done summary carries the PR-body behaviour-change note (spec D5) and the stale `CLAUDE.md` follow-up.
 - [ ] `./scripts/lint.sh` (pinned tools) and `./scripts/pre-push.sh --with-appstore` are clean.
 ## Done summary
-TBD
+The token saved in Settings now reaches every WhisperKit Hub request: `EngineController` points the engine's provider at `AppSettings.huggingFaceToken`, read at each request. A load Hugging Face refuses is named in Settings under "Load Model" and in a failed job's error. A request with a token gets "Hugging Face rejected the saved token. ...", one without gets "Hugging Face refused access without a token. ...". Any other failure keeps "WhisperKit model not loaded".
 
+Tier: session (jev-unavailable(no_key)) (model: claude-opus-5-5)
+
+stage: implement - ran (model: claude-opus-5-5; parallel-wave worker in lane/gh-12-hf-token.3, commits 997c977b and 7a966098 integrated by fast-forward, SHAs unchanged)
+stage: impl-review - ran [2026-10-07T00:08Z..2026-10-07T00:22Z] (model: codex gpt-5.6-sol xhigh; round 1 three-draw fan-out, correctness and integration NEEDS_WORK on one P1 finding, contracts SHIP, validator kept it; one fix commit 07c04956; round 2 single re-review SHIP "Prior findings: all fixed", R1 to R6 met; 2 of 8 rounds; receipt /tmp/impl-review-receipt-2258e1b40fef-gh-12-hugging-face-token-in-settings.3.json, attempts a15d1cfe16a04972984745ace5988a06 and 7d327347 recorded in .flow/specs/gh-12-hugging-face-token-in-settings.json)
+stage: plan-sync - skipped(config: planSync.enabled=false)
+
+### Review finding fixed (round 1, P1, R5)
+A load parked in its download when the user switched models, whose owner was then cancelled, wrote its eventual refusal into `lastLoadFailure` after `applyModelVariant` had cleared it, so Settings showed the old model's refusal under the new model's "Load Model". Fix (07c04956): the download `catch` records the failure only while the attempt's snapshotted variant and origin still equal the current selection. Pinned by `WhisperKitEngineSupersededLoadFailureTests` (own file, because `WhisperKitEngineModelSourceTests.swift` is 8 lines under the 600-line cap): red before (`XCTAssertNil failed: "tokenRejected"`), green after. Captured as a bug-track memory entry.
+
+### What changed
+- New `WhisperKitLoadFailure` (`.tokenRejected`, `.tokenRequired`) with the spec's exact messages as `errorDescription`, and `classify(_:tokenSent:)`. The reflected-name match `isRejectedToken` moved here from `WhisperKitModelSource` and is `private`, because `classify` is its only caller.
+- `WhisperKitModelSource.classifyingHubFailure(token:_:)` wraps the variant download and both `makePipe` closures. The token is read once per step and handed to the step, so the token sent and the token judged are the same read.
+- `WhisperKitEngine.lastLoadFailure` is cleared at the start of `performLoad` and when `applyModelVariant` changes the selection; the download `catch` sets it from `error as? WhisperKitLoadFailure` only for the still-selected model. `ensureModel` throws it ahead of `TranscriptionError.modelNotLoaded`. The local-snapshot branch records nothing, because its fallback download makes the same request and reports it.
+- `TranscriptionSettingsView.whisperKitLoadFailureLine` is a red caption in the `.unloaded` case after "Load Model", shown only with WhisperKit selected. New identifier `A11yID.whisperKitLoadFailureMessage`, not on any `/ui/press` or `/ui/type` allowlist.
+- `EngineController.init` sets `whisperKit.hubToken = { [settings] in settings.huggingFaceToken }`.
+- README "Custom WhisperKit models" gains one paragraph naming the token field and the Keychain, and saying that with the field empty models download anonymously and a token in `HF_TOKEN` or `~/.cache/huggingface/token` is not used.
+- Feature route (for the feature map): Settings → Transcription → engine WhisperKit → status area, the new red line under "Load Model" after a refused load.
+
+### Tests (R5 error cases, R3/R4 wiring)
+- `WhisperKitLoadFailureTests` (3): the refusal (`Hub.HubClientError.authorizationRequired`) gives `.tokenRejected` with a token sent and `.tokenRequired` without; `httpStatusCode(401)`, `httpStatusCode(500)`, `fileNotFound`, a `URLError` and an unrelated error give nil either way; each case's `errorDescription` and `localizedDescription` equal the exact spec message. Replaces the two `isRejectedToken` tests removed from `WhisperKitHubTokenTests`.
+- `WhisperKitEngineModelSourceTests` (3 new): a refusal in the download (`.tokenRejected`) or in the pipe (`.tokenRequired`) sets `lastLoadFailure`, leaves `.unloaded`, and makes `transcribeSegments` throw that failure with its message; a model change clears it, and so does a later successful load; a `URLError` download failure leaves it nil and transcription throws `TranscriptionError.modelNotLoaded`.
+- `WhisperKitEngineSupersededLoadFailureTests` (2, from the review fix).
+- `EngineSettingsRuntimeSyncTests.test_whisperKitHubToken_isTheSavedToken`, on an in-memory `HuggingFaceTokenStoreFake`: `EngineController(settings:).whisperKit.hubToken()` returns the saved token, and `""` after `removeHuggingFaceToken()`.
+- `TranscriptionSettingsHuggingFaceTokenTests.testTheLoadFailureLineNamesARefusalForWhisperKitOnly`: the line shows the refused engine's message, is absent for a fresh engine, and absent with Parakeet selected.
+- Mutation check (worker, measured): five breaks applied together (no clear in `performLoad`, no clear in `applyModelVariant`, `ensureModel` always throwing `modelNotLoaded`, no wiring in `EngineController`, no engine check in the view) each failed its own assertion: 4 tests red, 8 failures; files restored and checksum-verified.
+
+### Live test (opt-in, worker, fresh scratch home, rc=0, 3 tests), result lines verbatim
+- `[HFLive] made-up token: error=MeetingTranscriber.WhisperKitLoadFailure.tokenRejected message=Hugging Face rejected the saved token. Check that it is valid and has access to this model, or remove it to download anonymously.`
+- `[HFLive] tokenizer fetch, made-up token: error=MeetingTranscriber.WhisperKitLoadFailure.tokenRejected`
+- `[HFLive] anonymous: variant=openai_whisper-tiny downloaded, tokenizerCachedBefore=false tokenizerLoaded=true with HF_TOKEN set to a made-up OAuth-shaped token`
+The tokenizer-fetch case is one beyond the task's plan: it is the only test that reaches the production `makePipe` wrapping. That it would fail without the change is inferred from task .1's live result (the raw Hub error surfaced there), not measured by a live break.
+
+### Gates (measured)
+- Worker, lane 3 at 7a966098: baseline (task filter) rc=0, 531 tests; after rc=0, 538 tests; live test rc=0 (3 tests); `./scripts/lint.sh` (pinned SwiftFormat 0.63.0, SwiftLint 0.65.1) 0 violations; `./scripts/pre-push.sh --with-appstore` both release builds complete.
+- Review wrapper, lane 3 at 07c04956: focused run `WhisperKitEngineSupersededLoadFailure|WhisperKitEngineModelSource|WhisperKitLoadFailure|TranscriptionSettingsHuggingFaceToken|EngineSettingsRuntimeSync` rc=0 (42 tests); lint 0 violations in 670 files.
+- Conductor, integrated spec branch at 07c04956: serial `--filter "WhisperKitEngineTests/testTranscribe"` rc=0 (2 tests), then `CFFIXED_USER_HOME=/private/tmp/gh12-qc/home swift test --parallel --filter "WhisperKitLoadFailure|WhisperKitEngine|WhisperKitHubToken|WhisperTokenizerCache|EngineSettingsRuntimeSync|TranscriptionSettings|AppSettings|SettingsInteraction|SettingsView|RPC"` rc=0, 540 tests (log /private/tmp/gh12-qc/verify3.log).
+- Not run per task: CI's `swiftlint analyze` (`unused_declaration`), which needs an xcodebuild clean build-for-testing; CI runs it on the PR. `pre-push.sh` was not re-run after the two-line review fix; the conductor runs it once on the final head at quiesce.
+
+### For the PR body (behaviour change, spec D5)
+WhisperKit downloads no longer use a token from `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, `HF_TOKEN_PATH`, `$HF_HOME/token`, `~/.cache/huggingface/token` or `~/.huggingface/token`. Anyone who relied on one saves it in Settings → Transcription → "Hugging Face token" instead. With the field empty, every WhisperKit Hub request is anonymous.
+
+### Follow-ups
+- `CLAUDE.md`, Architecture Notes ("An already-fetched WhisperKit model loads without the Hub"), still says WhisperKit fetches the tokenizer from the Hub itself; the fetch now runs through `HubTokenScopedWhisperKit` with the app's token. Not edited (fork rule).
+- `WhisperKitEngineModelSourceTests.swift` is 8 lines under the strict `file_length` cap of 600; the next test for that class needs a new file (the review fix already started `WhisperKitEngineSupersededLoadFailureTests.swift`).
+- FluidAudio (Parakeet, diarization) still reads only `HF_TOKEN` (spec Boundaries, unchanged).
+
+### Notes
+- The commit messages carry no `Task:` trailer and no spec id (fork rule, enforced by `submit.sh`).
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 997c977bfa65eefa0f266111a35884f59d1ed1e5, 7a966098f6dfb6ef8ce641a651c30ad319aa2ec1, 07c04956999a277674b9ba7ec2af42587abaf7b1
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh12-t3/home swift test --filter "WhisperKitEngineTests/testTranscribe" (worker: serial model pre-fetch; rc=0, 2 tests), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh12-t3/home swift test --parallel --filter "WhisperKitLoadFailure|WhisperKitEngine|WhisperKitHubToken|WhisperTokenizerCache|EngineSettingsRuntimeSync|TranscriptionSettings|AppSettings|SettingsInteraction|SettingsView|RPC" (worker, lane 3 at 7a966098: baseline rc=0 531 tests; after rc=0 538 tests), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh12-t3/live-home MEETINGTRANSCRIBER_HF_LIVE=1 swift test --filter WhisperKitHubTokenLiveTests (worker: rc=0, 3 tests, fresh home, network), PATH="$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH" ./scripts/lint.sh (worker and review wrapper: 0 violations), ./scripts/pre-push.sh --with-appstore (worker at 7a966098: both release builds complete), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh12-rev3/home swift test --parallel --filter "WhisperKitEngineSupersededLoadFailure|WhisperKitEngineModelSource|WhisperKitLoadFailure|TranscriptionSettingsHuggingFaceToken|EngineSettingsRuntimeSync" (review wrapper, lane 3 at 07c04956 after the fix: rc=0, 42 tests), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh12-qc/home swift test --filter "WhisperKitEngineTests/testTranscribe" (conductor, integrated spec branch at 07c04956: rc=0, 2 tests), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh12-qc/home swift test --parallel --filter "WhisperKitLoadFailure|WhisperKitEngine|WhisperKitHubToken|WhisperTokenizerCache|EngineSettingsRuntimeSync|TranscriptionSettings|AppSettings|SettingsInteraction|SettingsView|RPC" (conductor, integrated spec branch at 07c04956: rc=0, 540 tests)
 - PRs:

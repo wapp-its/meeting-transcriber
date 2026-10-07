@@ -10,7 +10,10 @@ private let logger = Logger(subsystem: "com.meetingtranscriber.audiotap", catego
 enum MicRestartTrigger: Equatable {
     /// `kAudioHardwarePropertyDefaultInputDevice` changed.
     case defaultInputChanged
-    /// `AVAudioEngineConfigurationChange` for the running engine.
+    /// `AVAudioEngineConfigurationChange` for the running engine. Paced and
+    /// capped by `MicConfigChangePolicy` (see `+ConfigChange`): a pinned
+    /// headset posted one after every engine start, and restarting on each
+    /// one never let a buffer arrive.
     case configurationChanged
     /// The stall watchdog, with the restart's number in this recording.
     case stall(restart: Int)

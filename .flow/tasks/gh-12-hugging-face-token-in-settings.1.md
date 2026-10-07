@@ -60,9 +60,44 @@ Lint: `./scripts/lint.sh` with SwiftFormat 0.63.0 and SwiftLint 0.65.1 from `scr
 - [ ] The opt-in live test ran once with network under a fresh scratch home: (a) `openai_whisper-tiny` downloaded and loaded with its tokenizer while `HF_TOKEN` held a made-up token and the provider returned `""`; (b) a made-up provider token was refused (`isRejectedToken` true). Its result lines are quoted in the done summary.
 - [ ] `./scripts/lint.sh` (pinned tools) and `./scripts/pre-push.sh --with-appstore` are clean.
 ## Done summary
-TBD
+Every Hugging Face request the WhisperKit path makes now carries the token from a provider on the engine (anonymous `""` by default), so a token left on the Mac is never sent. The variant download gets the token explicitly, a WhisperKit subclass (`HubTokenScopedWhisperKit`) puts a loadable tokenizer in place with that token before WhisperKit can reach its own fetch, and the retry without a token is gone. The spec's early proof point holds: the opt-in live test loads `openai_whisper-tiny` anonymously, tokenizer included, while `HF_TOKEN` holds a made-up OAuth-shaped token, and the same test fails with `authorizationRequired` when a plain `WhisperKit` pipe is swapped back in.
 
+Tier: session (jev-unavailable(no_key)) (model: claude-opus-5-5)
+
+stage: implement - ran (model: claude-opus-5-5; parallel-wave worker in lane/gh-12-hf-token.1, lane commit cb17fb8b integrated by cherry-pick as 0e08e8c3)
+stage: impl-review - ran [2026-10-06T23:33Z..2026-10-06T23:48Z] (model: codex gpt-5.6-sol xhigh; round 1 three-draw fan-out all NEEDS_WORK on one P1 finding, validator kept it; one fix commit; round 2 single re-review SHIP "Prior findings: all fixed"; 2 of 8 rounds; receipt /tmp/impl-review-receipt-68483372840d-gh-12-hugging-face-token-in-settings.1.json, attempts cfe52db88581446a81e9d3c93399fe26 and 747fcddfcb2d412f8312b589cc7ba260 recorded in .flow/specs/gh-12-hugging-face-token-in-settings.json)
+stage: plan-sync - skipped(config: planSync.enabled=false)
+
+### Review finding fixed (round 1, P1)
+A damaged tokenizer in the first search path (the Hub download cache) whose `.metadata` record still named the current commit was never replaced: ArgmaxCore's `snapshot` returns such a file without reading it, so the re-trial failed forever until the user deleted the cache. The spec ("overwriting a broken copy there") and the task's acceptance ("broken copy → fetch and re-trial") cover that scenario. Fix: `WhisperTokenizerCache.removeCachedTokenizer(in:)` removes the three tokenizer files and their download records from the first search path before the fetch (lane commit a84669ca, integrated as 2a238b24), pinned by `WhisperTokenizerCacheTests.testABrokenCopyInTheFirstSearchPathIsRemovedWithItsRecordsBeforeTheFetch` (red before, green after). This supersedes the worker's earlier note that a broken copy with a matching record is not fetched again. Captured as a bug-track memory entry.
+
+### Acceptance criteria
+- `downloadRetryingAnonymously` and its four tests are gone. In `Sources/`, `WhisperKit.download(` passes `token: hubToken()` and no plain `WhisperKit(WhisperKitConfig` pipe remains. Both `makePipe` closures build `HubTokenScopedWhisperKit` (Hub origin `mayFetchTokenizer: true`, picked folder `false`).
+- `WhisperTokenizerCacheTests` (11 tests) covers the repository grid against `ModelUtilities.detectVariant` + `tokenizerNameForVariant` via `@testable import WhisperKit`, the search-path order, and every `ensureLoadable` branch: nothing local (one fetch per token, `""` included), a loadable copy in each of the four paths, a broken copy removed with its records then fetched and re-tried, a fetched copy still failing, a failed fetch, a picked folder without a loadable tokenizer, and the real trial on a malformed `tokenizer.json` and on a cache without `tokenizer_config.json` for both origins.
+- `HubTokenScopedWhisperKit.loadTokenizerIfNeeded` calls `cache.ensureLoadable`, which returns only after a passing trial and throws otherwise, before `super`. `super` is reached directly only when `tokenizer != nil` or a dimension is unknown.
+- `WhisperKitHubTokenTests.testAnEmptyTokenKeepsTheMachinesTokenOut`: `hfToken: nil` picks up the planted `HF_TOKEN`, `hfToken: ""` stays empty.
+- `WhisperKitEngineModelSourceTests.testAnInstalledSourceNeverAsksForTheHubToken` passes; every existing engine, model-source, model-origin and local-snapshot test is green.
+- Opt-in live test (worker, fresh scratch home, rc=0), result lines verbatim: `[HFLive] made-up token: refused=true error=ArgmaxCore.Hub.HubClientError.authorizationRequired` and `[HFLive] anonymous: variant=openai_whisper-tiny downloaded, tokenizerCachedBefore=false tokenizerLoaded=true with HF_TOKEN set to a made-up OAuth-shaped token`.
+
+### Gates (measured)
+- Worker, lane 1 at cb17fb8b: baseline red only on the two WhisperKitEngine model-download tests (environmental race of two parallel downloads into one fresh home); task filter rc=0 (68 tests) after a serial model pre-fetch; spec Quick command plus `WhisperKitLocalSnapshot` rc=0 (88 tests); live test rc=0 (2 tests); `./scripts/lint.sh` (pinned SwiftFormat 0.63.0, SwiftLint 0.65.1) 0 violations; `./scripts/pre-push.sh --with-appstore` passed.
+- Review wrapper, lane 1 at a84669ca: task filter rc=0 (69 tests) under a fresh scratch home; lint 0 violations.
+- Conductor, integrated spec branch at 2a238b24: serial `--filter "WhisperKitEngineTests/testTranscribe"` rc=0 (2 tests), then `CFFIXED_USER_HOME=/private/tmp/gh12-qc/home swift test --parallel --filter "WhisperKitHubToken|WhisperTokenizerCache|WhisperKitEngine|WhisperKitLocalSnapshot|EngineSettingsRuntimeSync"` rc=0, 69 tests (log /private/tmp/gh12-qc/verify1.log).
+- Not run: CI's `swiftlint analyze` (`unused_declaration`), which needs an xcodebuild clean build-for-testing; CI runs it on the PR.
+
+### Findings and deviations
+- A made-up token is refused by the Hub only when OAuth-shaped (`hf_oauth_…`); `hf_madeUpInvalidToken000`, a 37-character `hf_…` token and `notatoken` all get 200 on a public repository (measured with curl and the live test). The live test uses `hf_oauth_` tokens; task .3 needs the same shape for any refused-token test (also in the run notes).
+- `WhisperTokenizerCache` is a struct holding its repository, download base and search paths; `ensureLoadable(token:mayFetch:fetch:trialLoad:)` takes 4 parameters instead of 8 (SwiftLint `function_parameter_count`), with the production fetch and trial as defaults. The static `repository(logitsDim:encoderDim:)` and `searchPaths(repository:modelFolder:tokenizerFolder:)` keep the spec's names.
+- `searchPaths` builds its path-only Hub clients with `hfToken: ""`, so not even the machine's token is read for them.
+- For a picked folder, a tokenizer that does not load is logged (type public, message private) before `folderNotLoadable` replaces the error.
+- The commit messages carry no `Task:` trailer and no spec id, per the fork rule that `submit.sh` enforces.
+
+### Follow-ups
+- `CLAUDE.md` (Architecture Notes, "An already-fetched WhisperKit model loads without the Hub") still says WhisperKit fetches the tokenizer from the Hub itself; the fetch now runs through `HubTokenScopedWhisperKit` with the app's token. Not edited (fork rule).
+- When task .3 moves `isRejectedToken` onto `WhisperKitLoadFailure`, update its callers in `Tests/WhisperKitHubTokenLiveTests.swift` too; that test is skipped in normal runs, so a stale call shows up only as a compile error.
+
+No change to how a user reaches a mapped feature.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 0e08e8c34c29671e454f447b68b9c3888c089370, 2a238b241c713e71c006df4d020c65749f82676f
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh12-t1/home3 swift test --parallel --filter "WhisperKitHubToken|WhisperTokenizerCache|WhisperKitLoadFailure|WhisperKitEngine|WhisperKitLocalSnapshot|EngineSettingsRuntimeSync|AppSettingsHuggingFaceToken|TranscriptionSettings" (worker, lane 1 at cb17fb8b: rc=0, 88 tests), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh12-t1/home3 swift test --filter "WhisperKitEngineTests/testTranscribe" (worker: rc=0, 2 tests, sequential model pre-fetch), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh12-t1/live-home3 MEETINGTRANSCRIBER_HF_LIVE=1 swift test --filter WhisperKitHubTokenLiveTests (worker: rc=0, 2 tests, fresh home, network), PATH="$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH" ./scripts/lint.sh (worker and review wrapper: 0 violations), ./scripts/pre-push.sh --with-appstore (worker: passed), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh12-rev1/home swift test --parallel --filter "WhisperKitHubToken|WhisperTokenizerCache|WhisperKitEngine|WhisperKitLocalSnapshot|EngineSettingsRuntimeSync" (review wrapper, lane 1 at a84669ca after the fix: rc=0, 69 tests), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh12-qc/home swift test --filter "WhisperKitEngineTests/testTranscribe" (conductor, integrated spec branch at 2a238b24: rc=0, 2 tests), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh12-qc/home swift test --parallel --filter "WhisperKitHubToken|WhisperTokenizerCache|WhisperKitEngine|WhisperKitLocalSnapshot|EngineSettingsRuntimeSync" (conductor, integrated spec branch at 2a238b24: rc=0, 69 tests)
 - PRs:

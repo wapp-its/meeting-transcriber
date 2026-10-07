@@ -53,6 +53,9 @@ final class EngineController {
         self.warmupQueue = warmupQueue
         self.whisperKit = Self.makeWhisperKit()
         self.parakeetEngine = Self.makeParakeet()
+        // Read at each Hub request rather than copied here, so a token saved or
+        // removed in Settings applies to the next download without a restart.
+        whisperKit.hubToken = { [settings] in settings.huggingFaceToken }
 
         // Bring engines in line with the current settings up front so the first
         // transcription doesn't run against stale defaults, then start observing
