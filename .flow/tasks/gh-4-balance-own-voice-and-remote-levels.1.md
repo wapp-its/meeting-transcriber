@@ -47,9 +47,38 @@ Build the pure `LevelBalance` type (spec §Architecture: estimate, gain, clip bu
 - [ ] Existing `AudioMixer*`, `BuildRecording*`, `MicDelayNormalisation*` and `EchoBleedDetector*` tests pass unchanged.
 - [ ] `./scripts/lint.sh` passes with the pinned tools.
 ## Done summary
-TBD
+The mixer can now bring the own voice and the far end to a common loudness before averaging them. `LevelBalance` (new, pure) measures each track's speech level as the power mean of its 100 ms speech frames, moves it toward -20 dBFS with at most +24 dB of boost and a 0.1 % clip budget, and `AudioMixer.mix(..., levelBalance: true)` applies it to the app track and the echo-gated microphone track after the gate, then logs one notice line. Nothing in production passes the flag yet (task .2 wires the setting), so every existing caller writes the same mix as before.
 
+stage: impl-review - ran [2026-10-07T06:08Z..2026-10-07T06:15Z]
+
+Tier: session (jev-unavailable(no_key)); project routing block pins implementer opus at xhigh (actual: claude-opus-5-5)
+
+Review: codex gpt-5.6-sol at xhigh, one correctness draw (one area, no persisted or shared state), verdict SHIP with no findings in round 1. Receipt /tmp/impl-review-receipt-23a2c07fb458-gh-4-balance-own-voice-and-remote-levels.1.json reads model gpt-5.6-sol, effort xhigh. Run with CODEX_SANDBOX=workspace-write; the reviewer left no files in the tree.
+
+Baseline: green. The task's focused filter ran 92 tests with 0 failures before any edit. The first attempt exited 1 only because SwiftPM logged a keychain credential error while downloading binary artifacts for the first time; the re-run with artifacts cached exited 0.
+
+Tests first: with the tests written and `LevelBalance` absent, the build failed with "cannot find 'LevelBalance' in scope". Mutation check: moving the balancing before the echo gate turns `testTheEchoGateSilencesTheSameMicWindowsWithTheFlagOnAndOff` and `testFarEndBleedOnTheMicIsNotMeasuredAsOwnVoice` red.
+
+Acceptance, test by test:
+- R1 estimate and not-measurable cases: `LevelBalanceTests.testTheEstimateMatchesTheBurstLevelWhetherSpeechIsDenseOrSparse` (50 % of 20 s, 5 % of 120 s, a 0.6 s sample), `testATrackWithoutEnoughMeasurableSpeechIsLeftAtItsLevel` (digital zeros, steady -50 dBFS noise, 3 s in 60 s, 0.4 s in a sample; gain 0 and samples unchanged).
+- R2 gain and limits: `testTheGainReachesTheTargetStopsAtTheBoostCapAndCutsWithoutBound` (+10 dB to -20 dBFS, +24 dB with boostCap, a -26 dB cut of a +6 dBFS track), `testTheClipBudgetLowersABoostToTheLargestGainItAllows` (20 s at 50 % and 120 s at 5 %; the applied gain sits within 0.1 dB below a sorted-sample reference, never above it, and every sample stays within ±1.0).
+- R6 log line: `testTheLogLineCarriesOnlyLevelsGainsAndLimits` compares exact strings, so no path or title can ride along.
+- Mixer (R1, R2, R3, A5): `AudioMixerLevelBalanceTests` has six tests. -18 and -44 dBFS bursts land within 6 dB, both at -26 dBFS in the mix. With the flag off the output equals `mixTracks` over the `suppressEcho`'d inputs sample for sample. The gated microphone windows are zero at the same indices with the flag on and off. A -30 dBFS bleed copy is not measured as own voice. An all-zero microphone stays zero while the app is balanced. A transient-heavy microphone is raised exactly to its clip-budget limit and stays below the target.
+
+Verification on the committed tree (a1964ab4):
+- `cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh4-home swift test --parallel --filter 'LevelBalance|AudioMixer|MicDelayNormalisation|EchoBleedDetector|BuildRecording'` exited 0 with 103 tests and 0 failures (92 existing, all unchanged, plus 11 new).
+- `PATH=/private/tmp/gh4/tools:$PATH ./scripts/lint.sh` with SwiftFormat 0.63.0 and SwiftLint 0.65.1 fetched from their release assets (SHA-256 matched `scripts/tool-versions.sh`) exited 0, with 0 of 682 files needing formatting and 0 violations.
+
+Decisions:
+- With either track empty, `mix` balances nothing and logs nothing, so the mix is the other track as recorded. This follows the spec's single-track edge case and is stated in the doc comment of `mix`.
+- The clip budget is found from a 0.1 dB histogram of only the speech-frame samples that could clip at the capped gain, anchored at that gain. The result is at most one step (0.1 dB) below the exact optimum and never above it. Nothing is sorted and no copy of the track is made.
+
+Observation for the owner check after task .2: under the spec's estimator, a track whose only non-silent frames are speech (exact zeros between talk spurts, which a process tap can deliver for the far end) takes its noise floor from its quietest speech frames. Only frames 10 dB above that count, which biases the measured level upward. The synthetic tests carry a -70 dBFS room-tone bed for this reason. The log line's levels on a real meeting will show whether it matters.
+
+Feature map: no user route changed.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: a1964ab4abceb62cdb87929cec71e5705df39ee2
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh4-home swift test --parallel --filter 'LevelBalance|AudioMixer|MicDelayNormalisation|EchoBleedDetector|BuildRecording' (exit 0, 103 tests, 0 failures), PATH=/private/tmp/gh4/tools:$PATH ./scripts/lint.sh (exit 0, 0 violations)
 - PRs:

@@ -227,21 +227,22 @@ final class HelpBadgeTests: XCTestCase {
         XCTAssertFalse(SettingsHelp.echoDedup.isEmpty)
         XCTAssertFalse(SettingsHelp.echoCancellation.isEmpty)
         XCTAssertFalse(SettingsHelp.silentTrackWatchdog.isEmpty)
+        XCTAssertFalse(SettingsHelp.levelBalance.isEmpty)
     }
 
     // MARK: - Adoption in AudioSettingsView (issue #505)
 
-    /// VAD toggle + echo-cancellation toggle + echo-dedup toggle + Detect
-    /// Silent Capture Channel toggle + silent-capture rebuild toggle +
-    /// Warn-after row each carry a clickable info badge. All six rows are
-    /// visible with defaults
+    /// Level-balance toggle + VAD toggle + echo-cancellation toggle +
+    /// echo-dedup toggle + Detect Silent Capture Channel toggle +
+    /// silent-capture rebuild toggle + Warn-after row each carry a clickable
+    /// info badge. All seven rows are visible with defaults
     /// (perChannelIndicatorEnabled defaults to true → warn-after row shown;
     /// the dedup row is disabled while cancellation is on, and cancellation
     /// defaults to off, so both echo rows are enabled here).
     func testAudioTabShowsHelpBadgesForNamedOptions() throws {
         let settings = AppSettings(defaults: defaults)
         settings.perChannelIndicatorEnabled = true
-        XCTAssertEqual(try infoBadgeCount(in: AudioSettingsView(settings: settings)), 6)
+        XCTAssertEqual(try infoBadgeCount(in: AudioSettingsView(settings: settings)), 7)
     }
 
     /// The warn-after row stays whatever the per-channel toggle says.
@@ -277,5 +278,6 @@ final class HelpBadgeTests: XCTestCase {
         XCTAssertTrue(texts.contains(SettingsHelp.silentCaptureChannel))
         XCTAssertTrue(texts.contains(SettingsHelp.asymmetricSilenceWarning))
         XCTAssertTrue(texts.contains(SettingsHelp.silentTrackWatchdog))
+        XCTAssertTrue(texts.contains(SettingsHelp.levelBalance))
     }
 }

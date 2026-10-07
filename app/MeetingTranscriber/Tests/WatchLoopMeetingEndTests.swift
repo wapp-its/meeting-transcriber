@@ -136,6 +136,48 @@ final class WatchLoopMeetingEndTests: XCTestCase { // swiftlint:disable:this bal
         date?.timeIntervalSince(Harness.start)
     }
 
+    /// Reports how its mix was made, as `buildRecording` does.
+    private final class MixReportingRecorder: MockRecorder {
+        var levelBalanced = false
+
+        override func stop() throws -> RecordingResult {
+            var result = try super.stop()
+            result.levelBalanced = levelBalanced
+            return result
+        }
+    }
+
+    /// The headset-gap meeting (24 s), then the 2-minute question countdown,
+    /// in which someone still in the room talks loudly into the microphone,
+    /// mixed the way `stop()` mixes it. With the signal gone from the first
+    /// poll the cut keeps exactly the meeting: 144 s of audio stopped at
+    /// 130 s and cut at 10 s keep 24 s.
+    private func makeRecorderWithLoudTail(in dir: URL, balanced: Bool, withApp: Bool) throws -> MixReportingRecorder {
+        typealias Signal = LevelBalanceSignal
+        let farEnd = HeadsetGapFixture.farEnd + Signal.noise(dBFS: -70, seconds: 120, seed: 31)
+        var ownVoice = HeadsetGapFixture.ownVoice + Signal.noise(dBFS: -70, seconds: 120, seed: 32)
+        for k in 0 ..< 40 {
+            Signal.place(Signal.tone(dBFS: -10, seconds: 1), in: &ownVoice, at: 24 + Double(3 * k) + 1.5)
+        }
+        let recorder = MixReportingRecorder()
+        recorder.levelBalanced = balanced
+        let stem = dir.appendingPathComponent("20261006_100000").path
+        let mix = URL(fileURLWithPath: stem + RecordingFileSuffix.mix)
+        let mic = URL(fileURLWithPath: stem + RecordingFileSuffix.mic)
+        try AudioMixer.saveWAV(samples: ownVoice, sampleRate: Signal.sampleRate, url: mic)
+        if withApp {
+            let app = URL(fileURLWithPath: stem + RecordingFileSuffix.app)
+            try AudioMixer.saveWAV(samples: farEnd, sampleRate: Signal.sampleRate, url: app)
+            try AudioMixer.mix(appAudioPath: app, micAudioPath: mic, outputPath: mix, levelBalance: balanced)
+            recorder.appPath = app
+        } else {
+            try AudioMixer.saveWAV(samples: ownVoice, sampleRate: Signal.sampleRate, url: mix)
+        }
+        recorder.mixPath = mix
+        recorder.micPath = mic
+        return recorder
+    }
+
     // MARK: - R1 / R2 / R5 / R7: nobody answers
 
     /// The signal is gone from the first poll. At 10 s the person is asked and
@@ -369,5 +411,44 @@ final class WatchLoopMeetingEndTests: XCTestCase { // swiftlint:disable:this bal
         XCTAssertEqual(harness.elapsed, 51)
         XCTAssertEqual(harness.notifier.withdrawnMeetingEndQuestions, harness.askedIDs)
         XCTAssertEqual(harness.autoStopLines, ["recording_auto_stop trigger=auto reason=max_duration signal_absent_s=51"])
+    }
+
+    // MARK: - A balanced mix after the cut
+
+    /// The stop balanced the mix over everything recorded, the loud tail
+    /// included. The cut throws the tail away, so its gains must go with it:
+    /// the mix is made again from the kept tracks, and the own voice and the
+    /// far end sit within 6 dB.
+    func testACutBalancedMixIsMadeAgainFromTheKeptTracks() async throws {
+        let recorder = try makeRecorderWithLoudTail(in: tmpDir, balanced: true, withApp: true)
+        let asRecorded = try AudioMixer.loadAudioFileAsFloat32(url: XCTUnwrap(recorder.mixPath))
+        XCTAssertGreaterThan(
+            abs(HeadsetGapFixture.gap(in: asRecorded)), 6,
+            "test premise: gains measured with the tail leave the meeting apart",
+        )
+
+        try await Harness().makeLoop(recorder: recorder).handleMeeting(meeting)
+
+        let mix = try AudioMixer.loadAudioFileAsFloat32(url: XCTUnwrap(recorder.mixPath))
+        XCTAssertEqual(mix.count, 24 * 16000, "the mix ends where the meeting did")
+        XCTAssertLessThanOrEqual(abs(HeadsetGapFixture.gap(in: mix)), 6)
+    }
+
+    /// A mix made without the balance, and a single-track one, are only cut:
+    /// the meeting's frames as recorded.
+    func testAnUnbalancedOrSingleTrackMixIsOnlyCut() async throws {
+        for (balanced, withApp) in [(false, true), (true, false)] {
+            let dir = try makeTempDirectory(prefix: "meeting-end-mix")
+            let recorder = try makeRecorderWithLoudTail(in: dir, balanced: balanced, withApp: withApp)
+            let asRecorded = try AudioMixer.loadAudioFileAsFloat32(url: XCTUnwrap(recorder.mixPath))
+
+            try await Harness().makeLoop(recorder: recorder).handleMeeting(meeting)
+
+            XCTAssertEqual(
+                try AudioMixer.loadAudioFileAsFloat32(url: XCTUnwrap(recorder.mixPath)),
+                Array(asRecorded.prefix(24 * 16000)),
+                "balanced \(balanced), app track \(withApp)",
+            )
+        }
     }
 }

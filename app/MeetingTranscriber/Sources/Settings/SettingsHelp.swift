@@ -34,6 +34,17 @@ enum SettingsHelp {
         of the transcript.
         """
 
+    static let levelBalance =
+        """
+        Evens out your voice and the other participants in the saved mixed \
+        recording and in the speaker samples, so a quiet microphone is no \
+        longer drowned out by loud meeting audio. A very quiet microphone is \
+        raised by at most \(Int(LevelBalance.maxBoostDB)) dB.
+
+        Transcription and speaker recognition always use the unchanged \
+        recordings of each side. Applies from the next recording.
+        """
+
     static let vad =
         "Voice Activity Detection trims silent stretches out of the recording before " +
         "transcription, which speeds up processing and can improve accuracy. Enable it " +

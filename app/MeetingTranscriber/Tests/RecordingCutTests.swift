@@ -163,6 +163,24 @@ final class RecordingCutTests: XCTestCase { // swiftlint:disable:this balanced_x
         XCTAssertFalse(FileManager.default.fileExists(atPath: mix.path), "the cut copy is not left posing as the mix")
     }
 
+    // MARK: - Mixing the kept tracks again
+
+    /// A remix that cannot be swapped in leaves the mix as it was and nothing
+    /// beside it, so the recording goes on with the mix it had.
+    func testAFailedRemixLeavesTheMixAsItWas() throws {
+        let mix = try makeTrack("r_mix.wav", seconds: 10)
+        let app = try makeTrack("r_app.wav", seconds: 10)
+        let mic = try makeTrack("r_mic.wav", seconds: 10)
+        let before = try Data(contentsOf: mix)
+
+        XCTAssertThrowsError(try RecordingCut.remixBalanced(recording(mix: mix, app: app, mic: mic)) { _, _ in
+            throw POSIXError(.EIO)
+        })
+
+        XCTAssertEqual(try Data(contentsOf: mix), before)
+        XCTAssertEqual(try leftovers(), [])
+    }
+
     // MARK: - Where the cut falls
 
     /// The later of the two estimates wins, so neither a capture that started

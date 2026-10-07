@@ -21,8 +21,9 @@ final class DualSourceRecorderLifecycleTests: XCTestCase {
     /// wrote.
     private final class FakeCaptureSession: AudioCapturing {
         var startError: (any Error)?
-        /// The mic track `stop()` reports, set by a test after `start()` has
-        /// picked the URL and the test has written fixture audio there.
+        /// The tracks `stop()` reports, set by a test after `start()` has
+        /// picked the URLs and the test has written fixture audio there.
+        var appTrack: URL?
         var micTrack: URL?
         var appLevelDBFS: Double = -120
         var micLevelDBFS: Double = -120
@@ -41,7 +42,7 @@ final class DualSourceRecorderLifecycleTests: XCTestCase {
 
         func stop() -> AudioCaptureResult {
             AudioCaptureResult(
-                appAudioFileURL: nil, micAudioFileURL: micTrack,
+                appAudioFileURL: appTrack, micAudioFileURL: micTrack,
                 actualSampleRate: 16000, actualChannels: 1, micDelay: 0,
             )
         }
@@ -269,5 +270,61 @@ final class DualSourceRecorderLifecycleTests: XCTestCase {
         await waitFor(controller.watchLoop?.state == .recording, timeout: .seconds(2))
 
         XCTAssertEqual(session.lastConfiguration?.silentTrackWatchdog, true)
+    }
+
+    // MARK: - Level balance
+
+    /// `stop()` hands the recorder's flag to the mix: a quiet microphone and a
+    /// loud far end land within 6 dB of each other with it on, and stay as far
+    /// apart as recorded with it off.
+    func testStopHandsTheLevelBalanceFlagToTheMix() throws {
+        for levelBalance in [false, true] {
+            let dir = try makeTempDirectory(prefix: "lifecycle_level_balance")
+            let (recorder, session) = makeRecorder(dir: dir)
+            recorder.levelBalanceEnabled = levelBalance
+            // A PID no process holds, as in the app-only test above.
+            try recorder.start(source: .appAndMic(pid: 999_999))
+            let configuration = try XCTUnwrap(session.lastConfiguration)
+            session.appTrack = try XCTUnwrap(configuration.appOutputURL)
+            session.micTrack = try XCTUnwrap(configuration.micOutputURL)
+            // 16 kHz mono raw floats, what the in-IOProc resampler writes.
+            try writeRawFloat32(HeadsetGapFixture.farEnd, to: XCTUnwrap(session.appTrack))
+            try AudioMixer.saveWAV(
+                samples: HeadsetGapFixture.ownVoice, sampleRate: HeadsetGapFixture.rate, url: XCTUnwrap(session.micTrack),
+            )
+
+            let mix = try AudioMixer.loadAudioFileAsFloat32(url: recorder.stop().mixPath)
+
+            let gap = HeadsetGapFixture.gap(in: mix)
+            if levelBalance {
+                XCTAssertLessThanOrEqual(abs(gap), 6)
+            } else {
+                XCTAssertEqual(gap, HeadsetGapFixture.recordedGap, accuracy: 1)
+            }
+        }
+    }
+
+    /// The setting reaches a recording that `WatchingController` starts, both
+    /// ways. The recorder comes in holding the opposite value, so a factory
+    /// that never writes the flag, or always writes the same one, fails one of
+    /// the two rounds.
+    func testTheLevelBalanceSettingReachesARecordingTheControllerStarts() async throws {
+        for enabled in [true, false] {
+            let dir = try makeTempDirectory(prefix: "lifecycle_level_balance_controller")
+            let (recorder, _) = makeRecorder(dir: dir.appendingPathComponent("staging", isDirectory: true))
+            recorder.levelBalanceEnabled = !enabled
+            let controller = makeWatchingController(
+                logDir: dir, permissionHealth: .allHealthy,
+                // swiftlint:disable:next trailing_closure
+                makeRecorder: { recorder },
+            )
+            controller.settings.levelBalanceEnabled = enabled
+
+            controller.startManualRecording(pid: getpid(), appName: "Chrome", title: "Standup")
+            await waitFor(controller.watchLoop?.state == .recording, timeout: .seconds(2))
+
+            XCTAssertEqual(recorder.levelBalanceEnabled, enabled)
+            controller.stopManualRecording()
+        }
     }
 }

@@ -9,7 +9,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-4-balance-own-voice-and-remote-levels",
   "spec_path": ".flow/tasks/gh-4-balance-own-voice-and-remote-levels.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Speech-level balance in the mixer",
   "updated_at": "2026-10-06T20:33:50.733151Z"
 }

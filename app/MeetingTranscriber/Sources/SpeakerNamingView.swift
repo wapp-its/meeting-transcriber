@@ -26,6 +26,10 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
     /// the app, so the buttons must re-lock even though the displayed data is
     /// unchanged. See `NamingGraceKey`.
     let pendingJobCount: Int
+    /// Whether each voice sample is brought to a common speech level before it
+    /// plays (`playbackSnippet`). The naming dialog passes
+    /// `AppSettings.levelBalanceEnabled`; voice enrollment leaves it off.
+    let balanceSampleLevels: Bool
     /// Invoked when the user asks to dismiss the dialog (Escape). Closing is a
     /// no-op for the job — it stays `.speakerNamingPending` and can be reopened
     /// from the menu bar — which is what makes it a safe thing to bind a stray
@@ -50,6 +54,7 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
         knownSpeakerNames: [String] = [],
         currentDiarizerMode: DiarizerMode? = nil,
         pendingJobCount: Int = 1,
+        balanceSampleLevels: Bool = false,
         gracePeriod: TimeInterval = Self.defaultKeyboardGracePeriod,
         onDismissRequest: (() -> Void)? = nil,
         onComplete: @escaping (PipelineQueue.SpeakerNamingResult) -> Void,
@@ -58,6 +63,7 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
         self.knownSpeakerNames = knownSpeakerNames
         self.currentDiarizerMode = currentDiarizerMode
         self.pendingJobCount = pendingJobCount
+        self.balanceSampleLevels = balanceSampleLevels
         self.gracePeriod = gracePeriod
         self.onDismissRequest = onDismissRequest
         self.onComplete = onComplete
@@ -543,7 +549,7 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
               let source = data.sampleSource(for: chosen) else { return }
 
         // Perform file I/O off the main thread
-        Task.detached { [source] in
+        Task.detached { [source, balanceSampleLevels] in
             do {
                 let (samples, sampleRate) = try await AudioMixer.loadAudioAsFloat32(url: source.url)
                 guard let range = Self.sampleRange(
@@ -553,7 +559,9 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
                     totalSamples: samples.count,
                 ) else { return }
 
-                let snippet = Array(samples[range])
+                let snippet = Self.playbackSnippet(
+                    of: samples, range: range, sampleRate: sampleRate, balanced: balanceSampleLevels,
+                )
                 let tmpPath = FileManager.default.temporaryDirectory
                     .appendingPathComponent("speaker_\(label).wav")
                 try AudioMixer.saveWAV(samples: snippet, sampleRate: sampleRate, url: tmpPath)
@@ -618,6 +626,32 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
         let endSample = min(totalSamples, Int(end * Double(sampleRate)))
         guard startSample < endSample else { return nil }
         return startSample ..< endSample
+    }
+
+    /// The samples to play for `range` of a decoded file at `sampleRate`.
+    /// With `balanced`, the cut is brought to `LevelBalance.targetDBFS`
+    /// speech level on its own, under the same boost cap and clip rules as the
+    /// mix, so an own-voice and a far-end sample play at a similar loudness.
+    /// Its speech level is measured on the cut alone rather than given its
+    /// track's gain, because a microphone track on loudspeakers carries the far
+    /// end too; which frames count as speech is judged against the noise floor
+    /// of the whole file, because the cut can be speech from start to end. A
+    /// cut with less than `LevelBalance.sampleMinimumSpeechSeconds` of
+    /// measurable speech plays as it is.
+    nonisolated static func playbackSnippet(
+        of samples: [Float],
+        range: Range<Int>,
+        sampleRate: Int,
+        balanced: Bool,
+    ) -> [Float] {
+        var snippet = Array(samples[range])
+        if balanced {
+            _ = LevelBalance.balance(
+                &snippet, sampleRate: sampleRate, minimumSpeechSeconds: LevelBalance.sampleMinimumSpeechSeconds,
+                noiseReference: samples,
+            )
+        }
+        return snippet
     }
 
     /// Picks the longest temporally-pure segment for `label`, falling back to

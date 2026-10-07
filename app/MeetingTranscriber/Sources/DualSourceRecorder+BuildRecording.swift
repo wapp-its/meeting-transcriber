@@ -32,13 +32,16 @@ extension DualSourceRecorder {
     /// WAV) into a mixed 16 kHz `RecordingResult`: cross-check the rate, downmix
     /// + resample the app track, load the mic track, then mix or fall back to a
     /// single track. Pure file-processing — no capture session, no `@available`
-    /// gate — so it is unit-testable with fixture files.
+    /// gate — so it is unit-testable with fixture files. `levelBalance` reaches
+    /// the two-track mix only (see `AudioMixer.mix`); a single track is saved
+    /// as recorded.
     nonisolated static func buildRecording( // swiftlint:disable:this function_body_length
         from captureResult: AudioCaptureResult,
         recordingsDir recDir: URL,
         timestamp ts: String,
         recordingStartDate: Date,
         format: CaptureFormat,
+        levelBalance: Bool = false,
     ) throws -> RecordingResult {
         let micDelay = captureResult.micDelay
         let actualChannels = captureResult.actualChannels
@@ -196,6 +199,7 @@ extension DualSourceRecorder {
                 outputPath: mixPath,
                 micDelay: normalisation.reportedDelay,
                 sampleRate: mixRate,
+                levelBalance: levelBalance,
             )
         } else if !appSamples16k.isEmpty {
             try AudioMixer.saveWAV(samples: appSamples16k, sampleRate: mixRate, url: mixPath)
@@ -220,6 +224,7 @@ extension DualSourceRecorder {
             micPath: micPath,
             micDelay: normalisation.reportedDelay,
             recordingStartDate: recordingStartDate,
+            levelBalanced: levelBalance && appPath != nil && micPath != nil,
         )
     }
 }

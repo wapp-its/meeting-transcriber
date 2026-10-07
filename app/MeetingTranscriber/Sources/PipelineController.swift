@@ -58,15 +58,16 @@ final class PipelineController {
         var stagingDir: URL
         var securityScope: SecurityScopeAccess = .live
         /// Rescues crashed recordings from the staging folder and enqueues
-        /// orphans into the queue it is handed; nil skips it.
-        var recoverStagedRecordings: (@MainActor (PipelineQueue) -> Void)?
+        /// orphans into the queue it is handed, balancing each rebuilt mix
+        /// when the flag says so; nil skips it.
+        var recoverStagedRecordings: (@MainActor (_ queue: PipelineQueue, _ levelBalance: Bool) -> Void)?
         var resolveOutputDir: @MainActor (OutputDirectoryResolver) -> URL = { $0.resolve() }
 
         static var production: Self {
             Self(
                 logDir: nil,
                 stagingDir: AppPaths.recordingsDir,
-                recoverStagedRecordings: PipelineController.recoverStagedRecordings(into:),
+                recoverStagedRecordings: PipelineController.recoverStagedRecordings(into:levelBalance:),
             )
         }
     }
@@ -288,7 +289,7 @@ final class PipelineController {
         } else {
             q.loadSnapshot()
         }
-        if recoversStagedRecordings { queueEnvironment.recoverStagedRecordings?(q) }
+        if recoversStagedRecordings { queueEnvironment.recoverStagedRecordings?(q, settings.levelBalanceEnabled) }
         q.refreshKnownSpeakerNames()
         return q
     }
@@ -296,7 +297,7 @@ final class PipelineController {
     /// Fire-and-forget: dir scan + per-file attr probes run off-main so app
     /// startup (and the first call to `enqueueFiles`) isn't blocked by a slow
     /// filesystem. Recovered jobs appear in `queue.jobs` once the scan returns.
-    private static func recoverStagedRecordings(into q: PipelineQueue) {
+    private static func recoverStagedRecordings(into q: PipelineQueue, levelBalance: Bool) {
         Task {
             // Rescue recordings whose writer was killed mid-stream (#379), then
             // hand off to the orphan scan which enqueues the results. Detached
@@ -315,7 +316,7 @@ final class PipelineController {
             await Task.detached(priority: .utility) {
                 let repaired = WavHeaderRepair.repairUnfinalized(in: staging)
                 if repaired > 0 { logger.info("Repaired \(repaired) unfinalized recording(s) on launch") }
-                let recovered = DualSourceRecorder.recoverCrashedRecordings(in: staging)
+                let recovered = DualSourceRecorder.recoverCrashedRecordings(in: staging, levelBalance: levelBalance)
                 if recovered > 0 { logger.info("Recovered \(recovered) crashed recording(s) on launch") }
                 DualSourceRecorder.cleanupTempFiles(recordingsDir: staging)
             }.value

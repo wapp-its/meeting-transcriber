@@ -1,14 +1,18 @@
 {
   "branch_name": "feat/gh-4-level-balance",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-07T08:48:15.814923Z",
   "created_at": "2026-10-06T20:19:52.495155Z",
   "default_impl": null,
   "default_review": null,
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-4-balance-own-voice-and-remote-levels",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-4-balance-own-voice-and-remote-levels.1": 0,
+    "gh-4-balance-own-voice-and-remote-levels.2": 0,
+    "gh-4-balance-own-voice-and-remote-levels.3": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -135,31 +139,321 @@
       "task": null,
       "timestamp": "2026-10-06T20:35:04.458365Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "a3830a65d054922695164d4d1eb3b4e2876ac3e5f49cd6f6a9f041ace592f326",
+      "backend": "codex",
+      "base_sha": "9d01bbe1cd8bca78eb23ba32fcb605d738c1788b",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "a1964ab4abceb62cdb87929cec71e5705df39ee2",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "95dd6164bfe341c2b4c8f3166565aaf2",
+      "round_consumed": true,
+      "scope": "impl:gh-4-balance-own-voice-and-remote-levels.1",
+      "superseded_by": null,
+      "task": "gh-4-balance-own-voice-and-remote-levels.1",
+      "timestamp": "2026-10-07T06:15:09.070243Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "adc19d0ab7128cfe4ea2a039aee43805395a909617b91cbe7e0fff5cb8b6c873",
+      "backend": "codex",
+      "base_sha": "1ee1d74c8a02b32b3f9bf6705d3c676fa0dbd646",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-a6459dff8d3955962865f4d468e7bec0",
+            "classification": "introduced",
+            "findingId": "finding-a6459dff8d3955962865f4d468e7bec0",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "0fde5a46e206732a02695af01db3e224a781a357",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1457,
+      "output_sha256": "a85dfc93057a6a9a1df202851489c79b933c02708e2eb9758e935aebb70fba9c",
+      "reservation_id": "aa567b0a5bc94c0a868dd1b0ffbecea7",
+      "round_consumed": true,
+      "scope": "impl:gh-4-balance-own-voice-and-remote-levels.2",
+      "superseded_by": null,
+      "task": "gh-4-balance-own-voice-and-remote-levels.2",
+      "timestamp": "2026-10-07T06:39:26.157049Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "f5dc2d3f970c567d2e7067b3b17350929253d7cefc54956539668a51ebc365c8",
+      "backend": "codex",
+      "base_sha": "1ee1d74c8a02b32b3f9bf6705d3c676fa0dbd646",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-a6459dff8d3955962865f4d468e7bec0",
+            "classification": "introduced",
+            "findingId": "finding-a6459dff8d3955962865f4d468e7bec0",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "63be36d6dd9ac50a711905b7eb43db1d186d167b",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1031,
+      "output_sha256": "40b19cce2e70577c4dd19c167530bf207a5f200b05f1bf290ffc32d543503de1",
+      "reservation_id": "a72b2ea327c0456f9afc963c95fe9adc",
+      "round_consumed": true,
+      "scope": "impl:gh-4-balance-own-voice-and-remote-levels.2",
+      "superseded_by": null,
+      "task": "gh-4-balance-own-voice-and-remote-levels.2",
+      "timestamp": "2026-10-07T06:59:54.789159Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "d4d573e4589cf61e939e16a31e4447e12f013555eb08162073c5bfbd7d69cab6",
+      "backend": "codex",
+      "base_sha": "8b2d89426202a65938de9a6c947bb7e54aa55018",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-816574416968c775fea232b62420be51",
+            "classification": "introduced",
+            "findingId": "finding-816574416968c775fea232b62420be51",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "e5b80aca8906a32f18862d853590160e067ba576",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1167,
+      "output_sha256": "e3798d981c9964675f7e49551da3d095bcdf7b64bf7d39c782909c5fa2fbc9f4",
+      "reservation_id": "1957f671434543d983e717f476396777",
+      "round_consumed": true,
+      "scope": "impl:gh-4-balance-own-voice-and-remote-levels.3",
+      "superseded_by": null,
+      "task": "gh-4-balance-own-voice-and-remote-levels.3",
+      "timestamp": "2026-10-07T07:19:07.716876Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "bfcac1577d1bc76fd150bd766e12e7f15a4e45e5c8a318f150d1985627665a03",
+      "backend": "codex",
+      "base_sha": "8b2d89426202a65938de9a6c947bb7e54aa55018",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-816574416968c775fea232b62420be51",
+            "classification": "introduced",
+            "findingId": "finding-816574416968c775fea232b62420be51",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "6670b32485b71b677a89e53b8162cc4d8057085c",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 623,
+      "output_sha256": "9668cc856674964699ff3da4023f898d6e403655698500af50b8fa72c5c46943",
+      "reservation_id": "a52e6ff27e494f1c868b4e8bafe56410",
+      "round_consumed": true,
+      "scope": "impl:gh-4-balance-own-voice-and-remote-levels.3",
+      "superseded_by": null,
+      "task": "gh-4-balance-own-voice-and-remote-levels.3",
+      "timestamp": "2026-10-07T07:33:39.625366Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "85d123b30cc8a765d0fe2417038bef0613da48a871bb691d396065ebfadaf1bb",
+      "backend": "codex",
+      "base_sha": "f3cb9a26adb45b74e339e64383dc03f3bd28b9e7",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "a9eeadb9517f718357798731140fb65ae4487790",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 443510,
+      "output_sha256": "e51e5f030edade9e8fdf76582f90a51a61a2c4d87c131c2c4ff6ea0d3a8348d9",
+      "reservation_id": "4a8348ee10274cf7bfeaa188a62f2920",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-07T07:54:27.214714Z",
+      "tool_calls": 22,
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "7fe1f427eed5b91419c1df32beaaba343a1f25f73e60e8d68063aae4e8455e55",
+      "backend": "codex",
+      "base_sha": "7a61c31fa7fe6db2ad3f73c82916b2600dcef65b",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "84387418fd82a2eb7e3169a85765ab392de3d760",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 5486,
+      "output_sha256": "59e539df1c5278980af3d2857833381e56f073337e1d79448c94976a7cb78d9c",
+      "reservation_id": "66ed52dc66b44d4c8e1831e4c4ec9700",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-07T08:48:15.785936Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-4-balance-own-voice-and-remote-levels.1": 1,
+    "impl:gh-4-balance-own-voice-and-remote-levels.2": 1,
+    "impl:gh-4-balance-own-voice-and-remote-levels.3": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-4-balance-own-voice-and-remote-levels.1": 0,
+    "impl:gh-4-balance-own-voice-and-remote-levels.2": 0,
+    "impl:gh-4-balance-own-voice-and-remote-levels.3": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-4-balance-own-voice-and-remote-levels.md",
-  "status": "open",
+  "status": "done",
   "title": "Balance own voice and remote levels",
   "tracker": {
-    "baseHashFlow": null,
-    "baseHashTracker": null,
+    "baseHashFlow": "1441284ca32e370bff1f3a347131311e273bde194d5e8c5d961558f418216441",
+    "baseHashTracker": "a8c3332b46df5759ef68ae3c843b55b761b518c5095908640af79c11b22745a6",
     "depRelations": [],
     "id": "I_kwDOUvyDOc8AAAABUN9zmQ",
     "identifier": "#4",
-    "lastSyncedAt": null,
+    "lastSyncedAt": "2026-10-07T08:09:22.513952Z",
     "linkState": "linked",
-    "mergeBaseFlow": null,
-    "mergeBaseTracker": null,
+    "mergeBaseFlow": "# Balance own voice and remote levels\n\n## Conversation Evidence\n\n> issue #4 (observation, translated): \"With a headset in a Teams meeting, the recording has **my own voice very quiet** and **the other participants very loud**.\"\n> issue #4 (suspected cause 2, translated): \"**Levels are not matched:** microphone and app audio are mixed without bringing the two sources to a similar level.\"\n> issue #4 (wish, translated): \"**Level balancing** per source before mixing (e.g. normalise loudness to a target), can be switched off.\"\n> issue #4 (acceptance, translated): \"Headset selected: own voice and the other side sit in the same loudness range in the recording (\u00b1 6 dB).\"\n> issue #4 (owner comment 2026-10-05, translated): \"Three Teams recordings (1\u20132 Oct), speech level (95th percentile of the 100 ms RMS): app audio (other side) \u221217 to \u221220 dBFS; microphone (own voice) \u221241 to \u221243 dBFS (~25 dB quieter).\"\n> issue #4 (owner comment 2026-10-05, translated): \"**The mix lowers the microphone while the app audio is loud** (`AudioMixer.suppressEcho` in `AudioMixer.mix`). In the mix, and so in the samples, the own voice sounds even quieter or choppy.\"\n> issue #4 (owner comment 2026-10-05, translated): \"Not affected: transcription itself runs per track (`app16k` / `mic16k`) without this ducking; the quiet microphone level (1) does act there.\"\n> issue #4 (owner comment 2026-10-05, translated): \"Suggested fix (in this order): (a) show at start and warn when the recorded microphone is not the meeting app's input device [\u2026]; (b) play samples from the speaker's own track (`M_` \u2192 microphone, `R_` \u2192 app); (c) level balancing per track before mixing.\"\n> issue #4 (owner comment 2026-10-06, translated): \"**(b) done** with PR #56 \u2013 the samples in the naming dialog now play the speaker's track (M_ \u2192 microphone, R_ \u2192 app) instead of the mix. **Open:** (a) warning when the recorded microphone is not the meeting app's (depends on the measurement probe from #43), and (c) level balancing per track.\"\n> coordinator triage 2026-10-06: \"Part (b) is done (PR #56 [\u2026]). Part (a) (warn when the recorded microphone is not the meeting app's) moves to issue #43's spec: out of scope here.\"\n> coordinator triage 2026-10-06: \"This spec = part (c): balance the levels so own voice and remote land within about \u00b16 dB in what the person hears: the mixed recording and the naming-dialog voice samples (which now play the speaker's own track, so a quiet microphone track gives a quiet own-voice sample). Switchable in Settings (pick the default and justify it).\"\n> coordinator triage 2026-10-06: \"Even with the right headset the own voice was median \u221238 dBFS vs app \u221217 dBFS (issue #44 run 4). So the gap is ~20\u201325 dB.\"\n> coordinator triage 2026-10-06: \"Constraint (agent-inferred, keep unless research proves otherwise): do not change what transcription, diarization or the echo-bleed detector see. [\u2026] Balance only the mix and playback.\"\n> coordinator triage 2026-10-06: \"Use a robust speech level estimate (not peak, not whole-file RMS dominated by silence) and cap the gain so noise is not pumped up on a silent track.\"\n\n## Goal & Context\n\nWhen someone records a meeting, their own voice ends up far quieter than the other participants in the recording they listen to afterwards, about 20 to 25 dB in the owner's measurements, even with the right headset. The person wants both sides at a similar loudness, within about 6 dB, in the saved mixed recording and in the voice samples the speaker-naming dialog plays, with a switch to turn the balancing off. [paraphrase]\n\nToday the app writes three files per meeting: the far end (`_app.wav`), the microphone (`_mic.wav`) and a mix of the two (`_mix.wav`), made by `AudioMixer.mix` when the recording stops (and again by crash recovery after a crash). The mix is what a person opens to listen to a meeting, in the recordings folder and in the record-only output. Transcription, diarization, the echo-bleed detector and echo cancellation never read the mix of a dual-source recording: they read the per-track files. The only part of the pipeline that reads the mix of a dual-source recording is the naming dialog's fallback sample source (`<slug>_16k.wav`, a resampled copy of the mix). Since PR #56 the naming dialog plays each speaker's sample from that speaker's own 16 kHz track (`SpeakerNamingData.sampleSource`), so a quiet microphone track gives a quiet own-voice sample. [inferred]\n\nThe fix balances only what a person listens to: each track is brought to a common speech level before mixing, and each naming-dialog sample is brought to the same level before it plays. The per-track files, and with them everything the pipeline computes, stay exactly as recorded. [inferred]\n\n<!-- Source: 0% user / 45% [paraphrase] / 55% [inferred] -->\n\n## Architecture & Data Models\n\n- **`LevelBalance` (new pure type).** No I/O, no settings, no actor. [inferred]\n  - *Speech level estimate.* Split the samples into consecutive 100 ms frames and take each frame's RMS in dBFS. Frames at or below \u221290 dBFS (digital silence, gated stretches, alignment padding) are ignored. The noise floor is the 10th percentile of the remaining frame levels. A frame counts as speech when its level is at or above the larger of \u221260 dBFS and noise floor + 10 dB. The speech level is the power mean of the speech frames, in dBFS (10\u00b7log10 of the mean of their mean-square values). When the speech frames add up to less than the minimum speech duration (5 s for a whole track, 0.5 s for a naming sample), the level is \"not measurable\". [inferred]\n  - *Gain.* Target speech level \u221220 dBFS. Gain = target \u2212 measured level, at most +24 dB, with no lower bound (a cut is always safe). Not measurable means a gain of 0 dB. The gain is then lowered, if needed, until at most 0.1 % of the samples inside the track's speech frames would exceed full scale after it (this only ever lowers a boost, never below 0 dB); every sample that still exceeds full scale is clamped to \u00b11.0. [inferred]\n  - *Outcome.* The estimate and gain functions return a small value type (measured level or not measurable, applied gain in dB, whether the +24 dB cap or the clip budget lowered it), so tests and the log line read the same numbers. [inferred]\n- **`AudioMixer.mix`** gains a `levelBalance: Bool = false` parameter. Order inside `mix` when it is true: load both tracks, clamp the delay, run `suppressEcho` exactly as today (the gate is decided from the *unbalanced* app track), then measure the app track and the gated microphone track, apply each track's gain in place, write the log line, then align and average with `mixTracks` as today. When false, the function is today's code path unchanged. [inferred]\n- **Setting.** `AppSettings.levelBalanceEnabled: Bool`, UserDefaults key `levelBalanceEnabled`, default `true`. Shown in Settings \u2192 Audio as its own section with one `HelpfulToggle` (`A11yID.levelBalanceToggle`, help text `SettingsHelp.levelBalance`). Not dimmed in record-only mode, because record-only writes the mix too. [inferred]\n- **Recording wiring.** `DualSourceRecorder` gets a `var levelBalanceEnabled = false`, set per recording by the recorder factory from the setting, exactly like `silentTrackWatchdogEnabled`. `stop()` hands it to `buildRecording(\u2026, levelBalance:)`, which passes it to `AudioMixer.mix`. Crash recovery (`recoverCrashedRecordings` \u2192 `recoverCrashedRecording` \u2192 `buildRecording`) takes the same flag as a parameter. `PipelineController` reaches that recovery through its queue environment's staged-recording recovery callback, which today receives only the new queue: the callback gains the flag as a second argument, the controller passes `settings.levelBalanceEnabled` when it builds a queue (on the main actor), and the production callback hands it into its detached recovery task. [inferred]\n- **Naming-dialog samples.** `SpeakerNamingView` gets an init parameter `balanceSampleLevels: Bool = false`; `MeetingTranscriberApp.speakerNamingForm` passes `appState.settings.levelBalanceEnabled`. `playSpeakerSnippet` builds the cut sample through a new pure static helper that, when the flag is on, runs `LevelBalance` over the cut sample (0.5 s minimum) before writing the temporary WAV. This covers every source `sampleSource` can pick (app track, microphone track, or the mix fallback). [inferred]\n- **Untouched on purpose.** `_app.wav`, `_mic.wav`, the pipeline's `app_16k.wav`/`mic_16k.wav` and their `_app_16k.wav`/`_mic_16k.wav` sidecars, `suppressEcho`, `mixTracks`, `EchoBleedDetector`, echo cancellation, `PipelineQueue.ensureMixAudio` (the temporary mix it builds for a paired import without a `_mix.wav` calls `mix` without the flag; for a recording with a `_mix.wav` it only resamples that file), the `RecordingSidecar` format, and `CLAUDE.md`/`AGENTS.md` (fork rule: those belong to the original). [inferred]\n\n## Edge Cases & Constraints\n\n- **Single-track recordings** (microphone-only, app-only, or one track failed): the mix is the one track as today; there is nothing to balance. [inferred]\n- **A track with no measurable speech** (digital zeros, a muted or disconnected microphone, steady fan noise, under 5 s of speech): mixed at its recorded level, never boosted. The other track is still brought to the target. [paraphrase]\n- **Loudspeakers instead of a headset:** the far end leaks into the microphone. Because the gate runs first and the microphone is measured after it, the leaked far end does not count as own voice. Leftover echo that the gate does not catch is raised together with the own voice. [inferred]\n- **Talking over each other:** the gate keeps muting the microphone in the mix while the far end speaks, exactly as today; this spec changes levels, not the gate (see Boundaries). [inferred]\n- **Built-in microphone and typing:** the estimate is energy-based. A person who never speaks but types near the built-in microphone can have the typing measured as their speech level and raised by up to 24 dB. Accepted for this slice; the switch turns it off. [inferred]\n- **Noise floor:** a boost raises the track's noise with the voice (up to 24 dB). That is the cost of a quiet microphone; the cap bounds it. [inferred]\n- **Transient-heavy microphone** (desk knocks, a headset mic brushing clothing): the clip budget can stop the boost short of the target, so such a recording can stay more than 6 dB apart; the log line says the clip budget applied. Accepted over audible clipping. [inferred]\n- **Mix-only re-import:** a `_mix.wav` imported without its two track files becomes a single-source job that is transcribed from the mix, so a balanced mix reaches transcription on that path only. Accepted: every recording the app makes, and every paired re-import, transcribes the per-track files. [inferred]\n- **Record-only mode:** the balanced `_mix.wav` goes to the output folder; the unchanged `_app.wav` and `_mic.wav` go next to it, so a downstream processor can still use the raw tracks. [inferred]\n- **Existing recordings** are not re-mixed. A naming dialog still open from before the update plays balanced samples, because sample balancing happens at playback. [inferred]\n- **Long recordings** (up to the 4-hour cap): the analysis is two passes over audio `mix` already holds in memory, and the gain is applied in place, so no extra full-length copy is made. [inferred]\n- **Mic delay:** gains are applied before alignment; the zero padding stays zero and the alignment is unchanged. [inferred]\n- **App Store variant:** pure audio code and a setting; no `#if APPSTORE` branch. [inferred]\n\n### Verification\n\n- `LevelBalance` unit tests on synthetic signals (tone or noise bursts with pauses, at known levels): the estimate within 1 dB of the bursts' level whether speech fills 50 % of a 20 s track or 5 % of a 120 s track (6 s, above the 5 s minimum); a 60 s track with 3 s of speech is not measurable; not measurable for digital zeros, steady noise and under-minimum speech; the +24 dB cap; the 0.1 % clip budget on a track with a few loud transients, including one where speech fills only 5 % of the track; the clamp. [inferred]\n- `AudioMixer.mix` tests with two synthetic tracks: app bursts at about \u221218 dBFS and microphone bursts at about \u221244 dBFS, not overlapping. With `levelBalance: true` the two sides' speech levels in the mix are within 6 dB; with `false` the output is sample-identical to `mixTracks` over the `suppressEcho`'d inputs (today's behaviour). A gate test: microphone samples under app energy are still zero in the balanced mix. [inferred]\n- Wiring tests: the setting's default, persistence and toggle write-back (pattern `Tests/SilentTrackWatchdogSettingTests.swift`); `buildRecording` with fixture files writes a balanced mix when the flag is on and leaves `_app.wav`/`_mic.wav` byte-identical either way; the setting reaches a recording the controller starts (pattern `DualSourceRecorderLifecycleTests.testTheSettingReachesARecordingTheControllerStarts`); crash recovery honours the flag. [inferred]\n- Naming playback helper tests: a quiet sample comes out at the target level, a loud one is lowered, an unmeasurable one is unchanged, and the flag off returns the cut unchanged. [inferred]\n- Full suite, lint with the pinned tools, and `./scripts/pre-push.sh --with-appstore`. [inferred]\n- Owner check after merge (not automatable): a real headset meeting and a built-in-microphone meeting, listened to in `_mix.wav` and in the naming dialog, plus the log line's gains. [inferred]\n\n## Quick commands\n\n```bash\ncd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh4-home swift test --parallel --filter 'LevelBalance|AudioMixer' > /private/tmp/gh4-levelbalance.log 2>&1; echo \"exit $?\"\n```\n\n## Acceptance Criteria\n\n- **R1:** With the setting on, every dual-source recording's saved mix (`_mix.wav` in the recordings folder and in the record-only output, including one rebuilt by crash recovery) has the own voice and the far end at speech levels within 6 dB of each other, whenever each track carries at least 5 s of measurable speech and can reach \u221220 dBFS within both limits of R2 (the +24 dB cap and the clip budget). When a limit stops a track short, that track is raised exactly as far as the limit allows, the log line names the limit (R6), and the 6 dB promise does not hold for that recording. Errors: a track whose speech is not measurable is mixed at its recorded level and never boosted; balancing never stops the mix from being written or the recording from being processed. [paraphrase]\n- **R2:** No track is boosted by more than 24 dB, a boost is lowered so that at most 0.1 % of the samples in a track's speech frames would exceed full scale, every sample that still would is clamped, and the mix never exceeds full scale. Errors: none beyond R1. [inferred]\n- **R3:** Transcription, diarization, the echo-bleed detector, echo cancellation and speaker recognition read the same audio whether the setting is on or off: `_app.wav` and `_mic.wav` (and every 16 kHz copy made from them) are byte-identical either way, and the echo gate silences the same microphone windows as today. Errors: none; a difference is a test failure. [paraphrase]\n- **R4:** With the setting on, each voice sample played in the speaker-naming dialog, from the speaker's own track or from the mix fallback, is brought to \u221220 dBFS speech level under the same cap and clip rules, so own-voice and far-end samples play within 6 dB of each other. Errors: a sample with under 0.5 s of measurable speech plays unchanged; playback stays best-effort as today. [paraphrase]\n- **R5:** Settings \u2192 Audio shows a switch for the balancing, on by default, that survives a relaunch. With it off, recordings started afterwards get a mix sample-identical to today's mixer output, and naming samples play unchanged. The switch is read when a recording starts, so a change during a recording applies from the next one; crash recovery at launch uses the switch's value at that launch. Errors: none beyond R1. [paraphrase]\n- **R6:** Each mix made with balancing on writes one diagnostic log line at a retained (notice or higher) level with each track's measured speech level (or \"not measurable\") and applied gain, and whether the cap or the clip budget lowered it. The line carries no file name, meeting title, participant name or audio content. Errors: none beyond the log write itself. [inferred]\n\n## Early proof point\n\nTask gh-4-balance-own-voice-and-remote-levels.1 validates the core approach (the speech-level estimate and capped gain bring a \u221244 dBFS microphone and a \u221218 dBFS far end to within 6 dB in the mix, leave unmeasurable tracks alone, and keep the echo gate's decisions unchanged). If it fails, re-evaluate the estimator (frame gating and power mean) before continuing with gh-4-balance-own-voice-and-remote-levels.2+.\n\n## Boundaries\n\n- Out (moved to issue #43's spec by the coordinator): showing which microphone records and warning when it is not the meeting app's input device. [paraphrase]\n- Out (done in PR #56): playing each naming sample from the speaker's own track. [paraphrase]\n- Out: changing what transcription, diarization, the echo-bleed detector or echo cancellation see, including balancing the per-track files. If transcription quality on quiet microphones becomes a concern, that is a separate owner decision. [paraphrase]\n- Out, follow-up: changing the echo gate (`suppressEcho`), for example skipping it on headset recordings so own voice is not muted while the far end talks. [inferred]\n- Out, follow-up: a model-based speech detector (the app's Silero VAD) for the level estimate, so typing or rustling is not taken for speech. [inferred]\n- Out, follow-up: a live per-source level meter during recording (issue #4 wish; the existing per-channel indicator only flags silence). [paraphrase]\n- Out, follow-up: recording the applied gains in the record-only sidecar or on `GET /v1/jobs/<id>`. [inferred]\n- Out: re-mixing recordings made before this change, voice-enrollment samples in Settings \u2192 Speakers, and the temporary mix the pipeline builds for paired imports. [inferred]\n- Out: a target-level or cap setting; only the on/off switch is exposed. [inferred]\n\n## Decision Context\n\n- **D1 \u00b7 Balance the two sources before mixing, and let the user switch it off.** why: issue #4 wish \"Pegelausgleich je Quelle vor dem Mischen [\u2026], abschaltbar\" and acceptance \"\u00b1 6 dB\" in the recording \u00b7 status: active [owner-stated 2026-10-06]\n- **D2 \u00b7 This spec is part (c) only; (a) the microphone warning goes to issue #43, (b) shipped in PR #56.** why: owner comment 2026-10-06 \"(b) erledigt mit PR #56 \u2026 Offen: (a) \u2026 h\u00e4ngt an der Messsonde aus #43\", coordinator triage 2026-10-06 moves (a) to #43 \u00b7 status: active [owner-stated 2026-10-06]\n- **A1 \u00b7 Balance only the mix and naming-sample playback; transcription, diarization, echo detection and echo cancellation keep reading the unchanged per-track files.** flip at: `AudioMixer.mix` is the only writer that applies gain \u00b7 test: R3 byte-identity of `_app.wav`/`_mic.wav` with the switch on and off \u00b7 why: EchoBleedDetector thresholds are calibrated on raw envelopes; ASR already runs per track \u00b7 status: active [agent-inferred 2026-10-06]\n- **A2 \u00b7 The switch is on by default.** flip at: `AppSettings` init default for `levelBalanceEnabled` \u00b7 test: the settings test asserting the default \u00b7 why: issue #4 is a prio:now bug, the change only touches what a person listens to, and the raw tracks stay on disk \u00b7 status: active [agent-inferred 2026-10-06]\n- **A3 \u00b7 Target speech level \u221220 dBFS per track, boost capped at +24 dB, cuts unbounded.** flip at: `LevelBalance` constants \u00b7 test: the cap and target unit tests and the R1 mixer test \u00b7 why: owner measured app \u221217..\u221220 and built-in mic \u221241..\u221243 dBFS at p95; a probe on the repo's synthetic speech fixture put the power-mean estimate about 2.7 dB under p95, so the built-in mic needs about +24 dB \u00b7 status: active [agent-inferred 2026-10-06]\n- **A4 \u00b7 Speech level = power mean of 100 ms frames above max(\u221260 dBFS, 10th-percentile noise floor + 10 dB), ignoring frames at or below \u221290 dBFS; at least 5 s of speech per track and 0.5 s per sample.** flip at: `LevelBalance` estimate \u00b7 test: the sparse-speech, steady-noise and digital-zero unit tests \u00b7 why: the probe gave the same estimate with speech at 50 % and at 5 % of a track, where the p95 the owner used dropped by 21 dB, and found no speech in noise-only input \u00b7 status: active [agent-inferred 2026-10-06]\n- **A5 \u00b7 The echo gate stays unchanged and runs first; the microphone is measured after the gate.** flip at: the order inside `AudioMixer.mix` \u00b7 test: the gate test in the mixer tests \u00b7 why: with loudspeakers the leaked far end would otherwise be measured as own voice and raised with it \u00b7 status: active [agent-inferred 2026-10-06]\n- **A6 \u00b7 A boost is lowered so at most 0.1 % of the samples in a track's speech frames clip, and the rest is clamped.** flip at: `LevelBalance` gain \u00b7 test: the clip-budget unit test \u00b7 status: active [agent-assumed 2026-10-06]\n- **A7 \u00b7 Each naming sample is balanced on its own at playback, not with its track's mix gain.** flip at: the `SpeakerNamingView` playback helper \u00b7 test: the playback helper tests \u00b7 alternatives: apply the track's gain (consistent with the mix, but a loudspeaker microphone track measured without the gate mis-measures the own voice) \u00b7 status: active [agent-assumed 2026-10-06]\n- **A8 \u00b7 The switch is read when a recording starts, like the silent-track watchdog; crash recovery reads it at launch.** flip at: `WatchingController+RecorderFactory.swift` and `PipelineController.swift` \u00b7 test: the controller wiring test and the crash-recovery test \u00b7 status: active [agent-assumed 2026-10-06]\n- **A9 \u00b7 A recording cut back after the end-of-meeting question gets its mix rebuilt from the cut tracks, so the gains come from the kept audio only.** flip at: `WatchLoop.cutBack` (`WatchLoop+MeetingEnd.swift`) / `RecordingCut.apply` \u00b7 test: a cut whose discarded tail carries far louder microphone speech still yields a mix within 6 dB \u00b7 why: impl-review round 1 of task .2 (codex gpt-5.6-sol, P1 on R1): `stop()` balances the whole capture and the cut only truncates the balanced mix, so up to 120 s of countdown tail set the gains; declining would leave R1 broken for every auto-stopped meeting, so the unattended loop fixed it and widened task .2's files by the cut-back code and its tests \u00b7 status: active [agent-inferred 2026-10-07]\n- **A10 \u00b7 A naming sample is judged against the noise floor of the whole track it is cut from, not its own frames; thresholds, the 0.5 s minimum, cap, clip budget and clamp stay as in A4.** flip at: `LevelBalance` estimate (an optional noise reference the playback helper fills with the whole decoded file) \u00b7 test: an all-speech \u221240 dBFS sample of 1.5 s is measured and raised to \u221220 dBFS \u00b7 why: impl-review round 1 of task .3 (codex gpt-5.6-sol, P1 on R4): a short sample that is speech from start to end has no pause, so A4's 10th-percentile noise floor lands inside the speech and the +10 dB margin excludes it, and the sample plays unchanged; a probe over the repo's speech fixtures found 30 of 75 such 1.5\u20132 s cuts unmeasurable; the track the sample comes from carries the same background, so its floor is the right reference, and the unattended loop widened task .3's files by the estimator and its tests \u00b7 alternatives: the absolute \u221260 dBFS floor alone for short samples (misjudges a noisy microphone), copying the estimator into the view (duplicate) \u00b7 status: active [agent-inferred 2026-10-07]\n\nFIT: GO \u00b7 2026-10-07 \u00b7 base f3cb9a26 \u00b7 engine flow-next 8.1.0 \u00b7 spec text unchanged since its plan commit; no design doc moved; all cited symbols present on the head; of the named files only AppSettings.swift and A11yID.swift changed on the base (additive, gh-12/gh-1); the 12 specs planned since claim none of this scope (gh-43 defers part c here, gh-5 lists AudioMixer.mix/suppressEcho as unchanged); gh-46/gh-60 tasks touch DualSourceRecorder too, a later merge-order fact, not an ownership change\n\n\n## Requirement coverage\n\n| Req | Description | Task(s) | Gap justification |\n| --- | --- | --- | --- |\n| R1 | With the setting on, every dual-source recording's saved mix (`_mix.wav` in the recordings folder and in the record-only output, including one rebuilt by crash recovery) has the own voice and the far end at speech levels within 6 dB of each other, whenever each track carries at least 5 s of measurable speech and can reach \u221220 dBFS within both limits of R2 (the +24 dB cap and the clip budget). When a limit stops a track short, that track is raised exactly as far as the limit allows, the log line names the limit (R6), and the 6 dB promise does not hold for that recording. Errors: a track whose speech is not measurable is mixed at its recorded level and never boosted; balancing never stops the mix from being written or the recording from being processed. | gh-4-balance-own-voice-and-remote-levels.1, gh-4-balance-own-voice-and-remote-levels.2 | \u2014 |\n| R2 | No track is boosted by more than 24 dB, a boost is lowered so that at most 0.1 % of the samples in a track's speech frames would exceed full scale, every sample that still would is clamped, and the mix never exceeds full scale. Errors: none beyond R1. | gh-4-balance-own-voice-and-remote-levels.1 | \u2014 |\n| R3 | Transcription, diarization, the echo-bleed detector, echo cancellation and speaker recognition read the same audio whether the setting is on or off: `_app.wav` and `_mic.wav` (and every 16 kHz copy made from them) are byte-identical either way, and the echo gate silences the same microphone windows as today. Errors: none; a difference is a test failure. | gh-4-balance-own-voice-and-remote-levels.1, gh-4-balance-own-voice-and-remote-levels.2 | \u2014 |\n| R4 | With the setting on, each voice sample played in the speaker-naming dialog, from the speaker's own track or from the mix fallback, is brought to \u221220 dBFS speech level under the same cap and clip rules, so own-voice and far-end samples play within 6 dB of each other. Errors: a sample with under 0.5 s of measurable speech plays unchanged; playback stays best-effort as today. | gh-4-balance-own-voice-and-remote-levels.3 | \u2014 |\n| R5 | Settings \u2192 Audio shows a switch for the balancing, on by default, that survives a relaunch. With it off, recordings started afterwards get a mix sample-identical to today's mixer output, and naming samples play unchanged. The switch is read when a recording starts, so a change during a recording applies from the next one; crash recovery at launch uses the switch's value at that launch. Errors: none beyond R1. | gh-4-balance-own-voice-and-remote-levels.2 | \u2014 |\n| R6 | Each mix made with balancing on writes one diagnostic log line at a retained (notice or higher) level with each track's measured speech level (or \"not measurable\") and applied gain, and whether the cap or the clip budget lowered it. The line carries no file name, meeting title, participant name or audio content. Errors: none beyond the log write itself. | gh-4-balance-own-voice-and-remote-levels.1 | \u2014 |\n",
+    "mergeBaseTracker": "## Beobachtung\n\nMit Headset im Teams-Meeting ist in der Aufnahme die **eigene Stimme sehr leise**, die **anderen Teilnehmenden sehr laut**.\n\n## Vermutete Ursachen (zu pr\u00fcfen)\n\n1. **Falsches Mikrofon:** Unter **Settings \u2192 Audio \u2192 Microphone** steht standardm\u00e4ssig \u201eSystem Default\". Ist das macOS-Standard-Eingabeger\u00e4t das eingebaute MacBook-Mikrofon, w\u00e4hrend Teams selbst das Headset benutzt, nimmt die App die eigene Stimme aus Distanz \u00fcber das MacBook-Mikrofon auf. Sofort-Test: dort das Headset ausdr\u00fccklich w\u00e4hlen.\n2. **Pegel werden nicht angeglichen:** Mikrofon und App-Audio werden gemischt, ohne die beiden Quellen auf ein \u00e4hnliches Niveau zu bringen. F\u00fcr die Spracherkennung und die Sprecherzuordnung ist ein ausgeglichener Pegel wichtig.\n3. **Echo-Unterdr\u00fcckung** (falls eingeschaltet) d\u00e4mpft die eigene Stimme, wenn gleichzeitig App-Audio l\u00e4uft.\n\n## Wunsch\n\n- Beim Start der Aufnahme sichtbar machen, **welches Mikrofon** tats\u00e4chlich aufnimmt, und warnen, wenn es nicht das Ger\u00e4t ist, das die Meeting-App benutzt (soweit ermittelbar).\n- **Pegelausgleich** je Quelle vor dem Mischen (z. B. Lautheit auf ein Ziel normalisieren), abschaltbar.\n- Pegelanzeige je Quelle w\u00e4hrend der Aufnahme (`PerChannelIndicator` gibt es schon \u2014 pr\u00fcfen, ob sie das abdeckt).\n\n## Abnahme\n\n- Headset gew\u00e4hlt: eigene Stimme und Gegen\u00fcber liegen in der Aufnahme im selben Lautst\u00e4rkebereich (\u00b1 6 dB).\n- \u201eSystem Default\" zeigt ein anderes Ger\u00e4t als das Headset \u2192 sichtbarer Hinweis.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/4"
   },
-  "updated_at": "2026-10-06T20:54:51.904632Z"
+  "updated_at": "2026-10-07T08:48:15.816153Z"
 }

@@ -104,6 +104,30 @@ final class DualSourceRecorderCrashRecoveryTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: appTmp.path), "the raw temp should be consumed")
     }
 
+    /// A mix rebuilt after a crash is balanced like a finished recording's when
+    /// the flag is on, and left as recorded when it is off.
+    func testRecoveryBalancesTheRebuiltMixOnlyWithTheFlag() throws {
+        for levelBalance in [false, true] {
+            let dir = try makeTempDirectory(prefix: "crash_level_balance")
+            let stem = "20260311_290000"
+            let appTmp = dir.appendingPathComponent(stem + RecordingFileSuffix.appRaw)
+            try writeRawFloat32(HeadsetGapFixture.farEnd, to: appTmp)
+            let micWav = dir.appendingPathComponent(stem + RecordingFileSuffix.mic)
+            try AudioMixer.saveWAV(samples: HeadsetGapFixture.ownVoice, sampleRate: HeadsetGapFixture.rate, url: micWav)
+            try backdate([appTmp, micWav])
+
+            XCTAssertEqual(DualSourceRecorder.recoverCrashedRecordings(in: dir, levelBalance: levelBalance), 1)
+
+            let mix = try AudioMixer.loadAudioFileAsFloat32(url: dir.appendingPathComponent(stem + RecordingFileSuffix.mix))
+            let gap = HeadsetGapFixture.gap(in: mix)
+            if levelBalance {
+                XCTAssertLessThanOrEqual(abs(gap), 6)
+            } else {
+                XCTAssertEqual(gap, HeadsetGapFixture.recordedGap, accuracy: 1)
+            }
+        }
+    }
+
     /// A pre-upgrade temp (`_app_raw.tmp`, raw device-rate stereo) must also be
     /// detected as a crash orphan — upgrading the app must not strand audio
     /// recorded by the previous version.

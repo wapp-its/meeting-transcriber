@@ -12,7 +12,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-4-balance-own-voice-and-remote-levels",
   "spec_path": ".flow/tasks/gh-4-balance-own-voice-and-remote-levels.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "Balanced voice samples in the naming dialog",
   "updated_at": "2026-10-06T20:27:30.023061Z"
 }

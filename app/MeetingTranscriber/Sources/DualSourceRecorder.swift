@@ -21,6 +21,9 @@ struct RecordingResult {
     /// Where the saved audio ends on the same wall clock when the tracks were
     /// cut back after the stop (`RecordingCut`), nil when they run to it.
     var recordedUntil: Date?
+    /// Whether the two tracks were mixed with the speech-level balance. Its
+    /// gains come from all of the audio, so a cut mixes the kept tracks again.
+    var levelBalanced = false
 }
 
 /// The format `buildRecording` should expect the app track to arrive in, passed
@@ -297,9 +300,9 @@ class DualSourceRecorder: RecordingProvider {
     /// it unfinalized). The per-track `micDelay` is unrecoverable after a
     /// crash, so the tracks are mixed from their file starts — a sub-100 ms
     /// drift vs. a clean recording, an acceptable cost to rescue audio that
-    /// would otherwise be lost.
+    /// would otherwise be lost. `levelBalance` is handed to the re-mix.
     @discardableResult
-    nonisolated static func recoverCrashedRecording(stem: String, in recDir: URL) throws -> URL {
+    nonisolated static func recoverCrashedRecording(stem: String, in recDir: URL, levelBalance: Bool = false) throws -> URL {
         let temp = crashedTemp(stem: stem, in: recDir)
         let micWav = recDir.appendingPathComponent(stem + RecordingFileSuffix.mic)
         let hasMic = FileManager.default.fileExists(atPath: micWav.path)
@@ -329,6 +332,7 @@ class DualSourceRecorder: RecordingProvider {
                 requestedRate: rate,
                 targetRate: AudioConstants.targetSampleRate,
             ),
+            levelBalance: levelBalance,
         )
         return recording.mixPath
     }
@@ -343,11 +347,12 @@ class DualSourceRecorder: RecordingProvider {
     /// (its mtime is recent; a crashed recording's temp predates the relaunch
     /// gap). The queue-build Task that calls this is fired by a watch-start
     /// immediately before the loop may begin a new recording, so the guard is
-    /// load-bearing — not cosmetic.
+    /// load-bearing — not cosmetic. `levelBalance` is handed to every re-mix.
     @discardableResult
     nonisolated static func recoverCrashedRecordings(
         in dir: URL,
         minAge: TimeInterval = 30,
+        levelBalance: Bool = false,
     ) -> Int {
         let fm = FileManager.default
         let names = (try? fm.contentsOfDirectory(atPath: dir.path)) ?? []
@@ -360,7 +365,7 @@ class DualSourceRecorder: RecordingProvider {
             // running writer is what this guard exists to prevent.
             if lastTrackWrite(stem: stem, in: dir).map({ $0 > cutoff }) ?? true { continue }
             do {
-                let mix = try recoverCrashedRecording(stem: stem, in: dir)
+                let mix = try recoverCrashedRecording(stem: stem, in: dir, levelBalance: levelBalance)
                 // The mix alone would already stop `crashedRecordingStems` from
                 // re-reporting this stem; the marker goes too so a recovery
                 // whose mix is later moved into the output folder cannot look
@@ -390,6 +395,11 @@ class DualSourceRecorder: RecordingProvider {
     /// property rather than another `start` argument so the `RecordingProvider`
     /// doubles, which record nothing, do not all have to learn it.
     var silentTrackWatchdogEnabled = false
+
+    /// Whether `stop()` balances the two tracks' speech levels in the mix. Set
+    /// before `start(...)` by the recorder factory from
+    /// `AppSettings.levelBalanceEnabled`, like the watchdog flag above.
+    var levelBalanceEnabled = false
 
     /// Start recording whichever channels `source` asks for.
     func start(
@@ -500,6 +510,7 @@ class DualSourceRecorder: RecordingProvider {
             timestamp: ts,
             recordingStartDate: recordingStartDate,
             format: CaptureFormat(requestedChannels: 1, requestedRate: targetRate, targetRate: targetRate),
+            levelBalance: levelBalanceEnabled,
         )
 
         // Dropped only once the mix exists, exactly where `buildRecording`

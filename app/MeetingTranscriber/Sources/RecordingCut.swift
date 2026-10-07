@@ -69,6 +69,7 @@ enum RecordingCut {
             micPath: recording.micPath.map { uncut[$0] ?? $0 },
             micDelay: recording.micDelay,
             recordingStartDate: recording.recordingStartDate,
+            levelBalanced: recording.levelBalanced,
         )
     }
 
@@ -126,6 +127,33 @@ enum RecordingCut {
 
         let staged = try stageCopies(of: cuts)
         try swapIn(staged, rename: rename)
+    }
+
+    /// Mix the two tracks of a cut recording again with the speech-level
+    /// balance, so its gains come from the kept audio only, and swap the new
+    /// mix in over the old one. A single-track recording has nothing to mix.
+    /// The new mix is written beside the old one and renamed over it, so a
+    /// failure anywhere leaves the old mix whole on its path.
+    static func remixBalanced(
+        _ recording: RecordingResult,
+        rename: (URL, URL) throws -> Void = Self.rename,
+    ) throws {
+        guard let app = recording.appPath, let mic = recording.micPath else { return }
+        let staged = sibling(of: recording.mixPath, suffix: "remixing.wav")
+        try? FileManager.default.removeItem(at: staged)
+        do {
+            try AudioMixer.mix(
+                appAudioPath: app,
+                micAudioPath: mic,
+                outputPath: staged,
+                micDelay: recording.micDelay,
+                levelBalance: true,
+            )
+            try rename(staged, recording.mixPath)
+        } catch {
+            try? FileManager.default.removeItem(at: staged)
+            throw error
+        }
     }
 
     /// POSIX `rename`: atomically replaces `destination`, unlike
