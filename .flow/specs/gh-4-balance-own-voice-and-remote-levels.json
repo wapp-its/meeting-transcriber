@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-4-level-balance",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-10-07T07:54:27.254886Z",
+  "completion_reviewed_at": "2026-10-07T08:48:15.814923Z",
   "created_at": "2026-10-06T20:19:52.495155Z",
   "default_impl": null,
   "default_review": null,
@@ -386,6 +386,41 @@
       "timestamp": "2026-10-07T07:54:27.214714Z",
       "tool_calls": 22,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "7fe1f427eed5b91419c1df32beaaba343a1f25f73e60e8d68063aae4e8455e55",
+      "backend": "codex",
+      "base_sha": "7a61c31fa7fe6db2ad3f73c82916b2600dcef65b",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "84387418fd82a2eb7e3169a85765ab392de3d760",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 5486,
+      "output_sha256": "59e539df1c5278980af3d2857833381e56f073337e1d79448c94976a7cb78d9c",
+      "reservation_id": "66ed52dc66b44d4c8e1831e4c4ec9700",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-07T08:48:15.785936Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -393,7 +428,7 @@
     "impl:gh-4-balance-own-voice-and-remote-levels.2": 1,
     "impl:gh-4-balance-own-voice-and-remote-levels.3": 1,
     "plan": 1,
-    "plan#completion": 1
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -420,5 +455,5 @@
     "mergeBaseTracker": "## Beobachtung\n\nMit Headset im Teams-Meeting ist in der Aufnahme die **eigene Stimme sehr leise**, die **anderen Teilnehmenden sehr laut**.\n\n## Vermutete Ursachen (zu pr\u00fcfen)\n\n1. **Falsches Mikrofon:** Unter **Settings \u2192 Audio \u2192 Microphone** steht standardm\u00e4ssig \u201eSystem Default\". Ist das macOS-Standard-Eingabeger\u00e4t das eingebaute MacBook-Mikrofon, w\u00e4hrend Teams selbst das Headset benutzt, nimmt die App die eigene Stimme aus Distanz \u00fcber das MacBook-Mikrofon auf. Sofort-Test: dort das Headset ausdr\u00fccklich w\u00e4hlen.\n2. **Pegel werden nicht angeglichen:** Mikrofon und App-Audio werden gemischt, ohne die beiden Quellen auf ein \u00e4hnliches Niveau zu bringen. F\u00fcr die Spracherkennung und die Sprecherzuordnung ist ein ausgeglichener Pegel wichtig.\n3. **Echo-Unterdr\u00fcckung** (falls eingeschaltet) d\u00e4mpft die eigene Stimme, wenn gleichzeitig App-Audio l\u00e4uft.\n\n## Wunsch\n\n- Beim Start der Aufnahme sichtbar machen, **welches Mikrofon** tats\u00e4chlich aufnimmt, und warnen, wenn es nicht das Ger\u00e4t ist, das die Meeting-App benutzt (soweit ermittelbar).\n- **Pegelausgleich** je Quelle vor dem Mischen (z. B. Lautheit auf ein Ziel normalisieren), abschaltbar.\n- Pegelanzeige je Quelle w\u00e4hrend der Aufnahme (`PerChannelIndicator` gibt es schon \u2014 pr\u00fcfen, ob sie das abdeckt).\n\n## Abnahme\n\n- Headset gew\u00e4hlt: eigene Stimme und Gegen\u00fcber liegen in der Aufnahme im selben Lautst\u00e4rkebereich (\u00b1 6 dB).\n- \u201eSystem Default\" zeigt ein anderes Ger\u00e4t als das Headset \u2192 sichtbarer Hinweis.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/4"
   },
-  "updated_at": "2026-10-07T08:09:22.513986Z"
+  "updated_at": "2026-10-07T08:48:15.816153Z"
 }
