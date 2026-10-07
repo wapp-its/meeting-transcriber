@@ -108,6 +108,8 @@ Task gh-4-balance-own-voice-and-remote-levels.1 validates the core approach (the
 - **A7 · Each naming sample is balanced on its own at playback, not with its track's mix gain.** flip at: the `SpeakerNamingView` playback helper · test: the playback helper tests · alternatives: apply the track's gain (consistent with the mix, but a loudspeaker microphone track measured without the gate mis-measures the own voice) · status: active [agent-assumed 2026-10-06]
 - **A8 · The switch is read when a recording starts, like the silent-track watchdog; crash recovery reads it at launch.** flip at: `WatchingController+RecorderFactory.swift` and `PipelineController.swift` · test: the controller wiring test and the crash-recovery test · status: active [agent-assumed 2026-10-06]
 
+FIT: GO · 2026-10-07 · base f3cb9a26 · engine flow-next 8.1.0 · spec text unchanged since its plan commit; no design doc moved; all cited symbols present on the head; of the named files only AppSettings.swift and A11yID.swift changed on the base (additive, gh-12/gh-1); the 12 specs planned since claim none of this scope (gh-43 defers part c here, gh-5 lists AudioMixer.mix/suppressEcho as unchanged); gh-46/gh-60 tasks touch DualSourceRecorder too, a later merge-order fact, not an ownership change
+
 
 ## Requirement coverage
 
