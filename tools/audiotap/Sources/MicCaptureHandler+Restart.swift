@@ -18,17 +18,27 @@ extension MicCaptureHandler {
     /// is what enforces that: an attempt already in flight may be wedged, and
     /// starting a second one would leak another thread into the same loop.
     ///
-    /// `trigger` only names the cause for the log; both device triggers behave
-    /// exactly as they always have. The stall watchdog does not come through
-    /// here, because it has to count its launch and log its line between the
+    /// `trigger` only names the cause for the log; both device triggers launch
+    /// exactly the same attempt. What differs is how often they may ask: a
+    /// configuration change comes here only through `MicConfigChangePolicy`
+    /// (see `+ConfigChange`), which paces and caps those restarts, because a
+    /// pinned headset posted one after every engine start and restarting on
+    /// each never let a buffer arrive. A default-input change comes straight
+    /// here, as it always has. The stall watchdog does not come through here,
+    /// because it has to count its launch and log its line between the
     /// arbiter's grant and the launch (see `+StallWatchdog`), but it takes the
     /// same `claimRestartAttempt` and the same `launchRestartAttempt`.
-    func handleDeviceChange(_ trigger: MicRestartTrigger = .defaultInputChanged) {
-        guard let claim = claimRestartAttempt() else { return }
+    ///
+    /// Returns whether the arbiter granted an attempt, so the caller can
+    /// charge only a restart that was actually launched.
+    @discardableResult
+    func handleDeviceChange(_ trigger: MicRestartTrigger = .defaultInputChanged) -> Bool {
+        guard let claim = claimRestartAttempt() else { return false }
         // Not the watchdog's budget, but it ends the wait for a stall
         // restart's first buffer: what arrives next is this restart's.
         stallWatchdog.withLock { _ = $0.restartLaunched(byStall: false) }
         launchRestartAttempt(deviceUID: claim.deviceUID, generation: claim.generation, trigger: trigger)
+        return true
     }
 
     /// Choose the device a restart aims at and ask the arbiter for an attempt.
@@ -162,6 +172,8 @@ extension MicCaptureHandler {
         }
         session = candidate
         restartRetryCount = 0
+        configChangePolicy.engineStarted(at: adoptedAt)
+        cancelPendingConfigChangeRestart()
         installConfigChangeObserver()
         noteAdoptionForStallWatchdog(at: adoptedAt, trigger: trigger, onSelectedDevice: deviceUID != nil, rate: rate)
         // A stall restart's adoption is logged by the watchdog, at a retained
@@ -190,6 +202,7 @@ extension MicCaptureHandler {
         // teardown would block this thread behind it.
         outputFile = nil
         stopStallWatchdog()
+        cancelPendingConfigChangeRestart()
         onGiveUp?()
     }
 
@@ -217,6 +230,7 @@ extension MicCaptureHandler {
             logger.error("Mic: giving up restart after \(self.restartRetryCount) failed attempts")
             outputFile = nil
             stopStallWatchdog()
+            cancelPendingConfigChangeRestart()
             onGiveUp?()
 
         case let .retry(delay):

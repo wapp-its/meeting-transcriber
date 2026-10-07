@@ -13,8 +13,9 @@ private let logger = Logger(subsystem: "com.meetingtranscriber.audiotap", catego
 ///
 /// Public API (`start`/`stop`/`currentLevelDBFS`) is called from the main actor.
 ///
-/// Mutable state is split by owner. `session`, `configChangeObserver` and the
-/// retry counter are confined to the main queue: a restart attempt runs on
+/// Mutable state is split by owner. `session`, `configChangeObserver`,
+/// `configChangePolicy`, `pendingConfigChangeRestart` and the retry counter
+/// are confined to the main queue: a restart attempt runs on
 /// `restartQueue`, builds a candidate session from locals, and publishes nothing
 /// until the main queue adopts it with the arbiter's approval, so a stop and an
 /// adoption are totally ordered rather than racing. `outputFile` is created in
@@ -113,6 +114,12 @@ public class MicCaptureHandler: @unchecked Sendable {
     let isDevicePresent: @Sendable (String) -> Bool
     private var deviceChangeListener: AudioObjectPropertyListenerBlock?
     var configChangeObserver: (any NSObjectProtocol)?
+    /// Paces and caps the restarts a configuration change may launch (see
+    /// `+ConfigChange`). Main-queue confined, like `session`.
+    var configChangePolicy: MicConfigChangePolicy
+    /// The delayed configuration-change restart still waiting out its backoff,
+    /// nil when none is. Main-queue confined, like `session`.
+    var pendingConfigChangeRestart: DispatchWorkItem?
     var selectedDeviceUID: String?
     /// Wall-clock anchoring so a device-restart gap becomes silence in the WAV
     /// instead of an under-run (issue #379 follow-up — see `+Timeline`).
@@ -182,9 +189,11 @@ public class MicCaptureHandler: @unchecked Sendable {
         stallWatchdogLimits: MicStallWatchdogPolicy.Limits = .production,
         stallClock: @escaping @Sendable () -> TimeInterval = MicStallWatchdogPolicy.monotonicNow,
         isDevicePresent: @escaping @Sendable (String) -> Bool = MicCaptureHandler.isDevicePresentOnSystem,
+        configChangeLimits: MicConfigChangePolicy.Limits = .production,
     ) {
         self.decideRetry = decideRetry
         stallWatchdog = OSAllocatedUnfairLock(initialState: MicStallWatchdogPolicy(limits: stallWatchdogLimits))
+        configChangePolicy = MicConfigChangePolicy(limits: configChangeLimits)
         self.stallClock = stallClock
         self.isDevicePresent = isDevicePresent
         self.outputURL = outputURL
@@ -203,6 +212,7 @@ public class MicCaptureHandler: @unchecked Sendable {
         selectedDeviceUID = deviceUID
         try startEngine(deviceUID: deviceUID, on: session)
         _ = arbiter.withLock { $0.handle(.startSucceeded) }
+        configChangePolicy.engineStarted(at: stallClock())
         installDeviceChangeListener()
         installConfigChangeObserver()
         startStallWatchdog()
@@ -377,24 +387,6 @@ public class MicCaptureHandler: @unchecked Sendable {
         }
     }
 
-    /// Listen for AVAudioEngine configuration changes (format changes on current device).
-    func installConfigChangeObserver() {
-        guard configChangeObserver == nil else { return }
-        configChangeObserver = NotificationCenter.default.addObserver(
-            forName: .AVAudioEngineConfigurationChange,
-            object: session.notificationObject,
-            queue: .main,
-        ) { [weak self] _ in
-            self?.handleEngineConfigChange()
-        }
-        logger.info("Mic: listening for engine configuration changes")
-    }
-
-    private func handleEngineConfigChange() {
-        logger.info("Mic: engine configuration changed (format/route change)")
-        handleDeviceChange(.configurationChanged)
-    }
-
     private func handleDefaultInputDeviceChanged() {
         logger.info("Mic: default input device changed")
         handleDeviceChange(.defaultInputChanged)
@@ -409,6 +401,7 @@ public class MicCaptureHandler: @unchecked Sendable {
         // caller (issue #588).
         let decision = arbiter.withLock { $0.handle(.stopRequested) }
         stopStallWatchdog()
+        cancelPendingConfigChangeRestart()
         if let listener = deviceChangeListener {
             AudioObjectRemovePropertyListenerBlock(
                 AudioObjectID(kAudioObjectSystemObject),
