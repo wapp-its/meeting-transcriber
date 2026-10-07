@@ -56,9 +56,22 @@ Do not add `PermissionsTests` to the filter: it calls the live microphone reques
 - [ ] No test calls the live requester or any TCC request API.
 - [ ] Focused tests pass (`exit=0` in the log), the App Store variant builds, and lint is clean with the pinned tools.
 ## Done summary
-TBD
+The app now has the logic behind a per-permission Settings button. For Screen Recording, Microphone and Accessibility it asks macOS where asking can still list the app or grant in place, and then opens that permission's System Settings page. A permission that is granted when the person clicks only opens the page, with no dialog. Task 2 adds the views.
 
+- `Sources/PermissionAccessRequest.swift` adds `PermissionKind` (the three rows and their deep links, copied from `PrivacyPane`), `PermissionAccessState` with `init(microphone:)`, the pure `PermissionAccessStep.decide` with `buttonTitle`, and the `@MainActor PermissionAccessRequester`. `run` reads the state when called, awaits the request, then opens the page exactly once. `static var live` binds the real calls and compiles the Accessibility request out of the App Store build (`#if !APPSTORE`, `canRequestAccessibility` false there).
+- `Permissions.requestScreenRecordingAccess()` is the deliberate path (R5). It checks the preflight, then calls `CGRequestScreenCaptureAccess()`. It never touches `screenRecordingPromptLock` or `claimFirst` and logs nothing on a false return. `ensureScreenRecordingAccess()` is byte-for-byte unchanged (commit 2149531d adds lines only).
+- Tests. `PermissionAccessRequestTests` (7 tests) covers every decision-table cell for both values of `canRequestAccessibility`, the four microphone mappings, the three deep links and both titles. It also covers the executor: request before one open for all three kinds; one open and no request for each granted kind, for a denied microphone and for Accessibility with `canRequestAccessibility` false; and the state read at call time. No test builds `live` or calls a TCC API. Against a stub (`decide` always `.openSettings`, `run` empty, trivial URLs, titles and mapping) all 7 tests failed for those reasons before the implementation landed.
+- Verification on the final HEAD. `swift test --parallel --filter 'PermissionAccessRequestTests|WatchingControllerTests|AdvancedSettingsPermissionsTests|PermissionRowTests|SettingsViewTests'` exited 0 with 125 tests run. The App Store debug build exited 0. `./scripts/lint.sh` with the pinned SwiftFormat 0.63.0 and SwiftLint 0.65.1 found 0 violations in 663 files. Release builds of both variants (the `pre-push.sh --with-appstore` commands, run in a separate build path) exited 0. Baseline before any edit was green: 25 WatchingControllerTests, lint clean, App Store build.
+- Decisions. SwiftLint `file_name` rejects the planned file name, because none of the four types is named `PermissionAccessRequest`. The AC fixes that name, so line 1 carries `// swiftlint:disable:this file_name` with the reason. A file-level disable cannot cover the 1:1 violation. The constant deep-link URL carries a `force_unwrapping` suppression. Both commits end with the `Task:` trailer, as the dispatch asked. The fork rule for the original's readers bans spec ids in commit messages, so `submit.sh` would need these messages reworded.
+- Review notes. The Codex reviewers saw one `WatchingControllerTests` timing case fail inside their sandbox. It passes locally, before and after this change, so it is environmental to that sandbox and not part of this change.
+- No feature-map route changed: this task adds no UI.
+
+baseline: green (WatchingControllerTests 25/25, lint 0 violations, App Store build)
+stage: impl-review - ran [..2026-10-07T03:32:12Z] (codex gpt-5.6-sol xhigh, 3 draws correctness/contracts/integration, SHIP on round 1, 0 findings)
+Tier: session (jev-unavailable(no_key)) - actual_model: claude-opus-5-5 (host metadata)
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 2149531d072eee228ded945e3f4b023503c5a85c, 6804fe861ea0b23a55d44d536e2684c5a5b086d2
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh-1-home swift test --parallel --filter 'PermissionAccessRequestTests|WatchingControllerTests|AdvancedSettingsPermissionsTests|PermissionRowTests|SettingsViewTests' (exit 0, 125 tests), cd app/MeetingTranscriber && swift build --build-path /private/tmp/mt-gh-1-appstore-build -Xswiftc -DAPPSTORE (exit 0), PATH=<pinned lint cache>:$PATH ./scripts/lint.sh (exit 0, 0 violations), swift build -c release and swift build -c release -Xswiftc -DAPPSTORE (pre-push parity, separate build paths, exit 0)
 - PRs:
