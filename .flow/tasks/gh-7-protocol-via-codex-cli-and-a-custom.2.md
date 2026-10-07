@@ -64,9 +64,38 @@ Add the Codex CLI preset and the custom command as one `CommandProtocolGenerator
 - [ ] `customCommandArguments` and `customCommandModel` persist, `customCommandText` round-trips losslessly, and the App Store variant builds, offers neither provider and falls back from a stored `customCommand` to `.openAICompatible`.
 - [ ] `./scripts/lint.sh` passes with the pinned tools.
 ## Done summary
-TBD
+A user who picks "Codex CLI" or "Custom Command" as the protocol provider now gets a protocol written by that program (the Settings controls arrive in task .3; until then both show an interim caption). `CommandProtocolGenerator` runs the Codex preset (`codex exec --json --ephemeral --skip-git-repo-check --sandbox read-only --output-last-message {output_file} -`, prompt on stdin) and the user's stored argument list on the shared `CLIProcessRunner`, with the placeholder rules in the pure `CommandTemplate`.
 
+What a run does. The program is resolved before anything starts (absolute path, `~/`, or a bare name in the runner's search paths and then the absolute `PATH` entries; `bin/tool` and unknown names fail with `commandNotFound`). It starts without a shell in a fresh 0700 run folder that holds only the input files its placeholders name (0600), and the folder is removed after success and failure. `{output_file}` is opened with `O_RDONLY | O_NOFOLLOW | O_NONBLOCK`, checked as a regular file with `fstat`, and read up to the cap, so a symlink or FIFO there counts as no protocol. Every error names the tool and carries no stdout, stderr, argument or model text; Codex failures carry Codex's own `turn.failed`/`error` message or the update hint when Codex rejects an option. `ProtocolGenerator.fullPrompt` builds the prompt for the Claude and command providers alike. Settings add `codexCLI` and `customCommand` (Homebrew only), `customCommandArguments`, `customCommandModel` and the `customCommandText` line view; the factory builds both providers.
+
+Tests, one per acceptance item and error case:
+- `CommandTemplateTests` (6): trimming, `uses` ignores the program, substitution inside an argument, repeated and unknown placeholders, no re-expansion, input and output modes, both validation messages.
+- `CommandProtocolGeneratorTests` (16): stdin bytes equal pinned prompt plus transcript; `{prompt_file}` equals those bytes with empty stdin; `{transcript_file}` holds the transcript; modes 600/600/700 and folder contents; output file wins over stdout; missing, symlinked, FIFO, blank file and blank stdout fail as `commandProducedNoProtocol` within 5 s; file and stdout over a 1 KiB cap fail as `commandOutputTooLarge`; injection arguments and a `$(touch ...)` model with surrounding spaces arrive unchanged and create nothing; configuration errors start nothing; bare, relative and missing Codex programs fail as `commandNotFound`; `resolveProgram` table with an injected home; exit 2 with the transcript on stderr gives "Custom command exited with code 2"; a 1 s timeout gives `commandTimedOut`; the run folder is gone after success and failure; the Codex vector is pinned; a fake Codex's last-message file is the protocol; `turn.failed` and the `--ephemeral` rejection give their reasons; `codexFailureReason` table (precedence, last event wins, 300-character cap, unknown shapes nil).
+- `CommandProviderSettingsTests`: defaults, persistence through a fresh `AppSettings`, the `"ollama\nrun\n"` round trip, provider order and labels, and under `APPSTORE` the fallback of stored `codexCLI`/`customCommand` to `.openAICompatible` (run with `-Xswiftc -DAPPSTORE`, passed).
+- `AppStateTests`: `testMakeProtocolGeneratorCodexCLI` (exact vector) and `testMakeProtocolGeneratorCustomCommand`.
+Mutation check: dropping `O_NOFOLLOW | O_NONBLOCK` made the symlink case return the target file's text and the FIFO case hang past 5 s, so the output-file test fails for both guards.
+
+Deviations from the task text:
+- The FIFO case waits at most 5 s instead of 1 s. A blocking open never returns, so any bound catches the hang, and a 1 s bound would flake under the measured load.
+- `customCommandText` sits in an `extension AppSettings` in the same file, because inside the class it pushed the class body to 401 lines against SwiftLint's 400.
+- `resolveProgram` skips relative `PATH` entries, which would resolve against the app's working directory.
+- `timeout`, `maxOutputBytes` and `promptURL` are defaulted `var` properties, so tests set them on the real factories.
+- Lossy UTF-8 decoding is one helper with a `swiftlint:disable:next optional_data_string_conversion`, because that rule flags `String(decoding:as:)` and the failable initializer would lose a whole protocol to one bad byte.
+
+Review: round 1 fanned out three draws; the correctness draw timed out at 1800 s during an API outage, so only the contracts and integration lenses voted. Both found the same defect. The generator trimmed the model before substituting it, so a value with surrounding spaces reached the program changed. The validator kept it, fix commit b704b4f8 substitutes the model as stored, and the round 2 re-review returned SHIP (receipt effort xhigh).
+
+Follow-ups (not filed by this worker):
+- The absolute timing bounds in `CLIProcessRunnerTests` (2 s and 5 s) and `ClaudeCLIProtocolGeneratorSessionPersistenceTests` (3 s) failed once in a 186-test parallel run at load average 53 and passed on re-run at load 8. The full CI suite may hit the same.
+- CI's `swiftlint analyze` lane was not run locally.
+- A real Codex run and a real `ollama run` remain the owner's checks, as the spec says.
+
+baseline: green (158 focused tests and lint 0 violations, pre-edit)
+Tier: routing block -> opus at xhigh (judge unavailable: no_key) (actual: claude-opus-5-5)
+
+stage: impl-review - ran [2026-10-07T12:58Z..2026-10-07T14:15Z]
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 5d9b6131b3b02b145ab9c571d2aa26b99e21d94b, 930c448bdb4538afd3b41ba6d4155ceebc786a19, 03f3abaae5972116cdb5ae98bf398a6c21d08280, b704b4f8d57ae5b29de5f538aea61bcaa017d778
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh7-home swift test --parallel --filter 'CommandTemplateTests|CommandProtocolGeneratorTests|CommandProviderSettingsTests|AppStateTests|CLIProcessRunnerTests|ClaudeCLIProtocolGenerator' (186 tests, exit 0 at b704b4f8), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh7-home swift test -Xswiftc -DAPPSTORE --scratch-path /private/tmp/mt-gh7-appstore-build --filter 'CommandProviderSettingsTests|AppSettingsTests/testProtocolProvider' (3 tests, exit 0 at 03f3abaa), cd app/MeetingTranscriber && swift build -Xswiftc -DAPPSTORE --scratch-path /private/tmp/mt-gh7-appstore-build (exit 0 at b704b4f8), ./scripts/pre-push.sh (exit 0 at b704b4f8), PATH=/private/tmp/gh4/tools:$PATH ./scripts/lint.sh with SwiftFormat 0.63.0 and SwiftLint 0.65.1 (0 violations at b704b4f8)
 - PRs:
