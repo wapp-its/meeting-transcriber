@@ -7,14 +7,15 @@ satisfies: [R4]
 Balance each naming-dialog voice sample before it plays (R4). Last because it uses `LevelBalance` from .1 and the setting from .2.
 
 **Size:** S
-**Files:** `app/MeetingTranscriber/Sources/SpeakerNamingView.swift`, `app/MeetingTranscriber/Sources/MeetingTranscriberApp.swift`, `app/MeetingTranscriber/Tests/SpeakerSampleLevelTests.swift` (new)
-**Touches:** [app/MeetingTranscriber/Sources/SpeakerNamingView.swift, app/MeetingTranscriber/Sources/MeetingTranscriberApp.swift, app/MeetingTranscriber/Tests/SpeakerSampleLevelTests.swift]
+**Files:** `app/MeetingTranscriber/Sources/SpeakerNamingView.swift`, `app/MeetingTranscriber/Sources/MeetingTranscriberApp.swift`, `app/MeetingTranscriber/Tests/SpeakerSampleLevelTests.swift` (new); estimator noise reference (spec A10, added 2026-10-07 after impl-review round 1): `app/MeetingTranscriber/Sources/LevelBalance.swift`, `app/MeetingTranscriber/Tests/LevelBalanceTests.swift`
+**Touches:** [app/MeetingTranscriber/Sources/SpeakerNamingView.swift, app/MeetingTranscriber/Sources/MeetingTranscriberApp.swift, app/MeetingTranscriber/Tests/SpeakerSampleLevelTests.swift, app/MeetingTranscriber/Sources/LevelBalance.swift, app/MeetingTranscriber/Tests/LevelBalanceTests.swift]
 
 ### Approach
 - `SpeakerNamingView`: add `let balanceSampleLevels: Bool` and an init parameter `balanceSampleLevels: Bool = false` (init at `SpeakerNamingView.swift:48-81`). The default keeps voice enrollment (`VoiceEnrollmentView.swift:118`) and every existing test as it is.
 - Add a pure `nonisolated static func` in the "Pure Functions (testable without UI)" section (`:603`, beside `sampleRange` at `:611`) that takes the decoded samples, the range, the sample rate and the flag, and returns what to play: the cut, run through `LevelBalance.balance` with the 0.5 s sample minimum when the flag is on.
 - `playSpeakerSnippet` (`:531-582`) calls it inside the detached task in place of `Array(samples[range])`; capture the flag as a value in the closure's capture list, as `source` already is.
 - `MeetingTranscriberApp.speakerNamingForm` (`MeetingTranscriberApp.swift:335-355`) passes `balanceSampleLevels: appState.settings.levelBalanceEnabled`.
+- Noise reference for short samples (spec A10, from impl-review round 1): a 1.5–2 s sample that is speech throughout has no pause, so `LevelBalance.measure`'s 10th-percentile noise floor lands inside the speech and the +10 dB margin excludes most frames; the sample reads as not measurable and plays unchanged (R4 broken). Give `LevelBalance.measure`/`balance` an optional noise reference (frame levels or samples of the whole track the cut comes from) whose 10th percentile replaces the sample's own floor when supplied; `playbackSnippet` passes the whole decoded file. Thresholds, the 0.5 s minimum, cap, clip budget and clamp are unchanged, and the track path (`AudioMixer.mix`, no reference) measures exactly as before. Tests: `LevelBalanceTests` gets an all-speech −40 dBFS 1.5 s sample that is unmeasurable alone and raised to −20 ± 1 dBFS with a reference carrying the track's −70 dBFS room tone; the existing estimator tests stay byte-identical.
 
 ### Investigation targets
 **Required** (read before coding):
