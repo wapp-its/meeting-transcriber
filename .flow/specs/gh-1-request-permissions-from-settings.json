@@ -246,7 +246,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-1-request-permissions-from-settings.md",
-  "status": "open",
+  "status": "done",
   "title": "Request permissions from Settings",
   "tracker": {
     "baseHashFlow": null,
@@ -260,5 +260,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/1"
   },
-  "updated_at": "2026-10-07T04:02:01.690107Z"
+  "updated_at": "2026-10-07T04:34:32.922207Z"
 }
