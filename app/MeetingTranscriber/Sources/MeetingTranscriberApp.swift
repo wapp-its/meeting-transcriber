@@ -341,6 +341,7 @@ struct MeetingTranscriberApp: App {
             currentDiarizerMode: appState.pipeline.queue.usedDiarizerMode(forJobID: data.jobID)
                 ?? appState.settings.diarizerMode,
             pendingJobCount: appState.pipeline.queue.pendingSpeakerNamingJobs.count,
+            balanceSampleLevels: appState.settings.levelBalanceEnabled,
             onDismissRequest: { closeWindow(id: "speaker-naming") },
             onComplete: { result in
                 appState.pipeline.queue.completeSpeakerNaming(jobID: data.jobID, result: result)
