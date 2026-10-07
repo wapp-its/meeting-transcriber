@@ -33,12 +33,23 @@ enum AudioMixer {
     /// Mix app and mic audio tracks into a single mono WAV.
     ///
     /// Applies echo suppression, delay alignment, then averages the two tracks.
+    ///
+    /// `levelBalance` brings each track to `LevelBalance.targetDBFS` speech
+    /// level before they are averaged, so the own voice and the far end land
+    /// at a similar loudness in the mix, and logs one line with each track's
+    /// level and gain. It runs after the echo gate, which is still decided on
+    /// the unbalanced app track and silences the same microphone windows; the
+    /// microphone is measured after the gate, so far-end audio leaking into it
+    /// is not taken for the own voice. Only the mix changes: the input files
+    /// are read, never written. With either track empty there is nothing to
+    /// balance, and the mix is the other track as recorded.
     static func mix(
         appAudioPath: URL,
         micAudioPath: URL,
         outputPath: URL,
         micDelay: TimeInterval = 0,
         sampleRate: Int = AudioConstants.targetSampleRate,
+        levelBalance: Bool = false,
     ) throws {
         var appSamples = try loadAudioFileAsFloat32(url: appAudioPath)
         var micSamples = try loadAudioFileAsFloat32(url: micAudioPath)
@@ -53,6 +64,12 @@ enum AudioMixer {
                 sampleRate: sampleRate,
                 micDelay: clampedDelay,
             )
+            if levelBalance {
+                let minimum = LevelBalance.trackMinimumSpeechSeconds
+                let app = LevelBalance.balance(&appSamples, sampleRate: sampleRate, minimumSpeechSeconds: minimum)
+                let mic = LevelBalance.balance(&micSamples, sampleRate: sampleRate, minimumSpeechSeconds: minimum)
+                logger.notice("\(LevelBalance.logLine(app: app, mic: mic), privacy: .public)")
+            }
         }
 
         // Align by mic delay (shift mic samples)
