@@ -250,7 +250,13 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
             logger.error(
                 "WhisperKit model load failed (\(String(describing: type(of: error)), privacy: .public): \(String(reflecting: error), privacy: .public))",
             )
-            lastLoadFailure = error as? WhisperKitLoadFailure
+            // Recorded only for the selection still in force. A load superseded by a
+            // model change while it ran would otherwise write its refusal back under
+            // the new model, which `applyModelVariant` had just cleared, and a
+            // cancelled owner never runs the attempt that would clear it again.
+            if variant == modelVariant, origin == modelOrigin {
+                lastLoadFailure = error as? WhisperKitLoadFailure
+            }
             // A failed *reload* keeps the prior pipe (see `unloadModel`), and the
             // state has to say so: `ensureModel` short-circuits on a non-nil pipe
             // and keeps transcribing, so reporting `.unloaded` would have Settings
