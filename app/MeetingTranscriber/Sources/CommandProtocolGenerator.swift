@@ -64,7 +64,6 @@
             meetingStartTime: Date?,
         ) async throws -> String {
             let arguments = CommandTemplate.effectiveArguments(self.arguments)
-            let model = self.model.trimmingCharacters(in: .whitespacesAndNewlines)
             try CommandTemplate.validate(arguments, model: model)
             let prompt = ProtocolGenerator.fullPrompt(
                 transcript: transcript, diarized: diarized, language: language,

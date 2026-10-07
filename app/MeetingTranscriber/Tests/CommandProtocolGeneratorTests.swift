@@ -136,7 +136,8 @@
 
         func testArgumentsReachTheProgramUnchangedAndAreNeverExecuted() async throws {
             let quoted = "it's \"quoted\" `touch \(record("pwned3"))` | x"
-            let model = "$(touch \(record("pwned2")))"
+            // Surrounding spaces included: the value arrives exactly as set.
+            let model = "  $(touch \(record("pwned2")))  "
             let program = try makeProgram(#"for arg in "$@"; do printf '%s\n' "$arg"; done"#)
 
             let result = try await custom(
