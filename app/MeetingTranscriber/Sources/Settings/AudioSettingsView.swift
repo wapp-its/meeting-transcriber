@@ -21,6 +21,8 @@ struct AudioSettingsView: View {
                 }
             }
 
+            LevelBalanceSection(settings: settings)
+
             VoiceActivityDetectionSection(settings: settings)
 
             EchoSection(settings: settings)
@@ -37,6 +39,21 @@ struct AudioSettingsView: View {
             position: .unspecified,
         )
         audioDevices = session.devices.map { (id: $0.uniqueID, name: $0.localizedName) }
+    }
+}
+
+private struct LevelBalanceSection: View {
+    @Bindable var settings: AppSettings
+
+    var body: some View {
+        Section("Recording Levels") {
+            HelpfulToggle(
+                title: "Balance my voice and the meeting audio",
+                help: SettingsHelp.levelBalance,
+                isOn: $settings.levelBalanceEnabled,
+            )
+            .accessibilityIdentifier(A11yID.levelBalanceToggle)
+        }
     }
 }
 

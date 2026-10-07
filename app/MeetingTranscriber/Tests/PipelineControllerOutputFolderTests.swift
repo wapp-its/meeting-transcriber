@@ -83,7 +83,7 @@ final class PipelineControllerOutputFolderTests: XCTestCase {
                 logDir: logDir,
                 stagingDir: staging,
                 securityScope: recorder.access,
-                recoverStagedRecordings: { _ in recorder.recoveries += 1 },
+                recoverStagedRecordings: { _, _ in recorder.recoveries += 1 },
                 resolveOutputDir: { resolver in
                     let url = resolver.resolve()
                     recorder.resolved.append(url)

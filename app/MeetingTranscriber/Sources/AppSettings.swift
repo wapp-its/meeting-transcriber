@@ -260,6 +260,15 @@ final class AppSettings {
         didSet { defaults.set(silentTrackWatchdogEnabled, forKey: "silentTrackWatchdogEnabled") }
     }
 
+    /// Bring the own voice and the far end to a similar speech level in what a
+    /// person listens to: the saved mix and the naming dialog's voice samples.
+    /// Never changes the per-track files that transcription, diarization and
+    /// speaker recognition read. Default: on. Read when a recording starts;
+    /// crash recovery at launch reads it when the launch builds the queue.
+    var levelBalanceEnabled: Bool {
+        didSet { defaults.set(levelBalanceEnabled, forKey: "levelBalanceEnabled") }
+    }
+
     /// PoC: when on, mic-channel audio is also fed to a live `StreamingTranscriber`
     /// during recording. Partial / finalised captions are logged via os_log on
     /// subsystem `com.meetingtranscriber`, category `LiveTranscription` — no
@@ -683,6 +692,7 @@ final class AppSettings {
         micName = defaults.object(forKey: "micName") as? String ?? "Me"
         perChannelIndicatorEnabled = defaults.object(forKey: "perChannelIndicatorEnabled") as? Bool ?? true
         silentTrackWatchdogEnabled = defaults.object(forKey: "silentTrackWatchdogEnabled") as? Bool ?? false
+        levelBalanceEnabled = defaults.object(forKey: "levelBalanceEnabled") as? Bool ?? true
         liveTranscriptionEnabled = defaults.object(forKey: "liveTranscriptionEnabled") as? Bool ?? false
         liveCaptionsOverlayEnabled = defaults.object(forKey: "liveCaptionsOverlayEnabled") as? Bool ?? true
         liveCaptionsSize = defaults.string(forKey: "liveCaptionsSize")

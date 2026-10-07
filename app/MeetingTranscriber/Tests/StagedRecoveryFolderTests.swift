@@ -33,7 +33,7 @@ final class StagedRecoveryFolderTests: XCTestCase {
             stagingDir: staging,
         )
         let recover = try XCTUnwrap(PipelineController.QueueEnvironment.production.recoverStagedRecordings)
-        recover(queue)
+        recover(queue, false)
 
         var repaired = false
         let deadline = ContinuousClock.now + .seconds(5)

@@ -74,6 +74,7 @@ enum A11yID {
     static let liveCaptionsSizePicker = "liveCaptionsSizePicker"
     static let channelIndicatorSection = "channelIndicatorSection"
     static let silentTrackWatchdogToggle = "silentTrackWatchdogToggle"
+    static let levelBalanceToggle = "levelBalanceToggle"
     static let experimentalTuningDisclosure = "experimentalTuningDisclosure"
     static let speakerCapHint = "speaker-cap-hint"
 

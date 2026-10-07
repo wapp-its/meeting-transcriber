@@ -23,6 +23,7 @@ extension WatchingController {
                 // Read per recording, so a change applies from the next one
                 // without restarting watching.
                 dualSource.silentTrackWatchdogEnabled = self?.settings.silentTrackWatchdogEnabled ?? false
+                dualSource.levelBalanceEnabled = self?.settings.levelBalanceEnabled ?? false
                 await self?.liveTranscription.attachSinks(to: dualSource)
             }
             return recorder
