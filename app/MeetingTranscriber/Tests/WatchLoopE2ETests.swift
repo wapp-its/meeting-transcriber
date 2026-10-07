@@ -70,22 +70,22 @@ final class WatchLoopE2ETests: XCTestCase { // swiftlint:disable:this balanced_x
         )
     }
 
-    /// Create a WatchLoop with injected mocks and immediate meeting-end detection.
+    /// Create a WatchLoop with injected mocks whose recording ends at once.
+    ///
+    /// Ended by the duration cap, not by a lost signal: a lost signal now asks
+    /// before stopping and cuts the recording back to where the signal went,
+    /// which would leave a fraction of a second of the fixture to transcribe.
     private func makeLoop(
         recorder: MockRecorder,
         pipelineQueue: PipelineQueue,
     ) -> WatchLoop {
-        let detector = PowerAssertionDetector()
-        // Meeting ends immediately (no assertions)
-        detector.assertionProvider = { [:] }
-
-        return WatchLoop(
-            detector: detector,
+        WatchLoop(
+            detector: FixedMeetingDetector(),
             recorderFactory: { recorder },
             pipelineQueue: pipelineQueue,
             pollInterval: 0.05,
             endGracePeriod: 0.1,
-            maxDuration: 10,
+            maxDuration: 0.1,
             noMic: false,
         )
     }

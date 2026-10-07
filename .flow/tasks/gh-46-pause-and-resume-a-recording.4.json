@@ -1,0 +1,18 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-06T20:42:54.992985Z",
+  "depends_on": [
+    "gh-46-pause-and-resume-a-recording.2",
+    "gh-46-pause-and-resume-a-recording.3"
+  ],
+  "id": "gh-46-pause-and-resume-a-recording.4",
+  "priority": null,
+  "review": "codex:gpt-5.6-sol:xhigh",
+  "spec": "gh-46-pause-and-resume-a-recording",
+  "spec_path": ".flow/tasks/gh-46-pause-and-resume-a-recording.4.md",
+  "status": "todo",
+  "title": "Pause state in the watch loop",
+  "updated_at": "2026-10-06T20:57:00.231784Z"
+}

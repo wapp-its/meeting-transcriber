@@ -1,0 +1,151 @@
+{
+  "branch_name": "fix/gh-73-mic-stop-race",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-06T22:37:30.872327Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [
+    "gh-44-stop-the-microphone-restart-loop-on-a"
+  ],
+  "id": "gh-73-no-microphone-restart-after-the-capture",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-06T23:00:32.324808Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "f9aa29c2900c1bcf813ed8ab7f54f407aee4dbf2a9f798aefb060cbf08e25a8b",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-3e982995ed24bac3322bd9c5d1588514",
+            "classification": "introduced",
+            "findingId": "finding-3e982995ed24bac3322bd9c5d1588514",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-f69e8bc85652f9daee7d8cb82f8a25b7",
+            "classification": "introduced",
+            "findingId": "finding-f69e8bc85652f9daee7d8cb82f8a25b7",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "01064e9a300e18188ceb56b7f55379e30acedd1b",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 320869,
+      "output_sha256": "0852e7fd4f37a926cf506fbc4460314532b65c0b675ed2f1367c78a6fdfa3c7d",
+      "reservation_id": "81366bbf64b74728a372659667fec1d3",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T22:56:23.620800Z",
+      "tool_calls": 19,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "589ec2f87260ce3ea4c79ff4b57b355068f0066d7cda0b1b436166e385069fd4",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-3e982995ed24bac3322bd9c5d1588514",
+            "classification": "introduced",
+            "findingId": "finding-3e982995ed24bac3322bd9c5d1588514",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-f69e8bc85652f9daee7d8cb82f8a25b7",
+            "classification": "introduced",
+            "findingId": "finding-f69e8bc85652f9daee7d8cb82f8a25b7",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "01064e9a300e18188ceb56b7f55379e30acedd1b",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 956,
+      "output_sha256": "2d7451cc7013209212375bf63ff7d5c0c92b546cbbab50939bce52ed04bb07dc",
+      "reservation_id": "1204cf5168b3427d97817e7c8891ef69",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-06T23:00:02.505637Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-73-no-microphone-restart-after-the-capture.md",
+  "status": "open",
+  "title": "No microphone restart after the capture has stopped",
+  "tracker": {
+    "baseHashFlow": "6d0c8c1c28aab7fc8465576cbc1191e4bcb0efad7cf8e8be25fcd10ab6024354",
+    "baseHashTracker": "198ba553aa69ff8d428653d5817effde3e09bffb7591f48f2fc752a8d88ed780",
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABVePxog",
+    "identifier": "#73",
+    "lastSyncedAt": "2026-10-06T22:37:45.404411Z",
+    "linkState": "linked",
+    "mergeBaseFlow": "# No microphone restart after the capture has stopped (flaky watchdog timer test)\n\n## Conversation Evidence\n\n> issue #73 (filed 2026-10-06): \"Der Test `AudioTapLibTests.MicCaptureHandlerStallWatchdogTests.testTheTimerDrivesTheWatchdogAndStopsWithTheCapture` (kam mit dem Mikrofon-Watchdog-Fix aus #44) ist im Fork-CI auf PR #71 in **beiden Versuchen** eines Laufs fehlgeschlagen \u2026 `fixture.sessions.count` hat sich **nach** `handler.stop()` noch erh\u00f6ht (\\\"no attempt after the stop\\\"). \u2026 Lokal l\u00e4uft der Test einzeln 8 von 8 Mal gr\u00fcn\"\n> issue #73, Wunsch: \"Kl\u00e4ren, welches von beiden; bei einem Rennen `stop()` so machen, dass ein laufender Neustart nichts mehr \u00fcbernimmt, sonst den Test auf eine injizierte Uhr umstellen.\"\n> issue #73, Abnahme: \"Test l\u00e4uft unter `swift test --parallel` wiederholt (z. B. 20\u00d7) gr\u00fcn; CI-L\u00e4ufe auf Code-PRs scheitern nicht mehr daran.\"\n> user (2026-10-07, selected): \"A \u2014 Spec #60 + #73 now (Recommended)\"\n\n## Goal & Context\n\nThe microphone stall watchdog restarts a capture that stops delivering audio. Its timer-driven test failed twice in one CI run: after the capture was stopped, one more capture session was still created. It passes when run alone. Either the watchdog can start or adopt a restart after `stop()` (a real defect: the microphone would be reopened after the person or the app stopped recording) or the test's real-clock timing is too tight under CI load. The flake also turns unrelated pull requests red, which costs reruns and can park unattended loop runs. [paraphrase]\n\n<!-- Source: 45% user / 45% [paraphrase] / 10% [inferred] -->\n\n## Edge Cases & Constraints\n\n- This is a defect: the cause is the unknown. Reproduce it first (repeated parallel runs, or a deterministic schedule that forces a restart to be in flight when `stop()` is called), then fix the cause that the reproduction shows. [paraphrase]\n- The same code is being changed by the stall-restart work (gh-44); this spec builds on that work after it lands. [inferred]\n\n## Acceptance Criteria\n\n- **R1:** Once the microphone capture's `stop()` has returned, the stall watchdog creates and adopts no new capture session, including a restart that was already in flight when `stop()` was called. Errors: a restart that completes after the stop is torn down without being adopted, and that is logged. [paraphrase]\n- **R2:** The timer-driven watchdog test is deterministic: it passes 20 consecutive runs under parallel execution of the audio-capture test target, and it fails when the R1 guard is removed. Errors: no error surface beyond the test result. [paraphrase]\n- **R3:** The change records which cause the reproduction showed (production race, test timing, or both) in its commit message. Errors: no error surface. [inferred]\n\n## Boundaries\n\n- No change to when or how often the watchdog restarts a stalled microphone during a recording; only behaviour after stop and the test's determinism are in scope. [inferred]\n- No test is weakened, skipped or deleted to get green. [paraphrase]\n\n## Decision Context\n\n- **A1 \u00b7 Build after gh-44 lands, not alongside it.** flip at: gh-44 is abandoned or merged \u00b7 test: the spec's dependency on gh-44 \u00b7 status: active [agent-inferred 2026-10-07]\n",
+    "mergeBaseTracker": "## Beobachtung\nDer Test `AudioTapLibTests.MicCaptureHandlerStallWatchdogTests.testTheTimerDrivesTheWatchdogAndStopsWithTheCapture` (kam mit dem Mikrofon-Watchdog-Fix aus #44) ist im Fork-CI auf PR #71 in **beiden Versuchen** eines Laufs fehlgeschlagen (Run 37536506723, Head d7888cdf):\n\n`XCTAssertEqual failed: (\"2\") is not equal to ...` in Zeile 500, also `fixture.sessions.count` hat sich **nach** `handler.stop()` noch erh\u00f6ht (\"no attempt after the stop\").\n\nPR #71 \u00e4ndert nichts unter `tools/`. Lokal l\u00e4uft der Test einzeln 8 von 8 Mal gr\u00fcn; auf seinem eigenen Branch war CI gr\u00fcn.\n\n## Vermutung\nEchtzeit-Timer (Poll 50 ms, Stall 0,3 s) plus 0,5 s Wartezeit: unter CI-Last kann ein bereits gestarteter Neustart nach `stop()` noch eine Session bauen. Entweder ein echtes Rennen zwischen `stop()` und einem laufenden Neustart im `MicCaptureHandler` (dann Produktfehler: nach dem Stoppen wird noch ein Mikrofon-Neustart versucht) oder nur ein zu knapp getakteter Test.\n\n## Wunsch\nKl\u00e4ren, welches von beiden; bei einem Rennen `stop()` so machen, dass ein laufender Neustart nichts mehr \u00fcbernimmt, sonst den Test auf eine injizierte Uhr umstellen.\n\n## Abnahme\nTest l\u00e4uft unter `swift test --parallel` wiederholt (z. B. 20\u00d7) gr\u00fcn; CI-L\u00e4ufe auf Code-PRs scheitern nicht mehr daran.",
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/73"
+  },
+  "updated_at": "2026-10-06T23:00:41.078942Z"
+}

@@ -18,6 +18,9 @@ struct RecordingResult {
     /// Not derived from `systemUptime` (which doesn't advance during sleep, so
     /// a meeting spanning a sleep would skew the anchor) — this is exact.
     let recordingStartDate: Date
+    /// Where the saved audio ends on the same wall clock when the tracks were
+    /// cut back after the stop (`RecordingCut`), nil when they run to it.
+    var recordedUntil: Date?
 }
 
 /// The format `buildRecording` should expect the app track to arrive in, passed

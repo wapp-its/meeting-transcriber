@@ -20,8 +20,10 @@ extension WatchLoop {
         // Guard the sidecar's startedAt <= stoppedAt invariant against a
         // backward wall-clock step between start and stop (e.g. NTP correcting a
         // fast clock): never emit a negative interval for downstream fleet
-        // consumers that compute a duration from the pair.
-        let stoppedAt = max(Date(), startedAt)
+        // consumers that compute a duration from the pair. A recording cut back
+        // at its end stops at the cut, so the sidecar never claims audio the
+        // files no longer hold.
+        let stoppedAt = max(recording.recordedUntil ?? Date(), startedAt)
 
         let mixName = recording.mixPath.lastPathComponent
         let basename = RecordingFileSuffix.stripSuffix(from: mixName)?.stem

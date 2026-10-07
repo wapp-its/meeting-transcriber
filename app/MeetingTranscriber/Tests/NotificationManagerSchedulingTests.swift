@@ -37,7 +37,10 @@ final class NotificationManagerSchedulingTests: XCTestCase {
         XCTAssertTrue(manager.isSetUp)
         XCTAssertIdentical(fake.delegate, manager)
         XCTAssertTrue(fake.authRequested)
-        XCTAssertEqual(fake.categories.map(\.identifier), [NotificationManager.consentCategoryID])
+        XCTAssertEqual(
+            Set(fake.categories.map(\.identifier)),
+            [NotificationManager.consentCategoryID, NotificationManager.meetingEndCategoryID],
+        )
     }
 
     func testSetUpSkippedWhenNotDeliverable() {
