@@ -135,6 +135,19 @@ enum ProtocolGenerator {
         return prompt
     }
 
+    /// The whole prompt a CLI provider sends: `buildSystemPrompt` followed by
+    /// the transcript.
+    static func fullPrompt(
+        transcript: String,
+        diarized: Bool,
+        language: String,
+        meetingStartTime: Date?,
+        promptURL: URL = AppPaths.customPromptFile,
+    ) -> String {
+        buildSystemPrompt(diarized: diarized, language: language, meetingStartTime: meetingStartTime, promptURL: promptURL)
+            + transcript
+    }
+
     static func meetingMetadata(
         for meetingStartTime: Date,
         timeZone: TimeZone = .autoupdatingCurrent,

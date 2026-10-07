@@ -44,7 +44,9 @@
             diarized: Bool,
             meetingStartTime: Date?,
         ) async throws -> String {
-            let prompt = ProtocolGenerator.buildSystemPrompt(diarized: diarized, language: language, meetingStartTime: meetingStartTime) + transcript
+            let prompt = ProtocolGenerator.fullPrompt(
+                transcript: transcript, diarized: diarized, language: language, meetingStartTime: meetingStartTime,
+            )
 
             let launch = await Self.launchConfiguration(claudeBin: claudeBin, anthropicAPIKey: anthropicAPIKey)
             let workingDirectory = try Self.makeWorkingDirectory()
