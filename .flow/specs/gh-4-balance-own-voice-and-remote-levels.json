@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-4-level-balance",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-07T07:54:27.254886Z",
   "created_at": "2026-10-06T20:19:52.495155Z",
   "default_impl": null,
   "default_review": null,
@@ -350,6 +350,42 @@
       "task": "gh-4-balance-own-voice-and-remote-levels.3",
       "timestamp": "2026-10-07T07:33:39.625366Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "85d123b30cc8a765d0fe2417038bef0613da48a871bb691d396065ebfadaf1bb",
+      "backend": "codex",
+      "base_sha": "f3cb9a26adb45b74e339e64383dc03f3bd28b9e7",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "a9eeadb9517f718357798731140fb65ae4487790",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 443510,
+      "output_sha256": "e51e5f030edade9e8fdf76582f90a51a61a2c4d87c131c2c4ff6ea0d3a8348d9",
+      "reservation_id": "4a8348ee10274cf7bfeaa188a62f2920",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-07T07:54:27.214714Z",
+      "tool_calls": 22,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -357,12 +393,13 @@
     "impl:gh-4-balance-own-voice-and-remote-levels.2": 1,
     "impl:gh-4-balance-own-voice-and-remote-levels.3": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-4-balance-own-voice-and-remote-levels.1": 0,
     "impl:gh-4-balance-own-voice-and-remote-levels.2": 0,
     "impl:gh-4-balance-own-voice-and-remote-levels.3": 0,
@@ -383,5 +420,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/4"
   },
-  "updated_at": "2026-10-07T07:33:39.647576Z"
+  "updated_at": "2026-10-07T07:54:27.257589Z"
 }
