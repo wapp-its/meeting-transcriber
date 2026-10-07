@@ -406,7 +406,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-12-hugging-face-token-in-settings.md",
-  "status": "open",
+  "status": "done",
   "title": "Hugging Face token in Settings",
   "tracker": {
     "baseHashFlow": null,
@@ -420,5 +420,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/12"
   },
-  "updated_at": "2026-10-07T00:36:29.471342Z"
+  "updated_at": "2026-10-07T00:53:38.903723Z"
 }
