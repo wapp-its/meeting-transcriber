@@ -142,8 +142,8 @@ struct MeetingTranscriberApp: App {
             onRecordMicrophone: { appState.watching.startMicrophoneRecording() },
             noMic: appState.settings.noMic,
             manualRecordingPendingOrActive: appState.watching.isManualRecording,
-            onStopManualRecording: appState.isManualRecording ? {
-                appState.watching.stopManualRecording()
+            onStopManualRecording: appState.canStopRecording ? {
+                appState.watching.stopRecording()
             } : nil,
             onOpenLastProtocol: openLastProtocol,
             onOpenProtocol: { url in NSWorkspace.shared.open(url) },

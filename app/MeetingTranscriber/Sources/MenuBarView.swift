@@ -17,6 +17,7 @@ struct MenuBarView: View {
     /// handing back a dead click, which is what `AppPickerStartState` was built
     /// to avoid on the picker.
     let manualRecordingPendingOrActive: Bool
+    /// Stops whatever is recording, a detected meeting included; set only while a recording runs.
     let onStopManualRecording: (() -> Void)?
     let onOpenLastProtocol: () -> Void
     let onOpenProtocol: (URL) -> Void
