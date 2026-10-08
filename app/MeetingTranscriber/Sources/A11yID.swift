@@ -59,6 +59,12 @@ enum A11yID {
         "jobRetryButton.\(index)"
     }
 
+    /// Menu bar job row's Remove button on a failed job, addressed by ROW
+    /// INDEX for the same reason as `jobRetryButton`.
+    static func jobRemoveButton(_ index: Int) -> String {
+        "jobRemoveButton.\(index)"
+    }
+
     static let recordOnlyBanner = "recordOnlyBanner"
     static let transcriptionSection = "transcriptionSection"
     static let protocolSection = "protocolSection"

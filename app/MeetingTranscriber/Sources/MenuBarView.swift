@@ -5,6 +5,9 @@ struct MenuBarView: View {
     let isWatching: Bool
     let pipelineQueue: PipelineQueue
     var updateChecker: UpdateChecker?
+    /// The finished-job history, read with the queue's jobs so a finished
+    /// line outlives the queue's one-minute reap and a restart.
+    var history: [TerminalJobRecord] = []
     let onStartStop: () -> Void
     let onRecordApp: () -> Void
     let onRecordMicrophone: () -> Void
@@ -24,6 +27,9 @@ struct MenuBarView: View {
     let onOpenSettings: () -> Void
     let onNameSpeakers: (() -> Void)?
     let onProcessFiles: () -> Void
+    /// Remove on a failed job: off the menu and out of the history for good.
+    var onRemoveFailedJob: (UUID) -> Void = { _ in }
+    /// Dismiss on a job waiting for speaker names.
     let onDismissJob: (UUID) -> Void
     let onQuit: () -> Void
 
@@ -175,16 +181,24 @@ struct MenuBarView: View {
     }
 
     @ViewBuilder private var processingQueue: some View {
-        if !pipelineQueue.jobs.isEmpty {
+        let entries = jobEntries
+        if !entries.isEmpty {
             Divider()
             Label("Processing", systemImage: "gearshape.2.fill")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            ForEach(Array(pipelineQueue.jobs.enumerated()), id: \.element.id) { index, job in
-                jobRow(job, index: index)
+            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                jobRow(entry, index: index)
             }
         }
+    }
+
+    /// Every unfinished job and the three that finished last, from the same
+    /// list as the Transcriptions window, so the menu's length follows the
+    /// work in flight rather than the number of finished jobs.
+    private var jobEntries: [TranscriptionEntry] {
+        TranscriptionList.menuEntries(TranscriptionList.entries(liveJobs: pipelineQueue.jobs, records: history))
     }
 
     @ViewBuilder private var protocolActions: some View {
@@ -249,65 +263,79 @@ struct MenuBarView: View {
     /// `MenuBarExtra` cannot lay anything out side by side: an `HStack` row
     /// came out as one menu item per part, so the status dot and the spacer
     /// became empty lines and the buttons stood one below the other.
-    private func jobRow(_ job: PipelineJob, index: Int) -> some View {
+    private func jobRow(_ entry: TranscriptionEntry, index: Int) -> some View {
         Menu {
-            Text(job.meetingTitle)
-            jobStateLabel(job)
+            Text(entry.title)
+            jobStateLabel(entry)
             Divider()
-            jobActions(job, index: index)
+            jobActions(entry, index: index)
         } label: {
-            Label(jobMenuTitle(job), systemImage: JobMenuSummary.symbol(of: job))
+            Label(jobMenuTitle(entry), systemImage: jobSymbol(entry))
         }
     }
 
     /// Hoisted out of the `ViewBuilder` for the type-check budget (see the
     /// note on `body`).
-    private func jobMenuTitle(_ job: PipelineJob) -> String {
-        let status = JobMenuSummary.status(of: job, progress: stageProgressText(job))
-        return "\(job.meetingTitle) — \(status)"
+    private func jobMenuTitle(_ entry: TranscriptionEntry) -> String {
+        let status = JobMenuSummary.status(
+            state: entry.state, hasWarnings: !entry.warnings.isEmpty, progress: stageProgressText(entry),
+        )
+        return "\(entry.title) — \(status)"
     }
 
+    private func jobSymbol(_ entry: TranscriptionEntry) -> String {
+        JobMenuSummary.symbol(state: entry.state, hasWarnings: !entry.warnings.isEmpty)
+    }
+
+    /// A finished line has no Dismiss: it leaves the menu once three later
+    /// jobs have finished, and a failed one is taken off for good by Remove.
     @ViewBuilder
-    private func jobActions(_ job: PipelineJob, index: Int) -> some View {
-        if job.state == .done, let path = job.protocolPath ?? job.transcriptPath {
-            Button("Open") { onOpenProtocol(path) }
+    private func jobActions(_ entry: TranscriptionEntry, index: Int) -> some View {
+        if entry.state.isTerminal, let url = entry.fileToOpen {
+            Button("Open") { onOpenProtocol(url) }
         }
-        if job.state == .speakerNamingPending {
+        if entry.state == .speakerNamingPending {
             Button("Name Speakers") { onNameSpeakers?() }
         }
-        if job.state == .waiting || job.state == .transcribing
-            || job.state == .diarizing || job.state == .generatingProtocol {
-            Button("Cancel") { pipelineQueue.cancelJob(id: job.id) }
+        if entry.state == .waiting || entry.state == .transcribing
+            || entry.state == .diarizing || entry.state == .generatingProtocol {
+            Button("Cancel") { pipelineQueue.cancelJob(id: entry.id) }
         }
-        retryButton(job, index: index)
-        if job.state == .done || job.state == .error || job.state == .speakerNamingPending {
-            Button("Dismiss") { onDismissJob(job.id) }
+        retryButton(entry, index: index)
+        if entry.state == .error {
+            Button("Remove") { onRemoveFailedJob(entry.id) }
+                .accessibilityIdentifier(A11yID.jobRemoveButton(index))
+        }
+        if entry.state == .speakerNamingPending {
+            Button("Dismiss") { onDismissJob(entry.id) }
         }
     }
 
     /// Runs a failed job again from its audio, instead of the user having to
-    /// find the staged recording and import it by hand.
+    /// find the staged recording and import it by hand. A failed job known
+    /// only from the history is not in the queue, so the queue refuses it
+    /// until the pipeline has loaded it.
     @ViewBuilder
-    private func retryButton(_ job: PipelineJob, index: Int) -> some View {
-        if pipelineQueue.canRetryJob(id: job.id) {
-            Button("Retry") { pipelineQueue.retryJob(id: job.id) }
+    private func retryButton(_ entry: TranscriptionEntry, index: Int) -> some View {
+        if pipelineQueue.canRetryJob(id: entry.id) {
+            Button("Retry") { pipelineQueue.retryJob(id: entry.id) }
                 .accessibilityIdentifier(A11yID.jobRetryButton(index))
         }
     }
 
-    private func jobStateLabel(_ job: PipelineJob) -> some View {
+    private func jobStateLabel(_ entry: TranscriptionEntry) -> some View {
         Group {
-            if [.transcribing, .diarizing, .generatingProtocol].contains(job.state) {
-                Text(stageProgressText(job))
+            if [.transcribing, .diarizing, .generatingProtocol].contains(entry.state) {
+                Text(stageProgressText(entry))
                     .foregroundStyle(.secondary)
-            } else if job.state == .error, let msg = job.error {
+            } else if entry.state == .error, let msg = entry.error {
                 Text(msg)
                     .foregroundStyle(.red)
-            } else if job.state == .done, !job.warnings.isEmpty {
-                Text(job.warnings.joined(separator: "; "))
+            } else if entry.state == .done, !entry.warnings.isEmpty {
+                Text(entry.warnings.joined(separator: "; "))
                     .foregroundStyle(.orange)
             } else {
-                Text(job.state.label)
+                Text(entry.state.label)
                     .foregroundStyle(.secondary)
             }
         }
@@ -318,11 +346,11 @@ struct MenuBarView: View {
     /// m:ss") when one exists, and a "longer than usual" hint once the live run
     /// runs meaningfully past that average — so the user can tell at a glance
     /// whether the current run is normal. Purely informational.
-    private func stageProgressText(_ job: PipelineJob) -> String {
+    private func stageProgressText(_ entry: TranscriptionEntry) -> String {
         let elapsed = pipelineQueue.activeJobElapsed
-        let base = "\(job.state.label) \(formattedElapsed(elapsed))"
-        guard let stage = StageKind(jobState: job.state),
-              let avg = pipelineQueue.averageSeconds(forJobID: job.id, stage: stage), avg > 0 else { return base }
+        let base = "\(entry.state.label) \(formattedElapsed(elapsed))"
+        guard let stage = StageKind(jobState: entry.state),
+              let avg = pipelineQueue.averageSeconds(forJobID: entry.id, stage: stage), avg > 0 else { return base }
         let suffix = StageTimingStats.isSlowerThanUsual(elapsed: elapsed, average: avg)
             ? " · longer than usual (Ø \(formattedElapsed(avg)))"
             : " · Ø \(formattedElapsed(avg))"

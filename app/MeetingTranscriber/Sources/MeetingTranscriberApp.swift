@@ -137,6 +137,7 @@ struct MeetingTranscriberApp: App {
             isWatching: appState.isWatching,
             pipelineQueue: appState.pipelineQueue,
             updateChecker: appState.updateChecker,
+            history: appState.pipeline.terminalJobStore.records,
             onStartStop: { appState.watching.toggleWatching() },
             onRecordApp: { bringWindowToFront(id: "record-app") },
             onRecordMicrophone: { appState.watching.startMicrophoneRecording() },
@@ -146,7 +147,7 @@ struct MeetingTranscriberApp: App {
                 appState.watching.stopManualRecording()
             } : nil,
             onOpenLastProtocol: openLastProtocol,
-            onOpenProtocol: { url in NSWorkspace.shared.open(url) },
+            onOpenProtocol: openJobFile,
             onOpenProtocolsFolder: openProtocolsFolder,
             onOpenSettings: {
                 bringWindowToFront(id: "settings")
@@ -155,6 +156,7 @@ struct MeetingTranscriberApp: App {
                 bringWindowToFront(id: "speaker-naming")
             } : nil,
             onProcessFiles: processAudioFiles,
+            onRemoveFailedJob: { id in appState.pipeline.removeFailedJob(id: id) },
             onDismissJob: { id in appState.pipelineQueue.removeJob(id: id) },
             onQuit: quit,
         )
@@ -406,6 +408,15 @@ struct MeetingTranscriberApp: App {
         defer { if accessing { protocols.stopAccessingSecurityScopedResource() } }
         try? FileManager.default.createDirectory(at: protocols, withIntermediateDirectories: true)
         NSWorkspace.shared.open(protocols)
+    }
+
+    /// A job line's Open, inside the output folder's security scope: after a
+    /// restart a history line can be opened before any queue holds that scope,
+    /// which the App Store build needs. A file that is gone opens nothing.
+    private func openJobFile(_ url: URL) {
+        _ = TranscriptionFileOpener.perform(url, scopeRoot: appState.settings.effectiveOutputDir) { file in
+            NSWorkspace.shared.open(file)
+        }
     }
 
     private func quit() {
