@@ -126,6 +126,31 @@ struct RestartArbiter: Equatable {
         phase == .capturing
     }
 
+    /// True only while `generation` is the attempt in flight. An attempt asks
+    /// this before it builds its session, because one queued before a stop or a
+    /// give-up would otherwise bring an engine up, and open the microphone,
+    /// after the capture ended, for a result nothing will ever adopt.
+    func mayBuildAttempt(generation: Int) -> Bool {
+        phase == .attemptInFlight(generation: generation)
+    }
+
+    /// Why a sealed session is sealed.
+    enum Seal: Equatable {
+        case stopped
+        case gaveUp
+    }
+
+    /// Which seal holds, nil while the session is not sealed. The one answer
+    /// every line explaining a refused or discarded attempt takes its reason
+    /// from, so they cannot disagree.
+    var seal: Seal? {
+        switch phase {
+        case .idle, .capturing, .attemptInFlight, .backingOff, .committing: nil
+        case .gaveUp: .gaveUp
+        case .stopped: .stopped
+        }
+    }
+
     mutating func handle(_ event: Event) -> Action {
         switch (phase, event) {
         case (.idle, .startSucceeded), (.capturing, .startSucceeded):

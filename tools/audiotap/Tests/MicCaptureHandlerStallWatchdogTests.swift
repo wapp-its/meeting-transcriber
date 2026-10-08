@@ -505,9 +505,7 @@ final class MicCaptureHandlerStallWatchdogTests: XCTestCase {
         gate.signal()
         handler.restartQueue.sync {}
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
-        XCTExpectFailure("a restart queued before stop() still builds its session after stop() returned") {
-            XCTAssertEqual(fixture.sessions.count, built, "no attempt after the stop")
-        }
+        XCTAssertEqual(fixture.sessions.count, built, "no attempt after the stop")
     }
 
     // MARK: - Known risk: the outgoing teardown runs on the main thread

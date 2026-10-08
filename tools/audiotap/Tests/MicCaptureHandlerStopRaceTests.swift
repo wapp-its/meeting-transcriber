@@ -93,7 +93,8 @@ private struct StopRaceTestFixture {
 /// serial restart queue, where its first step is to build a new session.
 /// `stop()` returns without waiting for that queue, because an attempt there
 /// can block forever inside the engine. An attempt that was queued but had not
-/// started when `stop()` ran therefore still builds its session afterwards.
+/// started when `stop()` ran would therefore build its session afterwards,
+/// unless it asks the arbiter first, under the lock `stop()`'s seal takes.
 ///
 /// These hold the restart queue with a blocking item, so the attempt is
 /// queued, not started, whenever `stop()` is called: the schedule that a
@@ -109,7 +110,10 @@ final class MicCaptureHandlerStopRaceTests: XCTestCase {
         maxRestartsPerRecording: 6,
     )
 
-    private func makeFixture(_ sessions: [StopRaceTestSession]) -> StopRaceTestFixture {
+    private func makeFixture(
+        _ sessions: [StopRaceTestSession],
+        decideRetry: @escaping @Sendable (Int) -> CaptureRestartRetryAction = CaptureRestartRetryPolicy.decide,
+    ) -> StopRaceTestFixture {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("stop-race-\(UUID().uuidString).wav")
         let queue = StopRaceTestSessionQueue(sessions)
@@ -121,10 +125,25 @@ final class MicCaptureHandlerStopRaceTests: XCTestCase {
         let handler = MicCaptureHandler(
             outputURL: url,
             sessionFactory: factory,
+            decideRetry: decideRetry,
             stallWatchdogLimits: Self.manualLimits,
             stallClock: manualNow,
         )
         return StopRaceTestFixture(handler: handler, url: url, clock: clock, sessions: queue)
+    }
+
+    private func waitUntil(
+        _ description: String,
+        timeout: TimeInterval = 5,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        _ condition: () -> Bool,
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition(), Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+        }
+        XCTAssertTrue(condition(), description, file: file, line: line)
     }
 
     func testAStallRestartQueuedWhenStopIsCalledBuildsNoSession() throws {
@@ -150,9 +169,55 @@ final class MicCaptureHandlerStopRaceTests: XCTestCase {
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
 
         XCTAssertIdentical(handler.session as AnyObject, first, "a stopped capture adopts nothing")
-        XCTExpectFailure("a restart queued before stop() still builds and starts its session after stop() returned") {
-            XCTAssertEqual(fixture.sessions.count, builtAtStop, "no session is built after the stop")
-            XCTAssertEqual(candidate.calls, [], "the queued restart never touches its session")
+        XCTAssertEqual(fixture.sessions.count, builtAtStop, "no session is built after the stop")
+        XCTAssertEqual(candidate.calls, [], "the queued restart never touches its session")
+    }
+
+    func testADefaultInputRestartQueuedWhenStopIsCalledBuildsNoSession() throws {
+        // The refusal sits on the attempt path every trigger shares, not on the
+        // stall watchdog's own.
+        let fixture = makeFixture([StopRaceTestSession(), StopRaceTestSession()])
+        let handler = fixture.handler
+        let gate = DispatchSemaphore(value: 0)
+        defer { gate.signal(); try? FileManager.default.removeItem(at: fixture.url) }
+
+        try handler.start()
+        handler.restartQueue.async { gate.wait() }
+        XCTAssertTrue(handler.handleDeviceChange(.defaultInputChanged), "the device change launched a restart")
+
+        handler.stop()
+        gate.signal()
+        handler.restartQueue.sync {}
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+
+        XCTAssertEqual(fixture.sessions.count, 1, "no session is built after the stop")
+    }
+
+    func testARetryWaitingOutItsBackoffWhenStopIsCalledBuildsNoSession() throws {
+        // A retry is launched from the main queue only once the arbiter grants
+        // it, and a stopped capture never does. Pinned because "no restart
+        // after stop" covers this restart too.
+        let failing = StopRaceTestSession()
+        failing.shouldFail = true
+        // Typed local, not a trailing closure (see `makeFixture`).
+        let slowRetry: @Sendable (Int) -> CaptureRestartRetryAction = { _ in .retry(afterSeconds: 0.2) }
+        let fixture = makeFixture([StopRaceTestSession(), failing], decideRetry: slowRetry)
+        let handler = fixture.handler
+        defer { try? FileManager.default.removeItem(at: fixture.url) }
+
+        try handler.start()
+        fixture.clock.set(1010)
+        XCTAssertEqual(handler.pollStallWatchdog(), .restart(silentSeconds: 10))
+        waitUntil("the failed attempt waits out its backoff") {
+            handler.arbiter.withLock { $0.phase } == .backingOff
         }
+
+        handler.stop()
+        let builtAtStop = fixture.sessions.count
+        XCTAssertEqual(builtAtStop, 2, "the retry is waiting out its backoff when stop() returns")
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        handler.restartQueue.sync {}
+
+        XCTAssertEqual(fixture.sessions.count, builtAtStop, "no session is built after the stop")
     }
 }

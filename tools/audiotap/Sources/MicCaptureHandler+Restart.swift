@@ -110,7 +110,19 @@ extension MicCaptureHandler {
     private func runRestartAttempt(deviceUID: String?, generation: Int, trigger: MicRestartTrigger) {
         // AVAudioEngine can be in a bad state after a config change, so an
         // attempt always builds a new session rather than reusing the engine.
-        let candidate = sessionFactory()
+        // Checked and built under the lock stop()'s seal takes: either this
+        // builds first and stop() finds an attempt in flight, or the seal comes
+        // first and nothing is built.
+        let (built, sealAtBuild) = attemptBuildLock.withLock { () -> ((any MicEngineSessionProviding)?, RestartArbiter.Seal?) in
+            let state = arbiter.withLock { $0 }
+            return state.mayBuildAttempt(generation: generation) ? (sessionFactory(), nil) : (nil, state.seal)
+        }
+        guard let candidate = built else {
+            logger.notice(
+                "Mic: not building restart attempt \(generation, privacy: .public) after \(trigger.logDescription, privacy: .public): \(Self.sealReason(sealAtBuild), privacy: .public) first",
+            )
+            return
+        }
         var rate: Double?
         var thrown: (any Error)?
         do {
@@ -121,8 +133,8 @@ extension MicCaptureHandler {
         let failure = thrown
         let succeeded = failure == nil
 
-        let outcome = arbiter.withLock { state in
-            state.handle(.attemptReturned(generation: generation, succeeded: succeeded))
+        let (outcome, sealAtReturn) = arbiter.withLock { state in
+            (state.handle(.attemptReturned(generation: generation, succeeded: succeeded)), state.seal)
         }
 
         switch outcome {
@@ -147,9 +159,21 @@ extension MicCaptureHandler {
 
         default:
             // The session was sealed while this attempt was outstanding. It owns
-            // nothing shared, so it tears its own work down and says nothing.
-            logger.info("Mic: discarding a restart attempt that outlived its deadline")
+            // nothing shared, so it tears its own work down.
+            logger.notice(
+                "Mic: restart attempt \(generation, privacy: .public) after \(trigger.logDescription, privacy: .public) returned after \(Self.sealReason(sealAtReturn), privacy: .public); tearing its session down",
+            )
             candidate.teardown()
+        }
+    }
+
+    /// Why a sealed session refused or discarded an attempt, taken from the
+    /// arbiter's seal answer and nowhere else.
+    private static func sealReason(_ seal: RestartArbiter.Seal?) -> String {
+        switch seal {
+        case .stopped: "the capture was stopped"
+        case .gaveUp: "the capture gave up"
+        case nil: "a newer attempt took over"
         }
     }
 
@@ -166,7 +190,7 @@ extension MicCaptureHandler {
         // thread delivers in between is still credited to this adoption.
         let adoptedAt = stallClock()
         guard case .adopt = arbiter.withLock({ $0.handle(.commitReady(generation: generation)) }) else {
-            logger.info("Mic: discarding a restart that succeeded after the session was sealed")
+            logger.notice("Mic: discarding a restart that succeeded after the session was sealed")
             candidate.teardown()
             return
         }
