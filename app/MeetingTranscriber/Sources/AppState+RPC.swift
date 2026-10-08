@@ -165,13 +165,15 @@
             )
         }
 
-        /// The two `/v1/record` seams, bundled like `watchRPCClosures` so
+        /// The three `/v1/record` seams, bundled like `watchRPCClosures` so
         /// `buildDebugRPCServer` stays a flat wiring list. Control is `async`
         /// because the start awaits the mic gate, the queue and the loop before
-        /// there is anything true to report.
+        /// there is anything true to report; the stop of any recording because a
+        /// detected meeting ends only at the loop's next poll.
         func recordRPCClosures() -> (
             status: () -> RecordStatusDTO,
             control: (RecordAction) async -> RecordControlOutcome,
+            stopAny: () async -> RecordControlOutcome,
         ) {
             let status: () -> RecordStatusDTO = { [weak self] in
                 self?.recordStatusDTO() ?? .notRecording
@@ -188,7 +190,12 @@
                 if permissions.health == nil { await permissions.check() }
                 return await watching.applyRecordAction(action)
             }
-            return (status, control)
+            // No health seed: a stop needs no microphone.
+            let stopAny: () async -> RecordControlOutcome = { [weak self] in
+                guard let self else { return .failed }
+                return await watching.applyRecordStopAny()
+            }
+            return (status, control, stopAny)
         }
 
         /// The three per-job speaker-naming seams, bundled for the same reason as

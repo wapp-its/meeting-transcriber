@@ -405,6 +405,7 @@ class WatchLoop {
             next.phase = .recording
             next.currentMeeting = meeting
             next.detail = "Recording: \(title)"
+            next.lastError = nil
         }
 
         let source = RecordingSource.forApp(pid: meeting.windowPID, noMic: noMic)
