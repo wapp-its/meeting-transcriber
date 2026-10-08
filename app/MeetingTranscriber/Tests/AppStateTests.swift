@@ -34,32 +34,34 @@ final class AppStateTests: XCTestCase { // swiftlint:disable:this type_body_leng
     /// defaults, its pipeline would build queues on the installed app's logs,
     /// snapshot and recordings folder, and its settings would read and write
     /// the test host's real `UserDefaults` domain.
-    private func makeAppState(notifier: any AppNotifying = SilentNotifier()) -> AppState {
-        AppState(
+    /// `queue:` is the queue the pipeline controller starts with, injected
+    /// through the environment rather than assigned afterwards.
+    private func makeAppState(
+        notifier: any AppNotifying = SilentNotifier(),
+        logDir: URL? = nil,
+        queue: PipelineQueue? = nil,
+    ) -> AppState {
+        let logs: URL = logDir ?? testLogDir
+        return AppState(
             settings: settings,
             notifier: notifier,
-            pipelineEnvironment: .init(
-                logDir: testLogDir,
-                stagingDir: testLogDir.appendingPathComponent("staging", isDirectory: true),
-                recoverStagedRecordings: nil,
-            ),
+            pipelineEnvironment: IsolatedQueueEnvironment.make(logDir: logs, initialQueue: queue),
         )
     }
 
     private func makeState() -> (AppState, RecordingNotifier) {
         let notifier = RecordingNotifier()
-        let state = makeAppState(notifier: notifier)
-        // Inject a PipelineQueue with mocks + the per-test isolated logDir.
-        // The engine != nil arm short-circuits `pipeline.ensureQueue()` so
-        // it doesn't replace our queue with one wired to the real engine on
-        // the first `enqueueFiles` call.
-        state.pipeline.queue = PipelineQueue(
+        // A PipelineQueue with mocks + the per-test isolated logDir. The
+        // engine != nil arm short-circuits `pipeline.ensureQueue()` so it is
+        // not replaced with one wired to the real engine on the first
+        // `enqueueFiles` call.
+        let state = makeAppState(notifier: notifier, queue: PipelineQueue(
             engine: MockEngine(),
             diarizationFactory: { MockDiarization() },
             protocolGeneratorFactory: { MockProtocolGen() },
             outputDir: testLogDir,
             logDir: testLogDir,
-        )
+        ))
         return (state, notifier)
     }
 
@@ -68,8 +70,7 @@ final class AppStateTests: XCTestCase { // swiftlint:disable:this type_body_leng
     /// `makeState()` which uses the per-test isolated `testLogDir`.
     private func makeIsolatedState(logDir: URL) -> (AppState, RecordingNotifier) {
         let notifier = RecordingNotifier()
-        let state = makeAppState(notifier: notifier)
-        state.pipeline.queue = PipelineQueue(logDir: logDir)
+        let state = makeAppState(notifier: notifier, logDir: logDir)
         return (state, notifier)
     }
 
@@ -680,7 +681,6 @@ final class AppStateTests: XCTestCase { // swiftlint:disable:this type_body_leng
         // test's own folders (see `makeAppState`).
         let notifier = RecordingNotifier()
         let state = makeAppState(notifier: notifier)
-        state.pipeline.queue = PipelineQueue(logDir: testLogDir)
         XCTAssertNil(state.pipeline.queue.engine, "Precondition: fresh queue has no engine")
 
         state.pipeline.ensureQueue()
@@ -700,24 +700,22 @@ final class AppStateTests: XCTestCase { // swiftlint:disable:this type_body_leng
 
     // MARK: - pipeline.makeQueue
 
-    func testMakeQueueHasEngine() {
+    func testMakeQueueHasDiarizationFactory() throws {
         let (state, _) = makeState()
-        XCTAssertNotNil(state.pipeline.makeQueue().engine)
+        let queue = try XCTUnwrap(state.pipeline.makeQueue())
+        XCTAssertNotNil(queue.diarizationFactory)
     }
 
-    func testMakeQueueHasDiarizationFactory() {
+    func testMakeQueueHasProtocolGeneratorFactory() throws {
         let (state, _) = makeState()
-        XCTAssertNotNil(state.pipeline.makeQueue().diarizationFactory)
+        let queue = try XCTUnwrap(state.pipeline.makeQueue())
+        XCTAssertNotNil(queue.protocolGeneratorFactory)
     }
 
-    func testMakeQueueHasProtocolGeneratorFactory() {
+    func testMakeQueueSetsOutputDir() throws {
         let (state, _) = makeState()
-        XCTAssertNotNil(state.pipeline.makeQueue().protocolGeneratorFactory)
-    }
-
-    func testMakeQueueSetsOutputDir() {
-        let (state, _) = makeState()
-        XCTAssertNotNil(state.pipeline.makeQueue().outputDir)
+        let queue = try XCTUnwrap(state.pipeline.makeQueue())
+        XCTAssertNotNil(queue.outputDir)
     }
 
     // MARK: - makeProtocolGenerator
@@ -847,12 +845,23 @@ final class AppStateTests: XCTestCase { // swiftlint:disable:this type_body_leng
         XCTAssertTrue(state.engines.activeTranscriptionEngine is WhisperKitEngine)
     }
 
-    func testMakeQueueUsesActiveEngine() {
+    /// Asserted on the engine's type, not on it being non-nil: `makeQueue` hands
+    /// the provider's engine to a non-optional initialiser parameter, so a queue
+    /// that exists always has one and `XCTAssertNotNil` on it could not fail.
+    /// The claim worth pinning is which engine the setting selects, which is
+    /// what the messages said all along.
+    func testMakeQueueUsesActiveEngine() throws {
         let (state, _) = makeState()
-        XCTAssertNotNil(state.pipeline.makeQueue().engine, "WhisperKit engine should be set")
+        XCTAssertTrue(
+            try XCTUnwrap(state.pipeline.makeQueue()).engine is WhisperKitEngine,
+            "WhisperKit engine should be set",
+        )
 
         state.settings.transcriptionEngine = .parakeet
-        XCTAssertNotNil(state.pipeline.makeQueue().engine, "Parakeet engine should be set")
+        XCTAssertTrue(
+            try XCTUnwrap(state.pipeline.makeQueue()).engine is ParakeetEngine,
+            "Parakeet engine should be set",
+        )
     }
 
     func testEnsureQueueWithParakeet() {
@@ -866,24 +875,24 @@ final class AppStateTests: XCTestCase { // swiftlint:disable:this type_body_leng
 
     // MARK: - makeQueue settings
 
-    func testMakeQueueUsesDiarizeSettingFromSettings() {
+    func testMakeQueueUsesDiarizeSettingFromSettings() throws {
         let (state, _) = makeState()
         state.settings.diarize = true
-        let queue = state.pipeline.makeQueue()
+        let queue = try XCTUnwrap(state.pipeline.makeQueue())
         XCTAssertTrue(queue.diarizeEnabled)
     }
 
-    func testMakeQueueUsesMicLabelFromSettings() {
+    func testMakeQueueUsesMicLabelFromSettings() throws {
         let (state, _) = makeState()
         state.settings.micName = "Speaker A"
-        let queue = state.pipeline.makeQueue()
+        let queue = try XCTUnwrap(state.pipeline.makeQueue())
         XCTAssertEqual(queue.micLabel, "Speaker A")
     }
 
-    func testMakeQueueUsesNumSpeakersFromSettings() {
+    func testMakeQueueUsesNumSpeakersFromSettings() throws {
         let (state, _) = makeState()
         state.settings.numSpeakers = 4
-        let queue = state.pipeline.makeQueue()
+        let queue = try XCTUnwrap(state.pipeline.makeQueue())
         XCTAssertEqual(queue.numSpeakers, 4)
     }
 }

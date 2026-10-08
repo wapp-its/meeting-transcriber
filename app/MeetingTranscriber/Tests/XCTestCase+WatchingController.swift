@@ -122,8 +122,11 @@ extension XCTestCase {
         )
         settings.watchTeams = watchTeams
         settings.noMic = noMic
-        let pipeline = PipelineController(settings: settings, notifier: notifier)
-        pipeline.queue = PipelineQueue(logDir: logDir)
+        let pipeline = PipelineController(
+            settings: settings,
+            notifier: notifier,
+            queueEnvironment: IsolatedQueueEnvironment.make(logDir: logDir),
+        )
         let channelHealth = ChannelHealthController(
             notifier: notifier,
             debounceSeconds: { channelFaultWindow },
