@@ -356,10 +356,11 @@ final class WatchingController {
         await join { self.startTask != nil || self.manualStartTask != nil }
     }
 
-    /// Bounded wait for an in-flight start, shared by both joins. True when it
-    /// settled, false on expiry or cancellation. See `joinStart` for why the
-    /// bound and the polling shape are what they are.
-    private func join(while inFlight: () -> Bool) async -> Bool {
+    /// Bounded wait for an in-flight start, shared by both joins and by the
+    /// stop of any recording. True when it settled, false on expiry or
+    /// cancellation. See `joinStart` for why the bound and the polling shape
+    /// are what they are.
+    func join(while inFlight: () -> Bool) async -> Bool {
         let deadline = ContinuousClock.now + startJoinTimeout
         while inFlight() {
             if Task.isCancelled { return false }
