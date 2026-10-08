@@ -690,7 +690,7 @@ class PipelineQueue {
     /// back a finished job's outcome even after `completedJobLifetime` removes
     /// it from the in-memory list. No-op when no store is wired.
     private func recordTerminalJob(_ job: PipelineJob) {
-        terminalJobStore?.record(JobStatusDTO(job: job))
+        terminalJobStore?.record(TerminalJobRecord(job: job))
     }
 
     /// Deletes raw transcript artifacts only after a successfully completed job
@@ -774,6 +774,17 @@ class PipelineQueue {
     func recordEchoVerdict(jobID: UUID, _ verdict: EchoDetectionDTO) {
         guard let index = jobs.firstIndex(where: { $0.id == jobID }) else { return }
         jobs[index].echo = verdict
+    }
+
+    /// Record the recording's length from its frame count at 16 kHz, as stage
+    /// 1 measured it. Zero frames (an empty recording, or audio that could not
+    /// be read) are not recorded, so nil keeps meaning "not measured". No
+    /// snapshot write of its own: the stage transition after stage 1 persists
+    /// it, the terminal one included.
+    /// Internal (not private) because `PipelineQueue+Stages.swift` calls it.
+    func recordAudioDuration(jobID: UUID, frames: Int) {
+        guard frames > 0, let index = jobs.firstIndex(where: { $0.id == jobID }) else { return }
+        jobs[index].audioDuration = TimeInterval(frames) / TimeInterval(AudioConstants.targetSampleRate)
     }
 
     /// Record how many microphone segments the merge left out of the transcript.

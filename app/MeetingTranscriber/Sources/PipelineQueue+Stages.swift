@@ -295,11 +295,11 @@ extension PipelineQueue {
     /// note for the person reading the file later and for the model that
     /// writes the protocol from it.
     private func resolveTrackViability(
-        _ ctx: JobContext, engine: any TranscribingEngine, app16k: URL, mic16k: URL,
+        _ ctx: JobContext, engine: any TranscribingEngine, appFrames: Int, micFrames: Int,
     ) -> DualTrackViability {
         let viability = DualTrackViability.resolve(
-            appFrames: AudioMixer.frameCount(of: app16k),
-            micFrames: AudioMixer.frameCount(of: mic16k),
+            appFrames: appFrames,
+            micFrames: micFrames,
             minimumFrames: engine.minimumAudioFrames,
         )
         // Recorded for every dual-source job, not only when a track was
@@ -333,9 +333,14 @@ extension PipelineQueue {
         await appResample
         await micResample
 
+        // The recording lasts as long as its longer track.
+        let appFrames = AudioMixer.frameCount(of: app16k)
+        let micFrames = AudioMixer.frameCount(of: mic16k)
+        recordAudioDuration(jobID: ctx.jobID, frames: max(appFrames, micFrames))
+
         // Which of the two tracks has anything to transcribe, answered before
         // any of the work below.
-        let viability = resolveTrackViability(ctx, engine: engine, app16k: app16k, mic16k: mic16k)
+        let viability = resolveTrackViability(ctx, engine: engine, appFrames: appFrames, micFrames: micFrames)
 
         // Both tracks now exist at 16 kHz. Measure here, before transcription
         // and before any remedy touches the audio, whether they carry the same
@@ -462,6 +467,8 @@ extension PipelineQueue {
             }
             let mix16k = workDir.appendingPathComponent("mix_16k.wav")
             try await AudioMixer.resampleFile(from: mixPath, to: mix16k)
+            // The recording's length, taken before VAD trims the silence out.
+            recordAudioDuration(jobID: ctx.jobID, frames: AudioMixer.frameCount(of: mix16k))
 
             // Optional VAD preprocessing: trim silence before transcription
             var vadMap: VadSegmentMap?

@@ -2,8 +2,9 @@ import Foundation
 
 /// A job's status plus its result paths, for either a live (in-flight) job or a
 /// finished job already reaped from the queue. Served by `GET /v1/jobs/<id>` and
-/// persisted in `TerminalJobStore` (the wire shape and the stored shape are the
-/// same; if they ever need to diverge, split then).
+/// persisted in `TerminalJobStore` as the flat core of a `TerminalJobRecord`,
+/// which stores the history's own fields next to these keys, so a field added
+/// here reaches both the wire and the history file.
 struct JobStatusDTO: Codable, Equatable {
     let jobID: String
     let state: JobState
