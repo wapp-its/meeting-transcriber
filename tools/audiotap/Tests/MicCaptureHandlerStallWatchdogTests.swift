@@ -487,17 +487,27 @@ final class MicCaptureHandlerStallWatchdogTests: XCTestCase {
         )
         let fixture = makeFixture([StallTestSession(), StallTestSession()], limits: limits, realClock: true)
         let handler = fixture.handler
-        defer { try? FileManager.default.removeItem(at: fixture.url) }
+        // Holds the restart queue until after stop(), so the stall restart the
+        // timer launches is queued, not started, when stop() returns. The timer
+        // cannot tick before the main run loop runs, so this is always ahead.
+        let gate = DispatchSemaphore(value: 0)
+        defer { gate.signal(); try? FileManager.default.removeItem(at: fixture.url) }
 
         try handler.start()
+        handler.restartQueue.async { gate.wait() }
         XCTAssertNotNil(handler.stallTimer, "start() must arm the watchdog")
         waitUntil("the timer launched a stall restart on its own") { restartsLaunched(handler) >= 1 }
 
         handler.stop()
         XCTAssertNil(handler.stallTimer)
         let built = fixture.sessions.count
+        XCTAssertEqual(built, 1, "the stall restart is queued, not started, when stop() returns")
+        gate.signal()
+        handler.restartQueue.sync {}
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
-        XCTAssertEqual(fixture.sessions.count, built, "no attempt after the stop")
+        XCTExpectFailure("a restart queued before stop() still builds its session after stop() returned") {
+            XCTAssertEqual(fixture.sessions.count, built, "no attempt after the stop")
+        }
     }
 
     // MARK: - Known risk: the outgoing teardown runs on the main thread
