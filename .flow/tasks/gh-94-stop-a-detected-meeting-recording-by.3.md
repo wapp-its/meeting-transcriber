@@ -49,9 +49,47 @@ Adds the owner's opt-in to the automation API (R7, decision D3): `POST /v1/recor
 - [ ] Focused run green, read from the log file (locally: the integration cases need sockets): `cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh94-home swift test --parallel --filter "RecordActionPayload|WatchingController|RPCRecordStatus|DebugRPCServerIntegration|AppStateTests" > /private/tmp/mt-gh94-t3.log 2>&1; echo "exit=$?"` (never pipe the run into tail/head/grep).
 - [ ] `PATH="$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH" ./scripts/lint.sh` reports 0 violations, and `./scripts/pre-push.sh --with-appstore` is clean (the server and its tests are `#if !APPSTORE`; the App Store build must still compile without them).
 ## Done summary
-TBD
+A Stream Deck key or script can now end any recording, a detected meeting included, with `POST /v1/record` `{"action":"stop","scope":"any"}`. The route sends that stop to a new server closure that calls `WatchingController.applyRecordStopAny()`, which settles in-flight starts, stops through the menu's `stopRecording()`, and for a detected meeting waits (within the 20 s join bound) until the loop has left `.recording`. A plain `stop` still reaches only the old verb closure and keeps its microphone-only meaning.
 
+Integrated onto feat/gh-94-stop-detected-recording as dc1bbe6c (feat: end any recording from the automation API; worker commit 37a5cb33 on wave/gh-94.3 cherry-picked unchanged) plus the review fix ae87e5a1 (fix: reject an explicit null record scope); base 454251af.
+
+stage: impl-review - ran [22:34:39..22:44:09] round 1 NEEDS_WORK (3 draws correctness/contracts/integration, one P1 finding collapsed from all three: `decodeIfPresent` read an explicit `"scope": null` as absent, so `{"action":"start","scope":null}` started a recording instead of answering 400; validator pass kept it), fix ae87e5a1 (decoder checks the key's presence and decodes a present value non-optionally; payload tests for null with start/toggle/stop; route test for `start` + null), round 2 SHIP, prior finding fixed, no survivors; receipt /tmp/impl-review-receipt-846594bd1b60-gh-94-stop-a-detected-meeting-recording-by.3.json (model: codex gpt-5.6-sol xhigh)
+stage: wave-join - ran (cherry-pick of 1 commit, no collision; built concurrently with task .4 in its own worktree)
+
+Tier: session (jev-unavailable(no_key)); explicit invocation: opus at xhigh; actual model: claude-opus-5-5 (host-reported model id; effort not exposed by the host); the review fix was made by the conductor (claude-fable-5-1).
+
+Gates (logs under /private/tmp)
+- baseline: green via handoff (conductor integrated verify at 86a651a4, 286 tests); only `.flow/` paths changed since. Lint baseline exit 0 (`mt-gh94-t3-lint-baseline.log`).
+- Task acceptance command on the worker's commit (`mt-gh94-t3.log`) exit 0, 214 tests, all 13 new ones included; the integration cases ran locally over real sockets.
+- Spec Quick command on the worker's commit (`mt-gh94-t3-quick.log`) exit 0, 194 tests.
+- After the review fix, on the target @ ae87e5a1: the task acceptance filter (`mt-gh94-fix3-tests.log`) exit 0, 214 tests; lint (`mt-gh94-fix3-lint.log`) exit 0, 0 violations in 709 files.
+- Conductor's integrated verify on the final target @ ae87e5a1 with tasks .3 and .4 combined (`mt-gh94-verify-final.log`, the spec Quick filter plus MenuBarJobMenu) exit 0, 205 tests.
+- `./scripts/pre-push.sh --with-appstore` on the worker's commit (`mt-gh94-t3-prepush.log`) exit 0, both release variants, no compiler warnings. Not re-run after the one-line decoder fix (the focused tests compile the same target in debug; the release parity run is the spec-level Phase 4 check).
+- `flowctl gate classify --base 093c2cc0` returned FULL (Swift code changed). No GATE_SKIPPED lines.
+- Mutation check (worker): 5 mutants, each turned its own new test red; sources restored byte-identically.
+- Not run: CI's `swiftlint analyze` (needs a clean xcodebuild).
+
+Tests per acceptance criterion
+- Payload (`Tests/RecordActionPayloadTests.swift`): testScopeAnyDecodesOnAStop, testAPlainStopCarriesNoScope, testAnUnknownScopeOrAScopeOnAnotherVerbFailsToDecode (`scope:"all"`, `start`+`any`, `toggle`+`any`, and after the review fix `start`/`toggle`/`stop` + `null`).
+- Controller (`Tests/WatchingControllerStopRecordingTests.swift`): testStopAnyWithNothingRecordingIsUnchanged; testStopAnyEndsAManualRecordingOfEitherKind; testStopAnyEndsADetectedMeetingAndAnswersOnceItHasEnded; testStopAnyFailsWhenTheDetectedMeetingsRecorderThrowsOnStop; testStopAnyFailsForEachDetectedMeetingWhoseRecordOnlyOutputIsLost; testStopAnyFailsWhenADetectedStopDoesNotTakeEffectInTime (the R7 20 s case). The plain-stop pin is task .2's testAPlainRecordStopLeavesADetectedMeetingRecording, unchanged.
+- Server (`Tests/DebugRPCServerIntegrationTests.swift`): testV1RecordStopAnyGoesToItsOwnSeam (200, 200, 503 with a status body), testV1RecordRejectsAnUnknownOrMisplacedScope (400, empty body, neither closure called; includes `start` + `null` after the fix), testV1RecordPlainStopKeepsTheVerbSeam, testV1RecordStopAnyIsWiredByAppState.
+- Docs: `docs/automation-api.md` (endpoint row, "Ending any recording", 200/400/503 bullets, the kept plain-stop promise, status rows) and `docs/stream-deck.md` ("A key that ends any recording"; `mt-cli` has no flag yet).
+
+Decisions (worker, rule 6, plus the conductor's review fix)
+- `"scope": null` was first decoded as "no scope"; the review found that R7 promises 400 for any supplied scope other than `any`, so the decoder now distinguishes an absent key from a present null (conductor, from the review finding).
+- testV1RecordStopAnyIsWiredByAppState added because `DebugRPCServer.init` defaults the new closure to `.failed`, so dropping the `AppState.swift` argument would leave every route test green; it lives in the integration file because `AppStateTests.swift` is outside Touches.
+- The 20 s timeout test added because R7 enumerates that error case and the task acceptance had none.
+- `applyRecordStop` now reads "still recording" from the loop it captured (the old check read a controller predicate that is always false after the loop is dropped). `WatchingControllerRecordControlTests` unchanged and green.
+- Clearing `lastError` when a detected recording starts also clears the transcriber status's `error` field for the new recording; the menu shows `lastError` only in `.error` and the error notification fires on the transition, so neither changes.
+- A private `TwoCallsDetector` drives the two-meeting record-only test.
+- One commit for docs, code and tests of the one feature. Line budget: `AppState.swift` 599 (cap 600), `WatchLoop.swift` 589.
+
+Follow-ups (not filed by this task; listed for the pull request)
+- `mt-cli record stop --any` flag (the spec's own boundary).
+- The 409 bullet in `docs/automation-api.md` still points at `POST /v1/watch` for a detected meeting; it could now point at `scope: "any"`.
+
+stage: plan-sync - skipped(config: planSync.enabled=false)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: dc1bbe6cd2cc68f7be3027d99e4c9f3498362b45, ae87e5a1
+- Tests: worker (wave/gh-94.3) acceptance, on worker HEAD 37a5cb33: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh94-home swift test --parallel --filter "RecordActionPayload|WatchingController|RPCRecordStatus|DebugRPCServerIntegration|AppStateTests" > /private/tmp/mt-gh94-t3.log 2>&1 (exit 0, 214 tests, 13 new; the integration cases ran locally over real sockets), worker (wave/gh-94.3) spec Quick, on worker HEAD 37a5cb33: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh94-home swift test --parallel --filter "RedetectionHolds|WatchLoopStopByHand|WatchLoopMeetingEnd|WatchingControllerStopRecording|WatchingControllerRecordControl|MenuBarView|RecordActionPayload|RPCRecordStatus|DebugRPCServerIntegration" > /private/tmp/mt-gh94-t3-quick.log 2>&1 (exit 0, 194 tests), worker (wave/gh-94.3): PATH="$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH" ./scripts/lint.sh > /private/tmp/mt-gh94-t3-lint-final.log 2>&1 (exit 0, 0 violations, 0/708 files to format), worker (wave/gh-94.3): CFFIXED_USER_HOME=/private/tmp/mt-gh94-home ./scripts/pre-push.sh --with-appstore > /private/tmp/mt-gh94-t3-prepush.log 2>&1 (exit 0, both release variants, no compiler warnings), worker (wave/gh-94.3): bash /tmp/mt-gh94-tick/t3-mutate.sh and t3-mutate2.sh (5 mutants; each turned its own new test red; sources restored byte-identically; /private/tmp/mt-gh94-t3-mutant*.log), conductor review fix, on the target @ ae87e5a1: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh94-home swift test --parallel --filter "RecordActionPayload|WatchingController|RPCRecordStatus|DebugRPCServerIntegration|AppStateTests" > /private/tmp/mt-gh94-fix3-tests.log 2>&1 (exit 0, 214 tests); PATH="$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH" ./scripts/lint.sh > /private/tmp/mt-gh94-fix3-lint.log 2>&1 (exit 0, 0 violations in 709 files), conductor integrated verify on the final target @ ae87e5a1 (tasks .3 and .4 combined): cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh94-home swift test --parallel --filter "RedetectionHolds|WatchLoopStopByHand|WatchLoopMeetingEnd|WatchingControllerStopRecording|WatchingControllerRecordControl|MenuBarView|MenuBarJobMenu|RecordActionPayload|RPCRecordStatus|DebugRPCServerIntegration" > /private/tmp/mt-gh94-verify-final.log 2>&1 (exit 0, 205 tests), impl-review receipt: /tmp/impl-review-receipt-846594bd1b60-gh-94-stop-a-detected-meeting-recording-by.3.json -> round 1 NEEDS_WORK (codex gpt-5.6-sol xhigh, 3 draws, one P1 finding: explicit null scope decoded as absent; validator kept it), fix ae87e5a1, round 2 SHIP (prior finding fixed, no survivors)
 - PRs:
