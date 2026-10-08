@@ -1,0 +1,18 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-08T08:11:24.363567Z",
+  "depends_on": [
+    "gh-94-stop-a-detected-meeting-recording-by.1",
+    "gh-94-stop-a-detected-meeting-recording-by.2"
+  ],
+  "id": "gh-94-stop-a-detected-meeting-recording-by.3",
+  "priority": null,
+  "review": "codex:gpt-5.6-sol:xhigh",
+  "spec": "gh-94-stop-a-detected-meeting-recording-by",
+  "spec_path": ".flow/tasks/gh-94-stop-a-detected-meeting-recording-by.3.md",
+  "status": "todo",
+  "title": "End any recording from the automation API with stop and scope any",
+  "updated_at": "2026-10-08T08:15:18.241242Z"
+}

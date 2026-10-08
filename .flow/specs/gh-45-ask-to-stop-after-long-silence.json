@@ -7,7 +7,8 @@
   "default_review": null,
   "default_sync": null,
   "depends_on_epics": [
-    "gh-54-ask-before-auto-stopping-a-meeting"
+    "gh-54-ask-before-auto-stopping-a-meeting",
+    "gh-94-stop-a-detected-meeting-recording-by"
   ],
   "id": "gh-45-ask-to-stop-after-long-silence",
   "impl_review_rounds": {},
@@ -163,5 +164,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/45"
   },
-  "updated_at": "2026-10-06T20:54:54.265866Z"
+  "updated_at": "2026-10-08T08:05:48.158356Z"
 }
