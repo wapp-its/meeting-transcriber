@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-94-stop-detected-recording",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-10-08T22:50:52.143263Z",
+  "completion_reviewed_at": "2026-10-08T23:22:51.897470Z",
   "created_at": "2026-10-08T07:53:27.337309Z",
   "default_impl": null,
   "default_review": null,
@@ -500,6 +500,41 @@
       "timestamp": "2026-10-08T22:50:52.094641Z",
       "tool_calls": 29,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "007dcac986be80c937cf5b2eee9f16d69c2b8e1538bfc5732d6a924693e9b049",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "20a72ce9b804a53af88af35e1e0913451a54b670",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 7353,
+      "output_sha256": "866ffc3269c4e25d908e25a5193d14ec43a956ba6658c4e0a7b29500f2e924a9",
+      "reservation_id": "00c0038884364b64be1c6b44eb3b8130",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-08T23:22:51.873166Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -508,7 +543,7 @@
     "impl:gh-94-stop-a-detected-meeting-recording-by.3": 1,
     "impl:gh-94-stop-a-detected-meeting-recording-by.4": 1,
     "plan": 2,
-    "plan#completion": 1
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -536,5 +571,5 @@
     "mergeBaseTracker": "## Problem\n\nEine Aufnahme, die man selbst startet (App + Mikrofon, nur Mikrofon), l\u00e4sst sich im Men\u00fc mit **\u201eStop Recording\u201c** beenden. Eine **automatisch erkannte** Meeting-Aufnahme nicht: der Men\u00fcpunkt erscheint nur f\u00fcr manuelle Aufnahmen (`MeetingTranscriberApp.swift`, `onStopManualRecording` nur bei `isManualRecording`). Sie endet nur von selbst: Meeting-Signal 15 s weg, dann der 2-Minuten-Countdown aus #54, dessen \u201eJetzt beenden\u201c es nur in der Mitteilung gibt.\n\nIm Alltag: Meeting ist vorbei, man wartet, bis die App es merkt (Teams h\u00e4lt Fenster oder Mikrofon oft noch offen), und kann nicht einfach selbst beenden. Owner, 2026-10-08: \u201eusually it's annoying, I need to wait till it automatically stops \u2026 It's stopping only automatically.\u201c\n\n## Wunsch\n\n- **\u201eStop Recording\u201c im Men\u00fc f\u00fcr jede laufende Aufnahme**, auch f\u00fcr erkannte Meetings: beendet sofort und startet die Verarbeitung wie bei einer manuellen Aufnahme.\n- Dasselbe \u00fcber die Automation-API (`/v1/record` `stop`, heute nur f\u00fcr reine Mikrofon-Aufnahmen), damit Stream Deck es kann.\n- Nach dem Beenden darf dasselbe Meeting **nicht sofort wieder** erkannt und aufgenommen oder erneut nachgefragt werden, solange sein Anruf-Signal noch da ist (Teams-Fenster offen, Mikrofon gehalten). Erst wenn das Signal einmal weg war, gilt wieder die normale Erkennung.\n- Ein laufender Countdown aus #54 wird dabei zur\u00fcckgezogen.\n\n## Abnahme\n\n- Erkanntes Teams-Meeting l\u00e4uft \u2192 Men\u00fc zeigt \u201eStop Recording\u201c \u2192 Klick beendet die Aufnahme, ein Job wird verarbeitet.\n- Teams bleibt danach noch im Anruf-Zustand \u2192 keine neue Aufnahme, keine neue R\u00fcckfrage, bis der Anruf wirklich endet.\n- N\u00e4chster Anruf in Teams \u2192 wird wieder normal erkannt.\n\n## Bezug\n\n#54 (R\u00fcckfrage vor dem automatischen Stopp, gemergt), #45 (Stille-R\u00fcckfrage plant dieselbe Sperre \u201enicht wieder erkennen, bis das Signal weg war\u201c), #46 (Pausieren, `/v1/record`).",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/94"
   },
-  "updated_at": "2026-10-08T23:07:47.587033Z"
+  "updated_at": "2026-10-08T23:22:51.898603Z"
 }
