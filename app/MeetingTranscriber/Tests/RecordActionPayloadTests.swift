@@ -25,6 +25,11 @@ final class RecordActionPayloadTests: XCTestCase {
             #"{"action":"stop","scope":"all"}"#,
             #"{"action":"start","scope":"any"}"#,
             #"{"action":"toggle","scope":"any"}"#,
+            // An explicit null is a supplied scope, not an absent one: it
+            // must neither start a recording nor pass as a plain stop.
+            #"{"action":"start","scope":null}"#,
+            #"{"action":"toggle","scope":null}"#,
+            #"{"action":"stop","scope":null}"#,
         ] {
             XCTAssertThrowsError(try decode(body), body)
         }

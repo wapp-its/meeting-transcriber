@@ -121,8 +121,10 @@ enum RecordScope: String, Codable {
 /// Request body for `POST /v1/record`. An unrecognised action string fails to
 /// decode, which the route turns into a 400 — better than silently treating a
 /// typo'd verb as a toggle. The same goes for a `scope` the decoder does not
-/// know, or one sent with any action but `stop`: a body that fails here is
-/// never read as `scope: "any"`.
+/// know, an explicit `null`, or one sent with any action but `stop`: a body
+/// that fails here is never read as `scope: "any"`. Only an absent key means
+/// "no scope", which is why the key's presence is checked rather than
+/// `decodeIfPresent`, which reads `null` as absent.
 struct RecordActionPayload: Codable, Equatable {
     let action: RecordAction
     let scope: RecordScope?
@@ -135,7 +137,7 @@ struct RecordActionPayload: Codable, Equatable {
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         action = try container.decode(RecordAction.self, forKey: .action)
-        scope = try container.decodeIfPresent(RecordScope.self, forKey: .scope)
+        scope = container.contains(.scope) ? try container.decode(RecordScope.self, forKey: .scope) : nil
         guard scope == nil || action == .stop else {
             throw DecodingError.dataCorruptedError(
                 forKey: .scope, in: container, debugDescription: "scope is accepted only with action stop",

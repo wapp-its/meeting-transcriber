@@ -1382,7 +1382,11 @@
                 },
             )
 
-            for body in [#"{"action":"stop","scope":"all"}"#, #"{"action":"start","scope":"any"}"#] {
+            for body in [
+                #"{"action":"stop","scope":"all"}"#,
+                #"{"action":"start","scope":"any"}"#,
+                #"{"action":"start","scope":null}"#,
+            ] {
                 let (data, response) = try await postRecord(base, body)
                 XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 400, body)
                 XCTAssertTrue(data.isEmpty, "\(body): nothing was applied, so there is no state to report")
