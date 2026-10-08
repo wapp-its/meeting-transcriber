@@ -79,6 +79,11 @@ What the code does today (checked 2026-10-06 on `wapp/main` 65888b53): the open 
 
 Maintainability (plan review): duplication - task .1 first planned to copy the consent poll-loop test helpers into a new file; now the helpers lose `private` and the new tests extend the existing test class from a second file; structure - none identified
 
+FIT: GO · 2026-10-08 · base ed0b4e6d · engine flow-next 8.1.1 · no spec claims this scope (gh-2 builds on it; gh-58 and gh-46 add their icon flags after it lands); the two doc commits since the plan review cover other features; every code premise above still holds on the base, only line numbers drifted
+  - `AppNotifying` gained two meeting-end requirements with gh-54 (`AppState.swift:34-43`); their defaults live in a third extension in `MeetingEndQuestions.swift:6`, which stays where it is. Task .1 moves the protocol and the extensions that sit in `AppState.swift` only.
+  - The "single Boolean" on `AppState` in the Architecture section is task .3's `awaitingUserAnswer`.
+  - gh-54 is merged: its auto-stop question (`WatchLoop.meetingEndQuestionID`, `NotificationManager.askBeforeEndingRecording`) is a separate path and category; issue #58 puts it on the icon later, this spec does not touch it.
+
 ## Quick commands
 
 ```bash
