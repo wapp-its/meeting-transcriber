@@ -13,6 +13,7 @@
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
   "plan_reviewed_at": "2026-10-08T08:03:43.335666Z",
+  "ready": true,
   "review_attempts": [
     {
       "artifact_sha256": "f6539d8e3b157bf9a9ef4e31fee17a3047ca7049c42024a93a2089ea96d684ab",
@@ -144,5 +145,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/94"
   },
-  "updated_at": "2026-10-08T08:03:43.336998Z"
+  "updated_at": "2026-10-08T08:05:48.407412Z"
 }
