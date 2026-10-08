@@ -134,6 +134,9 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 |------|------|
 | `WatchLoop.swift` | Main orchestrator: detect → record → enqueue PipelineJob |
 | `WatchLoop+ManualRecording.swift` | The poll loop that decides when a manually started recording ends, split out of `WatchLoop` |
+| `WatchLoop+StopByHand.swift` | "Stop Recording" for a detected meeting: parks a request the meeting-end wait takes at its next poll, so the recording ends through the same stop, cut and enqueue as every other meeting end; split out of `WatchLoop` |
+| `WatchLoop+RedetectionHold.swift` | Keeps an app out of detection after its recording was ended while its call signal stayed, until the first watching poll finds that signal gone; split out of `WatchLoop` |
+| `RedetectionHolds.swift` | Pure per-app hold set behind `WatchLoop+RedetectionHold`, keyed by the detector identity (`AppMeetingPattern.appName`) |
 | `WatchLoopEndPolicy.swift` | Pure decision logic for `waitForMeetingEnd` (grace-period / max-duration) |
 | `WatchLoopState.swift` | Value-type snapshot of `WatchLoop`'s observable fields (for tests and RPC) |
 | `ManualRecordingMonitorPolicy.swift` | Pure decision logic for manual recording stop conditions (process-died vs max-duration) |
