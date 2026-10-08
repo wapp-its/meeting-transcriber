@@ -44,9 +44,28 @@ Line numbers are those on gh-44's branch head (`fix/gh-44-mic-restart-loop`, 6e2
 - [ ] Exactly the post-release assertions are wrapped in strict `XCTExpectFailure` (the unchanged count and the candidate's empty calls in the new test; the existing "no attempt after the stop" assertion in the timer test); the timer test keeps its real timer, limits and assertion wording; no test is removed or skipped.
 - [ ] The gate is released on every path; `MicCaptureHandlerStallWatchdogTests.swift` stays under 600 lines; `./scripts/lint.sh` is clean with the pinned tools.
 ## Done summary
-TBD
+Two tests now force the microphone stop race on every run. Each one holds the handler's serial restart queue with a blocking item, so a stall restart is claimed and queued before stop() and builds its session only after stop() returned. The new manual-clock test lives in tools/audiotap/Tests/MicCaptureHandlerStopRaceTests.swift with its own private fakes, and the session fake can fail its bring-up (shouldFail) for task .2. The existing timer test gets the same hold and keeps its real timer, limits and assertion wording. Each test asserts outside any wrapper that one session existed when stop() returned. The post-release assertions sit in strict XCTExpectFailure closures: unchanged count and empty candidate calls in the new test, and the "no attempt after the stop" assertion in the timer test.
 
+Cause, as the reproduction shows: a production race that the timer test's real-clock timing only sometimes exposes. launchRestartAttempt hands the attempt to restartQueue, and runRestartAttempt's first step is sessionFactory(). stop() seals the arbiter and returns without waiting for that queue. An attempt queued but not yet started at stop() therefore builds its session, runs hardwareFormat, installTap and start on it, and only then learns from the arbiter that the capture is sealed. It then tears the session down without adopting it. The timer test waits only until the restart is charged, which happens before the queued attempt builds, so on a loaded runner the attempt starts after stop().
+
+Observed raw failure, wrappers removed locally and not committed (serial swift test on the two tests, rc 1):
+- MicCaptureHandlerStallWatchdogTests.swift:508: error: testTheTimerDrivesTheWatchdogAndStopsWithTheCapture : XCTAssertEqual failed: ("2") is not equal to ("1") - no attempt after the stop
+- MicCaptureHandlerStopRaceTests.swift:153: error: testAStallRestartQueuedWhenStopIsCalledBuildsNoSession : XCTAssertEqual failed: ("2") is not equal to ("1") - no session is built after the stop
+- MicCaptureHandlerStopRaceTests.swift:154: error: XCTAssertEqual failed: (["hardwareFormat", "installTap", "start", "teardown"]) is not equal to ([]) - the queued restart never touches its session
+
+With the wrappers, the serial run reports each of the three as "XCTExpectFailure: matcher accepted" and passes. The focused suites passed 10 of 10 consecutive --parallel runs, with 13 tests collected each time. The reviewer independently ran them 20 of 20. MicCaptureHandlerStallWatchdogTests.swift is at 587 lines, and ./scripts/lint.sh with the pinned tools found 0 violations in 701 files. The gate is a DispatchSemaphore(value: 0) that a defer also signals, so a failing run never leaves the restart queue held.
+
+Decisions:
+- The review ran one correctness draw instead of three. The diff touches tests only, in one module, and changes no production concurrency. The reproduction was already measured deterministic (raw failure observed, 10 of 10 parallel runs).
+- The fake's installTap takes a non-escaping block parameter. SwiftLint's unneeded_escaping rejects @escaping on an unused parameter, and the non-escaping method still satisfies the protocol requirement (the test target compiles).
+
+baseline: green (swift test --parallel --filter 'MicCaptureHandlerStallWatchdogTests|RestartArbiterTests', 37 tests, rc 0; lint 0 violations)
+Tier: session (jev-unavailable(no_key))
+
+stage: impl-review - ran [2026-10-08T13:45Z..2026-10-08T13:51Z] (codex gpt-5.6-sol xhigh, one correctness draw, SHIP, no findings)
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 9da38cce62ec8cc57d9c6965a4a9c1a85ef9a244
+- Tests: cd tools/audiotap && swift test --parallel --filter 'MicCaptureHandlerStopRaceTests|MicCaptureHandlerStallWatchdogTests|RestartArbiterTests' (38 tests, rc 0), PATH=$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH ./scripts/lint.sh (0 violations, 701 files)
 - PRs:

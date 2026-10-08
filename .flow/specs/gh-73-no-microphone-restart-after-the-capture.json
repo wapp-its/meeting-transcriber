@@ -1,7 +1,7 @@
 {
   "branch_name": "fix/gh-73-mic-stop-race",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-08T14:29:32.274798Z",
   "created_at": "2026-10-06T22:37:30.872327Z",
   "default_impl": null,
   "default_review": null,
@@ -10,7 +10,10 @@
     "gh-44-stop-the-microphone-restart-loop-on-a"
   ],
   "id": "gh-73-no-microphone-restart-after-the-capture",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-73-no-microphone-restart-after-the-capture.1": 0,
+    "gh-73-no-microphone-restart-after-the-capture.2": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -121,19 +124,131 @@
       "task": null,
       "timestamp": "2026-10-06T23:00:02.505637Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "18d3091ccc4c63875a34d6b231f8ae08ed167266532c2ab178d8a9d97968dd57",
+      "backend": "codex",
+      "base_sha": "0fdd98dcda4d8bb2d9233c780348209d3382994f",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "9da38cce62ec8cc57d9c6965a4a9c1a85ef9a244",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "09bfe49d278447648efd6a6755a803ea",
+      "round_consumed": true,
+      "scope": "impl:gh-73-no-microphone-restart-after-the-capture.1",
+      "superseded_by": null,
+      "task": "gh-73-no-microphone-restart-after-the-capture.1",
+      "timestamp": "2026-10-08T13:50:26.950646Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "c1db2ce04e0a2128b2069b2f343dda8130bc97a228ca9068636175b284092303",
+      "backend": "codex",
+      "base_sha": "cd44d94e51ea2ba53ed5450bada1072b40273e2c",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "1f207e2ae967eb65a9b0a3926681a64368f72d67",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "8b524f6e39f6452bad66b06744fedcb2",
+      "round_consumed": true,
+      "scope": "impl:gh-73-no-microphone-restart-after-the-capture.2",
+      "superseded_by": null,
+      "task": "gh-73-no-microphone-restart-after-the-capture.2",
+      "timestamp": "2026-10-08T14:15:21.276233Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "14f470f419946c47b75433872991f1929d64b6b0b87c980ed7a8753b3a24905c",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "5ab7da4fd67dee53386af5cd498bb666411cc768",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1158891,
+      "output_sha256": "58749f31685718cf217c078c162bb3712b717f34d718920792a11966c942b85c",
+      "reservation_id": "295a5d11e7fb473eaf24156bb6854ec0",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-08T14:29:32.248359Z",
+      "tool_calls": 15,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-73-no-microphone-restart-after-the-capture.1": 1,
+    "impl:gh-73-no-microphone-restart-after-the-capture.2": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-73-no-microphone-restart-after-the-capture.1": 0,
+    "impl:gh-73-no-microphone-restart-after-the-capture.2": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-73-no-microphone-restart-after-the-capture.md",
-  "status": "open",
+  "status": "done",
   "title": "No microphone restart after the capture has stopped",
   "tracker": {
     "baseHashFlow": "6d0c8c1c28aab7fc8465576cbc1191e4bcb0efad7cf8e8be25fcd10ab6024354",
@@ -147,5 +262,5 @@
     "mergeBaseTracker": "## Beobachtung\nDer Test `AudioTapLibTests.MicCaptureHandlerStallWatchdogTests.testTheTimerDrivesTheWatchdogAndStopsWithTheCapture` (kam mit dem Mikrofon-Watchdog-Fix aus #44) ist im Fork-CI auf PR #71 in **beiden Versuchen** eines Laufs fehlgeschlagen (Run 37536506723, Head d7888cdf):\n\n`XCTAssertEqual failed: (\"2\") is not equal to ...` in Zeile 500, also `fixture.sessions.count` hat sich **nach** `handler.stop()` noch erh\u00f6ht (\"no attempt after the stop\").\n\nPR #71 \u00e4ndert nichts unter `tools/`. Lokal l\u00e4uft der Test einzeln 8 von 8 Mal gr\u00fcn; auf seinem eigenen Branch war CI gr\u00fcn.\n\n## Vermutung\nEchtzeit-Timer (Poll 50 ms, Stall 0,3 s) plus 0,5 s Wartezeit: unter CI-Last kann ein bereits gestarteter Neustart nach `stop()` noch eine Session bauen. Entweder ein echtes Rennen zwischen `stop()` und einem laufenden Neustart im `MicCaptureHandler` (dann Produktfehler: nach dem Stoppen wird noch ein Mikrofon-Neustart versucht) oder nur ein zu knapp getakteter Test.\n\n## Wunsch\nKl\u00e4ren, welches von beiden; bei einem Rennen `stop()` so machen, dass ein laufender Neustart nichts mehr \u00fcbernimmt, sonst den Test auf eine injizierte Uhr umstellen.\n\n## Abnahme\nTest l\u00e4uft unter `swift test --parallel` wiederholt (z. B. 20\u00d7) gr\u00fcn; CI-L\u00e4ufe auf Code-PRs scheitern nicht mehr daran.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/73"
   },
-  "updated_at": "2026-10-06T23:00:41.078942Z"
+  "updated_at": "2026-10-08T14:49:26.443273Z"
 }
