@@ -41,9 +41,44 @@ Moves the control for the current state to directly under the menu's grey status
 
 
 ## Done summary
-TBD
+The menu now shows the control for the current state directly under the grey status line, above the first divider: "Stop Recording" while any recording runs, otherwise "Stop Watching for Meetings" / "Start Watching for Meetings" (D4). While a recording runs, the watch toggle stays below the first divider with the same label, icon and shortcut (A7); it is one private `watchToggle` property that `sessionControls` and `watchControls` render on complementary conditions, so it appears exactly once in every state.
 
+Integrated onto feat/gh-94-stop-detected-recording as 45b41bf8 (feat: put the stop and watch controls directly under the menu's status line); base 093c2cc0. Worker commit 309caa57 on wave/gh-94.4 was cherry-picked unchanged. Only `Sources/MenuBarView.swift` and the new `Tests/MenuBarViewSessionControlsTests.swift` changed.
+
+stage: impl-review - ran [22:27:19..22:29:37] SHIP, 0 findings, 1 draw (correctness; panel rule: one view, no shared state); receipt /tmp/impl-review-receipt-846594bd1b60-gh-94-stop-a-detected-meeting-recording-by.4.json (model: codex gpt-5.6-sol xhigh)
+stage: wave-join - ran (cherry-pick of 1 commit, no collision; built concurrently with task .3 in its own worktree)
+
+Tier: session (jev-unavailable(no_key)); explicit invocation: opus at xhigh; actual model: claude-opus-5-5 (host-reported model id; effort not exposed by the host)
+
+Gates (logs under /private/tmp)
+- baseline: green via handoff (verified at 86a651a4; since then only `.flow/` paths changed). Lint baseline exit 0 (`mt-gh94-t4-lint-baseline.log`).
+- Task acceptance command (`mt-gh94-t4.log`) exit 0, 62 tests, all 5 new ones included.
+- `MenuBarJobMenuTests` (`mt-gh94-t4-jobmenu.log`) exit 0, 6 tests (also constructs `MenuBarView`; the acceptance filter does not match its name).
+- Conductor's integrated verify on the target (`mt-gh94-verify-t4.log`, filter "MenuBarView|MenuBarJobMenu|WatchingControllerStopRecording") exit 0, 73 tests.
+- `./scripts/lint.sh` with the pinned tools (`mt-gh94-t4-lint.log`) exit 0, 0 violations, 0/708 files to format.
+- `./scripts/pre-push.sh --with-appstore` (`mt-gh94-t4-prepush.log`) exit 0, both release variants, 0 warnings; the extra `body` section passed the 300 ms type-check budget.
+- `flowctl gate classify` returned FULL (Swift changed). No GATE_SKIPPED lines.
+- Mutation check (`/tmp/mt-gh94-tick/t4-mutants.sh`): each of 3 mutants turned the new suite red (pre-change layout; toggle duplicated below the divider plus both shortcuts changed; toggle dropped below the divider while recording); source restored byte-identically.
+- Not run: CI's `swiftlint analyze` (needs a clean xcodebuild).
+
+Tests per acceptance criterion (Tests/MenuBarViewSessionControlsTests.swift)
+- Stop closure set: testWhileRecordingStopRecordingIsTheFirstLineUnderTheStatus (lines in document order begin [status, "Stop Recording"]; tapping the first button calls the stop closure once and `onStartStop` never).
+- Watching / idle / error: testWithoutARecordingTheWatchToggleIsTheFirstLineUnderTheStatus.
+- Recording keeps Stop Watching below the first divider: testWhileRecordingStopWatchingStaysBelowTheFirstDivider; exactly once in every state: testTheWatchToggleAppearsExactlyOnceInEveryState.
+- Shortcuts unchanged ("." and "s"): testKeyboardShortcutsAreUnchanged.
+- Existing `MenuBarViewTests` (57) unchanged and green: none pinned the old position.
+
+Decisions (worker, rule 6)
+- `watchControls` shows the toggle when the stop closure is set, the exact complement of `sessionControls`' condition, so the toggle appears once even when the status says recording but no stop closure was passed.
+- The planned pause / resume control is not in the code yet, so nothing was moved under "Stop Recording"; the `sessionControls` doc comment says a control added there goes on its own line.
+- The body's hoisting note was kept as is.
+- The shortcut test walks the view value with `Mirror` for `KeyEquivalent`s because ViewInspector 0.10.5 has no keyboard-shortcut reader; if a ViewInspector upgrade breaks something, look at this test first.
+- The test helper takes `recording: Bool` and a `Taps` recorder instead of closure literals (an unlabeled trailing closure bound to the wrong parameter at the first run; SwiftLint's `trailing_closure` rule flags the labelled form).
+
+No feature map exists (`.flow/features/` absent), so there is no mapped route to update.
+
+stage: plan-sync - skipped(config: planSync.enabled=false)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 45b41bf8538582f1e3f12f626a26cbc0ab6eb6ed
+- Tests: worker (wave/gh-94.4): cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh94-home swift test --parallel --filter "MenuBarView" > /private/tmp/mt-gh94-t4.log 2>&1 (exit 0, 62 tests, 5 new), worker (wave/gh-94.4): cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh94-home swift test --parallel --filter "MenuBarJobMenu" > /private/tmp/mt-gh94-t4-jobmenu.log 2>&1 (exit 0, 6 tests), worker (wave/gh-94.4): PATH="$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH" ./scripts/lint.sh > /private/tmp/mt-gh94-t4-lint.log 2>&1 (exit 0, 0 violations, 0/708 files to format), worker (wave/gh-94.4): ./scripts/pre-push.sh --with-appstore > /private/tmp/mt-gh94-t4-prepush.log 2>&1 (exit 0, both release variants, 0 warnings), worker (wave/gh-94.4): bash /tmp/mt-gh94-tick/t4-mutants.sh (3 mutants, each turned the new suite red; source restored byte-identically; logs /private/tmp/mt-gh94-t4-mutant-*.log), conductor integrated verify (feat/gh-94-stop-detected-recording @ 45b41bf8): cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh94-home swift test --parallel --filter "MenuBarView|MenuBarJobMenu|WatchingControllerStopRecording" > /private/tmp/mt-gh94-verify-t4.log 2>&1 (exit 0, 73 tests), impl-review receipt: /tmp/impl-review-receipt-846594bd1b60-gh-94-stop-a-detected-meeting-recording-by.4.json -> SHIP (codex gpt-5.6-sol xhigh, 1 draw: correctness SHIP, 0 findings)
 - PRs:
