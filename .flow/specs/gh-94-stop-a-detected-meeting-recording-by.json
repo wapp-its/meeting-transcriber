@@ -522,7 +522,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-94-stop-a-detected-meeting-recording-by.md",
-  "status": "open",
+  "status": "done",
   "title": "Stop a detected meeting recording by hand",
   "tracker": {
     "baseHashFlow": null,
@@ -536,5 +536,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/94"
   },
-  "updated_at": "2026-10-08T22:50:52.146384Z"
+  "updated_at": "2026-10-08T23:01:39.362822Z"
 }

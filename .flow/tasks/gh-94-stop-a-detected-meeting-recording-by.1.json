@@ -6,7 +6,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-94-stop-a-detected-meeting-recording-by",
   "spec_path": ".flow/tasks/gh-94-stop-a-detected-meeting-recording-by.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Stop a detected recording by hand in the watch loop, with a per-app re-detection hold",
   "updated_at": "2026-10-08T21:07:17.057073Z"
 }
