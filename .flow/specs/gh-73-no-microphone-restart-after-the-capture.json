@@ -248,7 +248,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-73-no-microphone-restart-after-the-capture.md",
-  "status": "open",
+  "status": "done",
   "title": "No microphone restart after the capture has stopped",
   "tracker": {
     "baseHashFlow": "6d0c8c1c28aab7fc8465576cbc1191e4bcb0efad7cf8e8be25fcd10ab6024354",
@@ -262,5 +262,5 @@
     "mergeBaseTracker": "## Beobachtung\nDer Test `AudioTapLibTests.MicCaptureHandlerStallWatchdogTests.testTheTimerDrivesTheWatchdogAndStopsWithTheCapture` (kam mit dem Mikrofon-Watchdog-Fix aus #44) ist im Fork-CI auf PR #71 in **beiden Versuchen** eines Laufs fehlgeschlagen (Run 37536506723, Head d7888cdf):\n\n`XCTAssertEqual failed: (\"2\") is not equal to ...` in Zeile 500, also `fixture.sessions.count` hat sich **nach** `handler.stop()` noch erh\u00f6ht (\"no attempt after the stop\").\n\nPR #71 \u00e4ndert nichts unter `tools/`. Lokal l\u00e4uft der Test einzeln 8 von 8 Mal gr\u00fcn; auf seinem eigenen Branch war CI gr\u00fcn.\n\n## Vermutung\nEchtzeit-Timer (Poll 50 ms, Stall 0,3 s) plus 0,5 s Wartezeit: unter CI-Last kann ein bereits gestarteter Neustart nach `stop()` noch eine Session bauen. Entweder ein echtes Rennen zwischen `stop()` und einem laufenden Neustart im `MicCaptureHandler` (dann Produktfehler: nach dem Stoppen wird noch ein Mikrofon-Neustart versucht) oder nur ein zu knapp getakteter Test.\n\n## Wunsch\nKl\u00e4ren, welches von beiden; bei einem Rennen `stop()` so machen, dass ein laufender Neustart nichts mehr \u00fcbernimmt, sonst den Test auf eine injizierte Uhr umstellen.\n\n## Abnahme\nTest l\u00e4uft unter `swift test --parallel` wiederholt (z. B. 20\u00d7) gr\u00fcn; CI-L\u00e4ufe auf Code-PRs scheitern nicht mehr daran.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/73"
   },
-  "updated_at": "2026-10-08T14:29:32.279560Z"
+  "updated_at": "2026-10-08T14:49:26.443273Z"
 }
