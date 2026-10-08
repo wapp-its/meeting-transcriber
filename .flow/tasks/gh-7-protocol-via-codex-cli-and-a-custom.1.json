@@ -9,7 +9,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-7-protocol-via-codex-cli-and-a-custom",
   "spec_path": ".flow/tasks/gh-7-protocol-via-codex-cli-and-a-custom.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Shared CLI runner with the Claude CLI provider moved onto it",
   "updated_at": "2026-10-06T20:35:29.707655Z"
 }

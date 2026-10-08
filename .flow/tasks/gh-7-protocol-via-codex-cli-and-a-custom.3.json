@@ -11,7 +11,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-7-protocol-via-codex-cli-and-a-custom",
   "spec_path": ".flow/tasks/gh-7-protocol-via-codex-cli-and-a-custom.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "Settings controls for Codex CLI and Custom Command, provider docs",
   "updated_at": "2026-10-06T20:35:30.217077Z"
 }

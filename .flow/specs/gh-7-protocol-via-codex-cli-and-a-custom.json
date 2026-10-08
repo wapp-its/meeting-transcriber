@@ -449,7 +449,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-7-protocol-via-codex-cli-and-a-custom.md",
-  "status": "open",
+  "status": "done",
   "title": "Protocol via Codex CLI and a custom command",
   "tracker": {
     "baseHashFlow": null,
@@ -463,5 +463,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/7"
   },
-  "updated_at": "2026-10-08T08:01:50.301558Z"
+  "updated_at": "2026-10-08T08:12:35.090795Z"
 }
