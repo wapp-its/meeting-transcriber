@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-7-cli-protocol-providers",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-10-08T08:01:50.298658Z",
+  "completion_reviewed_at": "2026-10-08T08:54:48.653334Z",
   "created_at": "2026-10-06T20:22:25.790731Z",
   "default_impl": null,
   "default_review": null,
@@ -429,6 +429,41 @@
       "timestamp": "2026-10-08T08:01:50.258084Z",
       "tool_calls": 26,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "50b95a5c90f8f99d37dd1ecdf219689a26c4df8914d284ff278bf66c9d632d4f",
+      "backend": "codex",
+      "base_sha": "744e8e81a066fe0e0fe67746b387dad6334958ac",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "beff8347415fe9600591bc9945db7b6ddaa29c1b",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 6506,
+      "output_sha256": "2e783e4a253dc34a7228a276562fe71ee76bc8eb18351288265897838217ac62",
+      "reservation_id": "1f72a81aa063499ea18b91e341eab6f2",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-08T08:54:48.619174Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -436,7 +471,7 @@
     "impl:gh-7-protocol-via-codex-cli-and-a-custom.2": 1,
     "impl:gh-7-protocol-via-codex-cli-and-a-custom.3": 1,
     "plan": 1,
-    "plan#completion": 1
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -463,5 +498,5 @@
     "mergeBaseTracker": "## Problem\n\nF\u00fcr das Protokoll gibt es drei Anbieter: Claude CLI, eine OpenAI-kompatible Schnittstelle, keiner. Andere Kommandozeilen-Werkzeuge (Codex CLI, Gemini CLI, `ollama run`, `llm`, `mlx_lm.generate`, llama.cpp) lassen sich nicht einbinden.\n\n## Wunsch\n\n1. **Weitere fertige CLI-Anbieter**, mindestens Codex CLI (`codex exec -`, liest den Prompt von stdin).\n2. **\u201eEigener Befehl\"**: frei konfigurierbarer Aufruf mit Platzhaltern, zum Beispiel `ollama run qwen3:32b` oder `mlx_lm.generate --model {model} --prompt-file {prompt_file}`.\n   - Platzhalter: `{model}`, `{prompt_file}`, `{transcript_file}`, `{output_file}`.\n   - Ohne Platzhalter gehen Prompt und Transkript \u00fcber stdin, das Protokoll kommt \u00fcber stdout.\n   - Timeout und Fehlermeldung wie beim Claude-Anbieter.\n\n## Warum\n\n- Freie Wahl des Werkzeugs je Anwendungsfall (passt zu Profilen, #6).\n- **Lokale Modelle ohne Server:** \u00dcber `ollama run`, `mlx_lm` oder llama.cpp bleibt das Transkript auf dem Rechner \u2014 Voraussetzung f\u00fcr vertrauliche Sitzungen. Ob ein Befehl ins Netz geht, kann die App nicht pr\u00fcfen; im UI deshalb klar kennzeichnen: \u201eWas der Befehl mit dem Transkript macht, liegt beim Befehl.\"\n\n## Technische Hinweise\n\n- `ClaudeCLIProtocolGenerator` startet heute schon einen Prozess und schreibt \u00fcber stdin. Der Kern l\u00e4sst sich zu einem allgemeinen CLI-Generator verallgemeinern; Claude und Codex werden Voreinstellungen davon.\n- Argumente als Liste speichern und ohne Shell ausf\u00fchren (keine Shell-Injection \u00fcber Dateinamen).\n\n## Abnahme\n\n- Codex CLI als Anbieter gew\u00e4hlt \u2192 Protokoll wird erzeugt.\n- Eigener Befehl `ollama run <modell>` \u2192 Protokoll wird erzeugt, ohne dass die App selbst ins Netz geht.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/7"
   },
-  "updated_at": "2026-10-08T08:18:16.001116Z"
+  "updated_at": "2026-10-08T08:54:48.655401Z"
 }
