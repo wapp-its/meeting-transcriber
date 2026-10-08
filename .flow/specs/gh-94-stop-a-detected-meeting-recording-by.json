@@ -8,7 +8,9 @@
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-94-stop-a-detected-meeting-recording-by",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-94-stop-a-detected-meeting-recording-by.1": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -239,15 +241,53 @@
       "task": null,
       "timestamp": "2026-10-08T08:16:10.383321Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "d4e38c7044355c9af1aa4ee640d92a748d3435396d5966ec4719750098f0480a",
+      "backend": "codex",
+      "base_sha": "f0db8ca5b25c8fd641141ee8de7c079f0cbca2b7",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "70ebb830d011546374a3acaf1ed3413d8b76e5d9",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "ca7e9456c5184ea48c3f835e3e5169a5",
+      "round_consumed": true,
+      "scope": "impl:gh-94-stop-a-detected-meeting-recording-by.1",
+      "superseded_by": null,
+      "task": "gh-94-stop-a-detected-meeting-recording-by.1",
+      "timestamp": "2026-10-08T21:38:47.636431Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-94-stop-a-detected-meeting-recording-by.1": 1,
     "plan": 2,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-94-stop-a-detected-meeting-recording-by.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-94-stop-a-detected-meeting-recording-by.md",
@@ -265,5 +305,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/94"
   },
-  "updated_at": "2026-10-08T08:16:10.421717Z"
+  "updated_at": "2026-10-08T21:38:47.898875Z"
 }
