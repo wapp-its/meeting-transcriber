@@ -72,7 +72,8 @@ Native SwiftUI menu bar application that orchestrates meeting detection, recordi
         │ 7. Assign speakers to transcript by temporal overlap           │
         │ 8. Save transcript (.txt)                                      │
         │ 9. Protocol generation                                         │
-        │      └─ ProtocolProvider: .claudeCLI | .openAICompatible | .none│
+        │      └─ ProtocolProvider: .claudeCLI | .codexCLI |             │
+        │         .customCommand | .openAICompatible | .none             │
         │ 10. Save protocol (.md, transcript appended)                   │
         └────────────────────────────────────────────────────────────────┘
 ```
@@ -104,6 +105,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `Settings/TranscriptionSettingsView.swift` | ASR engine picker · engine-specific options · model status · Live transcription (PoC) toggle |
 | `Settings/SpeakersSettingsView.swift` | Diarization · Mic Speaker Name · Known Voices · Recognition Stats · Experimental Diarization Tuning |
 | `Settings/OutputSettingsView.swift` | LLM provider · protocol language · output folder · custom prompt |
+| `Settings/CommandProviderSettingsView.swift` | Codex CLI note · custom command editor, model and placeholder notes (`#if !APPSTORE`) |
 | `Settings/AdvancedSettingsView.swift` | Permissions · Diagnostics |
 | `Settings/AboutSettingsView.swift` | Version · bundle identifier · build date · ffmpeg status · project link · Updates |
 | `Settings/HelpBadge.swift` / `Settings/SettingsHelp.swift` | Reusable "?" help-popover badge + its shared copy, used across Settings sections |
@@ -222,6 +224,9 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `DiarizationProcess.swift` | Diarization result types, DiarizationProvider protocol, speaker assignment (standard + dual-track) |
 | `ProtocolGenerator.swift` | Shared protocol utilities: `ProtocolGenerating` protocol, prompts, file I/O, `ProtocolError` |
 | `ClaudeCLIProtocolGenerator.swift` | Claude CLI subprocess protocol generation (`#if !APPSTORE`) |
+| `CommandProtocolGenerator.swift` | Codex CLI preset and custom command protocol generation (`#if !APPSTORE`) |
+| `CommandTemplate.swift` | The custom command's placeholder rules: `{model}`, `{prompt_file}`, `{transcript_file}`, `{output_file}` (`#if !APPSTORE`) |
+| `CLIProcessRunner.swift` | Shared runner for every CLI provider: no shell, private run folder, wall-clock timeout, output cap (`#if !APPSTORE`) |
 | `OpenAIProtocolGenerator.swift` | OpenAI-compatible API protocol generation (Ollama, LM Studio, etc.) |
 | `RecordingSidecar.swift` | Metadata sidecar written next to recordings in record-only mode |
 | `RecordingFileSuffix.swift` | Filename suffix constants for dual-source recordings (`_app.wav`, `_mic.wav`, `_mix.wav`) |
@@ -583,6 +588,8 @@ When dual-source recording (app + mic) is available:
 
 `AppSettings.protocolProvider` selects the active provider:
 - **`.claudeCLI`** — Claude CLI subprocess (`#if !APPSTORE`)
+- **`.codexCLI`** — Codex CLI subprocess with the user's Codex login, model and reasoning effort (`#if !APPSTORE`)
+- **`.customCommand`** — A command the user enters, one argument per line, with the placeholders `{model}`, `{prompt_file}` (instructions and transcript), `{transcript_file}` and `{output_file}`; without an input-file placeholder the prompt goes to stdin, without `{output_file}` the protocol is read from stdout (`#if !APPSTORE`)
 - **`.openAICompatible`** — Any OpenAI-compatible HTTP API (Ollama, LM Studio, llama.cpp, etc.)
 - **`.none`** — Skip LLM generation; save transcript only
 
@@ -596,6 +603,10 @@ ends in an error, the raw transcript is retained with a warning; recordings are
 governed by their separate retention policy.
 
 `AppSettings.protocolLanguage` (default `"German"`) is substituted into the prompt as `{LANGUAGE}`. Custom prompts can also use `{MEETING_DATE}` (`YYYY-MM-DD`) and `{MEETING_TIME}` (`HH:mm`), derived from the captured recording start time. Imports and recovery jobs resolve those time placeholders to `Unknown` rather than their enqueue or processing time. Only recordings with a captured start receive the authoritative meeting-metadata block, so existing custom prompts receive reliable temporal context without needing to add the placeholders.
+
+### CLI Runner
+
+The Claude CLI, Codex CLI and custom command providers share one runner, `CLIProcessRunner`. Every run works in a fresh owner-only folder under the per-user temporary directory, removed when the run ends; the runner starts the program there directly from an argument vector, never through a shell, stops it after 10 minutes of wall-clock time even when it prints nothing (SIGTERM, then SIGKILL one second later), and caps stdout at 32 MiB. The Codex preset runs `codex exec --json --ephemeral --skip-git-repo-check --sandbox read-only --output-last-message {output_file} -` with the prompt on stdin; `--ephemeral` keeps the run out of Codex's session store.
 
 ### Claude CLI Invocation
 
@@ -721,8 +732,8 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 - `diarize` hides the diarizer-mode picker and Expected Speakers stepper
 - `vadEnabled` hides the VAD threshold slider
 - `transcriptionEngine` switches between WhisperKit / Parakeet option panels
-- `protocolProvider` switches between Claude CLI / OpenAI-compatible / None panels
-- `#if APPSTORE` removes the Claude CLI provider option entirely
+- `protocolProvider` switches between Claude CLI / Codex CLI / Custom Command / OpenAI-compatible / None panels
+- `#if APPSTORE` removes the Claude CLI, Codex CLI and Custom Command provider options entirely
 - `updateChecker == nil` hides the entire Updates section in About
 
 **Cross-cutting concerns owned by sub-views:**

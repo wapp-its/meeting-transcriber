@@ -55,7 +55,7 @@ flowchart TD
     D1["WhisperKit<br/>99 languages"]
     D2["Parakeet TDT v3<br/>25 EU languages"]
     E["Speaker Diarization<br/>FluidAudio · dual-track + recognition"]
-    F["Protocol Generation<br/>Claude CLI · OpenAI-compatible · none"]
+    F["Protocol Generation<br/>Claude CLI · Codex CLI · custom command<br/>OpenAI-compatible · none"]
     G["Markdown Protocol<br/>Summary · Decisions · Tasks · Transcript"]
 
     A --> B
@@ -92,7 +92,7 @@ flowchart TD
 - **Echo bleed handling** — On loudspeaker recordings, remote voices picked up by the microphone are detected automatically and reported. Two optional remedies, both off by default: acoustic echo cancellation removes the bleed from the microphone audio itself, and a transcript dedup leaves the duplicated lines out. The dedup is off because it can mistake a quiet remark made over the far end for echo and drop it
 - **Speaker recognition** — Voice embeddings stored across meetings, matched via cosine similarity
 - **VAD preprocessing** — Optional silence trimming via FluidAudio Silero v6 before transcription, with automatic timestamp remapping
-- **AI protocol generation** — Structured Markdown via [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code), OpenAI-compatible APIs (Ollama, LM Studio, etc.), or disabled (save transcript only)
+- **AI protocol generation** — Structured Markdown via [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), a custom command (any command-line model tool, e.g. `ollama run` or `mlx_lm.generate`, with `{model}`, `{prompt_file}`, `{transcript_file}` and `{output_file}` placeholders, run without a shell), OpenAI-compatible APIs (Ollama, LM Studio, etc.), or disabled (save transcript only)
 - **Configurable protocol prompt** — Custom prompt file support (`~/Library/Application Support/MeetingTranscriber/protocol_prompt.md`) with `{LANGUAGE}`, `{MEETING_DATE}` (`YYYY-MM-DD`), and `{MEETING_TIME}` (`HH:mm`) variables; recordings include authoritative metadata, while imports and recovery jobs resolve time placeholders to `Unknown`
 - **Manual recording** — Record any app via app picker, not just detected meetings
 - **Multi-format input** — Supports WAV, MP3, M4A, MP4, FLAC, plus the phone and messenger voice formats AMR, 3GP/3G2 and OPUS/OGG; MKV and WebM additionally need ffmpeg
@@ -110,6 +110,8 @@ flowchart TD
 - macOS 14.2+ (required for CATapDescription audio capture)
 - **One of:**
   - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) — installed and logged in (`claude --version`)
+  - [Codex CLI](https://github.com/openai/codex) — installed and logged in (`codex --version`)
+  - A command-line model tool (e.g. `ollama run`, `mlx_lm.generate`, llama.cpp) — set up as a custom command in Settings
   - An OpenAI-compatible API endpoint (e.g. [Ollama](https://ollama.com), LM Studio, llama.cpp) — configure in Settings
 
 No HuggingFace token needed — FluidAudio and WhisperKit download their models automatically on first run.
@@ -253,7 +255,7 @@ Open Settings via the menu bar item or ⌘,.
 | **Audio** | Microphone device, voice activity detection (VAD), per-channel silence indicator, echo cancellation (off by default) |
 | **Transcribe** | ASR engine (WhisperKit / Parakeet) and per-engine options (model incl. a custom WhisperKit model, language, custom vocabulary), terminology normalization rules, live caption overlay (PoC) |
 | **Speakers** | Diarization, mic speaker name, known voices, recognition stats |
-| **Output** | LLM provider (Claude CLI / OpenAI-compatible / none), transcript-retention options, protocol language, output folder, custom prompt |
+| **Output** | LLM provider (Claude CLI / Codex CLI / custom command / OpenAI-compatible / none), transcript-retention options, protocol language, output folder, custom prompt |
 | **Advanced** | Permissions status, diagnostics, version info |
 
 ### Custom WhisperKit models

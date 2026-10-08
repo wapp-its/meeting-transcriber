@@ -732,6 +732,36 @@ final class AppStateTests: XCTestCase { // swiftlint:disable:this type_body_leng
             let state = makeAppState()
             XCTAssertTrue(state.pipeline.makeProtocolGenerator() is ClaudeCLIProtocolGenerator)
         }
+
+        func testMakeProtocolGeneratorCodexCLI() throws {
+            settings.protocolProvider = .codexCLI
+            settings.protocolLanguage = "English"
+            let state = makeAppState()
+
+            let generator = try XCTUnwrap(state.pipeline.makeProtocolGenerator() as? CommandProtocolGenerator)
+            XCTAssertEqual(generator.tool, "Codex CLI")
+            XCTAssertEqual(generator.arguments, [
+                "codex", "exec", "--json", "--ephemeral", "--skip-git-repo-check",
+                "--sandbox", "read-only", "--output-last-message", "{output_file}", "-",
+            ])
+            XCTAssertEqual(generator.language, "English")
+            XCTAssertNotNil(generator.failureReason)
+        }
+
+        func testMakeProtocolGeneratorCustomCommand() throws {
+            settings.protocolProvider = .customCommand
+            settings.customCommandArguments = ["ollama", "run", "{model}"]
+            settings.customCommandModel = "qwen3:32b"
+            settings.protocolLanguage = "English"
+            let state = makeAppState()
+
+            let generator = try XCTUnwrap(state.pipeline.makeProtocolGenerator() as? CommandProtocolGenerator)
+            XCTAssertEqual(generator.tool, "Custom command")
+            XCTAssertEqual(generator.arguments, ["ollama", "run", "{model}"])
+            XCTAssertEqual(generator.model, "qwen3:32b")
+            XCTAssertEqual(generator.language, "English")
+            XCTAssertNil(generator.failureReason)
+        }
     #endif
 
     func testMakeProtocolGeneratorReturnsNilForNoneProvider() {

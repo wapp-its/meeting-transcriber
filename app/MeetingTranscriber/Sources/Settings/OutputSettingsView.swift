@@ -88,6 +88,7 @@ struct OutputSettingsView: View {
                         Text(provider.label).tag(provider)
                     }
                 }
+                .accessibilityIdentifier(A11yID.protocolProviderPicker)
 
                 providerConfigView
 
@@ -137,6 +138,12 @@ struct OutputSettingsView: View {
                 Text("Only set this if that session can't stay signed in. An explicit key here is billed separately from your subscription.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+            case .codexCLI:
+                CodexProviderSettingsView()
+
+            case .customCommand:
+                CustomCommandSettingsView(settings: settings)
         #endif
 
         case .openAICompatible:

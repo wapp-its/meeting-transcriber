@@ -135,6 +135,19 @@ enum ProtocolGenerator {
         return prompt
     }
 
+    /// The whole prompt a CLI provider sends: `buildSystemPrompt` followed by
+    /// the transcript.
+    static func fullPrompt(
+        transcript: String,
+        diarized: Bool,
+        language: String,
+        meetingStartTime: Date?,
+        promptURL: URL = AppPaths.customPromptFile,
+    ) -> String {
+        buildSystemPrompt(diarized: diarized, language: language, meetingStartTime: meetingStartTime, promptURL: promptURL)
+            + transcript
+    }
+
     static func meetingMetadata(
         for meetingStartTime: Date,
         timeZone: TimeZone = .autoupdatingCurrent,
@@ -266,6 +279,20 @@ enum ProtocolError: LocalizedError {
         case cliNotFound(String)
         case cliFailed(Int, String)
         case timeout
+        /// A CLI tool wrote more to stdout than a run accepts. Names the tool
+        /// only: the output itself may hold meeting content.
+        case commandOutputTooLarge(tool: String)
+        // The command providers' errors (Codex CLI, custom command). Their
+        // text is logged at `.public`, so it holds only the tool label, the
+        // program's file name, the exit code and a reason the tool itself
+        // reported, never the program's output or the command's arguments.
+        case commandNotFound(tool: String, program: String)
+        /// `reason` is the tool's own content-free error message, if any.
+        case commandFailed(tool: String, exitCode: Int32, reason: String?)
+        case commandTimedOut(tool: String)
+        case commandProducedNoProtocol(tool: String)
+        /// The command cannot run as configured; carries app-written text only.
+        case commandNotConfigured(String)
     #endif
     case emptyProtocol
     case httpError(Int, String)
@@ -281,6 +308,18 @@ enum ProtocolError: LocalizedError {
             case let .cliFailed(code, stderr): "Claude CLI exited with code \(code)\(stderr.isEmpty ? "" : ": \(stderr)")"
 
             case .timeout: "Claude CLI took too long (>10 min)"
+
+            case let .commandOutputTooLarge(tool): "\(tool) wrote more output than the app accepts"
+
+            case let .commandNotFound(tool, program): "\(tool): program '\(program)' not found or not executable"
+
+            case let .commandFailed(tool, exitCode, reason): "\(tool) exited with code \(exitCode)\(reason.map { ": \($0)" } ?? "")"
+
+            case let .commandTimedOut(tool): "\(tool) took too long (>10 min)"
+
+            case let .commandProducedNoProtocol(tool): "\(tool) produced no protocol"
+
+            case let .commandNotConfigured(message): message
         #endif
 
         case .emptyProtocol: "Protocol is empty. Tip: Test manually: echo Hello | claude --print"

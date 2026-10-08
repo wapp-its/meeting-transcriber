@@ -54,9 +54,37 @@ Build the shared process core (`CLIProcessRunner`) and move the Claude CLI provi
 - [ ] Claude's argument vector, environment, private working directory and project-folder cleanup are unchanged (pinned by the existing tests).
 - [ ] The App Store variant builds with `-Xswiftc -DAPPSTORE`, and `./scripts/lint.sh` passes with the pinned tools.
 ## Done summary
-TBD
+The Claude CLI provider now runs on a new shared process core, `CLIProcessRunner`. A Claude CLI that hangs without printing is stopped at the 10-minute timeout (before, nothing stopped it), and a Claude CLI that exits without reading its prompt fails the protocol instead of killing the app with SIGPIPE. Both were reproduced red on the old code first (commit fc6db31b: `generate()` had not returned 5 s after a 1 s timeout; the test process died with signal 13).
 
+What the runner does: `Process` with a fixed argument vector and no shell, a private 0700 run folder, one wall-clock deadline (SIGTERM, SIGKILL 1 s later, not waited for), a 32 MiB stdout cap, stderr kept to its first 1 MiB, and at most 2 s of draining after the exit. Pipe I/O runs on dispatch read and write sources on a serial queue of the run's own, one read or write per event, on non-blocking descriptors, with `F_SETNOSIGPIPE` on the stdin write end. Every source, descriptor and the termination handler is released before `run` returns.
+
+Tests: `CLIProcessRunnerTests` has 13 tests covering the 11 behaviours from the task plus the release of a run's request after it could not start, exited, or timed out (red before the review fix for the could-not-start case). `ClaudeCLIProtocolGeneratorRunnerTests` covers the silent-CLI timeout, the early exit with a 1 MiB prompt, `.cliNotFound`, `.emptyProtocol`, an unterminated last stream-json line, and the new `commandOutputTooLarge(tool: "Claude CLI")`. No existing `ClaudeCLIProtocolGenerator*Tests` file was edited, and all 77 of their tests still pass.
+
+Deviations from the task text:
+- `ClaudeCLIProtocolGenerator.timeoutSeconds` was deleted rather than kept as an alias. Its only reader was the deleted `readStreamJSON`, and CI's `swiftlint analyze --strict` (`unused_declaration`) fails an unused declaration. The runner owns `defaultTimeout`.
+- `CLIProcessRunner.environment(base:searchPaths:)` has a defaulted `searchPaths` parameter, so Claude's `buildEnvironment` keeps its signature and its tests.
+- The run folder prefix is now `MeetingTranscriber-cli-`, as the task asks (it was `MeetingTranscriber-claude-cli-`).
+
+Decisions:
+- Dispatch sources over `FileHandle.readabilityHandler`, which runs on Foundation's queue and raises an exception from `availableData` on a closed handle.
+- No close-on-exec on the pipes. A probe measured that `Process` does not pass the parent's other descriptors to the child.
+- The no-waiters test probes the cooperative pool at the default priority and at the test's own. The pool is split by priority (measured: 36 blockers stall a fresh task of the same priority for 6 s and a `.userInitiated` one not at all). A mutant that parked a `Task.detached` reader per run passed a test that probed only the test's priority and fails the final test.
+- The two leftover-process timing bounds are 5 s with a 20 s request timeout. One run under load (load average about 15) took 4.1 s, against 2.2 s in three repeats. A broken drain would wait for the 20 s deadline.
+- A deadline that passes after the program has exited ends the drain and returns what was read. It does not report a timeout.
+
+Review: the first round (3 Codex draws) found one defect, reported by all three draws. The termination handler kept the run, and with it the transcript, alive when `Process.run()` threw. The fix commit d9e9e121 clears the handler in `finish()`. The validator kept the finding and the re-review returned SHIP.
+
+Follow-ups (not filed by this worker):
+- `FFmpegHelper.loadAudioWithFFmpeg` reads stderr with a blocking `readDataToEndOfFile` in `Task.detached`, the same pool-parking pattern this task removed from the Claude provider.
+- Neither the CI `swiftlint analyze` lane nor a real Claude CLI run was exercised locally.
+
+baseline: green (77 `ClaudeCLIProtocolGenerator` tests, lint 0 violations, pre-edit)
+Tier: routing block -> opus at xhigh (judge unavailable: no_key) (actual: claude-opus-5-5)
+
+stage: impl-review - ran [2026-10-07T12:16Z..2026-10-07T12:35Z]
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: fc6db31bd2bdb041be46744dcfaafd2cd4459b92, b38163176a4031c1b4d098c7d472989d3677dfbf, c9c7df4dd92a75db01f60166ba0614a2ce889057, d9e9e121abe27d2c9b2ee2f0094b916f6a5be17b
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh7-home swift test --parallel --filter 'CLIProcessRunnerTests|ClaudeCLIProtocolGenerator' (96 tests, rc 0), cd app/MeetingTranscriber && swift build -Xswiftc -DAPPSTORE --scratch-path /private/tmp/mt-gh7-appstore-build (rc 0), ./scripts/pre-push.sh (release build, rc 0), PATH=<pinned SwiftFormat 0.63.0 + SwiftLint 0.65.1> ./scripts/lint.sh (0 violations)
 - PRs:

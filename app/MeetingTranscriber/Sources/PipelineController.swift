@@ -340,6 +340,14 @@ final class PipelineController {
                     language: settings.protocolLanguage,
                     anthropicAPIKey: settings.claudeAPIKey.isEmpty ? nil : settings.claudeAPIKey,
                 )
+
+            case .codexCLI:
+                CommandProtocolGenerator.codex(language: settings.protocolLanguage)
+
+            case .customCommand:
+                CommandProtocolGenerator.custom(
+                    arguments: settings.customCommandArguments, model: settings.customCommandModel, language: settings.protocolLanguage,
+                )
         #endif
 
         case .openAICompatible:
