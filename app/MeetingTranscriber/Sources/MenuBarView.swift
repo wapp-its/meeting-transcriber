@@ -56,6 +56,7 @@ struct MenuBarView: View {
     // order, dividers, and conditionals are unchanged.
     var body: some View {
         statusHeader
+        sessionControls
         meetingInfo
         errorInfo
 
@@ -121,18 +122,10 @@ struct MenuBarView: View {
         }
     }
 
-    @ViewBuilder private var watchControls: some View {
-        Button {
-            onStartStop()
-        } label: {
-            if isWatching {
-                Label("Stop Watching for Meetings", systemImage: "stop.fill")
-            } else {
-                Label("Start Watching for Meetings", systemImage: "play.fill")
-            }
-        }
-        .keyboardShortcut("s")
-
+    /// The control for the current state, directly under the status line with
+    /// no divider in between. One item per line, like every menu item (see
+    /// `jobRow`): a control added here goes on its own line under these.
+    @ViewBuilder private var sessionControls: some View {
         if let onStopManualRecording {
             Button {
                 onStopManualRecording()
@@ -140,6 +133,16 @@ struct MenuBarView: View {
                 Label("Stop Recording", systemImage: "stop.circle.fill")
             }
             .keyboardShortcut(".")
+        } else {
+            watchToggle
+        }
+    }
+
+    @ViewBuilder private var watchControls: some View {
+        // While a recording holds the line under the status, watching stays
+        // reachable here; otherwise the toggle is already up there.
+        if onStopManualRecording != nil {
+            watchToggle
         } else if state != .recording {
             Button {
                 onRecordMicrophone()
@@ -218,6 +221,21 @@ struct MenuBarView: View {
                 )
             }
         }
+    }
+
+    /// Rendered by `sessionControls` or `watchControls`, never both, so its
+    /// label, icon and shortcut have one definition.
+    private var watchToggle: some View {
+        Button {
+            onStartStop()
+        } label: {
+            if isWatching {
+                Label("Stop Watching for Meetings", systemImage: "stop.fill")
+            } else {
+                Label("Start Watching for Meetings", systemImage: "play.fill")
+            }
+        }
+        .keyboardShortcut("s")
     }
 
     private var settingsButton: some View {
