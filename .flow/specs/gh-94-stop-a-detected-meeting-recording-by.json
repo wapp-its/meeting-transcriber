@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-94-stop-detected-recording",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-08T22:50:52.143263Z",
   "created_at": "2026-10-08T07:53:27.337309Z",
   "default_impl": null,
   "default_review": null,
@@ -464,6 +464,42 @@
       "task": "gh-94-stop-a-detected-meeting-recording-by.3",
       "timestamp": "2026-10-08T22:44:09.553634Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "bdec556eedf80e3d9d1f14cc228f5cd81e191d6caf37ad687941a853ed1a8bbb",
+      "backend": "codex",
+      "base_sha": "d4579c5e78cc0413fb7bbfbe7ddce0ec3f0aea53",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "96aa4337e8564e2adfb38699f525020c36aee5f1",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 512056,
+      "output_sha256": "3b55bebd1ee837f514399a3a779ee56d5c53375de33af19a83d5454170f56a29",
+      "reservation_id": "43f4a62047f54bac89d164503984b8c5",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-08T22:50:52.094641Z",
+      "tool_calls": 29,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -472,12 +508,13 @@
     "impl:gh-94-stop-a-detected-meeting-recording-by.3": 1,
     "impl:gh-94-stop-a-detected-meeting-recording-by.4": 1,
     "plan": 2,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-94-stop-a-detected-meeting-recording-by.1": 0,
     "impl:gh-94-stop-a-detected-meeting-recording-by.2": 0,
     "impl:gh-94-stop-a-detected-meeting-recording-by.3": 0,
@@ -499,5 +536,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/94"
   },
-  "updated_at": "2026-10-08T22:44:09.577925Z"
+  "updated_at": "2026-10-08T22:50:52.146384Z"
 }
