@@ -4,7 +4,7 @@ satisfies: [R1, R2, R6]
 # gh-94-stop-a-detected-meeting-recording-by.2 Offer Stop Recording in the menu for every recording
 
 ## Description
-Wires the menu to task .1 (R1, R2's entry point, R6): one `WatchingController.stopRecording()` that stops whatever records, an `AppState.canStopRecording` accessor, the scene passing the stop closure for every recording, and the architecture-doc rows for the new files. The automation API is deliberately untouched (spec A4); this task adds a test that pins it.
+Wires the menu to task .1 (R1, R2's entry point, R6): one `WatchingController.stopRecording()` that stops whatever records, an `AppState.canStopRecording` accessor, the scene passing the stop closure for every recording, and the architecture-doc rows for the new files. The automation API's opt-in stop is task .3; this task leaves the existing `/v1/record` verbs alone and adds a test that pins them (R6).
 
 **Size:** S
 **Files:** new `app/MeetingTranscriber/Sources/WatchingController+StopRecording.swift`, `app/MeetingTranscriber/Sources/AppState.swift`, `app/MeetingTranscriber/Sources/MeetingTranscriberApp.swift`, `app/MeetingTranscriber/Sources/MenuBarView.swift` (doc comment only), `docs/architecture-macos.md`, new `app/MeetingTranscriber/Tests/WatchingControllerStopRecordingTests.swift`
@@ -31,7 +31,6 @@ Wires the menu to task .1 (R1, R2's entry point, R6): one `WatchingController.st
 ### Key context
 - `makeTestWatchLoop(detector: FixedMeetingDetector(), notifier: RecordingNotifier(consentAnswer: .granted), pipelineQueue:)` records a detected meeting within a couple of 0.05 s polls once `controller.watchLoop = loop; loop.start()`; `FixedMeetingDetector` reports the meeting active forever, which is exactly the lingering signal the hold is for. Count recordings with `loop.onStateChange` (nothing else sets it on an injected loop).
 - `MenuBarViewTests.swift` is at 980 lines: put new tests in the new file.
-
 ## Acceptance
 - [ ] `WatchingControllerStopRecordingTests`: with a detected meeting recording on an injected loop, `stopRecording()` makes the loop leave `.recording` within 1 s, `controller.watchLoop` is still that loop, `controller.isWatching` is true, the recorder was stopped and one job is in the queue; over the next 0.5 s (detector still reporting the meeting) the loop does not enter `.recording` again.
 - [ ] `stopRecording()` on a manual microphone recording ends it as `stopManualRecording()` does (`watchLoop` nil, recording enqueued); with the loop only watching it changes nothing and watching stays on.
