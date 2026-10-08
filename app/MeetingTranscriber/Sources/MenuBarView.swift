@@ -27,6 +27,8 @@ struct MenuBarView: View {
     let onOpenSettings: () -> Void
     let onNameSpeakers: (() -> Void)?
     let onProcessFiles: () -> Void
+    /// Opens the Transcriptions window.
+    var onShowAllTranscriptions: () -> Void = {}
     /// Remove on a failed job: off the menu and out of the history for good.
     var onRemoveFailedJob: (UUID) -> Void = { _ in }
     /// Dismiss on a job waiting for speaker names.
@@ -68,6 +70,7 @@ struct MenuBarView: View {
 
         watchControls
         processingQueue
+        allTranscriptionsItem
 
         Divider()
 
@@ -199,6 +202,18 @@ struct MenuBarView: View {
     /// work in flight rather than the number of finished jobs.
     private var jobEntries: [TranscriptionEntry] {
         TranscriptionList.menuEntries(TranscriptionList.entries(liveJobs: pipelineQueue.jobs, records: history))
+    }
+
+    /// Shown at all times, after the job lines: the menu keeps only a few
+    /// finished jobs, and every other one is in the window.
+    private var allTranscriptionsItem: some View {
+        Button {
+            onShowAllTranscriptions()
+        } label: {
+            Label("All Transcriptions...", systemImage: "list.bullet.rectangle")
+        }
+        .keyboardShortcut("t")
+        .accessibilityIdentifier(A11yID.allTranscriptionsMenuItem)
     }
 
     @ViewBuilder private var protocolActions: some View {

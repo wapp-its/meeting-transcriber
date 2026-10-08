@@ -39,6 +39,7 @@ final class MenuBarViewTests: XCTestCase {
         onRecordMicrophone: @escaping () -> Void = {},
         noMic: Bool = false,
         manualRecordingPendingOrActive: Bool = false,
+        onShowAllTranscriptions: @escaping () -> Void = {},
     ) -> MenuBarView {
         MenuBarView(
             status: status,
@@ -57,6 +58,7 @@ final class MenuBarViewTests: XCTestCase {
             onOpenSettings: {},
             onNameSpeakers: onNameSpeakers,
             onProcessFiles: {},
+            onShowAllTranscriptions: onShowAllTranscriptions,
             onDismissJob: { _ in },
             onQuit: {},
         )
@@ -383,6 +385,29 @@ final class MenuBarViewTests: XCTestCase {
         )
         let body = try sut.inspect()
         try body.find(button: "Name Speakers...").tap()
+        XCTAssertTrue(called)
+    }
+
+    /// The way into the Transcriptions window is there whatever else the menu
+    /// shows: while recording with a job line above it, and idle with none.
+    func testAllTranscriptionsItemIsAlwaysShownAndCallsItsCallback() throws {
+        let queue = PipelineQueue()
+        var job = PipelineJob(
+            meetingTitle: "Standup", appName: "Teams",
+            mixPath: URL(fileURLWithPath: "/tmp/mix.wav"), appPath: nil, micPath: nil, micDelay: 0,
+        )
+        job.state = .error
+        queue.insertJobForTesting(job)
+        let recording = try makeView(status: makeStatus(state: .recording), pipelineQueue: queue).inspect()
+        XCTAssertNoThrow(try recording.find(viewWithAccessibilityIdentifier: A11yID.allTranscriptionsMenuItem))
+
+        var called = false
+        // swiftlint:disable:next trailing_closure
+        let item = try makeView(status: makeStatus(state: .idle), onShowAllTranscriptions: { called = true })
+            .inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.allTranscriptionsMenuItem)
+        XCTAssertNoThrow(try item.find(text: "All Transcriptions..."))
+        try item.button().tap()
         XCTAssertTrue(called)
     }
 
