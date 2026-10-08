@@ -1,0 +1,148 @@
+{
+  "branch_name": "feat/gh-94-stop-detected-recording",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-08T07:53:27.337309Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-94-stop-a-detected-meeting-recording-by",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-08T08:03:43.335666Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "f6539d8e3b157bf9a9ef4e31fee17a3047ca7049c42024a93a2089ea96d684ab",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-776f713d026f1d278814b44f4453f6ff",
+            "classification": "introduced",
+            "findingId": "finding-776f713d026f1d278814b44f4453f6ff",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-b4b5d41706788c2607571fdeb0e5780b",
+            "classification": "introduced",
+            "findingId": "finding-b4b5d41706788c2607571fdeb0e5780b",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "744e8e81a066fe0e0fe67746b387dad6334958ac",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 378440,
+      "output_sha256": "9262e93d91a8bcdc5019f79d0cda33c6cc85a11b04fec0c1306965bd0817046a",
+      "reservation_id": "1c2107a67cdf4f42851c3bf5f7814129",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-08T08:01:02.007671Z",
+      "tool_calls": 19,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "c012f3d4c5af7f85c1b9fe77c6eb82f34208a64f51955bfaca1921719161b3c0",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-776f713d026f1d278814b44f4453f6ff",
+            "classification": "introduced",
+            "findingId": "finding-776f713d026f1d278814b44f4453f6ff",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-b4b5d41706788c2607571fdeb0e5780b",
+            "classification": "introduced",
+            "findingId": "finding-b4b5d41706788c2607571fdeb0e5780b",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "744e8e81a066fe0e0fe67746b387dad6334958ac",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 761,
+      "output_sha256": "eb2b0039de5c6efb025edbd86d5543b387650d19ed0b4ddbf85e0cf5030ad434",
+      "reservation_id": "4ffae992d0a44dbfb7271ff2c73e90b5",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-08T08:03:43.305896Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-94-stop-a-detected-meeting-recording-by.md",
+  "status": "open",
+  "title": "Stop a detected meeting recording by hand",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABVzMuew",
+    "identifier": "#94",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/94"
+  },
+  "updated_at": "2026-10-08T08:03:43.336998Z"
+}

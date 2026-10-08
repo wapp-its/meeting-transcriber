@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-08T07:57:54.317324Z",
+  "depends_on": [
+    "gh-94-stop-a-detected-meeting-recording-by.1"
+  ],
+  "id": "gh-94-stop-a-detected-meeting-recording-by.2",
+  "priority": null,
+  "review": "codex:gpt-5.6-sol:xhigh",
+  "spec": "gh-94-stop-a-detected-meeting-recording-by",
+  "spec_path": ".flow/tasks/gh-94-stop-a-detected-meeting-recording-by.2.md",
+  "status": "todo",
+  "title": "Offer Stop Recording in the menu for every recording",
+  "updated_at": "2026-10-08T07:57:54.317324Z"
+}
