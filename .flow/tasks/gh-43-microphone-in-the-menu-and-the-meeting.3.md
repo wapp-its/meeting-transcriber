@@ -45,9 +45,29 @@ App target. New `MicrophoneController`, the one owner of "which microphone" stat
 
 
 ## Done summary
-TBD
+A microphone chosen in Settings → Audio (or, from task .4, in the menu) during a recording now reaches that recording at once. The new `MicrophoneController`, owned by `AppState` as `microphone`, observes `AppSettings.micDeviceUID` and, while it is attached to a recording that captures the microphone, calls the recorder's `selectMicrophone` with the new UID (the empty System Default choice as nil). A stopped recording, or one with no microphone track, gets nothing. While attached it ticks once a second and publishes `recordedDevice`, the device the recorder reports. `WatchingController`'s state-change handler attaches it on the `.recording` transition, next to channel-health monitoring, with the loop's source, the app name and a provider for the loop's recorder, and detaches it on every other transition.
 
+Tests (`MicrophoneControllerTests`, 5): `testAChoiceChangedDuringARecordingReachesItsRecorderOncePerChange` (one call per change, `""` as nil), `testAChoiceReachesNoRecordingThatHasStoppedOrRecordsNoMicrophone` (after stop, app-only, with a live control), `testTheRecordedDeviceIsTheRecordersUntilTheRecordingStops` (`tick()` publishes, stop clears, a later tick does not bring it back), `testTheRecordedDeviceFollowsTheRecorderOnItsOwnWhileAttached` (the 1 s loop repeats), `testAMicrophoneRecordingAttachesTheControllerAndStoppingItDetachesIt` (wiring through `makeWatchingController`: attach with `.micOnly` and app name `Microphone`, a change reaches the loop's recorder, the stop detaches).
+Mutation check: each of six defects turned a test red: no microphone-capture guard, stop keeping the attachment, `""` passed through, the stop call missing from the default arm, a loop that never repeats, the attach call missing from the handler.
+Baseline: green. The focused filter `MicrophoneController|WatchingController|AppState` passed 147 tests and lint found 0 violations in 714 files.
+Gates at HEAD 1e4756cf: focused filter `MicrophoneController|WatchingController|AppState` 152 tests, rc 0. `ChannelHealthIntegration|MenuBarIconTests` (the readers of the moved accessors) 68 tests, rc 0. `./scripts/lint.sh` 0 violations in 717 files. `swift build` rc 0. A clean `xcodebuild build-for-testing` followed by `swiftlint analyze --strict` found 0 violations in 644 files. Line counts: `AppState.swift` 587, `WatchingController.swift` 592.
+
+Decision: `micSilentOverlay` and `appSilentOverlay` move unchanged from `AppState.swift` into the new `AppState+Microphone.swift` (own commit 0f4010f1) · rule 6 (the conductor's call) · `AppState.swift` was at 599 lines, and the pair is a self-contained set of menu-bar accessors of the kind task .4 adds there.
+Decision: the `WatchingController(...)` arguments in `AppState.init` are now grouped several per line · rule 6 · the init body was already at SwiftLint's 60-line `function_body_length` limit, and the two new lines made it 62. `PipelineController(...)` in the same init already uses this style.
+Decision: `MicrophoneController.attachment` is internal-read (`private(set)`) and observed · rule 6 · the wiring test reads it, and task .5 needs the app name it stores.
+Decision: the wiring test's controller observes the test's own settings, not the factory's · rule 6 · the factory builds its settings after the controller has to exist, and the task asks for a plain `microphone:` pass-through.
+Decision: no test reads the loop's cancellation directly · rule 6 · the cancellation cannot be seen without a test-only accessor. The stop clearing the attachment is tested, which makes any later tick a no-op, and a restart after a stop is guarded by `tickTask == nil`.
+Decision: the review ran with `CODEX_SANDBOX=workspace-write` and `FLOW_VALIDATE_REVIEW=1`, as the owner's standing override for this run requires · rule 1 · `git status` afterwards showed nothing written outside flowctl's own `.flow` state.
+
+Follow-ups: none filed by this task.
+Feature map: no user route changed (no UI in this task).
+
+Tier: session (jev-unavailable(no_key)) — explicit routing block: implementer opus at xhigh
+
+stage: impl-review - ran [2026-10-09T07:26:42Z..2026-10-09T07:33:35Z] codex gpt-5.6-sol at xhigh (receipt model gpt-5.6-sol, effort xhigh). Three draws (correctness, contracts, integration), all SHIP with no findings. The validator was not dispatched because the verdict was SHIP. The round was merged through `--merged-file` because the contracts and integration draws' text did not parse for the merge-plan route.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 0f4010f1f545f3fd87bd5d7c2bfc0d599ab0aba1, 1e4756cf3846b409c0d2e5a8a9c9e57345abae7e
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh43-home swift test --parallel --filter 'MicrophoneController|WatchingController|AppState' (152 tests, rc 0), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh43-home swift test --parallel --filter 'ChannelHealthIntegration|MenuBarIconTests' (68 tests, rc 0), ./scripts/lint.sh with pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1 (0 violations, 717 files), xcodebuild clean build-for-testing + swiftlint analyze --strict (0 violations, 644 files)
 - PRs:
