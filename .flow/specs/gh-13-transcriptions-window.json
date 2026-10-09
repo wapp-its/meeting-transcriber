@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-13-transcriptions-window",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-09T03:28:57.213063Z",
   "created_at": "2026-10-06T20:19:41.852724Z",
   "default_impl": null,
   "default_review": null,
@@ -368,6 +368,42 @@
       "task": "gh-13-transcriptions-window.4",
       "timestamp": "2026-10-08T13:17:02.209651Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "0ad46ec5258e0561927611b0d794425678cac42d8c168af8646c6a37029dcb79",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "0560e0d347e6c4b032fb04f1f4b61947a07dca5a",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 598027,
+      "output_sha256": "dd41e5c8386be470c8ba26bc212b5e4cad6268b992c47ff4e97781517aad3c03",
+      "reservation_id": "d1a52623c2424ba4990a1bde32e80e07",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-09T03:28:57.177428Z",
+      "tool_calls": 22,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -376,12 +412,26 @@
     "impl:gh-13-transcriptions-window.3": 1,
     "impl:gh-13-transcriptions-window.4": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
-  "review_pending_rounds": {},
+  "review_pending_rounds": {
+    "plan": 1
+  },
   "review_phase_leases": {},
-  "review_reservations": {},
+  "review_reservations": {
+    "4bed640c529d454280c1ed48bca17a68": {
+      "artifact_sha256": "2f043401056c45e45fad71e3d8a4ea5af7199f824c7d73ae273e1ea031a28a0f",
+      "counter_scope": "plan",
+      "epoch": 0,
+      "exclusive": false,
+      "forced": false,
+      "review_type": "completion",
+      "superseded_by": "d1a52623c2424ba4990a1bde32e80e07",
+      "superseded_epoch": 1
+    }
+  },
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-13-transcriptions-window.1": 0,
     "impl:gh-13-transcriptions-window.2": 0,
     "impl:gh-13-transcriptions-window.3": 0,
@@ -403,5 +453,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/13"
   },
-  "updated_at": "2026-10-08T13:17:07.656141Z"
+  "updated_at": "2026-10-09T03:28:57.216899Z"
 }
