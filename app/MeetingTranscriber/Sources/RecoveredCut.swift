@@ -123,7 +123,7 @@ enum RecoveredCut {
     /// The stem of a stored cut's file name, nil for every other file. Hidden
     /// files never count: a write's temporary file is one, and so is the
     /// `._` companion some volumes create beside every file.
-    static func stem(ofStoredCut name: String) -> String? {
+    private static func stem(ofStoredCut name: String) -> String? {
         guard !name.hasPrefix("."), name.hasSuffix(RecordingFileSuffix.pendingCut) else { return nil }
         return String(name.dropLast(RecordingFileSuffix.pendingCut.count))
     }
