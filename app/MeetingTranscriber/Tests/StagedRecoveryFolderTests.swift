@@ -104,6 +104,6 @@ final class StagedRecoveryFolderTests: XCTestCase {
         for suffix in RecordingFileSuffix.all {
             XCTAssertEqual(try fixture.frames(suffix), keptFrames, suffix)
         }
-        XCTAssertEqual(log.lines(.notice, startingWith: "recovered_cut applied"), ["recovered_cut applied removed_s=12 kept_s=13"])
+        XCTAssertEqual(log.lines.map(\.line), ["recovered_cut applied removed_s=12 kept_s=13"])
     }
 }

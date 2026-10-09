@@ -420,8 +420,9 @@ final class RecoveredCutTests: XCTestCase {
     }
 
     /// The app track's swap fails, then putting the mix back fails, so the
-    /// cut leaves the original mix under its hidden name; recovery moves it
-    /// back and the recording is queued uncut.
+    /// cut leaves the original mix under its hidden name. Recovery moves it
+    /// back and the recording is queued uncut; while it cannot, the stored
+    /// cut stays, resolved before the cut, for the next pass to finish.
     func testAnOriginalTheCutsRollbackLeftHiddenIsPutBack() throws {
         let fixture = try makeFixture("rollback")
         let log = makeLog()
@@ -436,6 +437,26 @@ final class RecoveredCutTests: XCTestCase {
         XCTAssertFalse(fixture.storedCutExists)
         XCTAssertEqual(log.lines(.warning, startingWith: "recovered_cut_failed"), ["recovered_cut_failed rollback_incomplete tracks_moved=1"])
         XCTAssertEqual(try fixture.hiddenFiles(), [])
+    }
+
+    func testAnOriginalTheCutsRollbackLeftHiddenAndThatCannotBePutBackKeepsTheStoredCut() throws {
+        let fixture = try makeFixture("rollback-stuck")
+        let log = makeLog()
+        try fixture.stoppedRecording()
+        try fixture.storeCut(startedAt: byStart.startedAt, cutAt: byStart.cutAt)
+
+        let collected = RecoveredCut.collect(in: fixture.dir, diagnostics: log)
+        RecoveredCut.apply(collected, in: fixture.dir, diagnostics: log, rename: renameFailing(on: Set(2 ... 10)))
+
+        guard case let .valid(stored) = PendingRecordingCut.read(stem: fixture.stem, in: fixture.dir) else {
+            XCTFail("the stored cut must stay while an original is hidden")
+            return
+        }
+        XCTAssertEqual(stored.keptSeconds, 8, "resolved before any track was cut")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.url(RecordingFileSuffix.mix).path))
+        XCTAssertEqual(log.lines(.warning, startingWith: "recovered_cut_failed"), [
+            "recovered_cut_failed restore tracks_left=1 domain=NSPOSIXErrorDomain code=5",
+        ])
     }
 
     /// The mix sits under its hidden name and cannot be renamed back: the
