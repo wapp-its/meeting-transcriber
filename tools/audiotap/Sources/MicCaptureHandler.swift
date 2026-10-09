@@ -11,7 +11,7 @@ private let logger = Logger(subsystem: "com.meetingtranscriber.audiotap", catego
 /// Automatically restarts the engine on device switch, preserving the selected device
 /// when still available or falling back to system default with a warning.
 ///
-/// Public API (`start`/`stop`/`currentLevelDBFS`) is called from the main actor.
+/// Public API (`start`/`stop`/`selectDevice`/`activeInputDevice`/`currentLevelDBFS`) is called from the main actor.
 ///
 /// Mutable state is split by owner. `session`, `configChangeObserver`,
 /// `configChangePolicy`, `pendingConfigChangeRestart` and the retry counter
@@ -126,6 +126,14 @@ public class MicCaptureHandler: @unchecked Sendable {
     /// nil when none is. Main-queue confined, like `session`.
     var pendingConfigChangeRestart: DispatchWorkItem?
     var selectedDeviceUID: String?
+    /// The microphone the running engine session reports it records from, read
+    /// where that session came up and published at the first start and at each
+    /// adoption; nil before the first start and after a stop or a give-up.
+    /// Main-queue confined, like `session`. See `+DeviceSelection`.
+    public internal(set) var activeInputDevice: MicInputDevice?
+    /// A selection the arbiter could not launch at once, because a restart
+    /// was outstanding. Main-queue confined. See `+DeviceSelection`.
+    var selectionPending = false
     /// Wall-clock anchoring so a device-restart gap becomes silence in the WAV
     /// instead of an under-run (issue #379 follow-up — see `+Timeline`).
     /// `internal` for that cross-file extension; survives restarts (never reset).
@@ -215,7 +223,7 @@ public class MicCaptureHandler: @unchecked Sendable {
 
     public func start(deviceUID: String? = nil) throws {
         selectedDeviceUID = deviceUID
-        try startEngine(deviceUID: deviceUID, on: session)
+        activeInputDevice = try startEngine(deviceUID: deviceUID, on: session).device
         _ = arbiter.withLock { $0.handle(.startSucceeded) }
         configChangePolicy.engineStarted(at: stallClock())
         installDeviceChangeListener()
@@ -242,20 +250,24 @@ public class MicCaptureHandler: @unchecked Sendable {
     }
 
     // swiftlint:disable function_body_length
+    /// Returns the hardware rate and the device the session reports, read here
+    /// so a restart reads it on the restart queue rather than on main.
     @discardableResult
-    func startEngine(deviceUID: String?, on session: any MicEngineSessionProviding) throws -> Double {
+    func startEngine(
+        deviceUID: String?, on session: any MicEngineSessionProviding,
+    ) throws -> (rate: Double, device: MicInputDevice?) {
         // The one call in here that can block forever (issue #588).
         let hwFormat = try session.hardwareFormat(deviceUID: deviceUID)
         logger.info("Mic hardware format: \(hwFormat.sampleRate) Hz, \(hwFormat.channelCount)ch")
 
         let tapFormat = try validatedTapFormat(for: hwFormat)
+        // The microphone the session says this recording comes from, which
+        // with a device configured is not the system default (issue #724).
+        let device = session.boundInputDevice
 
         if debugLogging {
-            // The microphone the session says this recording comes from, which
-            // with a device configured is not the system default this line used
-            // to name (issue #724).
             let line = micInputDeviceLogLine(
-                device: session.boundInputDevice,
+                device: device,
                 hardwareRate: hwFormat.sampleRate,
                 hardwareChannels: hwFormat.channelCount,
             )
@@ -368,7 +380,7 @@ public class MicCaptureHandler: @unchecked Sendable {
         logger.info("Mic recording started: \(self.outputURL.lastPathComponent)")
 
         armDebugFaultIfNeeded()
-        return hwFormat.sampleRate
+        return (hwFormat.sampleRate, device)
     }
 
     // swiftlint:enable function_body_length
@@ -408,6 +420,7 @@ public class MicCaptureHandler: @unchecked Sendable {
         let decision = attemptBuildLock.withLock { arbiter.withLock { $0.handle(.stopRequested) } }
         stopStallWatchdog()
         cancelPendingConfigChangeRestart()
+        endDeviceSelection()
         if let listener = deviceChangeListener {
             AudioObjectRemovePropertyListenerBlock(
                 AudioObjectID(kAudioObjectSystemObject),
