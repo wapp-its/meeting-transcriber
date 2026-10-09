@@ -67,9 +67,26 @@ Tests:
 - [ ] `AppState.pendingConsentQuestion` and `answerConsentQuestion` route to the current loop.
 - [ ] `AppNotifying` lives in its own file after a behaviour-neutral move; `Sources/WatchLoop.swift` stays at or under 597 lines and `Sources/AppState.swift` under 600; `./scripts/lint.sh` and `./scripts/pre-push.sh --with-appstore` pass.
 ## Done summary
-TBD
+The open recording prompt is now a `ConsentQuestion` (fresh id, app, posted title and body) that `WatchLoop` stores as `pendingConsentQuestion`, and the menu can answer exactly that prompt by id through `AppState.answerConsentQuestion` -> `WatchLoop.answerParkedConsent` -> `NotificationManager.answerConsentPrompt` -> `ConsentPromptCoordinator.resolve(id:answer:)`, the call a notification tap makes. A stale question (same text with a new id, already answered, after Stop Watching) answers nothing, and only a prompt's own completion clears the open question. No UI yet (tasks .2 and .3).
 
+Tests per acceptance item: two parked prompts answered by id, unknown id resolves nothing (`NotificationManagerSchedulingTests.testAnsweringOneOfTwoParkedPromptsResolvesOnlyThatOne`, `testAnsweringAnIdThatIsNotParkedResolvesNothing`, `testAnswerConsentPromptResolvesThePromptWithThatIdAndWithdrawsIt`, `ConsentPromptCoordinatorTests.testResolveByIdReportsWhetherThePromptWasWaiting`); menu Record/Ignore, posted text and id, stale questions, late completion (`WatchLoopAskBeforeRecordingTests+Menu.swift`, 6 tests); AppState routing (`AppStateConsentPromptTests`, 4 tests). Red first, observed: the two-prompt and unknown-id tests failed with `answerConsentPrompt` built on `resolvePending`; the late-completion test failed with the unconditional `clearConsentState()`; the after-Stop-Watching test failed without the open-question check in `answerParkedConsent`.
+
+Gates: baseline green (229 tests, task filter). Final: task filter 243 tests rc 0 (one earlier run had two `AppStateTests` toggleWatching tests time out at `waitFor`'s 500 ms under parallel load right after the move commit; they passed when `AppStateTests` was re-run alone and in every later run); `./scripts/lint.sh` with pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1 0 violations; `./scripts/pre-push.sh --with-appstore` rc 0. Line budgets: `WatchLoop.swift` 589 (unchanged), `AppState.swift` 492, `TestHelpers.swift` 600 (untouched).
+
+Decisions:
+- `ConsentQuestion.init` takes `id` last (`init(app:title:body:id: UUID = UUID())`): SwiftLint `function_default_parameter_at_end` under `--strict` rejected the id-first order.
+- `test_case_accessibility` is disabled around the shared helpers in `WatchLoopAskBeforeRecordingTests.swift`: dropping `private` (the task's instruction) trips that `--strict` rule, verified with a probe file against SwiftLint 0.65.1.
+- `import UserNotifications` was dropped from `AppState.swift` with the move: it was added for a former `UNAuthorizationStatus` requirement of `AppNotifying`, and nothing in either file uses it.
+- The comment at `WatchLoop.swift:74` now names `pendingConsentQuestion` (the stored state the consent extension owns).
+- Lint ran with the cached pinned binaries in `~/Library/Caches/MeetingTranscriber/lint-tools/bin` (versions checked: 0.63.0 / 0.65.1) instead of a fresh download.
+- Review ran under `CODEX_SANDBOX=workspace-write` as the conductor directed; the reviewer left no files in the tree.
+
+Tier: session (jev-unavailable(no_key)); project routing block: implementer opus at xhigh
+
+stage: impl-review - ran [..2026-10-09T04:35:58Z] (codex:gpt-5.6-sol:xhigh, 3 draws correctness/contracts/integration, all SHIP, 0 findings; --validate had nothing to validate)
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: f7b8cea6730a5e7fa33dfa554bcdef9509eaab4c, c6f3d6a7b6cb1a2567662fbc5c22d0d4fccb8a3c, 821ffce8320288ff4c4cadd1b8e66fa5e8efdf52, e17b5a852f53e38fcadae2027cb8cdd5b79c8f30
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh49/home swift test --parallel --filter 'WatchLoopAskBeforeRecordingTests|WatchLoopBrowserConsentTests|NotificationManager|ConsentPromptCoordinatorTests|AppStateConsentPromptTests|AppStateTests|DebugRPCServerIntegrationTests' (243 tests, rc 0), ./scripts/lint.sh with pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1 (0 violations, rc 0), ./scripts/pre-push.sh --with-appstore (rc 0)
 - PRs:

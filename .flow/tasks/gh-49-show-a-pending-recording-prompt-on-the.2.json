@@ -11,7 +11,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-49-show-a-pending-recording-prompt-on-the",
   "spec_path": ".flow/tasks/gh-49-show-a-pending-recording-prompt-on-the.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Offer Record and Ignore for the open prompt at the top of the menu",
   "updated_at": "2026-10-06T20:27:49.745878Z"
 }

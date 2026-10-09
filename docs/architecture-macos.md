@@ -93,9 +93,9 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `AppState.swift` | `@Observable @MainActor` composition root — wires the concern controllers (`engines`, `watching`, `pipeline`, `permissions`, `channelHealth`, `liveTranscription`, `rpcController`) and exposes the derived UI state (badge, status label) rather than owning it |
 | `LivenessMarker.swift` | Process-lifetime marker (issue #703): written at launch, touched once a minute, removed by a clean AppKit quit; the next launch reads it as `PreviousExit` to tell a crash, kill or power loss from a quit, which the per-recording marker cannot do for an idle app |
 | `PreviousExitNotice.swift` | Wording of the launch-time notification for a run that ended without a quit: the window in which nothing was watching for meetings |
-| `MenuBarView.swift` | Menu bar dropdown (state, actions, meeting info) |
+| `MenuBarView.swift` | Menu bar dropdown (state, actions, meeting info; at the top, the open recording prompt with Record / Ignore) |
 | `JobMenuSummary.swift` | Status text and symbol of a job's single line in the menu bar dropdown |
-| `MenuBarIcon.swift` | Renders the animated waveform icon + badge overlays (watching dot, permission, record-only, channel-silent) |
+| `MenuBarIcon.swift` | Renders the animated waveform icon + badge overlays (watching dot, question mark while a recording prompt is open, permission, record-only, channel-silent) |
 | `AppPickerView.swift` | App picker sheet for manual recording of any running app |
 | `AudioImportTypes.swift` | File types offered by the batch-import and voice-enrollment `NSOpenPanel`s — single source of truth so the ffmpeg-gated vs. natively-decoded format lists stay pinned and testable |
 | `A11yID.swift` | Shared accessibility-identifier namespace — one constant per control, referenced by the view modifier, ViewInspector tests, and the `/ui/press` allowlist |
@@ -380,6 +380,8 @@ PipelineQueue: waiting → transcribing → [diarizing] → generatingProtocol �
 | **Protocol** | <img src="menu-bar-protocol.gif" width="60"> | `PipelineJob.state == .generatingProtocol` (lines appear sequentially) | `BadgeKind.processing` |
 
 The icon is rendered as a SwiftUI `Image` template (auto-tinted by AppKit for light/dark mode) **unless** an overlay applies — overlays force non-template rendering to keep the colored badge intact.
+
+While a "Record <App> meeting?" prompt waits for an answer, a **question mark** replaces the watching dot at the top right (`MenuBarIcon.image(..., questionOverlay:)`, driven by `AppState.awaitingUserAnswer`), so a detected meeting that is not being recorded yet shows on the icon even when the notification was missed. Like the dot it is drawn in the icon's own colour and keeps the template path, and it stays in the top half: the waveform state, the red tints and the bottom-right badges are drawn as without the prompt. Once the prompt is answered, expires or is declined, the dot is back. `BadgeKind` and the `badge` value do not change; automation clients read the open question from `pendingConsentApp`.
 
 ### Permission problem badge
 

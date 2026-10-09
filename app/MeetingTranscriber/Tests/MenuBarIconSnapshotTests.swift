@@ -69,6 +69,16 @@ final class MenuBarIconSnapshotTests: XCTestCase {
         }
     }
 
+    /// The question mark that replaces the watching dot while a recording
+    /// prompt is open, over the idle and the recording waveform.
+    func testQuestionMarkSnapshots() throws {
+        try XCTSkipIf(isCI, "Snapshot tests are machine-dependent")
+        for badge: BadgeKind in [.inactive, .recording] {
+            let image = MenuBarIcon.image(badge: badge, watchingOverlay: true, questionOverlay: true)
+            assertSnapshot(of: image, as: Self.icon, named: "\(badge)")
+        }
+    }
+
     func testAllBadgesProduceNonEmptyImages() {
         for badge in BadgeKind.allCases {
             let frameCount = badge.isAnimated ? MenuBarIcon.frameCount : 1

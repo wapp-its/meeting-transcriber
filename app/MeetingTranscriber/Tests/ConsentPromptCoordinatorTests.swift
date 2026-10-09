@@ -140,6 +140,19 @@ final class ConsentPromptCoordinatorTests: XCTestCase {
         coord.resolve(id: "never-awaited", granted: true)
     }
 
+    /// The menu answers by id and must be able to tell that its prompt was
+    /// already gone: true only while a prompt waits under that id.
+    func testResolveByIdReportsWhetherThePromptWasWaiting() async {
+        let coord = ConsentPromptCoordinator(timeout: 60, sleep: neverSleep)
+        XCTAssertFalse(coord.resolve(id: "a", answer: .granted), "an id that was never parked")
+        let task = Task { await coord.awaitDecision(id: "a") {} }
+        await yieldUntilParked()
+        XCTAssertTrue(coord.resolve(id: "a", answer: .granted), "a waiting id")
+        XCTAssertFalse(coord.resolve(id: "a", answer: .declined), "an id already resolved")
+        let result = await task.value
+        XCTAssertEqual(result, .granted)
+    }
+
     // MARK: - resolvePending (the RPC consent hook — resolve without a prompt id)
 
     func testResolvePendingWithNoPromptsReturnsFalse() {

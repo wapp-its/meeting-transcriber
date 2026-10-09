@@ -9,7 +9,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-49-show-a-pending-recording-prompt-on-the",
   "spec_path": ".flow/tasks/gh-49-show-a-pending-recording-prompt-on-the.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Carry the open prompt as a question and answer it through the existing coordinator",
   "updated_at": "2026-10-06T20:36:49.493616Z"
 }
