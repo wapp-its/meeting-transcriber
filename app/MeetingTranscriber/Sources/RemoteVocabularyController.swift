@@ -103,8 +103,8 @@ final class RemoteVocabularyController {
     /// alone, so neither the address, the token nor a term can reach it.
     static func logDescription(of outcome: CheckOutcome, result: RemoteVocabularyFetchResult) -> String {
         // Some failures follow an answer the fetcher read: a 200 it refused, a
-        // 304 it could not use, a redirect it did not follow. It does not keep
-        // a redirect's exact code.
+        // 304 it could not use, a redirect it did not follow. A refused
+        // redirect reaches this type without its code (spec assumption A11).
         let httpStatus = switch result {
         case .modified: "200"
         case .notModified: "304"
