@@ -3,8 +3,8 @@ import CoreAudio
 import Foundation
 
 /// One process the recording tapped, as Core Audio describes its microphone
-/// use: whether it runs audio input and which input devices it uses (issue
-/// #43). Read by `MeetingMicrophoneProbe`, judged by `MeetingMicrophoneVerdict`.
+/// use: whether it runs audio input and which input devices it uses. Read by
+/// `MeetingMicrophoneProbe`, judged by `MeetingMicrophoneVerdict`.
 struct MeetingInputProcess: Equatable, Sendable {
     let pid: pid_t
     /// AudioTapLib's `getExecutableName(pid:)`, `?` when the lookup fails.

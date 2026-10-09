@@ -121,14 +121,18 @@ final class MicrophoneControllerMeetingProbeTests: XCTestCase {
         addTeardownBlock { await controller.recordingStopped() }
     }
 
-    /// Tick until a read starts, at most one probe interval, then wait until
-    /// its result has come back.
-    private func probeOnce(_ controller: MicrophoneController, file: StaticString = #filePath, line: UInt = #line) async {
+    /// Tick until a read starts, at most one probe interval.
+    private func startProbe(_ controller: MicrophoneController, file: StaticString = #filePath, line: UInt = #line) {
         for _ in 0 ..< MeetingMicrophoneWarningPolicy.Limits.production.probeEveryTicks
             where !controller.meetingProbe.readInFlight {
             controller.tick()
         }
         XCTAssertTrue(controller.meetingProbe.readInFlight, "no read started within one probe interval", file: file, line: line)
+    }
+
+    /// Start a read and wait until its result has come back.
+    private func probeOnce(_ controller: MicrophoneController, file: StaticString = #filePath, line: UInt = #line) async {
+        startProbe(controller, file: file, line: line)
         await waitFor(!controller.meetingProbe.readInFlight, timeout: .seconds(2))
     }
 
@@ -198,6 +202,32 @@ final class MicrophoneControllerMeetingProbeTests: XCTestCase {
         XCTAssertGreaterThan(callsBeforeGiveUp, 0, "precondition")
     }
 
+    /// A mismatch already counted, the second read out when the track gives
+    /// up: that read's mismatch must not warn about a microphone no longer
+    /// recorded, and the earlier hint goes with the track.
+    func testAResultStillOutWhenTheMicrophoneTrackGivesUpIsDropped() async {
+        let reader = ScriptedReader()
+        reader.processes = Self.mismatching
+        let controller = makeController(reader)
+        let recorder = meetingRecorder()
+        attach(controller, recorder)
+        await probeOnce(controller)
+        XCTAssertNotNil(controller.meetingAppHint, "precondition: one mismatch")
+        reader.block()
+        addTeardownBlock { reader.unblock() }
+        startProbe(controller)
+
+        recorder.microphoneTrackActive = false
+        controller.tick()
+        XCTAssertNil(controller.meetingAppHint, "the hint goes with the track")
+        reader.unblock()
+        await waitFor(!controller.meetingProbe.readInFlight, timeout: .seconds(2))
+
+        XCTAssertFalse(controller.meetingProbe.readInFlight, "the read came back")
+        XCTAssertEqual(notifier.calls.count, 0, "the second mismatch came back after the give-up")
+        XCTAssertNil(controller.meetingAppHint)
+    }
+
     /// The main thread goes on ticking while the read is stuck; the probe due
     /// meanwhile is skipped and counted, never queued behind it.
     func testAProbeDueWhileAReadIsOutstandingIsSkippedAndCounted() async {
@@ -246,7 +276,11 @@ final class MicrophoneControllerMeetingProbeTests: XCTestCase {
         XCTAssertFalse(controller.meetingProbe.readInFlight, "the read came back")
         XCTAssertNil(controller.meetingAppHint)
         XCTAssertEqual(notifier.calls.count, 0)
-        XCTAssertEqual(log.lines.map(\.line), [], "no entry, and no stop line for a probe that never came back in time")
+        XCTAssertEqual(
+            log.lines.map(\.line),
+            ["Meeting app microphone at stop: lastVerdict=none probes=1 skippedProbes=0 warned=false"],
+            "the stopped recording's summary counts the read still out, and its result writes no entry",
+        )
     }
 
     // MARK: - What a result does

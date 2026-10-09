@@ -36,8 +36,7 @@ final class MeetingMicrophoneWarningPolicyTests: XCTestCase {
 
     private static let mismatch = MeetingMicrophoneVerdict.mismatch([usbMic])
 
-    /// One probe whose processes are `processes`; the verdict defaults to the
-    /// one those processes give.
+    /// One probe, started and come back, as the controller runs it.
     @discardableResult
     private func record(
         _ policy: inout Policy,
@@ -45,7 +44,8 @@ final class MeetingMicrophoneWarningPolicyTests: XCTestCase {
         _ processes: [MeetingInputProcess] = [teams([usbMic]), idleHelper],
         tappedCount: Int = 3,
     ) -> Policy.Outcome {
-        policy.record(verdict: verdict, processes: processes, tappedCount: tappedCount, recordedDeviceUID: Self.recordedUID)
+        policy.recordProbeStarted()
+        return policy.record(verdict: verdict, processes: processes, tappedCount: tappedCount, recordedDeviceUID: Self.recordedUID)
     }
 
     // MARK: - Notification and hint
@@ -141,8 +141,8 @@ final class MeetingMicrophoneWarningPolicyTests: XCTestCase {
         )
     }
 
-    /// A failed read is `?(<status>)` wherever the value would be, and a device
-    /// whose UID cannot be read is neither "recorded" nor "other".
+    /// A failed read is `?(<status>)` wherever the value would be; for a
+    /// device's UID that is in place of "recorded" or "other".
     func testAFailedReadIsShownAsItsStatus() {
         var policy = Policy()
         let failing = MeetingInputDevice(objectID: 95, uid: .failed(1_852_797_029), name: .failed(2_003_332_927), transport: .failed(-50))
@@ -158,7 +158,7 @@ final class MeetingMicrophoneWarningPolicyTests: XCTestCase {
 
         XCTAssertEqual(outcome.lines.map(\.text), [
             "Meeting app microphone (first): exe=MSTeams pid=4242 isRunningInput=?(560947818) "
-                + "inputDevices=[73/Bluetooth/recorded, 95/?(-50)/?]",
+                + "inputDevices=[73/Bluetooth/recorded, 95/?(-50)/?(1852797029)]",
             "Meeting app microphone (first): exe=zoom.us pid=4243 isRunningInput=true inputDevices=?(2003332927)",
             "Meeting app microphone verdict (first): undetermined(unreadableProperty) processesWithAudioObject=2/2 capturingInput=1",
         ])
@@ -207,10 +207,16 @@ final class MeetingMicrophoneWarningPolicyTests: XCTestCase {
         var policy = Policy()
         XCTAssertNil(policy.stopLine, "nothing was due")
 
+        policy.recordProbeStarted()
+        XCTAssertEqual(
+            policy.stopLine, "Meeting app microphone at stop: lastVerdict=none probes=1 skippedProbes=0 warned=false",
+            "a read still out at stop",
+        )
         policy.recordSkip()
-        XCTAssertEqual(policy.stopLine, "Meeting app microphone at stop: lastVerdict=none probes=0 skippedProbes=1 warned=false")
+        XCTAssertEqual(policy.stopLine, "Meeting app microphone at stop: lastVerdict=none probes=1 skippedProbes=1 warned=false")
 
-        record(&policy, Self.mismatch)
+        // The outstanding read comes back, then one more probe.
+        _ = policy.record(verdict: Self.mismatch, processes: [Self.teams([Self.usbMic])], tappedCount: 1, recordedDeviceUID: Self.recordedUID)
         record(&policy, Self.mismatch)
         XCTAssertEqual(policy.stopLine, "Meeting app microphone at stop: lastVerdict=mismatch probes=2 skippedProbes=1 warned=true")
         record(&policy, .undetermined(.recordedMicrophoneUnknown))

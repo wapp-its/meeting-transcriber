@@ -1,10 +1,10 @@
 import Foundation
 
-/// The meeting-app microphone probe (issue #43): every fifth tick of a
-/// recording that taps a meeting app and is capturing the microphone, read
-/// which input devices the tapped processes use, judge it against the recorded
-/// microphone, log it, and after two mismatching probes notify once and show
-/// the menu hint. The reads are `MeetingMicrophoneProbe`'s, the decisions
+/// The meeting-app microphone probe: every fifth tick of a recording that taps
+/// a meeting app and is capturing the microphone, read which input devices the
+/// tapped processes use, judge it against the recorded microphone, log it,
+/// show the menu hint while the latest probe is a mismatch, and notify once
+/// after two mismatching probes. The reads are `MeetingMicrophoneProbe`'s, the decisions
 /// `MeetingMicrophoneVerdict`'s and `MeetingMicrophoneWarningPolicy`'s; this
 /// file only runs them in order.
 ///
@@ -13,7 +13,7 @@ import Foundation
 /// a time; a probe due while one is still out is skipped and counted, so a
 /// read that never returns costs skipped probes and nothing else. Its result
 /// comes back by a main-actor hop and is dropped unless the recording it was
-/// started for is still the attached one.
+/// started for is still the attached one and still capturing its microphone.
 extension MicrophoneController {
     /// The probe's state for the attached recording.
     struct MeetingProbeState {
@@ -30,20 +30,22 @@ extension MicrophoneController {
     /// From `tick()`. The microphone track is the one the capture reports
     /// running, not the requested source: a microphone that failed to start
     /// leaves the source `.appAndMic`, and a given-up track must end the
-    /// probing.
+    /// probing, and with it a hint about a microphone no longer recorded.
     func probeMeetingMicrophoneIfDue(_ recorder: (any RecordingProvider)?) {
         meetingProbe.ticks += 1
-        guard meetingProbe.ticks.isMultiple(of: meetingProbe.policy.limits.probeEveryTicks),
-              let recorder, recorder.microphoneTrackActive
-        else { return }
-        let pids = recorder.tappedPIDs
-        guard !pids.isEmpty else { return }
+        let pids = recorder?.tappedPIDs ?? []
+        guard recorder?.microphoneTrackActive == true, !pids.isEmpty else {
+            if meetingAppHint != nil { meetingAppHint = nil }
+            return
+        }
+        guard meetingProbe.ticks.isMultiple(of: meetingProbe.policy.limits.probeEveryTicks) else { return }
         guard !meetingProbe.readInFlight else {
             meetingProbe.policy.recordSkip()
             return
         }
 
         meetingProbe.readInFlight = true
+        meetingProbe.policy.recordProbeStarted()
         let generation = meetingProbe.generation
         let read = probeReader
         probeQueue.async { [weak self] in
@@ -68,7 +70,11 @@ extension MicrophoneController {
 
     private func adoptMeetingProbe(_ processes: [MeetingInputProcess], tappedCount: Int, generation: Int) {
         meetingProbe.readInFlight = false
-        guard generation == meetingProbe.generation, let attachment else { return }
+        // The track can have given up while the read was out: then there is
+        // no recorded microphone left to compare with.
+        guard generation == meetingProbe.generation, let attachment,
+              attachment.recorderProvider()?.microphoneTrackActive == true
+        else { return }
 
         let recordedUID = recordedDevice?.uid
         let verdict = MeetingMicrophoneVerdict.evaluate(processes: processes, recordedDeviceUID: recordedUID)

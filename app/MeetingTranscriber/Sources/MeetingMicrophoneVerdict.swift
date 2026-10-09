@@ -2,7 +2,7 @@ import CoreAudio
 import Foundation
 
 /// Whether the meeting app records from the microphone this recording
-/// captures (issue #43), as far as Core Audio lets the app tell. Pure: the
+/// captures, as far as Core Audio lets the app tell. Pure: the
 /// probe reads, this decides, `MeetingMicrophoneWarningPolicy` acts.
 ///
 /// Only the tapped processes that read as running input count. The app can

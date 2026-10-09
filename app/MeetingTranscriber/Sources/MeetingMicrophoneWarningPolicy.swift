@@ -1,7 +1,7 @@
 import CoreAudio
 import Foundation
 
-/// What the meeting-app probe does with each verdict (issue #43): when to post
+/// What the meeting-app probe does with each verdict: when to post
 /// the one mismatch notification, which devices the menu hint names, and which
 /// lines go to the log. Pure, so every limit is tested without Core Audio;
 /// `MicrophoneController+MeetingProbe.swift` feeds it one probe at a time and
@@ -58,7 +58,8 @@ struct MeetingMicrophoneWarningPolicy {
 
     let limits: Limits
     private var lastVerdict: MeetingMicrophoneVerdict?
-    /// Probes whose result was recorded.
+    /// Reads started, whether or not their result came back: a read still out
+    /// at stop is the one the summary most needs to show.
     private var probes = 0
     /// Probes that came due while an earlier read was still outstanding.
     private var skippedProbes = 0
@@ -80,6 +81,11 @@ struct MeetingMicrophoneWarningPolicy {
             + "probes=\(probes) skippedProbes=\(skippedProbes) warned=\(warned)"
     }
 
+    /// A read was started.
+    mutating func recordProbeStarted() {
+        probes += 1
+    }
+
     /// One probe's result. `processes` are the tapped processes that have an
     /// audio object, `tappedCount` all of them.
     mutating func record(
@@ -88,7 +94,6 @@ struct MeetingMicrophoneWarningPolicy {
         tappedCount: Int,
         recordedDeviceUID: String?,
     ) -> Outcome {
-        probes += 1
         lastVerdict = verdict
         var outcome = Outcome()
         if case let .mismatch(devices) = verdict {
@@ -171,13 +176,15 @@ struct MeetingMicrophoneWarningPolicy {
     // MARK: - Log lines
 
     /// `exe=… pid=… isRunningInput=… inputDevices=[<objectID>/<transport>/<recorded|other|?>, …]`.
-    /// A device is `?` when its UID or the recorded microphone's is unknown.
+    /// A device whose UID could not be read is `?(<status>)`; with the recorded
+    /// microphone's UID unknown it is `?`.
     private static func processText(_ process: MeetingInputProcess, recordedDeviceUID: String?) -> String {
         let devices = process.inputDevices.rendered { devices in
             let entries = devices.map { device in
                 let role = switch (device.uid, recordedDeviceUID) {
+                case let (.failed(status), _): "?(\(status))"
                 case let (.value(uid), recorded?): uid == recorded ? "recorded" : "other"
-                default: "?"
+                case (.value, nil): "?"
                 }
                 return "\(device.objectID)/\(transportText(device.transport))/\(role)"
             }
