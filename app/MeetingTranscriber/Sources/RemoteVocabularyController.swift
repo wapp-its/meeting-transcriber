@@ -102,10 +102,16 @@ final class RemoteVocabularyController {
     /// of the answer, "none" when no answer arrived. Built from these two values
     /// alone, so neither the address, the token nor a term can reach it.
     static func logDescription(of outcome: CheckOutcome, result: RemoteVocabularyFetchResult) -> String {
+        // Some failures follow an answer the fetcher read: a 200 it refused, a
+        // 304 it could not use, a redirect it did not follow. It does not keep
+        // a redirect's exact code.
         let httpStatus = switch result {
         case .modified: "200"
         case .notModified: "304"
         case let .failed(.httpStatus(code)): "\(code)"
+        case .failed(.notTextFile), .failed(.tooLarge): "200"
+        case .failed(.unexpectedNotModified): "304"
+        case .failed(.redirectToOtherServer), .failed(.insecureRedirect): "3xx"
         case .failed: "none"
         }
         let what = switch outcome {
@@ -186,6 +192,7 @@ final class RemoteVocabularyController {
         debounceTask = nil
         let checkGeneration = generation
         let address = currentAddress
+        let tokenRevision = settings.remoteVocabularyTokenRevision
         let token = settings.remoteVocabularyToken.trimmingCharacters(in: .whitespacesAndNewlines)
         // Read again for every check: the load is what drops validators that
         // no longer describe the text on disk.
@@ -194,9 +201,21 @@ final class RemoteVocabularyController {
         status = .checking
         checkTask = Task { [weak self, fetcher] in
             let result = await fetcher.fetch(url: url, token: token.isEmpty ? nil : token, validators: copy?.validators)
-            guard let self, !Task.isCancelled, self.generation == checkGeneration else { return }
+            guard let self, !Task.isCancelled,
+                  self.describesSettings(checkGeneration, address: address, tokenRevision: tokenRevision)
+            else { return }
             self.finish(result, address: address, copy: copy, host: url.host(percentEncoded: false) ?? "")
         }
+    }
+
+    /// Whether a check started under these values still matches the settings.
+    /// The generation alone is not enough: it moves when the observer runs, and
+    /// an answer can be queued on the main actor ahead of that.
+    private func describesSettings(_ checkGeneration: Int, address: String, tokenRevision: Int) -> Bool {
+        generation == checkGeneration
+            && settings.vocabularySource == .url
+            && currentAddress == address
+            && settings.remoteVocabularyTokenRevision == tokenRevision
     }
 
     private func finish(_ result: RemoteVocabularyFetchResult, address: String, copy: RemoteVocabularyCopy?, host: String) {
