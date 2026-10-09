@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-49-pending-prompt-icon",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-09T05:15:18.043160Z",
   "created_at": "2026-10-06T20:19:46.646530Z",
   "default_impl": null,
   "default_review": null,
@@ -228,6 +228,42 @@
       "task": "gh-49-show-a-pending-recording-prompt-on-the.3",
       "timestamp": "2026-10-09T05:09:36.723824Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "87fb5719ac61216f418cc52fbea137c4bffe31ffb124a67b0de00785ce947dbf",
+      "backend": "codex",
+      "base_sha": "47c550ada129a452cc2922d9f24653bb3212b497",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "3f1381490a8e9b83ccb300e16a717e0dd63833e8",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 388240,
+      "output_sha256": "768cd8ed18e18a607e87636eb0a4cbc477a398b7de08b19fb09487734755a16a",
+      "reservation_id": "7df922d84f544c48bea1960d1aa1a6d6",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-09T05:15:18.017934Z",
+      "tool_calls": 22,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -235,12 +271,13 @@
     "impl:gh-49-show-a-pending-recording-prompt-on-the.2": 1,
     "impl:gh-49-show-a-pending-recording-prompt-on-the.3": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-49-show-a-pending-recording-prompt-on-the.1": 0,
     "impl:gh-49-show-a-pending-recording-prompt-on-the.2": 0,
     "impl:gh-49-show-a-pending-recording-prompt-on-the.3": 0,
@@ -261,5 +298,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/49"
   },
-  "updated_at": "2026-10-09T05:09:36.980824Z"
+  "updated_at": "2026-10-09T05:15:18.046857Z"
 }
