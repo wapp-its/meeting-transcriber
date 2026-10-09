@@ -1,4 +1,5 @@
 import AudioTapLib
+import AVFoundation
 @testable import MeetingTranscriber
 import XCTest
 
@@ -13,6 +14,8 @@ final class MicrophoneControllerTests: XCTestCase {
 
     private let headset = MicInputDevice(uid: "HeadsetUID", name: "Headset")
     private let builtIn = MicInputDevice(uid: "BuiltInMicrophoneDevice", name: "MacBook Pro Microphone")
+    private let headsetEntry = MicrophoneDevice(uid: "HeadsetUID", name: "Headset")
+    private let builtInEntry = MicrophoneDevice(uid: "BuiltInMicrophoneDevice", name: "MacBook Pro Microphone")
 
     override func setUp() async throws {
         try await super.setUp()
@@ -110,6 +113,67 @@ final class MicrophoneControllerTests: XCTestCase {
         recorder.micInputDevice = headset
         await waitFor(controller.recordedDevice == headset, timeout: .seconds(3))
         XCTAssertEqual(controller.recordedDevice, headset)
+    }
+
+    // MARK: - The device list
+
+    /// What the providers report when asked; the test changes it between asks.
+    private final class DeviceSource {
+        var devices: [MicrophoneDevice] = []
+        var defaultInputName: String?
+    }
+
+    /// A controller reading its list from `source`, observing `center` rather
+    /// than the process-wide one, so posting a device notification here
+    /// reaches no other controller in the process.
+    private func listingController(_ source: DeviceSource, center: NotificationCenter) -> MicrophoneController {
+        MicrophoneController(
+            settings: settings,
+            listDevices: { source.devices },
+            readDefaultInputName: { source.defaultInputName },
+            notificationCenter: center,
+        )
+    }
+
+    func testRefreshDevicesPublishesTheListAndTheDefaultInputNameTheProvidersReport() {
+        let source = DeviceSource()
+        source.devices = [builtInEntry]
+        source.defaultInputName = "MacBook Pro Microphone"
+        let controller = listingController(source, center: NotificationCenter())
+        XCTAssertEqual(controller.devices, [builtInEntry], "read at init")
+        XCTAssertEqual(controller.defaultInputName, "MacBook Pro Microphone", "read at init")
+
+        source.devices = [builtInEntry, headsetEntry]
+        source.defaultInputName = "Headset"
+        controller.refreshDevices()
+
+        XCTAssertEqual(controller.devices, [builtInEntry, headsetEntry])
+        XCTAssertEqual(controller.defaultInputName, "Headset")
+    }
+
+    /// A device plugged in or pulled out shows up without restarting the app,
+    /// and a recording starts from a fresh list. (The macOS default input
+    /// changing is a Core Audio listener on the real system object, which a
+    /// test cannot fire without changing the user's default input.)
+    func testTheListIsRefreshedAtRecordingStartAndWhenADeviceConnectsOrDisconnects() async {
+        let source = DeviceSource()
+        let center = NotificationCenter()
+        let controller = listingController(source, center: center)
+        addTeardownBlock { await controller.recordingStopped() }
+
+        source.devices = [builtInEntry]
+        controller.recordingStarted(source: .micOnly, meetingAppName: nil) { nil }
+        XCTAssertEqual(controller.devices, [builtInEntry], "recording start")
+
+        source.devices = [builtInEntry, headsetEntry]
+        center.post(name: AVCaptureDevice.wasConnectedNotification, object: nil)
+        await waitFor(controller.devices == [builtInEntry, headsetEntry])
+        XCTAssertEqual(controller.devices, [builtInEntry, headsetEntry], "connect")
+
+        source.devices = [headsetEntry]
+        center.post(name: AVCaptureDevice.wasDisconnectedNotification, object: nil)
+        await waitFor(controller.devices == [headsetEntry])
+        XCTAssertEqual(controller.devices, [headsetEntry], "disconnect")
     }
 
     // MARK: - Wiring

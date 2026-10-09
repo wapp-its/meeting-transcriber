@@ -1,9 +1,8 @@
-import AVFoundation
 import SwiftUI
 
 struct AudioSettingsView: View {
     @Bindable var settings: AppSettings
-    @State private var audioDevices: [(id: String, name: String)] = []
+    @State private var audioDevices: [MicrophoneDevice] = []
 
     var body: some View {
         Form {
@@ -13,8 +12,8 @@ struct AudioSettingsView: View {
                 if !settings.noMic {
                     Picker("Microphone", selection: $settings.micDeviceUID) {
                         Text("System Default").tag("")
-                        ForEach(audioDevices, id: \.id) { device in
-                            Text(device.name).tag(device.id)
+                        ForEach(audioDevices, id: \.uid) { device in
+                            Text(device.name).tag(device.uid)
                         }
                     }
                     .onAppear { refreshAudioDevices() }
@@ -32,13 +31,9 @@ struct AudioSettingsView: View {
         .formStyle(.grouped)
     }
 
+    /// The same list the menu bar's Microphone entry offers.
     private func refreshAudioDevices() {
-        let session = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.microphone, .external],
-            mediaType: .audio,
-            position: .unspecified,
-        )
-        audioDevices = session.devices.map { (id: $0.uniqueID, name: $0.localizedName) }
+        audioDevices = MicrophoneDevices.available()
     }
 }
 

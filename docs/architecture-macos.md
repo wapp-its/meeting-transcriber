@@ -91,18 +91,19 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `AppLauncher.swift` | The actual `@main` — a process entry point that makes the one pre-launch diversion decision (e.g. `--localvqe-selftest`) before `MeetingTranscriberApp`/`AppState` construct, since a conforming `App` type cannot intercept its own launch |
 | `MeetingTranscriberApp.swift` | UI shell — SwiftUI scenes, windows, NSOpenPanel, NSWorkspace. Observes `.showSettings` / `.closeSettings` / `.showSpeakerNaming` notifications for RPC- and pipeline-driven scene control |
 | `AppState.swift` | `@Observable @MainActor` composition root — wires the concern controllers (`engines`, `watching`, `pipeline`, `permissions`, `channelHealth`, `microphone`, `liveTranscription`, `rpcController`) and exposes the derived UI state (badge, status label) rather than owning it |
-| `AppState+Microphone.swift` | The menu-bar body's accessors for the recording's microphone and app-audio channels (the two red tints), split out of `AppState.swift` at its line cap |
+| `AppState+Microphone.swift` | The menu-bar body's accessors for the recording's microphone and app-audio channels (the two red tints, and the Microphone entry's `MicrophoneMenuState`), split out of `AppState.swift` at its line cap |
 | `LivenessMarker.swift` | Process-lifetime marker (issue #703): written at launch, touched once a minute, removed by a clean AppKit quit; the next launch reads it as `PreviousExit` to tell a crash, kill or power loss from a quit, which the per-recording marker cannot do for an idle app |
 | `PreviousExitNotice.swift` | Wording of the launch-time notification for a run that ended without a quit: the window in which nothing was watching for meetings |
-| `MenuBarView.swift` | Menu bar dropdown (state, actions, meeting info) |
+| `MenuBarView.swift` | Menu bar dropdown (state, actions, meeting info, the Microphone entry: a submenu whose inline picker checks the chosen microphone and stores a choice in `AppSettings.micDeviceUID`) |
 | `JobMenuSummary.swift` | Status text and symbol of a job's single line in the menu bar dropdown |
+| `MicrophoneMenuState.swift` | Pure decision for the menu bar's Microphone entry: its title (the device a recording reports, otherwise the chosen device or `System Default (<name>)`, a chosen device that is not connected, no microphone available, the "No Microphone" off line), the items (`System Default (<name>)` then the Settings list) and the checked choice, and every string the entry shows |
 | `MenuBarIcon.swift` | Renders the animated waveform icon + badge overlays (watching dot, permission, record-only, channel-silent) |
 | `AppPickerView.swift` | App picker sheet for manual recording of any running app |
 | `AudioImportTypes.swift` | File types offered by the batch-import and voice-enrollment `NSOpenPanel`s — single source of truth so the ffmpeg-gated vs. natively-decoded format lists stay pinned and testable |
 | `A11yID.swift` | Shared accessibility-identifier namespace — one constant per control, referenced by the view modifier, ViewInspector tests, and the `/ui/press` allowlist |
 | `SettingsView.swift` | Settings window — `TabView` shell hosting seven topic-grouped sub-views in `Sources/Settings/` |
 | `Settings/GeneralSettingsView.swift` | Mode (Record-only) · Apps to Watch (Teams/Zoom/Webex/Browser/WeChat/Tencent Meeting/FaceTime/WhatsApp) · Record Without Asking (per native/mic-input app) · Detection (Poll Interval, Grace Period) |
-| `Settings/AudioSettingsView.swift` | Microphone device · VAD (enabled + threshold) · Per-Channel Indicator |
+| `Settings/AudioSettingsView.swift` | Microphone device (the `MicrophoneDevices` list the menu bar's Microphone entry also shows) · VAD (enabled + threshold) · Per-Channel Indicator |
 | `Settings/TranscriptionSettingsView.swift` | ASR engine picker · engine-specific options · model status · Live transcription (PoC) toggle |
 | `Settings/SpeakersSettingsView.swift` | Diarization · Mic Speaker Name · Known Voices · Recognition Stats · Experimental Diarization Tuning |
 | `Settings/OutputSettingsView.swift` | LLM provider · protocol language · output folder · custom prompt |
@@ -244,7 +245,8 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `AudioCapturing.swift` | The part of `AudioTapLib.AudioCaptureSession` one recording drives — the consumer-side protocol `DualSourceRecorder` depends on |
 | `DualSourceRecorder+BuildRecording.swift` | Turning a finished capture session into the files the pipeline consumes, split out of `DualSourceRecorder` |
 | `DualSourceRecorder+Microphone.swift` | The running recording's microphone device, whether a microphone track is being captured, and switching it to another device, forwarded to the capture session; the tapped process ids it reports beside them are stored in `DualSourceRecorder` for the recording's lifetime |
-| `MicrophoneController.swift` | `@Observable @MainActor` owner of "which microphone" state: attached to each recording on the same transitions as `ChannelHealthController`, it hands a changed `AppSettings.micDeviceUID` to the running recording (empty as System Default) and publishes the device the recording reports it captures from, refreshed once a second |
+| `MicrophoneController.swift` | `@Observable @MainActor` owner of "which microphone" state: attached to each recording on the same transitions as `ChannelHealthController`, it hands a changed `AppSettings.micDeviceUID` to the running recording (empty as System Default) and publishes the device the recording reports it captures from, refreshed once a second; also holds the microphone list and the macOS default input's name for the menu, refreshed at launch, at each recording start, when a device connects or disconnects and when the default input changes |
+| `MicrophoneDevices.swift` | The microphone list Settings → Audio and the menu bar share (AVFoundation discovery, in its order) and the macOS default input's name, read from Core Audio rather than from AVFoundation's default device |
 | `RecordingSource.swift` | What a single recording captures (app PID + mic on/off), replacing an untyped tuple |
 | `ManualRecordingInfo.swift` | Info about a manually started recording session, as opposed to one a detector started |
 | `ManualRecordingRequest.swift` | What the user asked `WatchingController` to record by hand (app-picker vs. microphone-only) |

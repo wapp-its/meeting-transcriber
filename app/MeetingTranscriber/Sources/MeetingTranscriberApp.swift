@@ -157,6 +157,8 @@ struct MeetingTranscriberApp: App {
             onProcessFiles: processAudioFiles,
             onDismissJob: { id in appState.pipelineQueue.removeJob(id: id) },
             onQuit: quit,
+            onSelectMicrophone: { appState.settings.micDeviceUID = $0 },
+            microphoneMenu: appState.microphoneMenuState,
         )
     }
 

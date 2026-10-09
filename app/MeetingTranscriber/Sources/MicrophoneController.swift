@@ -1,6 +1,11 @@
 import AudioTapLib
+import AVFoundation
+import CoreAudio
 import Foundation
 import Observation
+import os
+
+private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "MicrophoneController")
 
 // MARK: - MicrophoneController
 
@@ -19,6 +24,9 @@ import Observation
 /// - It publishes `recordedDevice`, the device the recording reports it
 ///   captures from, refreshed once a second from a value the capture layer
 ///   keeps, so no tick reads the hardware.
+///
+/// Attached or not, it also holds the microphone list and the default input's
+/// name that the menu bar's Microphone entry shows.
 ///
 /// The recorder arrives through a provider, not as a value: a detected
 /// meeting's `.recording` transition fires before `WatchLoop` assigns
@@ -43,13 +51,30 @@ final class MicrophoneController {
 
     private(set) var attachment: Attachment?
 
+    /// The microphones Settings → Audio → Microphone lists, in its order.
+    private(set) var devices: [MicrophoneDevice] = []
+
+    /// The macOS default input's name, which "System Default" records.
+    private(set) var defaultInputName: String?
+
     private let settings: AppSettings
+    private let listDevices: () -> [MicrophoneDevice]
+    private let readDefaultInputName: () -> String?
 
     @ObservationIgnored private var tickTask: Task<Void, Never>?
 
-    init(settings: AppSettings) {
+    init(
+        settings: AppSettings,
+        listDevices: @escaping () -> [MicrophoneDevice] = MicrophoneDevices.available,
+        readDefaultInputName: @escaping () -> String? = MicrophoneDevices.systemDefaultInputName,
+        notificationCenter: NotificationCenter = .default,
+    ) {
         self.settings = settings
+        self.listDevices = listDevices
+        self.readDefaultInputName = readDefaultInputName
         observeMicrophoneChoice()
+        refreshDevices()
+        observeDeviceChanges(notificationCenter)
     }
 
     /// Attach to a recording that has just started, and start the once-a-second
@@ -60,6 +85,7 @@ final class MicrophoneController {
         meetingAppName: String?,
         recorderProvider: @escaping @MainActor () -> (any RecordingProvider)?,
     ) {
+        refreshDevices()
         attachment = Attachment(source: source, meetingAppName: meetingAppName, recorderProvider: recorderProvider)
         guard tickTask == nil else { return }
         tickTask = Task { @MainActor [weak self] in
@@ -87,10 +113,44 @@ final class MicrophoneController {
         if recordedDevice != device { recordedDevice = device }
     }
 
+    /// Read the device list and the default input's name again. Assigns only
+    /// on a change, like `tick()`.
+    func refreshDevices() {
+        let list = listDevices()
+        if devices != list { devices = list }
+        let name = readDefaultInputName()
+        if defaultInputName != name { defaultInputName = name }
+    }
+
     private func applyMicrophoneChoice() {
         guard let attachment, attachment.source.capturesMicrophone else { return }
         let uid = settings.micDeviceUID
         attachment.recorderProvider()?.selectMicrophone(deviceUID: uid.isEmpty ? nil : uid)
+    }
+
+    /// Refresh the list when a device connects or disconnects and when the
+    /// macOS default input changes, on the main queue. The controller lives as
+    /// long as the app (`AppState.microphone`), so nothing is ever removed.
+    private func observeDeviceChanges(_ center: NotificationCenter) {
+        for name in [AVCaptureDevice.wasConnectedNotification, AVCaptureDevice.wasDisconnectedNotification] {
+            // swiftlint:disable:next discarded_notification_center_observer
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.refreshDevices() }
+            }
+        }
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain,
+        )
+        let status = AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject), &address, .main,
+        ) { [weak self] _, _ in
+            MainActor.assumeIsolated { self?.refreshDevices() }
+        }
+        if status != noErr {
+            logger.warning("Default input listener not installed (status: \(status))")
+        }
     }
 
     /// `withObservationTracking` is one-shot, so this re-arms after each fire,
