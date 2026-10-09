@@ -156,6 +156,10 @@ struct MeetingTranscriberApp: App {
             } : nil,
             onProcessFiles: processAudioFiles,
             onDismissJob: { id in appState.pipelineQueue.removeJob(id: id) },
+            consentQuestion: appState.pendingConsentQuestion,
+            onAnswerConsent: { question, granted in
+                appState.answerConsentQuestion(question, granted: granted)
+            },
             onQuit: quit,
         )
     }
