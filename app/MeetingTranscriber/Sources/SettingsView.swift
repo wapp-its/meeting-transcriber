@@ -6,6 +6,9 @@ struct SettingsView: View {
     var whisperKitEngine: WhisperKitEngine
     var parakeetEngine: ParakeetEngine
     var updateChecker: UpdateChecker?
+    /// The URL vocabulary source's controller, forwarded to the Transcription
+    /// tab. Nil hides its status line and disables "Update now".
+    var remoteVocabulary: RemoteVocabularyController?
 
     /// Notification visibility from `PermissionsController`, forwarded to the
     /// General tab so it can warn when browser-meeting consent cannot reach the
@@ -71,6 +74,7 @@ struct SettingsView: View {
                 settings: settings,
                 whisperKitEngine: whisperKitEngine,
                 parakeetEngine: parakeetEngine,
+                remoteVocabulary: remoteVocabulary,
             )
 
         case .speakers:
