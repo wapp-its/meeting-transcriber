@@ -539,21 +539,6 @@ final class AppState {
         watching.isRecording
     }
 
-    /// Menu-bar **top-half** red tint: mic channel silent, OR both channels
-    /// silent (`recordingSilentActive` paints both halves). Hoisted out of the
-    /// menu-bar body for the same type-check-budget reason as
-    /// `hasPermissionProblem` — reading two `channelHealth.*` flags through the
-    /// sub-controller inline is more than the body can afford on slow CI.
-    var micSilentOverlay: Bool {
-        channelHealth.micSilentOverlay
-    }
-
-    /// Menu-bar **bottom-half** red tint: app-audio channel silent, OR both
-    /// channels silent. See `micSilentOverlay`.
-    var appSilentOverlay: Bool {
-        channelHealth.appSilentOverlay
-    }
-
     // Internal (not private): also formats `postedAt` in the RPC snapshot
     // extension (AppState+RPC.swift), where file-private wouldn't reach.
     static let isoFormatter = ISO8601DateFormatter()
