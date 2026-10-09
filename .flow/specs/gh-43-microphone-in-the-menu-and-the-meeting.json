@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-43-mic-menu",
-  "completion_review_status": "needs_work",
-  "completion_reviewed_at": "2026-10-09T09:25:36.762065Z",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-09T09:30:28.058243Z",
   "created_at": "2026-10-06T20:29:21.055422Z",
   "default_impl": null,
   "default_review": null,
@@ -18,7 +18,7 @@
     "gh-43-microphone-in-the-menu-and-the-meeting.5": 0
   },
   "next_task": 1,
-  "plan_review_rounds": 1,
+  "plan_review_rounds": 0,
   "plan_review_status": "ship",
   "plan_reviewed_at": "2026-10-06T20:46:57.139649Z",
   "ready": true,
@@ -448,6 +448,50 @@
       "timestamp": "2026-10-09T09:25:36.723731Z",
       "tool_calls": 40,
       "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "17399a8fb5f3398c011aff8040b3773921f860218bbad0586a9cb766974ff9c2",
+      "backend": "codex",
+      "base_sha": "47c550ada129a452cc2922d9f24653bb3212b497",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-2615152b59c676e3b4bb1c0cc4d7ebd7",
+            "classification": "introduced",
+            "findingId": "finding-2615152b59c676e3b4bb1c0cc4d7ebd7",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "67f2b4d1af06f67fc5842b656d5728d16e77007e",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 3810,
+      "output_sha256": "24e079cfc24b14e87db67b8aaf8d6a871763d678c49b1930d2f13113816dee46",
+      "reservation_id": "e12155cd334a4ae591e23fc83e47eb43",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-09T09:30:28.017742Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -457,7 +501,7 @@
     "impl:gh-43-microphone-in-the-menu-and-the-meeting.4": 1,
     "impl:gh-43-microphone-in-the-menu-and-the-meeting.5": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -486,5 +530,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/43"
   },
-  "updated_at": "2026-10-09T09:25:36.765526Z"
+  "updated_at": "2026-10-09T09:30:28.060999Z"
 }
