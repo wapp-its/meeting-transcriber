@@ -436,13 +436,15 @@ class WatchLoop {
         // `enqueueRecording()` below are synchronous, so they run to completion
         // on the cancelled task, and nothing else can start a recording while
         // they do.
-        let cutAt = try await waitForMeetingEnd(meeting)
+        let cutAt = try await waitForMeetingEnd(meeting, storingCutsIn: (recorder, recordingStartedAt))
 
         // Stop recording
+        if cutAt == nil { clearStoredCut(of: recorder) }
         let stoppedAt = nowProvider()
         var recording = try recorder.stop()
         if let cutAt {
-            recording = cutBack(recording, to: cutAt, startedAt: recordingStartedAt, stoppedAt: stoppedAt)
+            recording = cutBack(recording, to: cutAt, startedAt: recordingStartedAt, stoppedAt: stoppedAt, recorder: recorder)
+            clearStoredCut(of: recorder)
         }
 
         // --- Enqueue for background processing ---
