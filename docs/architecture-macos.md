@@ -90,7 +90,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 |------|------|
 | `AppLauncher.swift` | The actual `@main` — a process entry point that makes the one pre-launch diversion decision (e.g. `--localvqe-selftest`) before `MeetingTranscriberApp`/`AppState` construct, since a conforming `App` type cannot intercept its own launch |
 | `MeetingTranscriberApp.swift` | UI shell — SwiftUI scenes, windows, NSOpenPanel, NSWorkspace. Observes `.showSettings` / `.closeSettings` / `.showSpeakerNaming` notifications for RPC- and pipeline-driven scene control |
-| `AppState.swift` | `@Observable @MainActor` composition root — wires the concern controllers (`engines`, `watching`, `pipeline`, `permissions`, `channelHealth`, `liveTranscription`, `rpcController`) and exposes the derived UI state (badge, status label) rather than owning it |
+| `AppState.swift` | `@Observable @MainActor` composition root — wires the concern controllers (`engines`, `watching`, `pipeline`, `permissions`, `channelHealth`, `microphone`, `liveTranscription`, `rpcController`) and exposes the derived UI state (badge, status label) rather than owning it |
 | `AppState+Microphone.swift` | The menu-bar body's accessors for the recording's microphone and app-audio channels (the two red tints), split out of `AppState.swift` at its line cap |
 | `LivenessMarker.swift` | Process-lifetime marker (issue #703): written at launch, touched once a minute, removed by a clean AppKit quit; the next launch reads it as `PreviousExit` to tell a crash, kill or power loss from a quit, which the per-recording marker cannot do for an idle app |
 | `PreviousExitNotice.swift` | Wording of the launch-time notification for a run that ended without a quit: the window in which nothing was watching for meetings |
@@ -244,6 +244,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `AudioCapturing.swift` | The part of `AudioTapLib.AudioCaptureSession` one recording drives — the consumer-side protocol `DualSourceRecorder` depends on |
 | `DualSourceRecorder+BuildRecording.swift` | Turning a finished capture session into the files the pipeline consumes, split out of `DualSourceRecorder` |
 | `DualSourceRecorder+Microphone.swift` | The running recording's microphone device, whether a microphone track is being captured, and switching it to another device, forwarded to the capture session; the tapped process ids it reports beside them are stored in `DualSourceRecorder` for the recording's lifetime |
+| `MicrophoneController.swift` | `@Observable @MainActor` owner of "which microphone" state: attached to each recording on the same transitions as `ChannelHealthController`, it hands a changed `AppSettings.micDeviceUID` to the running recording (empty as System Default) and publishes the device the recording reports it captures from, refreshed once a second |
 | `RecordingSource.swift` | What a single recording captures (app PID + mic on/off), replacing an untyped tuple |
 | `ManualRecordingInfo.swift` | Info about a manually started recording session, as opposed to one a detector started |
 | `ManualRecordingRequest.swift` | What the user asked `WatchingController` to record by hand (app-picker vs. microphone-only) |
