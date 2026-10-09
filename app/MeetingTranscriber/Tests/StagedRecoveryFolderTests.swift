@@ -1,14 +1,16 @@
+import AVFoundation
 @testable import MeetingTranscriber
 import XCTest
 
-/// The staging recovery repairs WAV headers, re-mixes crashed recordings and
-/// deletes temporary files. All three write, so the folder it works in has to be
-/// the one the queue was built with and never the process-wide default: a
-/// controller built against a temp staging folder reaching into the real
-/// recordings folder is the hazard that injecting the folder exists to remove.
+/// The staging recovery repairs WAV headers, re-mixes crashed recordings,
+/// deletes temporary files and applies stored meeting-end cuts. All of them
+/// write, so the folder it works in has to be the one the queue was built with
+/// and never the process-wide default: a controller built against a temp
+/// staging folder reaching into the real recordings folder is the hazard that
+/// injecting the folder exists to remove.
 ///
-/// Only the repaired-header half is asserted, because it is the one with a
-/// visible result on a file this test created. There is deliberately no probe
+/// Only the repaired header and the cut are asserted, because they have a
+/// visible result on files these tests created. There is deliberately no probe
 /// that reverts the fix: that one would scan and rewrite the real recordings
 /// folder.
 @MainActor
@@ -45,5 +47,63 @@ final class StagedRecoveryFolderTests: XCTestCase {
             repaired,
             "the staging recovery did not touch the queue's staging folder, so it was working somewhere else",
         )
+    }
+
+    // MARK: - The stored meeting-end cut
+
+    /// A queue on a temp staging folder, wired to mocks.
+    private func makeQueue(staging: URL) throws -> PipelineQueue {
+        try PipelineQueue(
+            engine: MockEngine(),
+            diarizationFactory: { MockDiarization() },
+            protocolGeneratorFactory: { nil },
+            outputDir: makeTempDirectory(prefix: "StagedRecoveryOutput"),
+            logDir: makeTempDirectory(prefix: "StagedRecoveryLog"),
+            stagingDir: staging,
+        )
+    }
+
+    /// A stopped, uncut 25 s recording whose stored cut is placed by its
+    /// capture end: 12.999 968 75 s are kept. Placed again on the cut mix the
+    /// cut would keep under 10 s, so a second cut shows in the frame count.
+    private func recordingToCut() throws -> StagedRecordingFixture {
+        let fixture = try StagedRecordingFixture(dir: makeTempDirectory(prefix: "StagedRecoveryCut"))
+        try fixture.stoppedRecording(seconds: 25)
+        try fixture.storeCut(startedAt: -22, cutAt: -12.000_031_25)
+        return fixture
+    }
+
+    private let keptFrames: AVAudioFramePosition = 207_999
+
+    func testTheStoredCutIsAppliedInTheQueuesStagingFolder() async throws {
+        let fixture = try recordingToCut()
+        let recover = try XCTUnwrap(PipelineController.QueueEnvironment.production.recoverStagedRecordings)
+
+        try recover(makeQueue(staging: fixture.dir), false)
+        await PipelineController.stagedRecoveryPass?.value
+
+        for suffix in RecordingFileSuffix.all {
+            XCTAssertEqual(try fixture.frames(suffix), keptFrames, suffix)
+        }
+        XCTAssertFalse(fixture.storedCutExists)
+    }
+
+    /// A queue rebuilt while the previous pass still runs starts a second
+    /// pass on the same folder. It waits for the first, which has settled the
+    /// stored cut by then, so the recording is cut once and not deeper.
+    func testTwoPassesStartedBackToBackCutTheRecordingOnce() async throws {
+        let fixture = try recordingToCut()
+        let queue = try makeQueue(staging: fixture.dir)
+        let log = RecordingDiagnostics()
+
+        let first = PipelineController.startStagedRecovery(into: queue, levelBalance: false, diagnostics: log)
+        let second = PipelineController.startStagedRecovery(into: queue, levelBalance: false, diagnostics: log)
+        await first.value
+        await second.value
+
+        for suffix in RecordingFileSuffix.all {
+            XCTAssertEqual(try fixture.frames(suffix), keptFrames, suffix)
+        }
+        XCTAssertEqual(log.lines(.notice, startingWith: "recovered_cut applied"), ["recovered_cut applied removed_s=12 kept_s=13"])
     }
 }

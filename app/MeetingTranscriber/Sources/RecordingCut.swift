@@ -198,7 +198,7 @@ enum RecordingCut {
         var swapped: [(original: URL, backup: URL)] = []
         do {
             for entry in staged {
-                let backup = sibling(of: entry.original, suffix: "uncut")
+                let backup = backupURL(for: entry.original)
                 try? FileManager.default.removeItem(at: backup)
                 try FileManager.default.linkItem(at: entry.original, to: backup)
                 do {
@@ -229,6 +229,14 @@ enum RecordingCut {
         for entry in swapped {
             try? FileManager.default.removeItem(at: entry.backup)
         }
+    }
+
+    /// The second name a cut keeps a track's original under until every track
+    /// is swapped in, and where a failed rollback leaves it
+    /// (`CutError.rollbackIncomplete`). Recovery puts such an original back
+    /// on its path from here.
+    static func backupURL(for track: URL) -> URL {
+        sibling(of: track, suffix: "uncut")
     }
 
     /// A hidden file next to `url`. Hidden and with its own ending, so no scan

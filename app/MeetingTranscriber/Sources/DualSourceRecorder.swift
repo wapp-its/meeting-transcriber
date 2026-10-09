@@ -263,7 +263,9 @@ class DualSourceRecorder: RecordingProvider {
 
     /// When this stem's audio was last written, across whichever tracks exist,
     /// or nil when it has none (nothing to recover, and nothing to wait for).
-    nonisolated private static func lastTrackWrite(stem: String, in dir: URL) -> Date? {
+    /// Also where a recovered recording's stored cut takes its capture end
+    /// from (`RecoveredCut`).
+    nonisolated static func lastTrackWrite(stem: String, in dir: URL) -> Date? {
         let fm = FileManager.default
         let candidates = RecordingFileSuffix.appRawAny.map { stem + $0 } + [stem + RecordingFileSuffix.mic]
         return candidates
