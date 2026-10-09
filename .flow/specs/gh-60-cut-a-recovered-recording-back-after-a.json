@@ -1,14 +1,19 @@
 {
   "branch_name": "feat/gh-60-recovered-cut",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-09T02:48:29.610761Z",
   "created_at": "2026-10-06T22:37:30.592359Z",
   "default_impl": null,
   "default_review": null,
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-60-cut-a-recovered-recording-back-after-a",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-60-cut-a-recovered-recording-back-after-a.1": 0,
+    "gh-60-cut-a-recovered-recording-back-after-a.2": 0,
+    "gh-60-cut-a-recovered-recording-back-after-a.3": 0,
+    "gh-60-cut-a-recovered-recording-back-after-a.4": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -315,31 +320,455 @@
       "task": null,
       "timestamp": "2026-10-06T23:15:57.503732Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "a2df587c710f40847501d483d1bfb1a735b3a5409532a4fab762607f5f9cb8f1",
+      "backend": "codex",
+      "base_sha": "eaf4eb65fc6055f86672563a808f41971030a94c",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "d2db03e16cd4206f96c5c75e9987f7040002cd52",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1146,
+      "output_sha256": "483dff7c6e0cffa5356815e6d41d2920bcdc7b2bebc9a50aa6668a382056dc5b",
+      "reservation_id": "6845f8195e754287b5931ebca1371893",
+      "round_consumed": true,
+      "scope": "impl:gh-60-cut-a-recovered-recording-back-after-a.1",
+      "superseded_by": null,
+      "task": "gh-60-cut-a-recovered-recording-back-after-a.1",
+      "timestamp": "2026-10-09T00:26:42.103393Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "82fc3be13f89932350acd9da48b0df0e56c56a09904fa64090b39f32c05eec14",
+      "backend": "codex",
+      "base_sha": "cf248d4fd120cdd11834ffab4c413869150509c9",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-4a13e2894fba11729a17efe489b12651",
+            "classification": "introduced",
+            "findingId": "finding-4a13e2894fba11729a17efe489b12651",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-f999a4da112ab5aff453a36f9bebff34",
+            "classification": "introduced",
+            "findingId": "finding-f999a4da112ab5aff453a36f9bebff34",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-15252eb6afe295faec6e46972e05ff50",
+            "classification": "introduced",
+            "findingId": "finding-15252eb6afe295faec6e46972e05ff50",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-dfbbca4aa08a668ab47ba273575f9d17",
+            "classification": "introduced",
+            "findingId": "finding-dfbbca4aa08a668ab47ba273575f9d17",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "c3eb6db70558a308744c3c95f6b870afad48afc1",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 3953,
+      "output_sha256": "ad6f4a316bc0d8707647308bfe252ffba27547329a0f22fd9ede4e5d82e4b174",
+      "reservation_id": "8f5c2c60a0ff4f0da1f509eff10dd59a",
+      "round_consumed": true,
+      "scope": "impl:gh-60-cut-a-recovered-recording-back-after-a.4",
+      "superseded_by": null,
+      "task": "gh-60-cut-a-recovered-recording-back-after-a.4",
+      "timestamp": "2026-10-09T01:09:16.709231Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "11f07df75418f1258a424a38bda21dfdadfb4ec34b4c1fa0f76148b100f4e136",
+      "backend": "codex",
+      "base_sha": "cf248d4fd120cdd11834ffab4c413869150509c9",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-4a13e2894fba11729a17efe489b12651",
+            "classification": "introduced",
+            "findingId": "finding-4a13e2894fba11729a17efe489b12651",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "not_fixed"
+          },
+          {
+            "chainRoot": "finding-f999a4da112ab5aff453a36f9bebff34",
+            "classification": "introduced",
+            "findingId": "finding-f999a4da112ab5aff453a36f9bebff34",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-8049212b85ee0dde4e0173612ce60bc9",
+            "classification": "introduced",
+            "findingId": "finding-8049212b85ee0dde4e0173612ce60bc9",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-15252eb6afe295faec6e46972e05ff50",
+            "classification": "introduced",
+            "findingId": "finding-15252eb6afe295faec6e46972e05ff50",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "withdrawn"
+          },
+          {
+            "chainRoot": "finding-dfbbca4aa08a668ab47ba273575f9d17",
+            "classification": "introduced",
+            "findingId": "finding-dfbbca4aa08a668ab47ba273575f9d17",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "a81226f8ccd3110164eacc57e96638c7a1e9ed57",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1974,
+      "output_sha256": "63d104abee63a8fc2b837a820f5571a34f8ecd86bdc2069c48dbe6cc6059af6c",
+      "reservation_id": "f1b6958fbdc04fe6a1fe38f2aed19586",
+      "round_consumed": true,
+      "scope": "impl:gh-60-cut-a-recovered-recording-back-after-a.4",
+      "superseded_by": null,
+      "task": "gh-60-cut-a-recovered-recording-back-after-a.4",
+      "timestamp": "2026-10-09T01:18:14.449702Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "f6df707c446abf911caf05c7da23c1c2e87f6c2e03e3fb937e460d143a47186d",
+      "backend": "codex",
+      "base_sha": "cf248d4fd120cdd11834ffab4c413869150509c9",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-4a13e2894fba11729a17efe489b12651",
+            "classification": "introduced",
+            "findingId": "finding-4a13e2894fba11729a17efe489b12651",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-f999a4da112ab5aff453a36f9bebff34",
+            "classification": "introduced",
+            "findingId": "finding-f999a4da112ab5aff453a36f9bebff34",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-8049212b85ee0dde4e0173612ce60bc9",
+            "classification": "introduced",
+            "findingId": "finding-8049212b85ee0dde4e0173612ce60bc9",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-15252eb6afe295faec6e46972e05ff50",
+            "classification": "introduced",
+            "findingId": "finding-15252eb6afe295faec6e46972e05ff50",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "withdrawn"
+          },
+          {
+            "chainRoot": "finding-dfbbca4aa08a668ab47ba273575f9d17",
+            "classification": "introduced",
+            "findingId": "finding-dfbbca4aa08a668ab47ba273575f9d17",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "8f868a91dfe8120eaa55cc7aef630095f1a9b93c",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 952,
+      "output_sha256": "2f3ba90323ea19bb86967c856b6860768567c64140ccd63fd7ee8a24ebde7f5c",
+      "reservation_id": "4fbee46512904dc5b4e51b9bdb0769fe",
+      "round_consumed": true,
+      "scope": "impl:gh-60-cut-a-recovered-recording-back-after-a.4",
+      "superseded_by": null,
+      "task": "gh-60-cut-a-recovered-recording-back-after-a.4",
+      "timestamp": "2026-10-09T01:26:46.450729Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "eae68070c15f18524f445ef4868bd53824201603f93f714c2be3c6c4c3e8c810",
+      "backend": "codex",
+      "base_sha": "13e8f610c77accba0e2e783cd0aeae627aa86001",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "4ab0a4d97821bbb61066e624b1c81b433bd5eb00",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 927,
+      "output_sha256": "acb1f92a65361a189bc758a7723b453383e5dc180e6de92001495a7ca9b9f48f",
+      "reservation_id": "7a7f49daf50449cfb28d9c3b4b3f440f",
+      "round_consumed": true,
+      "scope": "impl:gh-60-cut-a-recovered-recording-back-after-a.2",
+      "superseded_by": null,
+      "task": "gh-60-cut-a-recovered-recording-back-after-a.2",
+      "timestamp": "2026-10-09T02:03:14.325196Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "9d8bfe83b9f7809274c0d771205a65d8636880fa590b5871916c0d4cc8306919",
+      "backend": "codex",
+      "base_sha": "c21e0ea33a0a6c328296bf1b941a176cce0dbfc2",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "f8e765f736441e35111a3574269217bab941459d",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "e369512a17494158b244458b8cbf7233",
+      "round_consumed": true,
+      "scope": "impl:gh-60-cut-a-recovered-recording-back-after-a.3",
+      "superseded_by": null,
+      "task": "gh-60-cut-a-recovered-recording-back-after-a.3",
+      "timestamp": "2026-10-09T02:33:25.215366Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "babfd29357599f8c02962434f9d3597b84a65f6fbe4e9e2bf29efc00fe101b28",
+      "backend": "codex",
+      "base_sha": "47c550ada129a452cc2922d9f24653bb3212b497",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-86f1d1bfc73675cb46ad95bcff785a6f",
+            "classification": "introduced",
+            "findingId": "finding-86f1d1bfc73675cb46ad95bcff785a6f",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "17bc9bb7294331929fe0e4f150e8482d180de86f",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 567663,
+      "output_sha256": "d5101daf292558f3e49c14eb5d210e3b735997f64cb9fc6f19465b505008b550",
+      "reservation_id": "b4903fcb1b1e481cb2ef528af36243ba",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-09T02:42:23.884198Z",
+      "tool_calls": 34,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "d8215de2400e146ea3616616bc6bb0eff3da5ef308f704bca38abb7226b8201d",
+      "backend": "codex",
+      "base_sha": "47c550ada129a452cc2922d9f24653bb3212b497",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-86f1d1bfc73675cb46ad95bcff785a6f",
+            "classification": "introduced",
+            "findingId": "finding-86f1d1bfc73675cb46ad95bcff785a6f",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "07865caa420c9b633a18fea2459750202bfc09f0",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 5500,
+      "output_sha256": "a276fd0bab1aa30dfc0e4ee37e6ec639a271de18e9c22063a5b1c2e8f1c4d717",
+      "reservation_id": "09807212b2394c4f8f626a8218051cdb",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-09T02:48:29.576826Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-60-cut-a-recovered-recording-back-after-a.1": 1,
+    "impl:gh-60-cut-a-recovered-recording-back-after-a.2": 1,
+    "impl:gh-60-cut-a-recovered-recording-back-after-a.3": 1,
+    "impl:gh-60-cut-a-recovered-recording-back-after-a.4": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-60-cut-a-recovered-recording-back-after-a.1": 0,
+    "impl:gh-60-cut-a-recovered-recording-back-after-a.2": 0,
+    "impl:gh-60-cut-a-recovered-recording-back-after-a.3": 0,
+    "impl:gh-60-cut-a-recovered-recording-back-after-a.4": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-60-cut-a-recovered-recording-back-after-a.md",
-  "status": "open",
+  "status": "done",
   "title": "Cut a recovered recording back after a crash during the countdown",
   "tracker": {
-    "baseHashFlow": "1db8107491204296b68fa83b3105249fef865417e37f58be41c7630f0c26763c",
+    "baseHashFlow": "53e2c6580c48e654785e36a3d135a9645dbc1200a9bd2d0cfaa3fcbc273d5000",
     "baseHashTracker": "d712bdae38da2ff18a0a0c77f903684eecdd04c37b796536a1ce9b36c145ffe2",
     "depRelations": [],
     "id": "I_kwDOUvyDOc8AAAABVdjRfw",
     "identifier": "#60",
-    "lastSyncedAt": "2026-10-06T22:37:44.728899Z",
+    "lastSyncedAt": "2026-10-09T03:01:42.945517Z",
     "linkState": "linked",
-    "mergeBaseFlow": "# Cut a recovered recording back when the app died during the meeting-end countdown\n\n## Conversation Evidence\n\n> issue #60 (filed 2026-10-06 from the gh-54 build): \"St\u00fcrzt die App ab oder wird sie beendet, w\u00e4hrend der 2-Minuten-Countdown aus #54 l\u00e4uft, holt die Wiederherstellung beim n\u00e4chsten Start die Aufnahme **ungeschnitten** zur\u00fcck. Damit landen die Countdown-Minuten (Raumaudio nach dem Meeting) doch im Transkript und Protokoll, entgegen der Entscheidung in #54\"\n> issue #60, Wunsch: \"Den ausstehenden Schnittpunkt neben der Markierung der laufenden Aufnahme speichern, sobald der Countdown beginnt, und bei der Wiederherstellung anwenden; nach \u201eWeiter aufnehmen\u201c oder zur\u00fcckkehrendem Signal wieder entfernen.\"\n> user (2026-10-07, selected): \"A \u2014 Spec #60 + #73 now (Recommended)\"\n\n## Goal & Context\n\nSince gh-54, a detected meeting whose signal disappears is not stopped at once: the app asks \"Meeting seems to have ended\" and records on for up to 2 minutes. If nobody answers, the saved recording is cut back to where the old automatic stop would have ended it (signal loss plus end grace), so the room audio recorded while asking is neither kept nor transcribed (owner decision D2 of gh-54). That guarantee holds only when the app is still running at the end of the countdown. If it crashes, is force-quit, loses power or is quit normally while the question is open, the next launch recovers the in-progress recording uncut, and the countdown minutes reach the transcript and protocol after all. This spec makes the cut point survive the process. [paraphrase]\n\n<!-- Source: 30% user / 50% [paraphrase] / 20% [inferred] -->\n\n## Architecture & Data Models\n\n- The pending cut point is a fact about one in-progress recording, so it is stored with that recording's in-progress state, written when the meeting-end question opens and removed when the question is settled without a cut. [paraphrase]\n- Recovery of an interrupted recording reads it and applies the same all-or-nothing cut gh-54 uses for an unanswered countdown, before the recording is queued. [inferred]\n\n## Edge Cases & Constraints\n\n- A stored cut point that belongs to another recording, or that cannot be read, is never applied; the recording is recovered uncut and the fact is logged. [inferred]\n- A cut point stored during a countdown whose signal then returned, or that the person answered with \"Keep recording\", must already be gone when a crash follows, so the whole recording is recovered. [paraphrase]\n\n## Acceptance Criteria\n\n- **R1:** When the meeting-end question opens, the pending cut point is stored durably with the recording in progress before the countdown starts. Errors: a failed write is logged and the countdown proceeds as today (no worse than before this spec). [paraphrase]\n- **R2:** When the app ends for any reason while the question is open, the next launch's recovery cuts the recovered recording back to the stored cut point before it is processed, with the same result as an unanswered countdown: every saved track cut at the same point, and a record-only sidecar's stop time at the cut. Errors: if the cut fails, the recording is processed uncut and the failure is logged; the recording is never discarded. [paraphrase]\n- **R3:** \"Keep recording\" and a returning signal remove the stored cut point durably, so a crash afterwards recovers the whole recording. Errors: a failed removal is logged; recovery must then not cut a recording whose question was settled with Keep or a returning signal. [paraphrase]\n- **R4:** Every normal end of the recording (countdown expiry, \"Stop now\", Stop Watching, the 4-hour cap) leaves no stored cut point behind once the recording is finalized. Errors: no error surface beyond R3's logging. [inferred]\n- **R5:** Recovery logs whether it applied a stored cut point, with the length of audio removed, and never meeting content. Errors: no error surface beyond the log write. [inferred]\n\n## Boundaries\n\n- The live countdown, its notification and its answers stay exactly as gh-54 built them; this spec only adds persistence and its use at recovery. [inferred]\n- Recordings started manually have no meeting-end question and are untouched. [inferred]\n\n## Decision Context\n\n- **D1 \u00b7 An unanswered countdown cuts the recording back to signal loss plus end grace, and this holds across a crash.** why: owner decision D2 of gh-54 (room audio after a meeting is neither kept nor transcribed) would otherwise fail exactly when the app dies during the 2 minutes. \u00b7 status: active [owner-ratified 2026-10-07]\n- **A1 \u00b7 A cut point whose removal failed after \"Keep recording\" must not be applied at recovery.** flip at: plan finds the removal cannot fail independently of the recording's own state \u00b7 test: R3's error case \u00b7 status: active [agent-assumed 2026-10-07]\n",
+    "mergeBaseFlow": "# Cut a recovered recording back when the app died during the meeting-end countdown\n\n## Conversation Evidence\n\n> issue #60 (filed 2026-10-06 from the gh-54 build): \"St\u00fcrzt die App ab oder wird sie beendet, w\u00e4hrend der 2-Minuten-Countdown aus #54 l\u00e4uft, holt die Wiederherstellung beim n\u00e4chsten Start die Aufnahme **ungeschnitten** zur\u00fcck. Damit landen die Countdown-Minuten (Raumaudio nach dem Meeting) doch im Transkript und Protokoll, entgegen der Entscheidung in #54\"\n> issue #60, Wunsch: \"Den ausstehenden Schnittpunkt neben der Markierung der laufenden Aufnahme speichern, sobald der Countdown beginnt, und bei der Wiederherstellung anwenden; nach \u201eWeiter aufnehmen\u201c oder zur\u00fcckkehrendem Signal wieder entfernen.\"\n> issue #60, Abnahme: \"Countdown l\u00e4uft, App wird hart beendet \u2192 nach Neustart wird die Aufnahme verarbeitet und endet am selben Punkt wie bei abgelaufenem Countdown.\"\n> user (2026-10-07, selected): \"A \u2014 Spec #60 + #73 now (Recommended)\"\n\n## Goal & Context\n\nSince gh-54, a detected meeting whose signal disappears is not stopped at once: the app asks \"Meeting seems to have ended\" and records on for up to 2 minutes. If nobody answers, the saved recording is cut back to where the old automatic stop would have ended it (signal loss plus end grace), so the room audio recorded while asking is neither kept nor transcribed (owner decision D2 of gh-54). That guarantee holds only when the app is still running at the end of the countdown. If it crashes, is force-quit, loses power or is quit normally while the question is open, the next launch recovers the in-progress recording uncut, and the countdown minutes reach the transcript and protocol after all. This spec makes the cut point survive the process. [paraphrase]\n\nA normal quit does not stop the recorder today (the app ends the recording abruptly and leaves it to the next launch's recovery), so every one of these endings reaches the same recovery path.\n\n<!-- Source: 30% user / 50% [paraphrase] / 20% [inferred] -->\n\n## Architecture & Data Models\n\n- **The pending cut is a fact about one in-progress recording**, so it is stored with that recording's in-progress state: a small owner-only file in the recordings staging folder beside the recording's in-progress marker, named by and carrying the recording's stem. It is written when the meeting-end question opens, before the question is posted, and replaced whole (atomically) if a later question opens in the same recording. [paraphrase]\n- **Every change to it is durable, not only atomic**, so it survives a power loss as well as a process death: a write goes to a temporary file that is fully synced to the disk, renamed over the target, and then the folder is synced; a removal unlinks the file and syncs the folder; the fallback that empties a file it could not remove truncates it and fully syncs it. A sync that fails makes the whole operation report failure, and the caller logs it as it logs any other failure of that operation. A write reports one of three outcomes: written; not published (it failed before the rename, so whatever was there before is untouched); or published but not synced (the new record is in place, only the folder sync failed). Because a failed write may still have published its record, the recorder remembers the stem and holds it **before** it writes, whatever the outcome, so a later Keep, returning signal or stop clears that record like any other. A removal likewise reports removed, removed but not synced, emptied, or failed.\n- **It is its own file, not content in the in-progress marker.** The recorder removes the marker as soon as the stopped recording's mix exists, which is before the live cut runs, so a cut stored in the marker would vanish exactly in the window between stop and cut. The marker's age also anchors the reaping of dead markers, and rewriting it would change that age. Its name ends in neither `.wav` nor any audio-track suffix, so no scan of the staging folder (orphan scan, header repair, crash detection) mistakes it for a track or a crash signal.\n- **Record shape** (these fields are the contract; nothing else is stored):\n\n  | Field | Meaning |\n  |---|---|\n  | `version` | record format, `1` |\n  | `stem` | the recording's stem, compared with the file's own name on read |\n  | `cutAt` | the cut point gh-54 computed (signal loss plus end grace), wall clock |\n  | `startedAt` | when the loop saw capture running, the origin gh-54's live cut measures from, wall clock |\n  | `deadline` | when the countdown would end the recording unanswered, wall clock |\n  | `captureEndedAt` | optional: when capture stopped, wall clock; set by the live stop or by the first recovery pass that sees the record, never changed afterwards |\n  | `keptSeconds` | optional: the resolved cut on the recording's own timeline, seconds from its first frame; set before any track is cut, never changed afterwards |\n\n  A record is valid only when its version is known, its stem matches the file name, `startedAt \u2264 cutAt \u2264 deadline`, and `keptSeconds`, when present, is positive.\n- **Who writes and removes it.** The recorder owns the staging folder and the stem, so writing, updating and removing go through the recorder seam the watch loop already holds; the watch loop decides when. Settling the question without a cut (Keep recording, a returning signal) removes it. A stop that carries no cut (the question was settled, including by a Keep that arrived just before Stop Watching or together with the 4-hour cap) removes it **before** the recorder stops, so a stop that then fails can never hand a settled question's cut to recovery. A stop that carries a cut keeps it through the recorder's stop and removes it after the cut was applied or failed. A cut-carrying stop whose recording could not be finalized keeps it, because that recording's marker also survives for recovery.\n- **The resolved cut is recorded before any track changes.** gh-54's placement reads the mix's current length, which the cut itself shortens, so computing it a second time on an already (or partly) cut recording would cut deeper. The live stop therefore writes `keptSeconds` and `captureEndedAt` into the stored cut before it cuts, and recovery writes `keptSeconds` before it cuts; whoever finds `keptSeconds` present applies exactly that and never recomputes it, so a cut interrupted or completed before the file's removal is finished, never deepened.\n- **This process's hold.** While a recording of this process has a stored cut that its stop sequence has not settled yet (the recording is live, or stopped and not yet cut), the stem is held in a process-wide set. A stop that could not finalize its recording releases the hold, handing the stored cut to recovery with the marker. Recovery also runs on queue rebuilds while this process may be recording; it leaves held stored cuts alone and treats every other one as its own. No clock is involved in this decision.\n- **One recovery pass at a time.** Staged recovery passes are serialized process-wide: a pass started while another is still running (a queue rebuilt by stopping and restarting watching) waits until the earlier one has finished, orphan scan included. No two passes ever cut, restore or queue the same recording concurrently, and the cut's fixed working-file names are never shared between two cuts.\n- **Recovery applies it before the recording is queued.** The launch recovery of staged recordings first collects the stored cuts that are not held. For each one without `captureEndedAt` it reads when the recording's capture files were last written and stores that in the record, before it repairs headers or re-mixes anything (both rewrite the track files and move their modification times, and the re-mix creates files that did not exist during capture), so a later pass interrupted after the re-mix still has the original evidence. Once crashed recordings are re-mixed, for each collected recording it first puts back any original track (mix, app or microphone) that an earlier cut's rollback left under its hidden backup name while the track's own path is missing, whether or not a mix is present at that moment; only after that does it judge the recording (no mix but a marker: wait; no mix, no marker and no hidden original: stale). Then, for a recording that has a mix, it uses the stored `keptSeconds` if present, or else decides (below) and stores `keptSeconds` first, and cuts with gh-54's all-or-nothing cut; only then does the orphan scan queue it. Placement on the recovered audio uses gh-54's two-estimate rule (`RecordingCut.keptSeconds`, the later of \"from the start\" and \"from the end\" wins) with `captureEndedAt` as the stop time. That time is the last write of the files written during capture (the raw app temp and the microphone track, or, for an app-only recording stopped by the recorder before the crash, the app track; never the mix or the cut's hidden working files). It trails the audio's real end by the file write latency (well under a second), so the recovered cut can land up to that much before the live one would have, inside the end grace period (at least 1 s), never before the signal was lost. The recovered tracks are aligned at their file starts (the recovered job carries no microphone delay), so all of them are cut at the same timeline point.\n- **A stored cut is only applied when its recording evidently ended inside the countdown.** This check runs only while `keptSeconds` is absent (a present one was resolved by a cut-carrying stop or an earlier pass). The countdown ends an unanswered recording at its deadline; a recording whose capture ended (`captureEndedAt`) more than a tolerance after the deadline was kept (Keep recording or a returning signal), so a stored cut that survived its removal is refused there instead of cutting a meeting that went on. The tolerance is 5 minutes: it covers the whole stop sequence of a recording up to the 4-hour cap (the poll after the deadline, the recorder's stop and mix build, and the live cut's copying), with margin.\n\n```mermaid\nflowchart LR\n  Q[Question opens] -->|write + hold| F[(pending cut file<br/>beside marker)]\n  K[Keep / signal returns /<br/>stop without cut] -->|remove| F\n  S[Stop with cut] -->|store keptSeconds, cut, remove| F\n  C[Crash / quit during question] --> L[Next launch recovery,<br/>one pass at a time]\n  L -->|collect unheld, store captureEndedAt<br/>before header repair| F\n  L --> R[Re-mix crashed recording]\n  R --> D{keptSeconds stored, or ended<br/>within deadline plus tolerance?}\n  D -->|yes| X[Store keptSeconds, cut every track] --> O[Orphan scan queues it]\n  D -->|no| U[Leave uncut, log] --> O\n```\n\n## Edge Cases & Constraints\n\n- A stored cut that belongs to another recording (its stem differs from its file name), that cannot be read or decoded, that has an unknown version or whose times are out of order is never applied; the recording is recovered uncut, the file is removed and the fact is logged.\n- A cut point stored during a countdown whose signal then returned, or that the person answered with \"Keep recording\", must already be gone when a crash follows, so the whole recording is recovered. A failed removal falls back to emptying the file (an empty file never decodes, so it is never applied) and is logged; recovery also refuses any stored cut whose recording ran on past the deadline plus the tolerance. What remains possible is a removal and its fallback both failing and the app dying before the original deadline plus tolerance: both fail only when the staging folder has become unwritable, which also breaks the recording itself (A6). [paraphrase]\n- The crash can fall between the recorder's stop (mix written, marker removed) and the live cut. The recording then has a mix and no marker, so only the orphan scan sees it; the stored cut must still be applied, which is why it outlives the stop and why recovery looks for stored cuts directly rather than only beside surviving markers.\n- A crash after the live cut (or a recovery cut) but before the file's removal leaves an already cut recording with its stored cut and its `keptSeconds`; applying that same `keptSeconds` again leaves tracks that already end there as they are. The same holds when the crash fell inside the cut's swap and left some tracks cut and others not: re-applying the stored `keptSeconds` brings the rest to the same point. This holds when capture began before the loop saw it running, where recomputing would cut deeper.\n- If writing `keptSeconds` fails, the cut still goes ahead (logged); a crash before the stored cut's removal then lets recovery recompute it from the shortened mix, which can remove up to the audio recorded before capture was reported running (normally well under a second, inside the end grace). This needs two failures and is accepted (A7).\n- An app-only recording recovered in a pass that dies after the re-mix but before the cut: the next pass reads `captureEndedAt` from the record, not from the app track the re-mix just wrote, so it neither refuses the cut as \"ran past the deadline\" nor misplaces it.\n- A stored cut whose recording has no mix yet but still has its in-progress marker is kept for a later recovery attempt (the re-mix failed this time). Hidden originals are put back before this judgment, so a mix that an earlier failed rollback left under its backup name counts as present once restored, and as not stale while it cannot be restored (the stored cut is then kept). Only a recording with no mix, no marker and no hidden original left is stale; its stored cut is removed and logged.\n- A store whose record was published but whose folder sync failed is logged as a failed write, and the record is still cleared by a later Keep, returning signal or stop, because the recorder took the stem before writing; recovery after such a Keep finds nothing to apply.\n- A cut that fails at recovery leaves the originals in place and the recording is queued uncut (R2's error case). If the cut's own rollback could not put an original back on its path, recovery moves it back from its hidden backup name before the orphan scan runs, so the scan still finds the recording. If that also fails, the stored cut is kept (the recording is not settled), the recording stays on disk under the backup name, the failure is logged, and every later pass first tries the restore again; the recording is never discarded, and it is queued once its tracks are back.\n- A stored cut that would keep nothing (cut point at or before the audio's start) is refused by the cut as on the live path, and the recording is queued uncut.\n- The orphan scan only queues recordings younger than 24 hours; a recording recovered later is still cut (its countdown minutes are not kept) but, as today, not queued.\n- Clock: all stored times are wall clock, like gh-54's live cut. A clock step between the question and the recovery can move the estimate; the two-estimate rule then keeps more audio rather than less, and the deadline check errs toward leaving the recording uncut.\n- Microphone-only and app-only recordings: the cut works with whichever tracks exist, as gh-54's does.\n- Several recordings with stored cuts are handled one by one; one failing never blocks the others.\n- Pause and resume (gh-46, planned): a recording paused during the meeting has less audio than wall-clock time, so the \"from the start\" estimate lands later on the audio and keeps more, never less; gh-60 does not depend on gh-46, and whichever lands second keeps the stored record consistent with how the live cut is placed.\n- Privacy: the file holds times and the stem only, is owner-only like the recordings, and no log line carries the stem, a title or any meeting content.\n\n## Acceptance Criteria\n\n- **R1:** When the meeting-end question opens, the pending cut point is stored durably with the recording in progress before the question is posted and the countdown runs. Errors: a failed write is logged (error domain and code, no path) and the countdown proceeds as today (no worse than before this spec); a write that published its record but could not sync it is logged the same way and its record is still cleared by a later Keep, returning signal or stop. [paraphrase]\n- **R2:** When the app ends for any reason while the question is open, the next launch's recovery cuts the recovered recording back to the stored cut point before it is processed, with the same result as an unanswered countdown: every saved track cut at the same point on the recording's timeline, placed by the live cut's two-estimate rule with the capture files' last write standing in for the stop (so on an ordinary recording it lands within a second of where the live cut would, inside the end grace period), and, where the recovered recording produces a record-only sidecar, its stop time at the cut (recovery produces none today; see Boundaries). Errors: if the cut fails, the recording is processed uncut and the failure is logged; the recording is never discarded (an original the cut could not put back is restored by recovery, and retried on every later pass until it is). A cut interrupted or already completed before a crash is finished at the same point on recovery, never cut deeper. [paraphrase]\n- **R3:** \"Keep recording\" and a returning signal remove the stored cut point durably, so a crash afterwards recovers the whole recording. Errors: a failed removal is logged; recovery must then not cut a recording whose question was settled with Keep or a returning signal (see Edge Cases for the guards and the one remaining double-failure case). [paraphrase]\n- **R4:** Every normal end of the recording (countdown expiry, \"Stop now\", Stop Watching, the 4-hour cap, and an end after \"Keep recording\") leaves no stored cut point behind once the recording is finalized, whether its cut succeeded, failed or was not needed; a stop that carries no cut removes it before the recorder stops. Errors: a cut-carrying stop whose recording could not be finalized keeps the stored cut and releases it to recovery; a failed removal is logged as in R3.\n- **R5:** Recovery writes one line to the app's diagnostic log (the same sink as gh-54's stop lines) for every stored cut it settles: applied (with the seconds of audio removed and kept), refused (with the reason: unreadable, another recording, ran past the deadline, no known capture end, nothing to keep, stale), or failed (error domain and code, including an original that could not be restored). No line carries the recording's stem, a meeting title, participant names or transcript content. Errors: no error surface beyond the log write.\n\n## Early proof point\n\nTask gh-60-cut-a-recovered-recording-back-after-a.4 validates the core approach (a stored cut, collected at launch recovery before headers are repaired, places the cut on a re-mixed crashed recording at the point the live countdown would have cut, refuses one whose recording ran on past the deadline, and finishes an interrupted cut at the same point). It builds only on the stored-cut record of gh-60-cut-a-recovered-recording-back-after-a.1. If it fails, re-evaluate where the stop time comes from at recovery (stored progress instead of file modification times) before continuing with gh-60-cut-a-recovered-recording-back-after-a.2 and .3.\n\n## Boundaries\n\n- The live countdown, its notification and its answers stay exactly as gh-54 built them; this spec only adds persistence and its use at recovery.\n- Recordings started manually have no meeting-end question and are untouched.\n- Recovery keeps queuing every recovered recording for processing, record-only mode included, and writes no record-only sidecar; making a crash-recovered recording honour record-only mode is a separate, pre-existing gap and not part of this spec.\n- A crash in the middle of the live cut itself is gh-54's territory beyond what Edge Cases says (the hidden working files it may leave are not cleaned up here).\n- No live end-to-end lane that kills the app during a countdown is added here; the behaviour is proven with WAV-fixture tests through the real recovery entry point.\n- `CLAUDE.md` is not edited (fork rule); the architecture doc gets the new file and the recovery step.\n\n## Decision Context\n\n- **D1 \u00b7 An unanswered countdown cuts the recording back to signal loss plus end grace, and this holds across a crash.** why: owner decision D2 of gh-54 (room audio after a meeting is neither kept nor transcribed) would otherwise fail exactly when the app dies during the 2 minutes. \u00b7 status: active [owner-ratified 2026-10-07]\n- **A1 \u00b7 A cut point whose removal failed after \"Keep recording\" must not be applied at recovery.** flip at: plan finds the removal cannot fail independently of the recording's own state \u00b7 test: R3's error case \u00b7 status: superseded by A6 [agent-assumed 2026-10-07]\n- **A2 \u00b7 The pending cut is its own owner-only file beside the in-progress marker, not content inside the marker.** flip at: the recorder stops removing the marker before the live cut runs \u00b7 test: a crash between stop and cut still recovers a cut recording \u00b7 alternatives: marker content, rejected because stop removes the marker before the cut and its age anchors marker reaping \u00b7 status: active [agent-inferred 2026-10-07]\n- **A3 \u00b7 Recovery applies a stored cut only when the recording's capture files stopped being written no later than the countdown deadline plus 5 minutes.** flip at: the owner prefers cutting even when the recording ran on \u00b7 test: a stored cut beside a recording that ran past the deadline plus tolerance is refused and logged \u00b7 status: active [agent-assumed 2026-10-07]\n- **A4 \u00b7 Recovery skips a stored cut while this process still holds it (its recording is live, or stopped and not yet settled) and treats every other one as its own.** flip at: recovery stops running during this process's recordings \u00b7 test: a recovery pass during a live countdown leaves the stored cut untouched; one after a failed stop applies it \u00b7 alternatives: \"written before this process started\" by modification time, rejected because a clock step can misjudge it and a failed stop's cut would wait for the next launch \u00b7 status: active [agent-inferred 2026-10-07]\n- **A5 \u00b7 Recovery writes no record-only sidecar, so R2's sidecar clause has nothing to act on there; a recovered recording is processed in every mode, as today.** flip at: the owner wants crash-recovered recordings to honour record-only mode (separate issue) \u00b7 test: no recovery code path writes a sidecar \u00b7 status: active [agent-inferred 2026-10-07]\n- **A6 \u00b7 A failed removal after \"Keep recording\" or a returning signal is covered by emptying the file and by A3's deadline check; the remaining case (removal and emptying both fail, then the app dies before the deadline plus tolerance) is accepted.** flip at: the owner requires no residual case at all \u00b7 test: a removal failure empties the file and logs; a stored cut beside a recording that ran past the deadline plus tolerance is refused \u00b7 status: active [agent-inferred 2026-10-07]\n- **A7 \u00b7 If writing the resolved `keptSeconds` fails, the cut still goes ahead; a later crash before the stored cut's removal can then let recovery recompute it from the shortened mix and remove up to the audio recorded before capture was reported running.** flip at: the owner wants the cut skipped whenever its resolution cannot be stored \u00b7 test: a forced `keptSeconds` write failure logs and still cuts \u00b7 alternatives: skip the cut when the write fails, rejected because a crash mid-cut would then leave tracks cut at different points with nothing to finish them \u00b7 status: active [agent-inferred 2026-10-07]\n- **A8 \u00b7 Staged recovery passes run one at a time in the process.** flip at: recovery gains its own per-recording ownership \u00b7 test: two passes started back to back on the same staging folder cut and queue the recording once \u00b7 alternatives: per-recording claims in the hold set, rejected because the orphan scan of an overlapping pass could still queue a recording mid-cut \u00b7 status: active [agent-inferred 2026-10-07]\n- **A9 \u00b7 A recovered cut leaves the recovered mix as cut and does not re-mix a level-balanced recording from the kept audio, unlike the live cut since gh-4's A9.** alternatives: B \u2014 re-mix balanced after the recovered cut as the live path does (RecordingCut.remixBalanced), so the balance gains come from the kept audio alone \u00b7 flip at: RecoveredCut.swift:Pass.cut (after RecordingCut.apply) \u00b7 test: RecoveredCutTests.testACrashedDualSourceRecordingIsCutBeforeItIsQueued \u00b7 status: active [agent-assumed 2026-10-09]\nDIRECTION: GO \u2014 four M-sized tasks on existing seams (recorder, launch recovery, gh-54's cut), no new subsystem; nothing an existing tool gives, and the stored record carries gh-46's pause work without change.\n\nFIT: GO \u00b7 2026-10-09 \u00b7 base 47c550ad \u00b7 engine flow-next 8.1.1 \u00b7 gh-73, gh-94 and gh-4's cut-back remix landed on the same seams and claim none of this scope; the recovery entry moved to PipelineController+ProductionEnvironment.swift and gained levelBalance (tasks re-pinned); remixing a recovered cut as the live path does since gh-4 A9 is a follow-up, not built here\n\n## Memory findings\n\n| Track | Category | Entry | Why relevant |\n|---|---|---|---|\n| knowledge | workflow | `lint-locally-with-the-cached-pinned-2026-10-06` | how to run the pinned linters locally |\n| knowledge | workflow | `run-swift-tests-locally-redirect-models-2026-10-06` | test runs need a redirected home and a log file; known environmental failures |\n\n- Lint with the cached pinned SwiftFormat/SwiftLint, never a global install.\n- Run focused tests with `CFFIXED_USER_HOME` and read the log file; never pipe a test run.\n\n## Quick commands\n\n```bash\ncd app/MeetingTranscriber && CFFIXED_USER_HOME=/tmp/mt-gh60-home swift test --parallel --filter 'PendingRecordingCut|RecoveredCut|DualSourceRecorder|WatchLoopMeetingEnd|StagedRecovery|RecordingCut' > /tmp/mt-gh60-tests.log 2>&1; echo \"exit $?\"\n```\n\n```bash\nPATH=\"$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH\" ./scripts/lint.sh\n```\n\n## Requirement coverage\n\n| Req | Description | Task(s) | Gap justification |\n| --- | --- | --- | --- |\n| R1 | When the meeting-end question opens, the pending cut point is stored durably with the recording in progress before the question is posted and the countdown runs. Errors: a failed write is logged (error domain and code, no path) and the countdown proceeds as today (no worse than before this spec); a write that published its record but could not sync it is logged the same way and its record is still cleared by a later Keep, returning signal or stop. | gh-60-cut-a-recovered-recording-back-after-a.1, gh-60-cut-a-recovered-recording-back-after-a.2, gh-60-cut-a-recovered-recording-back-after-a.3 | \u2014 |\n| R2 | When the app ends for any reason while the question is open, the next launch's recovery cuts the recovered recording back to the stored cut point before it is processed, with the same result as an unanswered countdown: every saved track cut at the same point on the recording's timeline, placed by the live cut's two-estimate rule with the capture files' last write standing in for the stop (so on an ordinary recording it lands within a second of where the live cut would, inside the end grace period), and, where the recovered recording produces a record-only sidecar, its stop time at the cut (recovery produces none today; see Boundaries). Errors: if the cut fails, the recording is processed uncut and the failure is logged; the recording is never discarded (an original the cut could not put back is restored by recovery, and retried on every later pass until it is). A cut interrupted or already completed before a crash is finished at the same point on recovery, never cut deeper. | gh-60-cut-a-recovered-recording-back-after-a.4 | \u2014 |\n| R3 | \"Keep recording\" and a returning signal remove the stored cut point durably, so a crash afterwards recovers the whole recording. Errors: a failed removal is logged; recovery must then not cut a recording whose question was settled with Keep or a returning signal (see Edge Cases for the guards and the one remaining double-failure case). | gh-60-cut-a-recovered-recording-back-after-a.1, gh-60-cut-a-recovered-recording-back-after-a.3, gh-60-cut-a-recovered-recording-back-after-a.4 | \u2014 |\n| R4 | Every normal end of the recording (countdown expiry, \"Stop now\", Stop Watching, the 4-hour cap, and an end after \"Keep recording\") leaves no stored cut point behind once the recording is finalized, whether its cut succeeded, failed or was not needed; a stop that carries no cut removes it before the recorder stops. Errors: a cut-carrying stop whose recording could not be finalized keeps the stored cut and releases it to recovery; a failed removal is logged as in R3. | gh-60-cut-a-recovered-recording-back-after-a.2, gh-60-cut-a-recovered-recording-back-after-a.3 | \u2014 |\n| R5 | Recovery writes one line to the app's diagnostic log (the same sink as gh-54's stop lines) for every stored cut it settles: applied (with the seconds of audio removed and kept), refused (with the reason: unreadable, another recording, ran past the deadline, no known capture end, nothing to keep, stale), or failed (error domain and code, including an original that could not be restored). No line carries the recording's stem, a meeting title, participant names or transcript content. Errors: no error surface beyond the log write. | gh-60-cut-a-recovered-recording-back-after-a.4 | \u2014 |\n\n",
     "mergeBaseTracker": "Folgearbeit zu #54.\n\n## Problem\nSt\u00fcrzt die App ab oder wird sie beendet, w\u00e4hrend der 2-Minuten-Countdown aus #54 l\u00e4uft, holt die Wiederherstellung beim n\u00e4chsten Start die Aufnahme **ungeschnitten** zur\u00fcck. Damit landen die Countdown-Minuten (Raumaudio nach dem Meeting) doch im Transkript und Protokoll, entgegen der Entscheidung in #54 (ohne Antwort wird auf Signalverlust + Nachlaufzeit zur\u00fcckgeschnitten).\n\nHeute (vor #54) war das Fenster nur die Nachlaufzeit von 15 s, jetzt bis zu gut 2 Minuten.\n\n## Wunsch\nDen ausstehenden Schnittpunkt neben der Markierung der laufenden Aufnahme speichern, sobald der Countdown beginnt, und bei der Wiederherstellung anwenden; nach \u201eWeiter aufnehmen\u201c oder zur\u00fcckkehrendem Signal wieder entfernen.\n\n## Abnahme\nCountdown l\u00e4uft, App wird hart beendet \u2192 nach Neustart wird die Aufnahme verarbeitet und endet am selben Punkt wie bei abgelaufenem Countdown.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/60"
   },
-  "updated_at": "2026-10-06T23:16:03.193838Z"
+  "updated_at": "2026-10-09T03:01:42.945559Z"
 }

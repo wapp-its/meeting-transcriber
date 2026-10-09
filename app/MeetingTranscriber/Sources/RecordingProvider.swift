@@ -38,6 +38,37 @@ protocol RecordingProvider {
     /// that does not simulate capture never looks broken.
     var appSignalAges: ChannelSignalAges { get }
     var micSignalAges: ChannelSignalAges { get }
+
+    /// Store the meeting-end cut of the recording in progress
+    /// (`PendingRecordingCut`) beside its in-progress marker, in place of any
+    /// stored before in the same recording, and hold it until it is settled.
+    /// The stem is owned before the write, so a cut whose write throws is
+    /// still cleared by `clearPendingCut`.
+    ///
+    /// Throws `RecorderError.notRecording` between recordings, and
+    /// `PendingCutWriteError` when the write was not durable.
+    /// Default: nothing stored, for doubles that do not simulate it.
+    func storePendingCut(cutAt: Date, deadline: Date, startedAt: Date) throws
+
+    /// Add how the stored cut was resolved, before any track is cut. A value
+    /// already stored is never changed. Nothing stored: a no-op. Throws
+    /// `PendingCutWriteError`. Default: a no-op.
+    func recordPendingCutResolution(keptSeconds: TimeInterval, captureEndedAt: Date) throws
+
+    /// Remove the stored cut and release its hold. Nothing stored: a no-op
+    /// that reports `.removed`. Default: `.removed`.
+    func clearPendingCut() -> PendingRecordingCut.RemoveOutcome
+}
+
+/// A change to the stored meeting-end cut that is not durable.
+struct PendingCutWriteError: Error {
+    /// Whether the new record is in place anyway: only the folder sync after
+    /// its rename failed. Either way the stored cut is the recorder's to
+    /// clear.
+    let published: Bool
+    /// What failed, whose domain and code are what a log line may carry: a
+    /// file error's description names its path.
+    let underlying: any Error
 }
 
 extension ChannelSignalAges {
@@ -75,5 +106,13 @@ extension RecordingProvider {
 
     var micSignalAges: ChannelSignalAges {
         .deliveringSignalNow
+    }
+
+    func storePendingCut(cutAt _: Date, deadline _: Date, startedAt _: Date) {}
+
+    func recordPendingCutResolution(keptSeconds _: TimeInterval, captureEndedAt _: Date) {}
+
+    func clearPendingCut() -> PendingRecordingCut.RemoveOutcome {
+        .removed
     }
 }
