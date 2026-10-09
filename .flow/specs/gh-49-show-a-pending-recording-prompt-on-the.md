@@ -84,6 +84,11 @@ FIT: GO · 2026-10-08 · base ed0b4e6d · engine flow-next 8.1.1 · no spec clai
   - The "single Boolean" on `AppState` in the Architecture section is task .3's `awaitingUserAnswer`.
   - gh-54 is merged: its auto-stop question (`WatchLoop.meetingEndQuestionID`, `NotificationManager.askBeforeEndingRecording`) is a separate path and category; issue #58 puts it on the icon later, this spec does not touch it.
 
+FIT: GO · 2026-10-09 · base 47c550ad · engine flow-next 8.1.1 · gh-94 (PR #106) merged since: it claims no part of this scope (its menu rule R8 pins the stop and watch controls directly under the status line and says nothing about what sits above it); the other spec commits are gh-13/gh-60/gh-73 bookkeeping; every code premise still holds, line numbers drifted
+  - `AppState.swift` is at 599 lines on the base (gh-94 added `canStopRecording` at :530-540), so task .1's step 0 (move `AppNotifying`, now `:7-111`, into its own file) must land before any other `AppState` edit; `Tests/TestHelpers.swift` is at exactly 600 lines and must not grow.
+  - `MenuBarView.body` is now `statusHeader, sessionControls, meetingInfo, errorInfo, Divider, watchControls, …` (`:57-80`); task .2's `consentPrompt` goes before `statusHeader`, its trailing `Divider()` separates it from the status line, so gh-94's "no divider between the status line and its control" stays true. `makeView` in task .2's new test copies gh-94's `manualRecordingPendingOrActive:` and `onStopManualRecording:` parameters (`Tests/MenuBarViewTests.swift:32-63`).
+  - Drifted anchors on the base: `AppNotifying` `AppState.swift:7-111`; `WatchLoop.pendingConsentApp` `:105-110`, `clearConsentState` `:126-133`; `NotificationManager.askToRecord` `:279-307`, `resolveBrowserConsent` `:322-330`; `MenuBarView.statusHeader` `:84-96`, `meetingInfo` `:98-113`; `MeetingTranscriberApp.menuBarContent` `:134-161`, `menuBarLabel` `:163-178`; `docs/architecture-macos.md` rows `:96`/`:98`, icon section `:370-383`; `severalPolls` `:177`. Unchanged: `WatchLoop+Consent.swift`, `ConsentPromptCoordinator`, `MenuBarIcon`, `A11yID`.
+
 ## Quick commands
 
 ```bash
