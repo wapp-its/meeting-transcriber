@@ -120,6 +120,8 @@ Task gh-9-find-and-preload-models-from-hugging.1 validates the core approach (th
 - **A4 · Stock-model sizes come from a static table measured on 2026-10-06 and are shown as approximate.** flip at: argmax republishes the stock variants at clearly different sizes · test: the table lists all six stock entries with a size · status: active [agent-inferred 2026-10-06]
 - **A5 · A stock-repository variant picked in the browser selects the matching stock entry rather than a custom model.** flip at: the owner wants every browser pick to show as "Custom model…" · test: "Use" on `argmaxinc/whisperkit-coreml` + a stock variant turns the custom model off and sets that stock variant · status: active [agent-assumed 2026-10-06]
 
+FIT: GO · 2026-10-09 · base 47c550ad · engine flow-next 8.3.0 · no FIT receipt before; spec text unchanged since its plan commit; gh-12 (the token this spec reads) merged 2026-10-07 as AppSettings.huggingFaceToken over an injectable HuggingFaceTokenStore; every cited symbol is on the head, only line numbers drifted in TranscriptionSettingsView (binding :173, Load Model button :441); the 13 specs planned since claim none of this scope (gh-6 only consumes the model selection); open PR #111 (gh-10) also edits TranscriptionSettingsView, SettingsView and AppSettings, a merge-order fact; the live search and spert listing still answer as measured on 2026-10-06
+
 ## Quick commands
 
 ```bash
