@@ -54,9 +54,86 @@ Tests first (controller and settings have clear contracts: spec R1–R4, R6, R8)
 - [ ] Each finished check logs one line with outcome and status, host private, no path/query/token/terms.
 - [ ] Focused tests, lint and `./scripts/pre-push.sh --with-appstore` pass.
 ## Done summary
-TBD
+The URL source now works end to end without UI. `AppSettings` holds the source, the address and the Keychain token, and both engines read the copy kept for the configured address (no copy means no vocabulary, never the local file). `RemoteVocabularyController` checks at start, 2 s after a change, on `refreshNow()` and hourly. It adopts only valid downloads and publishes the status Settings will show. `AppState` exposes it inert, and the menu-bar scene starts it.
 
+stage: impl-review - ran [2026-10-09T11:07Z..2026-10-09T11:24Z]
+
+Tier: session (jev-unavailable(no_key)); implementer opus at xhigh (project routing block) · actual: claude-opus-5-5 (host metadata)
+
+Verification (all measured, on the final HEAD unless noted):
+- baseline: green. Before any edit the focused filter ran 181 tests with suite_rc=0, and lint found 0 violations. Pre-push was not run at baseline.
+- `swift test --parallel --filter "RemoteVocabulary|AppSettingsRemoteVocabulary|EngineSettingsRuntimeSync|AppSettingsTests|AppStateTests|ParakeetVocabularyPreparation|WhisperKitVocabularyFlow"`: suite_rc=0, 198 tests, 0 failed. New tests: RemoteVocabularyControllerTests 13, AppSettingsRemoteVocabularyTests 2, EngineSettingsRuntimeSyncTests +2 (the 14 existing tests are unchanged). No model-download test is inside this filter.
+- Flakiness check: RemoteVocabularyControllerTests and EngineSettingsRuntimeSyncTests ran 6 times in a row, 6/6 green.
+- `./scripts/lint.sh` with the pinned SwiftFormat 0.63.0 and SwiftLint 0.65.1: 0 violations in 721 files.
+- `./scripts/pre-push.sh --with-appstore`: passed for both the Homebrew and the App Store release builds, with no diagnostics in the changed files.
+- Mutation check on the first commit: I removed the generation guard, always rewrote an identical body, gave the engines the local path for `.url`, and dropped the token revision bump. Each mutation turned only its intended tests red. Originals were restored and confirmed byte-identical with `cmp`.
+- Not run: `swiftlint analyze` (CI only). Every new declaration is referenced from app code or tests. The log line's `.private` host attribute is not asserted, because reading back through OSLogStore is asynchronous (repo precedent: AppSettingsOutputDirectoryTests). The public part is pinned by `testTheLogLineCarriesOnlyTheOutcomeAndTheHTTPStatus`.
+
+Tests per acceptance criterion:
+- Settings persistence and token: `AppSettingsRemoteVocabularyTests.testSourceAndAddressPersistInTheInjectedDefaults` and `testTokenLivesOnlyInTheKeychainAndEverySetBumpsTheRevision`.
+- Engine wiring: `EngineSettingsRuntimeSyncTests.test_urlSource_givesBothEnginesTheAddressCopy_orNothingForAnInvalidAddress` and `test_runtimeSwitch_ofSourceAndAddress_propagatesToBothEngines`, both table-driven over both engines.
+- Controller, in RemoteVocabularyControllerTests:
+  - no check with the local file or an invalid address
+  - start() checks once and stores the download
+  - checks repeat every interval
+  - the next check sends the validators, and a 304 only records the check time
+  - an identical body is not rewritten, and a changed one replaces the copy
+  - an invalid body, offline, 401, a timeout and a save failure keep the copy and name it
+  - offline with no copy reports no vocabulary in use
+  - an address change deletes the old copy and drops the check in flight
+  - a token change triggers one debounced check with the trimmed new token
+  - an answer queued ahead of a token change does not land
+  - a new controller starts from the stored copy
+  - AppState exposes the controller and its init touches no cache
+  - the log line carries only the outcome and the HTTP status
+
+Review: Codex `gpt-5.6-sol` at `xhigh`, confirmed in the receipt; `/tmp/impl-review-receipt-3dc1fc7d306f-gh-10-vocabulary-from-a-central-url.2.json`.
+- Round 1, three draws, all NEEDS_WORK. The validator kept two findings and dropped one:
+  - (#2, P1) An answer already queued on the main actor ran before the settings observer, passed the generation check, and could adopt an old token's download. It is fixed test-first: 0a7d619e went red, a28bb374 makes it green. The check now compares source, address and token revision with the live settings.
+  - (#1, P1) The log line said "HTTP none" for refused 200, unusable 304 and refused redirects. a28bb374 fixed the 200 and 304 cases.
+  - (#3) Confirming the copy loaded before the request was dropped by the validator under A10, and declined in a28bb374.
+- Round 2 kept #1 for redirects only: the exact 3xx code is dropped inside task .1's fetcher. I recorded it as spec assumption A11 (cab16bd6), with the flip point and the test.
+- Round 3: SHIP. #1 withdrawn, #2 fixed, #3 withdrawn.
+- One memory entry was captured: `.flow/memory/bug/runtime-errors/stale-async-answer-queued-ahead-of-the-2026-10-09.md`.
+
+Decisions:
+1. (rule 1) The UserDefaults keys `vocabularySource` and `remoteVocabularyURL`, the Keychain account `remoteVocabularyToken` and the injected `remoteVocabularyCacheDirectory` are built as the task says. The token is a computed property in the class body next to `openAIAPIKey`; `remoteVocabularyTokenRevision` is `private(set)`.
+2. (rule 6) The cache's bundle identifier lives in one place: the computed `AppSettings.remoteVocabularyCache`, which uses `Bundle.main.bundleIdentifier ?? "MeetingTranscriber"`. Both `effectiveVocabularyPath` and the controller use it, so the writer and the readers cannot disagree on the file name.
+3. (rule 4) Status while no check runs:
+   - `.inactive` for the local file
+   - `.addressProblem` for an address that is not fetched
+   - `.notDownloaded` when there is no copy
+   - `.current` for a copy with a trusted check time
+   - `.checking` for a copy with an untrusted sidecar, because a check is always due then
+
+   During every check the status is `.checking`, per A8. Before `start()` it is `.inactive`.
+4. (rule 6) A cancelled answer that still matches the settings shows as `.failed(.cancelled, lastGood:)`, so "Checking the address…" cannot stay stuck. A superseded answer is dropped silently.
+5. (rule 6) The copy every failure names comes from `cache.load(for:)` after the check, not only after a save failure. A failed sidecar write after a 304 or an identical body reports "The download could not be saved".
+6. (rule 6) The controller has no deadline of its own. The fetcher's 60 s total deadline from task .1 bounds a check.
+7. (rule 6) The log is one `notice` per finished check: `Remote vocabulary check: <updated|unchanged|failed (<sentence>)>, HTTP <status>, host <private>`.
+8. (rule 6) Every observer fire counts as a change. A write of the same value re-checks after the debounce, which is harmless.
+9. (rule 6) Lint caps. AppState.swift was at 599/600 lines, its init at 60/60 lines and the AppSettings class body at about 398/400, so the change could not fit without one of these:
+   - a reasoned `file_length` disable at the top of AppState.swift
+   - a reasoned `type_body_length` disable:this on `final class AppSettings`
+   - one existing `PipelineController(...)` call joined onto a single line, which keeps the init at 59 lines
+10. (rule 5) A11, the refused redirect logged as `HTTP 3xx`, was written into the spec's Decision Context by this worker rather than the conductor, so the re-review could see the settled choice (cab16bd6).
+11. (rule 1) Reviews ran with `CODEX_SANDBOX=workspace-write`, as the dispatch requires. No network or full access was granted. The reviewer left only flowctl's `.flow/` bookkeeping, which is committed.
+12. (rule 6) The task's "AppState init does no cache I/O" test lives in RemoteVocabularyControllerTests, because AppStateTests.swift is outside the declared Touches.
+13. (rule 1) Commits carry `Task: gh-…` trailers, following task .1's precedent.
+14. (rule 6) Process deviation: tests and code for the first commit were written together, not test first. The mutation check stands in as proof the tests can fail. The review fix did go red before green.
+15. (rule 6) `/state` adds no field. The existing engine field `customVocabularyPath` in `AppState+RPC.swift` now shows the cache path when the source is URL. That is the engine's real path: it contains an address hash, not the address.
+
+ASSUME: a refused redirect is logged as `HTTP 3xx`, every other check with its exact status (refused 200 → 200, unusable 304 → 304, no answer → none) · alternatives: B — carry the exact code from `RemoteVocabularyFetcher.transfer` through the failure into the log line · flip at: app/MeetingTranscriber/Sources/RemoteVocabularyController.swift:RemoteVocabularyController.logDescription(of:result:) · test: RemoteVocabularyControllerTests.testTheLogLineCarriesOnlyTheOutcomeAndTheHTTPStatus
+ASSUME: while a check is due or running, a copy without a trusted check time reads "Checking the address…", and no copy reads "Not downloaded yet – no vocabulary in use" · alternatives: B — show the untrusted copy as current with its file date; C — "Checking the address…" also during the debounce when there is no copy · flip at: app/MeetingTranscriber/Sources/RemoteVocabularyController.swift:RemoteVocabularyController.idleStatus() · test: RemoteVocabularyControllerTests.testAnAddressChangeDeletesTheOldCopyAndDropsTheCheckInFlight, RemoteVocabularyControllerTests.testStartChecksOnceAndStoresAValidDownload
+
+Follow-ups (not part of this task):
+- Exact redirect code in the log (A11 alternative B). It needs `RemoteVocabularyFetcher` and `RemoteVocabularyFailure` to carry the 3xx status.
+- Split AppState.swift by moving `AppNotifying` and `SilentNotifier` into their own file, then drop its `file_length` suppression.
+- Instruction conflicts, as in task .1: the impl-review skill says never to set `CODEX_SANDBOX`, and the fork rule forbids `gh-N` ids in commit messages while the worker template adds `Task:` trailers.
+- No user route changed (there is no UI yet; task .3 adds it), so the feature map needs no update.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 88837cd0c5dce24ef7bac9e10ac0c7a42b498076, 0a7d619ea35b5fa32ba52f1ecfbdf9e3ade66f31, a28bb374be31661da92c9b3b146673319dc12665, cab16bd6883c3a0d5125f5df7c85cd7dcd6e825f, 30a20cdbcf9bf60eb388b8c4016e629f0fd9c887
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh10-home swift test --parallel --filter "RemoteVocabulary|AppSettingsRemoteVocabulary|EngineSettingsRuntimeSync|AppSettingsTests|AppStateTests|ParakeetVocabularyPreparation|WhisperKitVocabularyFlow" (suite_rc=0, 198 tests), PATH=<pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1> ./scripts/lint.sh (0 violations, 721 files), ./scripts/pre-push.sh --with-appstore (Homebrew + App Store release builds passed)
 - PRs:

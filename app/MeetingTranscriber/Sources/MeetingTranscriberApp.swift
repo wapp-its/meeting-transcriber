@@ -197,6 +197,9 @@ struct MeetingTranscriberApp: App {
             appState.updateChecker.startPeriodicChecks(settings: appState.settings)
         }
         .task {
+            appState.remoteVocabulary.start()
+        }
+        .task {
             await appState.permissions.check()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -260,6 +263,7 @@ struct MeetingTranscriberApp: App {
                 whisperKitEngine: appState.engines.whisperKit,
                 parakeetEngine: appState.engines.parakeetEngine,
                 updateChecker: appState.updateChecker,
+                remoteVocabulary: appState.remoteVocabulary,
                 notificationVisibility: appState.permissions.notificationVisibility,
                 // Share the pipeline's actor instance so both writers serialise on
                 // the same `recognition_log.jsonl` file. Fallback only fires in the

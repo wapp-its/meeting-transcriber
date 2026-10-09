@@ -221,4 +221,88 @@ final class EngineSettingsRuntimeSyncTests: XCTestCase {
             engines.parakeetEngine.customVocabularyPath, "/tmp/parakeet-vocab.txt",
         )
     }
+
+    // MARK: - Vocabulary source
+
+    private static let addressA = "https://lists.example.org/team/vocabulary.txt"
+    private static let addressB = "https://lists.example.org/other/vocabulary.txt"
+
+    /// With the URL source both engines read the copy kept for the configured
+    /// address, never the local file and never with its bookmark; an address
+    /// that is not fetched leaves them without vocabulary.
+    func test_urlSource_givesBothEnginesTheAddressCopy_orNothingForAnInvalidAddress() throws {
+        for engine in TranscriptionEngineSetting.allCases {
+            let source = try makeSourceSettings(engine: engine)
+            source.vocabularySource = .url
+            source.remoteVocabularyURL = "  \(Self.addressA)\n"
+
+            let valid = vocabulary(of: EngineController(settings: source), engine)
+            XCTAssertEqual(valid.path, cacheFile(source, address: Self.addressA), "\(engine)")
+            XCTAssertNil(valid.bookmark, "\(engine)")
+
+            source.remoteVocabularyURL = "http://lists.example.org/team/vocabulary.txt"
+
+            let invalid = vocabulary(of: EngineController(settings: source), engine)
+            XCTAssertEqual(invalid.path, "", "\(engine)")
+            XCTAssertNil(invalid.bookmark, "\(engine)")
+        }
+    }
+
+    func test_runtimeSwitch_ofSourceAndAddress_propagatesToBothEngines() async throws {
+        for engine in TranscriptionEngineSetting.allCases {
+            let source = try makeSourceSettings(engine: engine)
+            source.remoteVocabularyURL = Self.addressA
+            let local = (path: source.customVocabularyPath, bookmark: source.customVocabularyBookmark)
+            let engines = EngineController(settings: source)
+            XCTAssertEqual(vocabulary(of: engines, engine).path, local.path, "\(engine)")
+            XCTAssertEqual(vocabulary(of: engines, engine).bookmark, local.bookmark, "\(engine)")
+
+            source.vocabularySource = .url
+
+            await waitFor(vocabulary(of: engines, engine).path == cacheFile(source, address: Self.addressA))
+            XCTAssertEqual(vocabulary(of: engines, engine).path, cacheFile(source, address: Self.addressA), "\(engine)")
+            XCTAssertNil(vocabulary(of: engines, engine).bookmark, "\(engine)")
+
+            source.remoteVocabularyURL = Self.addressB
+
+            await waitFor(vocabulary(of: engines, engine).path == cacheFile(source, address: Self.addressB))
+            XCTAssertEqual(vocabulary(of: engines, engine).path, cacheFile(source, address: Self.addressB), "\(engine)")
+
+            source.vocabularySource = .file
+
+            await waitFor(vocabulary(of: engines, engine).path == local.path)
+            XCTAssertEqual(vocabulary(of: engines, engine).path, local.path, "\(engine)")
+            XCTAssertEqual(vocabulary(of: engines, engine).bookmark, local.bookmark, "\(engine)")
+        }
+    }
+
+    /// Settings with their own cache directory (never created: only paths are
+    /// derived here) and a local file selected through its bookmark.
+    private func makeSourceSettings(engine: TranscriptionEngineSetting) throws -> AppSettings {
+        let source = AppSettings(
+            defaults: defaults,
+            remoteVocabularyCacheDirectory: FileManager.default.temporaryDirectory
+                .appendingPathComponent("EngineSettingsRuntimeSyncTests-\(UUID().uuidString)", isDirectory: true),
+        )
+        source.transcriptionEngine = engine
+        source.vocabularySource = .file
+        let file = makeTempFile(suffix: ".txt")
+        try Data("Northstar\n".utf8).write(to: file)
+        source.setCustomVocabularyFile(file)
+        XCTAssertNotNil(source.customVocabularyBookmark, "precondition: the local file carries a bookmark")
+        return source
+    }
+
+    private func cacheFile(_ settings: AppSettings, address: String) -> String {
+        RemoteVocabularyCache.textFile(
+            in: settings.remoteVocabularyCacheDirectory, bundleID: settings.remoteVocabularyCache.bundleID, address: address,
+        ).path
+    }
+
+    private func vocabulary(of engines: EngineController, _ engine: TranscriptionEngineSetting) -> (path: String, bookmark: Data?) {
+        switch engine {
+        case .whisperKit: (engines.whisperKit.customVocabularyPath, engines.whisperKit.customVocabularyBookmark)
+        case .parakeet: (engines.parakeetEngine.customVocabularyPath, engines.parakeetEngine.customVocabularyBookmark)
+        }
+    }
 }

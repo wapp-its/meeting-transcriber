@@ -1,14 +1,18 @@
 {
   "branch_name": "feat/gh-10-remote-vocabulary",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-09T12:01:30.863226Z",
   "created_at": "2026-10-06T20:18:22.941395Z",
   "default_impl": null,
   "default_review": null,
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-10-vocabulary-from-a-central-url",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-10-vocabulary-from-a-central-url.1": 0,
+    "gh-10-vocabulary-from-a-central-url.2": 0,
+    "gh-10-vocabulary-from-a-central-url.3": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -135,31 +139,358 @@
       "task": null,
       "timestamp": "2026-10-06T20:35:31.939122Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "d371f79ca093a3f571fa4cd8667c5aa8d2015834510180c1c800dd700eb43569",
+      "backend": "codex",
+      "base_sha": "d9565a5121908813299d525a2c06337dc625dda4",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-1f2cbb4b08d484d93d640cf5f8c30508",
+            "classification": "introduced",
+            "findingId": "finding-1f2cbb4b08d484d93d640cf5f8c30508",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-6e15f0733d3a19997515c1fe24407db8",
+            "classification": "introduced",
+            "findingId": "finding-6e15f0733d3a19997515c1fe24407db8",
+            "firstSeenThisRound": true,
+            "severity": "P3",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "3d8a67b70ef64f3653409e546c5674cbadb9a024",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1791,
+      "output_sha256": "12e48a8e45f3bbd6454e8a7a17108b61ca20147f81df73733290c4157f763dbf",
+      "reservation_id": "e70ec91586f547b9829c93502f4b2806",
+      "round_consumed": true,
+      "scope": "impl:gh-10-vocabulary-from-a-central-url.1",
+      "superseded_by": null,
+      "task": "gh-10-vocabulary-from-a-central-url.1",
+      "timestamp": "2026-10-09T10:39:41.098145Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "6d3b05a307355f2b2e9b3dc3c8393abec8d48d6ca97f6bb298c1f721d26f5284",
+      "backend": "codex",
+      "base_sha": "57347e67a87da2af0f0527cf9d6f5a57bc5fc25e",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-c884f007e335700803a79c4b8084eec3",
+            "classification": "introduced",
+            "findingId": "finding-c884f007e335700803a79c4b8084eec3",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-a18efd4e411acc10eba86086b884e20b",
+            "classification": "introduced",
+            "findingId": "finding-a18efd4e411acc10eba86086b884e20b",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-763d25abb2652c8722ac5a6426e74d70",
+            "classification": "introduced",
+            "findingId": "finding-763d25abb2652c8722ac5a6426e74d70",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "88837cd0c5dce24ef7bac9e10ac0c7a42b498076",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 3109,
+      "output_sha256": "deb296df59435032825b9aacc00344467ff4912ff018a8caafec4b1269cfaf18",
+      "reservation_id": "f9714d2185df4d3a946fd0f12156866c",
+      "round_consumed": true,
+      "scope": "impl:gh-10-vocabulary-from-a-central-url.2",
+      "superseded_by": null,
+      "task": "gh-10-vocabulary-from-a-central-url.2",
+      "timestamp": "2026-10-09T11:16:43.962713Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "540014df0b71582fb648907e9929127a41e51b398140e9ac8bc9e3f718c333d1",
+      "backend": "codex",
+      "base_sha": "57347e67a87da2af0f0527cf9d6f5a57bc5fc25e",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-c884f007e335700803a79c4b8084eec3",
+            "classification": "introduced",
+            "findingId": "finding-c884f007e335700803a79c4b8084eec3",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "not_fixed"
+          },
+          {
+            "chainRoot": "finding-ba86a2134f98801907afeb3fb21d3f46",
+            "classification": "introduced",
+            "findingId": "finding-ba86a2134f98801907afeb3fb21d3f46",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-a18efd4e411acc10eba86086b884e20b",
+            "classification": "introduced",
+            "findingId": "finding-a18efd4e411acc10eba86086b884e20b",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-763d25abb2652c8722ac5a6426e74d70",
+            "classification": "introduced",
+            "findingId": "finding-763d25abb2652c8722ac5a6426e74d70",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "withdrawn"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "a28bb374be31661da92c9b3b146673319dc12665",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1751,
+      "output_sha256": "7c964959b227e11ca960012c45afc8405582d57f526c057a11f64fad9966ba1c",
+      "reservation_id": "d9004eab10ad45efa462f041422c8d2c",
+      "round_consumed": true,
+      "scope": "impl:gh-10-vocabulary-from-a-central-url.2",
+      "superseded_by": null,
+      "task": "gh-10-vocabulary-from-a-central-url.2",
+      "timestamp": "2026-10-09T11:21:58.323680Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "648e6c02a72b00e4724484806fede21848b0b50ce74874e9feef500e01c9cb0e",
+      "backend": "codex",
+      "base_sha": "57347e67a87da2af0f0527cf9d6f5a57bc5fc25e",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-c884f007e335700803a79c4b8084eec3",
+            "classification": "introduced",
+            "findingId": "finding-c884f007e335700803a79c4b8084eec3",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "withdrawn"
+          },
+          {
+            "chainRoot": "finding-ba86a2134f98801907afeb3fb21d3f46",
+            "classification": "introduced",
+            "findingId": "finding-ba86a2134f98801907afeb3fb21d3f46",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-a18efd4e411acc10eba86086b884e20b",
+            "classification": "introduced",
+            "findingId": "finding-a18efd4e411acc10eba86086b884e20b",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-763d25abb2652c8722ac5a6426e74d70",
+            "classification": "introduced",
+            "findingId": "finding-763d25abb2652c8722ac5a6426e74d70",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "withdrawn"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "cab16bd6883c3a0d5125f5df7c85cd7dcd6e825f",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1182,
+      "output_sha256": "e42ed7743d8d1a500ab2b7d58feb5555effe5b6372f941df62e3b9e98769ae0f",
+      "reservation_id": "9ca12b868f4f49169a33e2e68cbdbce7",
+      "round_consumed": true,
+      "scope": "impl:gh-10-vocabulary-from-a-central-url.2",
+      "superseded_by": null,
+      "task": "gh-10-vocabulary-from-a-central-url.2",
+      "timestamp": "2026-10-09T11:24:30.632942Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "f70053f4ec183b46f623702b70e7ba5cde178bbdc748e7f7ff9eb7593efad8a5",
+      "backend": "codex",
+      "base_sha": "4035f5edf76a30f2e70f900875c15f1cd1861468",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "efc93a4037575c1283e11323dcf1fa8a6ceac13f",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "3b31207f1d804598987dc24309e2b584",
+      "round_consumed": true,
+      "scope": "impl:gh-10-vocabulary-from-a-central-url.3",
+      "superseded_by": null,
+      "task": "gh-10-vocabulary-from-a-central-url.3",
+      "timestamp": "2026-10-09T11:52:40.557544Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "ff0fb112324a5e7674d81102767ae45432ebf847c2bce155cbbe93fedece79f9",
+      "backend": "codex",
+      "base_sha": "47c550ada129a452cc2922d9f24653bb3212b497",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "9775207f24223a1049d279085fad11930e06864d",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 586457,
+      "output_sha256": "81d7aa9802e740cba6717f23962e15ba54bd6beef341345481764a627d4a10d4",
+      "reservation_id": "0fa5c2c8ea1e4c2c9270d297b5ce28da",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-09T12:01:30.830890Z",
+      "tool_calls": 36,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-10-vocabulary-from-a-central-url.1": 1,
+    "impl:gh-10-vocabulary-from-a-central-url.2": 1,
+    "impl:gh-10-vocabulary-from-a-central-url.3": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-10-vocabulary-from-a-central-url.1": 0,
+    "impl:gh-10-vocabulary-from-a-central-url.2": 0,
+    "impl:gh-10-vocabulary-from-a-central-url.3": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-10-vocabulary-from-a-central-url.md",
-  "status": "open",
+  "status": "done",
   "title": "Vocabulary from a central URL",
   "tracker": {
-    "baseHashFlow": null,
-    "baseHashTracker": null,
+    "baseHashFlow": "a0271b19432f7a95734518dfaff7da29432afbff7ca3d2533055f13f5e457eaa",
+    "baseHashTracker": "a3ad90dcdc3ffc3bf4297dc90c075d49c5ec60285f7cc6fefab0c2aba0b90b0e",
     "depRelations": [],
     "id": "I_kwDOUvyDOc8AAAABUOERdQ",
     "identifier": "#10",
-    "lastSyncedAt": null,
+    "lastSyncedAt": "2026-10-09T12:16:53.892186Z",
     "linkState": "linked",
-    "mergeBaseFlow": null,
-    "mergeBaseTracker": null,
+    "mergeBaseFlow": "# Vocabulary from a central URL\n\n## Conversation Evidence\n\n> issue #10 (Problem, translated): \"The vocabulary for transcription (names, technical terms) currently comes from a local file (`AppSettings+Vocabulary.swift`). In an organisation, ideally one office maintains the list centrally (names of committee members, organisational units, abbreviations), and everyone gets the same state.\"\n> issue #10 (Wish, translated): \"Allow a **URL** as a source alongside the local file, e.g. the raw address of a file in a Git repository (GitLab/GitHub): load at launch and periodically (with ETag/Last-Modified, so only changes are transferred), cache locally and keep working **offline** with the last state, optionally with an access token (private repository) stored in the Keychain, show the state and the time of the last update in the Settings.\"\n> issue #10 (translated): \"Same principle later for terminology rules (`terminologyRules`) and protocol templates (#2).\"\n> issue #10 (Acceptance, translated): \"URL set to a vocabulary file \u2192 terms are used; change in the repository \u2192 adopted after the next sync.\" \u00b7 \"Without network \u2192 the last state stays active, note in the Settings.\"\n> issue #10: \"Fits the central preconfiguration (#11).\"\n> coordinator triage 2026-10-06: \"prio:later. Besides the local vocabulary file [\u2026] allow a URL (e.g. the raw URL of a file in a GitLab/GitHub repository): fetched at launch and periodically with ETag/Last-Modified, cached locally, offline keeps the last good copy, optional access token stored in the Keychain, Settings shows the source, last update time and an offline/failed note.\"\n> coordinator triage 2026-10-06: \"Decide (and record as an assumption) how URL and local file combine: one source at a time (simplest) vs. merged lists. Must-first suggests one source at a time.\"\n> coordinator triage 2026-10-06: \"Terminology rules and protocol templates from a URL are later (Boundaries).\" \u00b7 \"App Store variant: check the network entitlement (OpenAI provider already needs outbound network).\"\n> coordinator triage 2026-10-06: \"Privacy: the fetch is a plain GET with an optional token; nothing about meetings leaves the machine. Note GitLab private raw URLs need a token header (PRIVATE-TOKEN) vs GitHub (Authorization) \u2014 research how to keep it simple [\u2026] and say what you chose.\"\n\n## Goal & Context\n\nToday the custom vocabulary (one term per line; names, units, abbreviations) comes only from a file on the user's own Mac, chosen in Settings \u2192 Transcription. Both engines use it: Parakeet boosts the terms during decoding, WhisperKit uses them as an optional prompt hint. In an organisation one office should maintain the list centrally, and every installation should pick up the same, current list without anyone copying files around. [paraphrase]\n\nThis spec lets the vocabulary come from a web address instead of a local file, for example the raw address of a text file in a GitHub or GitLab repository. The app downloads it at launch and periodically, transfers it again only when it changed, keeps the last good copy for offline use, can send an access token for private repositories, and shows in Settings where the list comes from, when it was last updated and whether the last attempt failed. [paraphrase]\n\nVerified against today's code (wapp/main 65888b53): the local file is stored as a path plus a security-scoped bookmark (`AppSettings.customVocabularyPath` / `customVocabularyBookmark`), validated with fixed limits (`WhisperVocabularyPrompt.maximumFileBytes` 256 KB, `maximumTermCount` 256, `maximumTermBytes` 512), and pushed to both engines by `EngineController.syncEngineSettings()`. Both engines already re-read a file whose content changed at the same path before the next decode, because the file revision (inode, modification time, size) is part of their cache key (`ParakeetVocabularyConfiguration`, `WhisperVocabularyPrompt.CacheKey`). The App Store variant already holds the outbound-network entitlement (`com.apple.security.network.client`), and `KeychainHelper` already stores the OpenAI and Claude API keys. [inferred]\n\n<!-- Source: 10% user / 45% [paraphrase] / 45% [inferred] -->\n\n## Architecture & Data Models\n\n- **Source choice, one at a time.** A new setting `vocabularySource` (`.file` default, `.url`) persisted in UserDefaults. With `.url`, the engines get the downloaded copy and the local file selection is kept but not used; nothing is merged and there is no silent fallback to the local file (D-A1). [inferred]\n- **One effective vocabulary for the engines.** `AppSettings` gains `effectiveVocabularyPath` / `effectiveVocabularyBookmark`: the local path and bookmark for `.file`, for `.url` the path of the cached copy keyed by the currently configured address (empty when the address is invalid) and no bookmark. `EngineController.syncEngineSettings()` and its observer switch to these and also observe `vocabularySource` and `remoteVocabularyURL`. The engines themselves do not change: for one address the path is stable, and replacing its content atomically gives a new file revision, which both engines already pick up before their next decode. Because the path is derived from the address, a copy fetched for another address can never be read, whatever happens to deletions. [inferred]\n- **Remote settings.** `remoteVocabularyURL` (String, UserDefaults; trimmed when used), and an access token read and written through `KeychainHelper` under an injectable account (pattern: `openAIAPIKey`, whose Keychain account is injected through `AppSettings.init`). An in-memory, observable `remoteVocabularyTokenRevision` counter is bumped by the token setter so a token change can be observed (the Keychain itself is not observable). Plain UserDefaults keys keep the source and URL presettable by a configuration profile later (#11); the token is per person. [inferred]\n- **Cache.** One copy per address in `AppPaths.remoteVocabularyCacheDirectory` (`<dataDir>/vocabulary/`), named `remote-vocabulary-<bundle identifier>-<first 16 hex digits of the SHA-256 of the trimmed address>.txt`, plus a JSON sidecar with the same stem (`.json`) holding the source URL, the SHA-256 of the text it describes, ETag, Last-Modified, `updatedAt` (content last changed) and `checkedAt` (server last reached). The term count is derived from the cached text when it is loaded, never stored. Named per bundle identifier because the dev and release builds share `dataDir` (same reason as `AppPaths.livenessMarker`). Only the current address's copy is kept: copies of this bundle for other addresses are deleted when the address changes and at start; a deletion that fails leaves an unread file behind and is logged. The directory is injected into `AppSettings` (like `defaultOutputDir`) so tests never touch the real folder. Storing a new copy is a three-step commit: write the new text to a temporary file in the same directory, write the new sidecar atomically, then rename the temporary file over the text file. A failure before the rename leaves the previous text in place and is reported as \"could not save\" (the previous copy is then truly the one in use); a failure of the rename leaves the previous text under a sidecar that no longer matches it. **The sidecar's validators and dates are trusted only when its address and text hash match the text on disk**: on any mismatch (a failed or interrupted commit, a hand edit) the text, if present and valid, stays in use as this address's copy, its update time falls back to the file's modification date, the stale sidecar is deleted, and the next check sends no validators, so a full download repairs the pair and a 304 can never pin mismatched text. A missing or invalid text file deletes the pair. [inferred]\n- **Fetcher.** A `RemoteVocabularyFetching` protocol (pattern: `UpdateProviding`) with a URLSession-backed implementation: one GET, `If-None-Match` / `If-Modified-Since` from the sidecar only when a usable copy exists, `Authorization: Bearer <token>` when a token is set, a 30 s idle timeout plus a 60 s total deadline for the whole check (a request timeout only bounds inactivity, so a server trickling bytes would otherwise hold the check open indefinitely; on the deadline the transfer is cancelled and the check fails as timed out), no URL cache (`urlCache = nil`, `.reloadIgnoringLocalCacheData`, so a 304 reaches our code instead of being answered from Foundation's cache). It returns modified (bytes + validators), not modified, or a failure reason. [inferred]\n- **Controller.** `RemoteVocabularyController` (`@MainActor @Observable`, owned by `AppState` as `remoteVocabulary`, started from the menu-bar `.task` next to `updateChecker.startPeriodicChecks`). It runs one check at launch, one 2 s after the source, URL or token last changed, one on \"Update now\", and one every 60 minutes, only while the source is `.url` and the address is valid. It validates a downloaded body with the same rules as the local file, adopts it into the cache only when it is valid and differs from the cached text, and publishes a `RemoteVocabularyStatus` for Settings. Every change of source, URL or token starts a new generation; a result from an older generation is discarded. [inferred]\n- **Settings UI.** In Settings \u2192 Transcription, a \"Vocabulary source\" picker (Local file / URL). Local file shows today's file row and its validation line. URL shows an address field, a secure token field, an \"Update now\" button and a status line. The new controls live in their own `View` struct, not in `TranscriptionSettingsView`'s section body, which sits near the 300 ms type-check limit (spec gh-17). [inferred]\n- **What leaves the machine.** Only the GET to the configured address, with the optional token header. No meeting data, no terms, no device identifiers. [paraphrase]\n\n## Edge Cases & Constraints\n\n- Address empty, not `https://`, or without a host: nothing is fetched, Settings says what is wrong, and no vocabulary is used while the source is URL. [inferred]\n- The address changes (typed, pasted, cleared): the engines switch at once to the new address's copy (none yet, so no vocabulary until the first successful check), the previous address's copy is deleted, and a download still in flight for the previous address is cancelled or its result discarded. Terms from one address are never used for another. [inferred]\n- Switching the source to Local file and back to URL with the same address keeps the copy. [inferred]\n- The server ignores the conditional headers and answers 200 with identical text: the cache file is not rewritten (no needless re-preparation in the engines), only `checkedAt` and the validators are updated. [inferred]\n- The server sends neither ETag nor Last-Modified: every check downloads the whole file (at most 256 KB). [inferred]\n- A 304 arrives although no validators were sent (no usable copy): treated as a failed check. [inferred]\n- A body larger than 256 KB is not held in memory beyond 256 KB + 1 byte: the download is aborted and reported as too large. [inferred]\n- A body that is not UTF-8, has no terms, more than 256 unique terms or a term over 512 bytes is not adopted; the previous copy stays and Settings names the reason (same limits and wording as the local file). [inferred]\n- A response with `Content-Type: text/html` (a sign-in page after a redirect, an error page served with 200) is rejected as \"not a text file\". [inferred]\n- With a token set, a redirect to another host is not followed (the token must never reach a host the user did not name); any redirect to a non-https address is not followed. Both are reported as failed checks. [inferred]\n- A token pasted with surrounding whitespace or a trailing newline is trimmed before it is sent. [inferred]\n- A server that keeps a response open by trickling bytes is cut off at the 60 s total deadline and reported as timed out; \"Update now\" becomes available again. [inferred]\n- Network down, DNS failure, idle timeout: reported as offline; HTTP 401/403 as access denied (check the token); 404 as not found; other statuses with their code. In every failure case the last good copy stays in use, also across a restart. [paraphrase]\n- No copy yet and the check fails: no vocabulary is used, and Settings says so. [inferred]\n- The text file is missing or no longer valid: the pair is deleted and the next check downloads afresh. The sidecar is missing, corrupt, names another address or describes other text: the text stays in use, the sidecar is deleted and the next check sends no validators (spec \u00a7 Architecture \"Cache\"). [inferred]\n- Writing the cache fails (disk full, permissions) before the final rename: the previous copy stays in use unchanged and Settings reports that the download could not be saved. The rename itself fails: the previous text stays in use and the mismatch rule repairs it on the next check. The status never claims one copy while the engines read another. [inferred]\n- A copy replaced while a job is transcribing affects only the next engine call; a dual-source job can get the old list on one track and the new one on the other. Accepted: rare and harmless. [inferred]\n- The Mac sleeps through a scheduled check: the overdue check runs after wake; if the network is not up yet, the status shows offline until the next check or \"Update now\". [inferred]\n- App Store variant: the cache lives inside the sandbox container (`dataDir` resolves there), the outbound-network entitlement is already present, the Keychain works as for the OpenAI key. No `#if APPSTORE` is needed. [inferred]\n- Dev and release builds on one Mac keep separate copies (per-bundle file name) and separate settings (UserDefaults are per bundle identifier). [inferred]\n- Privacy: the log gets one line per check with the outcome and HTTP status; the host is logged with `privacy: .private`; never the path or query of the address, the token, or any term. The token is stored only in the Keychain: never in UserDefaults, the sidecar, logs or `/state`. [inferred]\n- Record-only mode dims the Transcription section as today; checks still run, harmlessly. [inferred]\n- This fork does not edit `CLAUDE.md` or `AGENTS.md` (fork rule); rationale goes into the doc comments of the new types. [inferred]\n\n### Verification\n\n- Fetcher tests through a dedicated `URLProtocol` stub that records each request and can answer 200 / 304 / 401 / 404 / redirect / transport error / oversized body / HTML / a response that never finishes: they pin the conditional headers, the Bearer header, the refused cross-host redirect, the byte cap, the content-type check and the total deadline (injected short). [inferred]\n- Cache tests in a temporary directory: atomic replace yields a new file revision (`WhisperVocabularyPrompt.fileRevision` differs) so both engines re-read it; sidecar round trip; injected failures at each commit step (temporary text, sidecar, rename) leave the previous text readable and, after a reload, no validators are offered for mismatched text, so a following 304 cannot keep it. [inferred]\n- Controller tests with a fake fetcher, a temporary cache location, a zero debounce and a short interval: launch check, URL change switches the engines' path and deletes the old copy, stale generation discarded, 304 keeps the copy, invalid body keeps the copy, offline keeps the copy, identical body does not rewrite, token revision triggers a check, no checks while the source is Local file. [inferred]\n- `EngineController` sync tests: `.url` gives both engines the current address's cache path and no bookmark, `.file` gives today's path and bookmark, switching the source or the address at runtime propagates. [inferred]\n- One ViewInspector wiring test per new control, located by `A11yID` constant. [inferred]\n- `./scripts/lint.sh` clean with the pinned tools; `./scripts/pre-push.sh --with-appstore` (release build plus App Store variant) clean. [inferred]\n- A live check against a real public and a real private repository file is the owner's (human checks in the report). [inferred]\n\n## Acceptance Criteria\n\n- **R1:** Settings \u2192 Transcription has a \"Vocabulary source\" picker with \"Local file\" (default, also for existing installations) and \"URL\". With \"Local file\", everything behaves exactly as today. With \"URL\", both engines use only the downloaded copy; the local file selection is kept for switching back and is not used. Errors: with \"URL\" and no usable copy, the engines run without vocabulary rather than falling back to the local file. [paraphrase]\n- **R2:** With source \"URL\" and a valid `https://` address, the app checks the address at launch, about 2 s after the source, address or token was last changed, when the user presses \"Update now\", and every 60 minutes while running. Each check after the first sends the ETag / Last-Modified validators of the last successful response for that address; a 304 keeps the copy and only records the check time. Errors: an address that is empty, not `https://` or without a host is never fetched, and Settings says what is wrong. [paraphrase]\n- **R3:** A downloaded file is adopted only when it passes the same limits as the local file (UTF-8, at most 256 KB, 1 to 256 unique terms, each at most 512 bytes) and is not served as `text/html`; it then replaces the cached copy atomically, and the next transcription with either engine uses the new terms without a restart. A body identical to the cached copy is not rewritten. Errors: a file that fails these checks is not adopted, the previous copy stays in use, and Settings shows the reason. [paraphrase]\n- **R4:** When a check fails (no network, timeout, HTTP error, refused redirect, invalid content, the copy cannot be saved), the last good copy for the same address stays in use, also after a restart, and Settings shows the failure next to the date of the copy in use, for example \"No connection to the server \u00b7 using the copy from 6 Oct 2026, 14:02 (128 terms)\". Errors: with no copy yet, Settings says no vocabulary is in use. [paraphrase]\n- **R5:** An optional access token can be entered in a secure field; it is stored only in the Keychain (clearing the field deletes the item), sent only as `Authorization: Bearer <token>` over https, and never written to UserDefaults, the cache sidecar, logs or `/state`. With a token set, a redirect to another host is not followed. The help text names the address forms that work: a GitHub `raw.githubusercontent.com` address with a GitHub token, and the GitLab API raw-file address (`https://<host>/api/v4/projects/<id or URL-encoded path>/repository/files/<URL-encoded file path>/raw?ref=<branch>`) with a GitLab token. Errors: HTTP 401/403 shows \"Access denied (HTTP <code>) \u2013 check the access token\"; a refused redirect shows that the address points to another server. [paraphrase]\n- **R6:** The copy the engines use always belongs to the address currently configured: copies are kept per address, the engines read only the current address's copy, copies for other addresses are deleted when the address changes, and the result of a check started for a previous address, source or token is discarded. Errors: a copy that cannot be deleted is logged and stays unread. [inferred]\n- **R7:** With source \"URL\", Settings shows the address, the term count of the copy in use, when its content last changed (\"updated\"), when the server was last reached (\"checked\"), and an offline or failure note when the last check failed; \"Update now\" is disabled while a check runs. Errors: no error surface beyond R2\u2013R5. [paraphrase]\n- **R8:** The only network traffic this feature causes is the GET to the configured address; each check writes one log line with its outcome and HTTP status, with the host marked private and without the address path or query, the token or any term. Errors: no error surface beyond the log write itself. [paraphrase]\n\n## Early proof point\n\nTask gh-10-vocabulary-from-a-central-url.1 validates the core approach (a URLSession GET with our own conditional headers surfaces a 304 to our code instead of a cached 200, the Bearer header goes out, a cross-host redirect can be refused while a token is set, the body is capped, and an atomic cache replace gives the engines a new file revision). If it fails, re-evaluate the fetch mechanism (session configuration, task delegate) or the per-address cache file before continuing with gh-10-vocabulary-from-a-central-url.2+.\n\n## Quick commands\n\n```bash\ncd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh10-home swift test --parallel --filter \"RemoteVocabulary|CustomVocabularyValidation|EngineSettingsRuntimeSync|TranscriptionSettingsVocabulary|VocabularySourceSettings\" > /private/tmp/mt-gh10-test.log 2>&1; echo \"exit=$?\"\n```\n\n## Boundaries\n\n- Terminology rules (`terminologyRulesText`) and protocol templates (#2) from a URL are a follow-up; the issue names them as later. [paraphrase]\n- Merging the central list with a personal local file is a follow-up (D-A1); only one source is active at a time. [inferred]\n- Locking the source and address through a configuration profile is #11's job; this spec only keeps both as plain UserDefaults keys so a profile can preset them. Tokens from a profile are out. [paraphrase]\n- No per-profile vocabulary (#6), no notification or menu-bar indicator for a failing check, no `/state` or automation-API fields for the remote source: follow-ups if needed. [inferred]\n- No retry schedule beyond the 60-minute cadence and \"Update now\" (for example a quick retry after a failure, or on network return or wake): follow-up. [inferred]\n- No `PRIVATE-TOKEN` header and no GitLab `/-/raw/` web address for private projects; the API raw-file address covers private GitLab files. Follow-up if an organisation server rejects Bearer tokens. [inferred]\n- The vocabulary limits (256 KB, 256 terms, 512 bytes per term) stay as they are for both sources. [inferred]\n- No change to the engines' vocabulary handling (`ParakeetEngine`, `WhisperKitEngine`, `WhisperVocabularyPrompt`). [inferred]\n\n## Decision Context\n\n- **D1 \u00b7 Allow a URL (for example the raw address of a file in a GitHub or GitLab repository) as a vocabulary source alongside the local file.** why: issue #10 asks for one central list that everyone gets in the same state \u00b7 status: active [owner-stated 2026-10-06]\n- **D2 \u00b7 Check at launch and periodically with ETag/Last-Modified, cache locally, keep the last copy offline, and show state, last update time and an offline note in Settings.** why: issue #10 Wish and Acceptance list exactly these \u00b7 status: active [owner-stated 2026-10-06]\n- **D3 \u00b7 An optional access token for private repositories, stored in the Keychain.** why: issue #10 Wish, \"optional mit Zugangstoken (privates Repository), im Schl\u00fcsselbund gespeichert\" \u00b7 status: active [owner-stated 2026-10-06]\n- **D4 \u00b7 Terminology rules and protocol templates from a URL come later, not in this spec.** why: issue #10 \"Gleiches Prinzip sp\u00e4ter\" and coordinator triage 2026-10-06 put them in Boundaries \u00b7 status: active [owner-stated 2026-10-06]\n- **A1 \u00b7 One source at a time through a \"Vocabulary source\" picker (Local file / URL); with URL only the downloaded copy is used, no merge and no fallback to the local file, as the coordinator triage 2026-10-06 suggested.** flip at: the owner wants personal terms on top of the central list (merged lists with a priority order) \u00b7 test: EngineSettingsRuntimeSyncTests, source `.url` gives the engines the cache path and source `.file` the local path \u00b7 alternatives: merged lists, rejected for now because they raise dedup, priority and limit questions and add a second failure mode \u00b7 status: active [agent-inferred 2026-10-06]\n- **A2 \u00b7 The token is sent only as `Authorization: Bearer <token>`; the supported private-file addresses are GitHub raw.githubusercontent.com and the GitLab API raw-file endpoint; GitLab's REST docs accept personal access tokens as Bearer and raw.githubusercontent.com accepts Bearer tokens.** flip at: an organisation server accepts only `PRIVATE-TOKEN` or the owner needs GitLab `/-/raw/` web addresses \u00b7 test: fetcher test asserts the exact Authorization header and no PRIVATE-TOKEN header \u00b7 status: active [agent-inferred 2026-10-06]\n- **A3 \u00b7 Only https:// addresses; with a token a redirect to another host is not followed; any redirect to http is not followed; a text/html response is rejected.** flip at: the owner needs plain http inside a trusted network \u00b7 test: fetcher tests for scheme, redirects and content type \u00b7 status: active [agent-assumed 2026-10-06]\n- **A4 \u00b7 Checks run at launch, 2 s after the last change of source, address or token, on \"Update now\" and every 60 minutes; the cadence has no setting.** flip at: the owner wants a different cadence or a setting \u00b7 test: RemoteVocabularyControllerTests with injected debounce and interval \u00b7 status: active [agent-assumed 2026-10-06]\n- **A5 \u00b7 A downloaded file must pass the local file's limits (256 KB, 256 terms, 512 bytes per term) or it is not adopted and the previous copy stays; those `WhisperVocabularyPrompt` limits bound main-actor parsing and the Whisper prompt.** flip at: an organisation list outgrows the limits \u00b7 test: RemoteVocabularyControllerTests invalid-body cases \u00b7 status: active [agent-inferred 2026-10-06]\n- **A6 \u00b7 The cached copy is keyed by its address (an address hash in the file name) and by the bundle identifier; the engines read only the current address's copy and copies for other addresses are deleted.** flip at: the owner wants offline copies kept for several addresses \u00b7 test: RemoteVocabularyControllerTests address-change case and EngineSettingsRuntimeSyncTests address switch \u00b7 alternatives: one fixed cache file deleted on address change, rejected because a failed deletion would then serve another address's terms \u00b7 status: active [agent-assumed 2026-10-06]\n- **A7 \u00b7 The status is shown only in Settings: no notification, no menu-bar indicator, no new `/state` fields.** flip at: users miss a long-failing source, or an automation driver needs the state \u00b7 test: RPCSettingsStateTests key list unchanged \u00b7 status: active [agent-assumed 2026-10-06]\n- **A8 \u00b7 The Settings sentences the spec does not quote read: an address problem \"<problem> \u2013 no vocabulary in use\", \"Checking the address\u2026\" while a check runs, \"<n> terms \u00b7 updated <date> \u00b7 checked <date>\" for a current copy, a failure with no copy \"<failure> \u00b7 no vocabulary in use\", 404 \"Not found (HTTP 404) \u2013 check the address\", any other status \"The server answered with HTTP <code>\", \"The file is larger than 256 KB\", \"The download could not be saved\"; invalid content reuses the local file's sentence without its period.** alternatives: B \u2014 no \"\u2013 no vocabulary in use\" tail on address problems; C \u2014 the local file's sentences verbatim with the period \u00b7 flip at: app/MeetingTranscriber/Sources/RemoteVocabulary.swift:RemoteVocabularyStatus.message(formatDate:) and RemoteVocabularyFailure.message \u00b7 test: RemoteVocabularyTests.testStatusMessages and RemoteVocabularyTests.testFailureMessages \u00b7 status: active [agent-assumed 2026-10-09]\n- **A9 \u00b7 A refused redirect has two cases: to another server with a token set (\"\u2026the token is not sent there\", the spec's sentence) and to an address without https (\"The address redirects to an address without https\"), so a refusal without a token never claims a token was withheld.** alternatives: B \u2014 one \"redirect refused\" case with the spec's sentence for both \u00b7 flip at: app/MeetingTranscriber/Sources/RemoteVocabularyFetcher.swift:RemoteVocabularyFetcher.redirectRefusal(from:to:tokenPresent:) \u00b7 test: RemoteVocabularyFetcherTests.testRedirectPolicy and RemoteVocabularyFetcherTests.testCrossHostRedirectWithATokenIsRefused \u00b7 status: active [agent-assumed 2026-10-09]\n- **A10 \u00b7 A sidecar-only update (`updateMetadata(_:describing:)`) binds the sidecar to the hash of the text the server's answer was checked against, never to the file re-read from disk, so a file changed underneath fails the next load's hash check instead of receiving validators.** alternatives: B \u2014 `updateMetadata(_:)` hashing the file on disk; C \u2014 metadata carrying a hash set by the caller \u00b7 flip at: app/MeetingTranscriber/Sources/RemoteVocabularyCache.swift:RemoteVocabularyCache.updateMetadata(_:describing:) \u00b7 test: RemoteVocabularyCacheTests.testUpdatingMetadataLeavesTheTextFileUntouched and RemoteVocabularyCacheTests.testUntrustedSidecarIsDeletedAndTheTextKeptWithoutValidators \u00b7 status: active [agent-assumed 2026-10-09]\n- **A11 \u00b7 A refused redirect is logged with the status class `HTTP 3xx`, not its exact code: the fetcher reports a refusal without the response's status, and carrying it means changing `RemoteVocabularyFetcher` and `RemoteVocabularyFailure`, which task .2 does not touch. Every other check logs its exact status (a refused 200 web page or oversized body as 200, an unusable 304 as 304, no answer as `none`).** alternatives: B \u2014 carry the redirect's exact code from `RemoteVocabularyFetcher.transfer` through the failure into the log line \u00b7 flip at: app/MeetingTranscriber/Sources/RemoteVocabularyController.swift:RemoteVocabularyController.logDescription(of:result:) and app/MeetingTranscriber/Sources/RemoteVocabularyFetcher.swift:RemoteVocabularyFetcher.transfer \u00b7 test: RemoteVocabularyControllerTests.testTheLogLineCarriesOnlyTheOutcomeAndTheHTTPStatus \u00b7 status: active [agent-assumed 2026-10-09]\n- **A12 \u00b7 While a check is due or running, a copy whose sidecar was not trusted (no recorded check time) reads \"Checking the address\u2026\", and no copy reads \"Not downloaded yet \u2013 no vocabulary in use\"; the status never calls such a copy current.** alternatives: B \u2014 show the untrusted copy as current with its file date; C \u2014 \"Checking the address\u2026\" also during the debounce when there is no copy \u00b7 flip at: app/MeetingTranscriber/Sources/RemoteVocabularyController.swift:RemoteVocabularyController.idleStatus() \u00b7 test: RemoteVocabularyControllerTests.testAnAddressChangeDeletesTheOldCopyAndDropsTheCheckInFlight and RemoteVocabularyControllerTests.testStartChecksOnceAndStoresAValidDownload \u00b7 status: active [agent-assumed 2026-10-09]\n- **A13 \u00b7 The URL controls are separate form rows in this order: address field, secure token field, \"Update now\", the status line (caption font, secondary colour, also for a failure), then the address-forms caption.** alternatives: B \u2014 the status line beside the button on one row; C \u2014 failure lines in red \u00b7 flip at: app/MeetingTranscriber/Sources/Settings/VocabularySourceSettingsView.swift:VocabularySourceSettingsView.updateControls \u00b7 test: VocabularySourceSettingsTests.testEachSourceShowsOnlyItsOwnControls \u00b7 status: active [agent-assumed 2026-10-09]\n- **A14 \u00b7 The caption under the address reads: \"A text file with one term per line. GitHub: https://raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>, with a GitHub token for a private repository. GitLab: https://<host>/api/v4/projects/<id or URL-encoded path>/repository/files/<URL-encoded file path>/raw?ref=<branch>, with a GitLab token with the read_api scope. The token is kept in the Keychain.\"** alternatives: B \u2014 the same forms as a help tooltip on the address field; C \u2014 a short caption pointing to the README \u00b7 flip at: app/MeetingTranscriber/Sources/Settings/VocabularySourceSettingsView.swift:VocabularySourceSettingsView.addressFormsCaption \u00b7 test: VocabularySourceSettingsTests.testEachSourceShowsOnlyItsOwnControls \u00b7 status: active [agent-assumed 2026-10-09]\n\nFIT: GO \u00b7 2026-10-09 \u00b7 base 47c550ad \u00b7 engine flow-next 8.1.1 \u00b7 since the plan review (wapp/main 65888b53) gh-12, gh-1, gh-4, gh-44, gh-7, gh-73, gh-94, gh-54 and two upstream merges landed; the cited constructs all still exist with the same meaning, only their line numbers moved; no open or merged spec claims the source picker, the fetch, the cache or the status line (gh-11 and gh-6 list the vocabulary file as a follow-up; gh-12's fit note says gh-10 keeps its own Keychain account)\n  - gh-12 (merged, PR #79) added `HuggingFaceTokenStore` (`AppSettings+HuggingFaceToken.swift:6-26`, injected through `AppSettings.init`) with a write-only draft field, because a view body reading the app's own Keychain item raises an authorization prompt in a test process (`AppSettings+HuggingFaceToken.swift:36-39`). This spec keeps its bound secure field (R5: clearing the field deletes the item; Architecture: the `openAIAPIKey` shape, `AppSettings.swift:605-614` today), and the controller reads the token outside any view. Consequence for tasks .2 and .3: every test that renders the URL branch or reads the token injects its own Keychain account, as the tasks already say.\n  - `KeychainHelper.save` / `delete` now return `Bool` (`@discardableResult`); the computed-property setter the tasks describe compiles unchanged.\n  - `transcriptionSection` has 8 children today (`TranscriptionSettingsView.swift:39-46`); task .3's count of 9 after its insert holds. `huggingFaceTokenRow` is nested inside `whisperKitModelPicker`, not a section child.\n  - Drifted anchors (same construct, new place): `AppSettings.swift` injection comments 126-148, `openAIAPIKey` 605-614, init 680-693, vocabulary props 397-418; `EngineController.syncEngineSettings` 97-121 and `observeEngineSettings` 126-147 (init now sets `whisperKit.hubToken` at :58); `AppState.makeUpdateChecker` 218; `MeetingTranscriberApp` `startPeriodicChecks` 197 and `SettingsView(` 258; `OutputSettingsView` secure field 189; `SettingsView.swift` 70-75; `A11yID.customVocabularyPathField` 97; `docs/architecture-macos.md` vocabulary bullet ~510 and Settings UI Transcription row 728; `README.md` Transcribe row 256.\n\n## Resolved via Research\n<!-- provenance: plan (docs-scout, practice-scout, docs-gap-scout run inline by the planning agent, no subagents available) on 2026-10-06 -->\n\n### docs-scout\n- **GitLab REST API** \u2014 a personal access token is accepted as `PRIVATE-TOKEN` or as `Authorization: Bearer <token>`; the raw-file endpoint is `GET /projects/:id/repository/files/:file_path/raw?ref=<branch>` with the project id or URL-encoded path and a URL-encoded file path; no ETag is documented for it, so full downloads must work. Source: https://docs.gitlab.com/api/rest/authentication/ and https://docs.gitlab.com/api/repository_files/\n- **GitHub raw content** \u2014 `raw.githubusercontent.com` serves private files with `Authorization: Bearer <token>` (or `token <token>`); a fine-grained token needs Contents read access; the API alternative is `api.github.com/repos/<owner>/<repo>/contents/<path>?ref=<branch>` with `Accept: application/vnd.github.raw`. Source: https://github.com/orgs/community/discussions/53637\n- **URLSession redirects** \u2014 a task delegate's `willPerformHTTPRedirection` that completes with nil cancels the redirect and delivers the 3xx response as the task's result; the async `data(for:delegate:)` / `bytes(for:delegate:)` calls accept a task-specific delegate. Source: https://developer.apple.com/documentation/foundation/urlsessiontaskdelegate\n\n### practice-scout\n- **Gotcha:** with a URL cache in place, URLSession may revalidate on its own and hand back a cached 200 for a 304, so the conditional request is invisible; give the fetcher its own session with `urlCache = nil` and `.reloadIgnoringLocalCacheData`, and send `If-None-Match` / `If-Modified-Since` yourself. Source: https://developer.apple.com/documentation/foundation/nsurlrequest/cachepolicy\n- **Gotcha:** an access token in the URL query (`?private_token=`) would land in UserDefaults and could reach logs; keep tokens in the secure field and log only the host, marked private. Source: https://docs.gitlab.com/api/rest/authentication/\n- **Gotcha:** a private GitLab `/-/raw/` web address without a session redirects to the sign-in page and answers 200 with HTML, which would pass a naive one-term-per-line parse; reject `text/html`. Source: https://docs.gitlab.com/api/repository_files/\n\n### docs-gap-scout\n- **Docs that must change:** `docs/architecture-macos.md` \u2014 file table rows for the new source files, the \"Custom Vocabulary & Terminology Normalization\" bullet (file or URL source), and the Settings UI table's Transcription row (new `remoteVocabulary?` input). Source: docs/architecture-macos.md:119, docs/architecture-macos.md:501, docs/architecture-macos.md:713\n- **Docs that must change:** `README.md` \u2014 the Settings \u2192 Transcribe row and the custom-vocabulary feature bullet mention the URL source. Source: README.md:89, README.md:254\n- **Not changed:** `CLAUDE.md` / `AGENTS.md` stay untouched under the fork rule; `docs/automation-api.md` is unaffected because `/state` does not change (A7). Source: .claude/rules/wapp-fork.md\n\n## Requirement coverage\n\n| Req | Description | Task(s) | Gap justification |\n| --- | --- | --- | --- |\n| R1 | Vocabulary source picker; URL uses only the downloaded copy, no fallback to the local file | gh-10-vocabulary-from-a-central-url.2, gh-10-vocabulary-from-a-central-url.3 | \u2014 |\n| R2 | Checks at launch, after changes, on \"Update now\", every 60 min; conditional requests; address validation | gh-10-vocabulary-from-a-central-url.1, gh-10-vocabulary-from-a-central-url.2 | \u2014 |\n| R3 | Adopt only valid, non-HTML downloads atomically; next transcription uses them; identical body not rewritten | gh-10-vocabulary-from-a-central-url.1, gh-10-vocabulary-from-a-central-url.2 | \u2014 |\n| R4 | Failed check keeps the last good copy, also after restart; Settings shows failure and copy date | gh-10-vocabulary-from-a-central-url.2, gh-10-vocabulary-from-a-central-url.3 | \u2014 |\n| R5 | Optional token in Keychain only, Bearer over https, no cross-host redirect with token, address forms in help | gh-10-vocabulary-from-a-central-url.1, gh-10-vocabulary-from-a-central-url.3 | \u2014 |\n| R6 | Copy in use always belongs to the configured address; stale results discarded | gh-10-vocabulary-from-a-central-url.2 | \u2014 |\n| R7 | Settings status: address, term count, updated, checked, failure note; button disabled while checking | gh-10-vocabulary-from-a-central-url.3 | \u2014 |\n| R8 | Only the GET leaves the machine; one privacy-safe log line per check | gh-10-vocabulary-from-a-central-url.2 | \u2014 |\n\n",
+    "mergeBaseTracker": "## Problem\n\nDas Vokabular f\u00fcr die Transkription (Namen, Fachbegriffe) kommt heute aus einer lokalen Datei (`AppSettings+Vocabulary.swift`). In einer Organisation pflegt aber idealerweise eine Stelle die Liste zentral (Namen der Gremiumsmitglieder, Organisationseinheiten, Abk\u00fcrzungen), und alle bekommen denselben Stand.\n\n## Wunsch\n\nAls Quelle neben der lokalen Datei eine **URL** zulassen, z. B. die Raw-Adresse einer Datei in einem Git-Repository (GitLab/GitHub):\n\n- beim Start und periodisch laden (mit ETag/Last-Modified, damit nur \u00c4nderungen \u00fcbertragen werden),\n- lokal zwischenspeichern und **offline** mit dem letzten Stand weiterarbeiten,\n- optional mit Zugangstoken (privates Repository), im Schl\u00fcsselbund gespeichert,\n- Stand und Zeitpunkt der letzten Aktualisierung in den Einstellungen anzeigen.\n\nGleiches Prinzip sp\u00e4ter f\u00fcr Terminologie-Regeln (`terminologyRules`) und Protokoll-Vorlagen (#2).\n\n## Abnahme\n\n- URL auf eine Vokabeldatei gesetzt \u2192 Begriffe werden verwendet; \u00c4nderung im Repository \u2192 nach dem n\u00e4chsten Abgleich \u00fcbernommen.\n- Ohne Netz \u2192 letzter Stand bleibt aktiv, Hinweis in den Einstellungen.\n\nPasst zur zentralen Vorkonfiguration (#11).",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/10"
   },
-  "updated_at": "2026-10-06T20:54:53.329832Z"
+  "updated_at": "2026-10-09T12:16:53.892219Z"
 }

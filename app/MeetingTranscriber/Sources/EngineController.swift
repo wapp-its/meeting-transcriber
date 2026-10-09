@@ -101,9 +101,9 @@ final class EngineController {
             whisperKit.applyModelVariant(model.variant, origin: model.origin)
             let next = settings.whisperLanguageOrNil
             if whisperKit.language != next { whisperKit.language = next }
-            let nextVocab = settings.customVocabularyPath
+            let nextVocab = settings.effectiveVocabularyPath
             if whisperKit.customVocabularyPath != nextVocab { whisperKit.customVocabularyPath = nextVocab }
-            let nextBookmark = settings.customVocabularyBookmark
+            let nextBookmark = settings.effectiveVocabularyBookmark
             if whisperKit.customVocabularyBookmark != nextBookmark { whisperKit.customVocabularyBookmark = nextBookmark }
             let nextVocabularyPromptEnabled = settings.whisperKitVocabularyPromptEnabled
             if whisperKit.vocabularyPromptEnabled != nextVocabularyPromptEnabled {
@@ -111,9 +111,9 @@ final class EngineController {
             }
 
         case .parakeet:
-            let nextVocab = settings.customVocabularyPath
+            let nextVocab = settings.effectiveVocabularyPath
             if parakeetEngine.customVocabularyPath != nextVocab { parakeetEngine.customVocabularyPath = nextVocab }
-            let nextBookmark = settings.customVocabularyBookmark
+            let nextBookmark = settings.effectiveVocabularyBookmark
             if parakeetEngine.customVocabularyBookmark != nextBookmark { parakeetEngine.customVocabularyBookmark = nextBookmark }
             let nextLang = settings.parakeetLanguageOrNil
             if parakeetEngine.language != nextLang { parakeetEngine.language = nextLang }
@@ -135,6 +135,8 @@ final class EngineController {
             _ = settings.whisperLanguage
             _ = settings.customVocabularyPath
             _ = settings.customVocabularyBookmark
+            _ = settings.vocabularySource
+            _ = settings.remoteVocabularyURL
             _ = settings.whisperKitVocabularyPromptEnabled
             _ = settings.parakeetLanguage
         } onChange: { [weak self] in
