@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-13-transcriptions-window",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-10-09T03:28:57.213063Z",
+  "completion_reviewed_at": "2026-10-09T03:56:40.533017Z",
   "created_at": "2026-10-06T20:19:41.852724Z",
   "default_impl": null,
   "default_review": null,
@@ -404,6 +404,41 @@
       "timestamp": "2026-10-09T03:28:57.177428Z",
       "tool_calls": 22,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "33ba28a9c1d46ef7784676467c17ffbe8848efb5cf9db365929b9fdca92b252d",
+      "backend": "codex",
+      "base_sha": "47c550ada129a452cc2922d9f24653bb3212b497",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "3e6c9bfcdda50a833f5aebe6fb84e0511be218b6",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 6780,
+      "output_sha256": "3a124367e655d3e36cbd1811dae5b665d4313fbda335d1d85c077c5aebcc606d",
+      "reservation_id": "e19da9dc04a64992acabde3843673667",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-09T03:56:40.501942Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -412,7 +447,7 @@
     "impl:gh-13-transcriptions-window.3": 1,
     "impl:gh-13-transcriptions-window.4": 1,
     "plan": 1,
-    "plan#completion": 1
+    "plan#completion": 2
   },
   "review_pending_rounds": {
     "plan": 1
@@ -453,5 +488,5 @@
     "mergeBaseTracker": "## Problem\n\nErledigte, laufende und fehlgeschlagene Transkriptionen erscheinen heute als Eintr\u00e4ge im Men\u00fc des Men\u00fcleisten-Symbols. Die Liste w\u00e4chst mit jeder Aufnahme, fehlgeschlagene Jobs bleiben dort stehen, und es gibt keinen Ort, um eine \u00e4ltere Transkription wiederzufinden. Ein Kontextmen\u00fc ist f\u00fcr eine wachsende Liste das falsche Werkzeug: kein Scrollen mit \u00dcbersicht, keine Suche, keine Aktionen pro Eintrag au\u00dfer dem \u00d6ffnen.\n\n## Wunsch\n\nEin eigenes Fenster **\u201eTranskriptionen\u201c** (aus dem Men\u00fc und per Tastenk\u00fcrzel erreichbar), f\u00fcr den Anfang bewusst einfach:\n\n- Liste aller Jobs, neueste oben: Titel, App, Datum/Uhrzeit, Dauer, Status (l\u00e4uft \u00b7 wartet auf Sprechernamen \u00b7 fertig \u00b7 fehlgeschlagen).\n- **Suche** \u00fcber Titel und Teilnehmende; Volltextsuche im Transkript als zweiter Schritt.\n- Pro Eintrag: Protokoll/Transkript \u00f6ffnen, im Finder zeigen; bei fehlgeschlagenen Jobs **Fehlergrund anzeigen, erneut versuchen, entfernen**.\n- Das Men\u00fc zeigt danach nur noch die laufenden Jobs und die letzten paar fertigen, plus \u201eAlle Transkriptionen\u2026\u201c.\n\n## Hinweise\n\n- Quelle der Liste: die Ausgabeordner (Protokolle/Transkripte) und der gespeicherte Pipeline-Zustand \u2013 kein neuer Speicher n\u00f6tig, solange beides reicht.\n- Inhalte bleiben lokal; das Fenster geh\u00f6rt nicht auf die Allowlist des Debug-RPC-Servers (`/ui/tree`), da es Titel und Teilnehmende zeigt.\n- Kleinster brauchbarer Schritt: Liste + Status + \u00d6ffnen + Entfernen fehlgeschlagener Jobs. Suche im Transkripttext und Filter erst danach.\n\n## Abnahme\n\n- Nach mehreren Aufnahmen ist das Men\u00fc nicht l\u00e4nger als vorher; alle Jobs stehen im Fenster.\n- Ein fehlgeschlagener Job zeigt seinen Grund und l\u00e4sst sich erneut starten oder entfernen.\n- Die Suche nach einem Meeting-Titel findet den Eintrag.\n- Ein Neustart der App \u00e4ndert nichts an der Liste.\n\nKandidat f\u00fcrs Original (eigener `feat/\u2026`-Branch).",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/13"
   },
-  "updated_at": "2026-10-09T03:38:50.947984Z"
+  "updated_at": "2026-10-09T03:56:40.534495Z"
 }
