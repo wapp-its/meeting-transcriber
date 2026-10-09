@@ -47,6 +47,7 @@
             watchControl: @escaping (WatchAction) async -> WatchControlOutcome = { _ in .failed },
             recordStatus: @escaping () -> RecordStatusDTO = { .notRecording },
             recordControl: @escaping (RecordAction) async -> RecordControlOutcome = { _ in .failed },
+            recordStopAny: @escaping () async -> RecordControlOutcome = { .failed },
         ) async throws -> URL {
             let server = DebugRPCServer(
                 port: 0,
@@ -65,7 +66,13 @@
                 watchControl: watchControl,
                 recordStatus: recordStatus,
                 recordControl: recordControl,
+                recordStopAny: recordStopAny,
             )
+            return try await listen(server)
+        }
+
+        /// Start `server` and return its base URL once the OS has assigned a port.
+        private func listen(_ server: DebugRPCServer) async throws -> URL {
             self.server = server
             server.start()
             // Wait for the listener's stateUpdateHandler to populate boundPort.
@@ -1330,6 +1337,103 @@
             req.httpMethod = "DELETE"
             let (_, response) = try await URLSession.shared.data(for: req)
             XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 404)
+        }
+
+        /// A `scope: "any"` stop goes to its own seam and never to the verb seam,
+        /// and answers with the status body: 200 for both success outcomes, 503
+        /// for a stop that lost the recording or did not settle.
+        func testV1RecordStopAnyGoesToItsOwnSeam() async throws {
+            var outcome = RecordControlOutcome.changed
+            var stopAnyCalls = 0
+            var controlCalls: [RecordAction] = []
+            let base = try await startServer(
+                recordControl: { action in
+                    controlCalls.append(action)
+                    return .changed
+                },
+                recordStopAny: {
+                    stopAnyCalls += 1
+                    return outcome
+                },
+            )
+
+            for (expected, code) in [(RecordControlOutcome.changed, 200), (.unchanged, 200), (.failed, 503)] {
+                outcome = expected
+                let (data, response) = try await postRecord(base, #"{"action":"stop","scope":"any"}"#)
+                XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, code, "\(expected)")
+                XCTAssertNoThrow(try JSONDecoder().decode(RecordStatusDTO.self, from: data), "\(expected): status body")
+            }
+            XCTAssertEqual(stopAnyCalls, 3)
+            XCTAssertEqual(controlCalls, [], "a stop of any recording must never reach the verb seam")
+        }
+
+        /// Never read as `any`: an unknown scope, or one on another verb, is a
+        /// 400 with an empty body before either seam runs.
+        func testV1RecordRejectsAnUnknownOrMisplacedScope() async throws {
+            var calls = 0
+            let base = try await startServer(
+                recordControl: { _ in
+                    calls += 1
+                    return .changed
+                },
+                recordStopAny: {
+                    calls += 1
+                    return .changed
+                },
+            )
+
+            for body in [
+                #"{"action":"stop","scope":"all"}"#,
+                #"{"action":"start","scope":"any"}"#,
+                #"{"action":"start","scope":null}"#,
+            ] {
+                let (data, response) = try await postRecord(base, body)
+                XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 400, body)
+                XCTAssertTrue(data.isEmpty, "\(body): nothing was applied, so there is no state to report")
+            }
+            XCTAssertEqual(calls, 0, "neither seam may run")
+        }
+
+        func testV1RecordPlainStopKeepsTheVerbSeam() async throws {
+            var stopAnyCalls = 0
+            var controlCalls: [RecordAction] = []
+            let base = try await startServer(
+                recordControl: { action in
+                    controlCalls.append(action)
+                    return .unchanged
+                },
+                recordStopAny: {
+                    stopAnyCalls += 1
+                    return .changed
+                },
+            )
+
+            let (_, response) = try await postRecord(base, #"{"action":"stop"}"#)
+
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+            XCTAssertEqual(controlCalls, [.stop])
+            XCTAssertEqual(stopAnyCalls, 0)
+        }
+
+        /// `DebugRPCServer.init` defaults the stop-any seam to `.failed`, so
+        /// dropping the argument where `AppState` builds the server would compile
+        /// and leave every route test above green. With nothing recording the
+        /// wired closure answers 200 (`unchanged`) where that default answers 503.
+        func testV1RecordStopAnyIsWiredByAppState() async throws {
+            let state = makeRPCTestState()
+            let base = try await listen(state.buildDebugRPCServer(port: 0, token: Self.testToken))
+
+            let (data, response) = try await postRecord(base, #"{"action":"stop","scope":"any"}"#)
+
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+            XCTAssertFalse(try JSONDecoder().decode(RecordStatusDTO.self, from: data).recording)
+            withExtendedLifetime(state) {} // the server's closures hold it weakly
+        }
+
+        private func postRecord(_ base: URL, _ body: String) async throws -> (Data, URLResponse) {
+            var req = request("POST", base.appendingPathComponent("v1/record"), headers: authHeader)
+            req.httpBody = Data(body.utf8)
+            return try await URLSession.shared.upload(for: req, from: XCTUnwrap(req.httpBody))
         }
 
         func testV1RecordRequiresAuth() async throws {

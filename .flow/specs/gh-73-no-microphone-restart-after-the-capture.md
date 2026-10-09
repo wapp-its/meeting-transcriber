@@ -62,6 +62,8 @@ Task gh-73-no-microphone-restart-after-the-capture.1 validates the core approach
 
 Maintainability (plan review, round 2): duplication - task .1 mirrors the private clock, session and factory test fakes in the new stop-race suite (advisory; the same copy gh-44 made, kept to avoid refactoring the stall watchdog test file); structure - none identified
 
+FIT: GO · 2026-10-08 · base ed0b4e6d · engine flow-next 8.1.1 · gh-44 merged into wapp/main on 2026-10-07 (PR #75), so A1 holds; tools/audiotap on the base is byte-identical to gh-44's planning head 6e259686, every task anchor matches by symbol; no spec or doc changed since the plan review claims the microphone restart path (gh-94 is the watch loop, the doc commits cover other features)
+
 ## Memory findings
 
 | Track | Category | Entry | Why relevant |

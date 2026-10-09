@@ -53,9 +53,46 @@ Line numbers are those on gh-44's branch head (6e259686); re-anchor by symbol if
 - [ ] 20 consecutive `swift test --parallel` runs of the audiotap target are green, every log read; refused and late attempts log at notice level with the reason from the seal answer and no device UID, seen in `log show`.
 - [ ] `./scripts/lint.sh` is clean with the pinned tools; `MicCaptureHandler.swift` and both test files stay under 600 lines; `swift build` of `app/MeetingTranscriber` succeeds; the commit message records the cause the reproduction showed.
 ## Done summary
-TBD
+A microphone capture that is stopped while a restart is still queued no longer opens the microphone after stop() returns. The restart attempt now asks the restart arbiter whether its generation is still the attempt in flight, and builds its session, inside one critical section on a new `MicCaptureHandler.attemptBuildLock` that stop()'s seal also takes. An attempt queued before stop() builds nothing afterwards, on every trigger (stall, default-input change, configuration change, retries), because they all build through `runRestartAttempt`.
 
+What changed:
+- `RestartArbiter.mayBuildAttempt(generation:)` (true only for `.attemptInFlight(generation)`) and `RestartArbiter.seal` (`.stopped`, `.gaveUp`, nil) are read-only additions. No phase or transition changed.
+- `attemptBuildLock` is an NSLock. Its doc comment names who takes it, the lock order (it, then `arbiter`) and that the session factory runs under it. stop() takes it around the `.stopRequested` seal only and still never waits on the restart queue. The attempt copies the arbiter state under the arbiter's lock and releases that lock before the factory runs.
+- Logs, all notice level with no device UID or name. A refused attempt logs "Mic: not building restart attempt N after <trigger>: the capture was stopped first" (or "gave up"). A late return logs "Mic: restart attempt N after <trigger> returned after the capture was stopped; tearing its session down" in place of "outlived its deadline". The adoption-refused line moved from info to notice. One helper (`sealReason`) maps the seal to text for both new lines.
+- Tests. Task .1's two XCTExpectFailure wrappers are gone and their assertions are unchanged. `RestartArbiterTests.testOnlyTheAttemptStillInFlightMayBuildItsSession` and `testTheSealSaysWhetherTheCaptureWasStoppedOrGaveUp` are table-driven over launched, stopped, given up, superseded, newer, backing off and committing, and over nil, stopped and gave up. `MicCaptureHandlerStopRaceTests.testADefaultInputRestartQueuedWhenStopIsCalledBuildsNoSession` was red before the guard and is green after. `testARetryWaitingOutItsBackoffWhenStopIsCalledBuildsNoSession` is green before and after and pins R1's "including".
+
+Evidence:
+- Red with the arbiter API present and the guard absent. Four failures, all `("2") is not equal to ("1")` (StopRace :172, its candidate-calls line :173, :193, StallWatchdog :508).
+- Revert check after the fix, with the bare factory call restored locally and not committed. The same four failures appeared, and the guard was restored byte-identical.
+- Focused suites with the guard. 61 tests (RestartArbiter 27, StopRace 3, StallWatchdog 12, Wedge 7, Stop 2, ConfigChange 10), rc 0. Wedge, Stop and ConfigChange suites are unedited.
+- R2. 20 consecutive `swift test --parallel` runs of the whole audiotap target, each rc 0, 521 of 521 tests in every log, zero `error:` lines, the 3 stop-race tests and the timer test present in every log (/private/tmp/gh73-run-1.log to gh73-run-20.log). The 20 runs ran as two back-to-back foreground batches of 10 on the same tree, because one 600 s tool call does not fit 20 runs.
+- Log check. `log show` showed the new lines at Default (notice) level with both reasons, "was stopped" and "gave up", and no device identifiers. The suites run for the check did not exercise the adoption-refused line. Only its level changed.
+- Lint found 0 violations in 701 files and 0 files needing formatting. Line counts are MicCaptureHandler.swift 582, the StopRace tests 223, the StallWatchdog tests 585 and the RestartArbiter tests 326. `swift build` of app/MeetingTranscriber succeeded and compiled AudioTapLib.
+- The commit message records the cause. The reproduction showed a production race, and runner load decided how often CI saw it.
+
+Defect route:
+- prior fixes: no open fork or upstream PR touches MicCaptureHandler or RestartArbiter, no reverts on those files, no matching memory bug entry, no other open fork issue for the symptom. The check ran after the fix was written (late against the route's order) and found nothing that would have changed it.
+- diagnosis: eliminated "a timer tick after stop()" (stop() invalidates the timer, and the manual-clock test with no timer reproduces it); confirmed "an attempt queued on restartQueue before stop() builds its session after stop() returned" (task .1's held-queue reproduction failed on every run, and the guard turns it green).
+- introduced by: skipped: no known-good revision (the build-first order dates from 603f6213, which moved restart attempts onto restartQueue)
+- base: 4 failures `("2") is not equal to ("1")` at cd44d94e with the wrappers removed | head: 61 focused tests and 20 full-target runs green at 1f207e2a
+- live: no live surface (library; the tests are the proof)
+
+Follow-ups:
+- The app-audio channel has the same shape. `AppAudioCapture.completeRestart` queues `performAttempt()` on its own restart queue, which builds an aggregate device and tap before it consults the arbiter, and `AppAudioCapture.stop()` does not wait on that queue. An app-tap restart queued before stop() would build a tap after stop() returned and then destroy it. This is outside this spec's Touches (microphone only), and nothing has measured it.
+
+Decisions:
+- One commit carries the guard and the wrapper removal, with no separate red commit. Task .1 already committed the reproduction, and a red commit would break bisection.
+- The refusal reads the arbiter state once under its lock, so the reason it logs is the seal that refused the attempt, even if a give-up turns into a stop right after.
+- A nil seal is unreachable for a launched attempt. It reads "a newer attempt took over".
+- The review ran its normal three draws (correctness, contracts, integration) because the change adds a lock to production concurrency.
+
+baseline: green (swift test --parallel --filter 'MicCaptureHandlerStallWatchdogTests|RestartArbiterTests|MicCaptureHandlerStopRaceTests', 38 tests, rc 0; lint 0 violations)
+Tier: session (jev-unavailable(no_key)); actual model: claude-opus-5-5
+
+stage: impl-review - ran [2026-10-08T14:10Z..2026-10-08T14:15Z] (codex gpt-5.6-sol xhigh, three draws, all SHIP, no findings)
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 1f207e2ae967eb65a9b0a3926681a64368f72d67
+- Tests: cd tools/audiotap && swift test --parallel --filter 'RestartArbiterTests|MicCaptureHandlerStopRaceTests|MicCaptureHandlerStallWatchdogTests|MicCaptureHandlerWedgeTests|MicCaptureHandlerStopTests|MicCaptureHandlerConfigChangeTests' (61 tests, rc 0), cd tools/audiotap && swift test --parallel, 20 consecutive runs (each rc 0, 521/521 tests), PATH=$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH ./scripts/lint.sh (0 violations, 701 files), cd app/MeetingTranscriber && swift build (rc 0)
 - PRs:

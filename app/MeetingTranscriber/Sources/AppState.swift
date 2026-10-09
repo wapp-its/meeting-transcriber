@@ -449,6 +449,7 @@ final class AppState {
                 watchControl: watch.control,
                 recordStatus: record.status,
                 recordControl: record.control,
+                recordStopAny: record.stopAny,
             )
         }
     #endif
@@ -518,20 +519,24 @@ final class AppState {
         !pipeline.queue.pendingSpeakerNamingJobs.isEmpty
     }
 
-    /// Whether the active loop is a manual recording (vs. auto-detect). Drives
-    /// the menu-bar "Stop Recording" item; hoisted to a single-member accessor
-    /// so the body reading it through `watching.watchLoop` stays cheap.
-    ///
-    /// Deliberately the loop-only predicate, not the controller's wider one.
-    /// The menu item asks "is there a recording I can stop", and during a
-    /// manual start that has registered but not yet built its loop the honest
-    /// answer is no: `stopManualRecording()` would find no loop, stop nothing,
-    /// and the recording would begin a moment later regardless. The wider
-    /// predicate belongs to the automation API, which asks the different
-    /// question of whether a manual recording owns *or is about to own* the
-    /// loop; see `watchStatusDTO()`.
+    /// Whether the active loop is a manual recording (vs. auto-detect), read
+    /// off the loop alone. `WatchingController.isManualRecording` is the wide
+    /// predicate (a manual start that has not built its loop yet counts too)
+    /// that the automation API and the `/state` snapshot ask instead.
     var isManualRecording: Bool {
         watching.watchLoop?.isManualRecording == true
+    }
+
+    /// Whether the menu's "Stop Recording" has a recording to end: the loop is
+    /// recording, a detected meeting or a manual recording alike. A
+    /// single-member accessor so the menu-bar body reading it stays cheap.
+    ///
+    /// Deliberately the loop-only predicate, not the controller's wider manual
+    /// one. During a manual start that has registered but not yet built its
+    /// loop there is nothing to stop yet: the click would stop nothing, and
+    /// the recording would begin a moment later regardless.
+    var canStopRecording: Bool {
+        watching.isRecording
     }
 
     /// Menu-bar **top-half** red tint: mic channel silent, OR both channels

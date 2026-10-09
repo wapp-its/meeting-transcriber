@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-08T14:57:11.896558Z",
+  "depends_on": [
+    "gh-94-stop-a-detected-meeting-recording-by.2"
+  ],
+  "id": "gh-94-stop-a-detected-meeting-recording-by.4",
+  "priority": null,
+  "review": "codex:gpt-5.6-sol:xhigh",
+  "spec": "gh-94-stop-a-detected-meeting-recording-by",
+  "spec_path": ".flow/tasks/gh-94-stop-a-detected-meeting-recording-by.4.md",
+  "status": "done",
+  "title": "Put the stop and watch controls directly under the menu's status line",
+  "updated_at": "2026-10-08T14:57:11.896558Z"
+}

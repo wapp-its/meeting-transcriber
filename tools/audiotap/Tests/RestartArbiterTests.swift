@@ -156,6 +156,50 @@ final class RestartArbiterTests: XCTestCase {
         XCTAssertEqual(arbiter.phase, .stopped)
     }
 
+    // MARK: - Building an attempt
+
+    func testOnlyTheAttemptStillInFlightMayBuildItsSession() {
+        // An attempt asks this before it builds anything: one queued before a
+        // stop or a give-up must not bring an engine up after it.
+        let launched: [RestartArbiter.Event] = [.startSucceeded, .deviceChanged]
+        let adopted = launched + [.attemptReturned(generation: 1, succeeded: true), .commitReady(generation: 1)]
+        let cases: [(name: String, events: [RestartArbiter.Event], generation: Int, mayBuild: Bool)] = [
+            ("the launched attempt", launched, 1, true),
+            ("stopped during the attempt", launched + [.stopRequested], 1, false),
+            ("given up during the attempt", launched + [.attemptTimedOut(generation: 1)], 1, false),
+            ("superseded by a newer attempt", adopted + [.deviceChanged], 1, false),
+            ("the newer attempt", adopted + [.deviceChanged], 2, true),
+            ("backing off", launched + [.attemptReturned(generation: 1, succeeded: false)], 1, false),
+            ("committing", launched + [.attemptReturned(generation: 1, succeeded: true)], 1, false),
+        ]
+        for (name, events, generation, mayBuild) in cases {
+            var arbiter = RestartArbiter()
+            for event in events {
+                _ = arbiter.handle(event)
+            }
+            XCTAssertEqual(arbiter.mayBuildAttempt(generation: generation), mayBuild, name)
+        }
+    }
+
+    func testTheSealSaysWhetherTheCaptureWasStoppedOrGaveUp() {
+        let launched: [RestartArbiter.Event] = [.startSucceeded, .deviceChanged]
+        let exhausted = launched + [.attemptReturned(generation: 1, succeeded: false), .retryBudgetExhausted]
+        let cases: [(name: String, events: [RestartArbiter.Event], seal: RestartArbiter.Seal?)] = [
+            ("capturing", [.startSucceeded], nil),
+            ("an attempt in flight", launched, nil),
+            ("stopped", [.startSucceeded, .stopRequested], .stopped),
+            ("gave up on a timeout", launched + [.attemptTimedOut(generation: 1)], .gaveUp),
+            ("gave up on an exhausted retry budget", exhausted, .gaveUp),
+        ]
+        for (name, events, seal) in cases {
+            var arbiter = RestartArbiter()
+            for event in events {
+                _ = arbiter.handle(event)
+            }
+            XCTAssertEqual(arbiter.seal, seal, name)
+        }
+    }
+
     // MARK: - Timeout constant
 
     func testAttemptTimeoutIsGenerousComparedToAHealthyRestart() {
