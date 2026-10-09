@@ -165,8 +165,9 @@ enum RecordingCut {
         }
     }
 
-    /// Write each track's kept frames beside it. On any failure every copy
-    /// written so far is removed and the originals were never touched.
+    /// Write each track's kept frames beside it, each copy dated like the
+    /// original it will replace. On any failure every copy written so far is
+    /// removed and the originals were never touched.
     private static func stageCopies(
         of cuts: [(url: URL, frames: AVAudioFramePosition)],
     ) throws -> [(original: URL, staged: URL)] {
@@ -177,6 +178,7 @@ enum RecordingCut {
                 try? FileManager.default.removeItem(at: copy)
                 staged.append((cut.url, copy))
                 try copyFrames(from: cut.url, to: copy, frames: cut.frames)
+                try carryCreationDate(from: cut.url, to: copy)
             }
         } catch {
             for entry in staged {
@@ -185,6 +187,17 @@ enum RecordingCut {
             throw error
         }
         return staged
+    }
+
+    /// The copy takes the original's place on its path, so it carries the
+    /// original's creation date. The orphan scan ages a recording by that
+    /// date and queues nothing older than a day; a cut that reset it would
+    /// make a recording recovered days later young enough to be queued after
+    /// all, where before the cut it was rightly passed over.
+    private static func carryCreationDate(from original: URL, to copy: URL) throws {
+        let attributes = try FileManager.default.attributesOfItem(atPath: original.path)
+        guard let created = attributes[.creationDate] as? Date else { return }
+        try FileManager.default.setAttributes([.creationDate: created], ofItemAtPath: copy.path)
     }
 
     /// Swap every copy in, keeping each original under a second name (a hard

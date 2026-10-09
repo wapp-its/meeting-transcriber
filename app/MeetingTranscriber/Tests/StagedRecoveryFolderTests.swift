@@ -108,6 +108,39 @@ final class StagedRecoveryFolderTests: XCTestCase {
         XCTAssertTrue(registry.claimedAudioPaths.isEmpty, "the hold ends with the scan")
     }
 
+    /// A recording recovered more than a day after it was made is still cut
+    /// (its countdown minutes are not kept) but, as before this spec, no
+    /// longer queued: the cut keeps the recording's age, so the orphan scan's
+    /// day limit still excludes it. A fresh recording beside it is cut and
+    /// queued, which is what shows the age and not the cut did the excluding.
+    func testARecordingRecoveredAfterADayIsCutButNotQueued() async throws {
+        let dir = try makeTempDirectory(prefix: "StagedRecoveryOld")
+        let old = StagedRecordingFixture(dir: dir, stem: "20260301_100000")
+        let fresh = StagedRecordingFixture(dir: dir, stem: "20260301_110000")
+        for fixture in [old, fresh] {
+            try fixture.stoppedRecording(seconds: 25)
+            try fixture.storeCut(startedAt: -22, cutAt: -12.000_031_25)
+        }
+        let twoDaysAgo = Date(timeIntervalSinceNow: -2 * 86400)
+        for suffix in RecordingFileSuffix.all {
+            try FileManager.default.setAttributes([.creationDate: twoDaysAgo], ofItemAtPath: old.url(suffix).path)
+        }
+        let queue = try makeQueue(staging: dir)
+
+        let unsettled = PipelineController.recoverStagingFolder(dir, levelBalance: false, diagnostics: RecordingDiagnostics())
+        await PipelineController.recoverOrphans(
+            into: queue, holdingBack: unsettled.map { dir.appendingPathComponent($0 + RecordingFileSuffix.mix) }, recordingsDir: dir,
+        )
+
+        for fixture in [old, fresh] {
+            for suffix in RecordingFileSuffix.all {
+                XCTAssertEqual(try fixture.frames(suffix), keptFrames, "\(fixture.stem)\(suffix)")
+            }
+            XCTAssertFalse(fixture.storedCutExists, fixture.stem)
+        }
+        XCTAssertEqual(queue.jobs.map(\.meetingTitle), ["Recovered Recording (20260301_110000)"])
+    }
+
     /// A queue rebuilt while the previous pass still runs starts a second
     /// pass on the same folder. It waits for the first, which has settled the
     /// stored cut by then, so the recording is cut once and not deeper.
