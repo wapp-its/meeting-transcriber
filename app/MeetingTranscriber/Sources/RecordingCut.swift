@@ -118,9 +118,10 @@ enum RecordingCut {
         for track in tracks(of: recording) {
             let file = try AVAudioFile(forReading: track.url)
             let keep = max(0, ((seconds - track.offset) * file.fileFormat.sampleRate).rounded(.down))
-            let frames = AVAudioFramePosition(keep)
-            if file.length > frames {
-                cuts.append((track.url, frames))
+            // Compared before the conversion, which traps on a point far past
+            // any track's end.
+            if Double(file.length) > keep {
+                cuts.append((track.url, AVAudioFramePosition(keep)))
             }
         }
         guard !cuts.isEmpty else { return }
