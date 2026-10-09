@@ -240,10 +240,14 @@ final class DualSourceRecorderLifecycleTests: XCTestCase {
     /// The microphone members reach the live session, and the tapped process
     /// ids last exactly as long as the recording: a reader that found them
     /// before the start or after the stop would look at a meeting app nobody
-    /// is recording.
+    /// is recording. The live recording is read through `RecordingProvider`,
+    /// the role the callers hold: a recorder member that missed the role's
+    /// requirement would leave the role's default (no device, no track) in its
+    /// place and fail there. Before and after it, the recorder is read itself.
     func testTheMicrophoneReachesTheSessionAndTheTappedProcessesLastTheRecording() throws {
         let dir = try makeTempDirectory(prefix: "lifecycle_microphone")
         let (recorder, session) = makeRecorder(dir: dir)
+        let provider: any RecordingProvider = recorder
         let headset = MicInputDevice(uid: "HeadsetUID", name: "Headset")
         session.micInputDevice = headset
         session.microphoneTrackActive = true
@@ -257,14 +261,14 @@ final class DualSourceRecorderLifecycleTests: XCTestCase {
         // A PID no process holds, as in the app-only test above.
         try recorder.start(source: .appAndMic(pid: 999_999))
 
-        XCTAssertEqual(recorder.micInputDevice, headset)
-        XCTAssertTrue(recorder.microphoneTrackActive)
+        XCTAssertEqual(provider.micInputDevice, headset)
+        XCTAssertTrue(provider.microphoneTrackActive)
         session.microphoneTrackActive = false
-        XCTAssertFalse(recorder.microphoneTrackActive, "read from the session, not copied at the start")
-        XCTAssertEqual(recorder.tappedPIDs, [999_999])
-        XCTAssertEqual(recorder.tappedPIDs, session.lastConfiguration?.pids, "the ids the tap was opened with")
-        recorder.selectMicrophone(deviceUID: "BuiltInUID")
-        recorder.selectMicrophone(deviceUID: nil)
+        XCTAssertFalse(provider.microphoneTrackActive, "read from the session, not copied at the start")
+        XCTAssertEqual(provider.tappedPIDs, [999_999])
+        XCTAssertEqual(provider.tappedPIDs, session.lastConfiguration?.pids, "the ids the tap was opened with")
+        provider.selectMicrophone(deviceUID: "BuiltInUID")
+        provider.selectMicrophone(deviceUID: nil)
         XCTAssertEqual(session.selectMicrophoneCalls, ["BuiltInUID", nil])
 
         let configuration = try XCTUnwrap(session.lastConfiguration)
