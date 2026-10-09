@@ -48,9 +48,48 @@ App target. The Microphone entry in the menu bar menu (R1, R2): its title, the s
 
 
 ## Done summary
-TBD
+The menu bar menu now has a Microphone entry, right after the watch controls, that names the microphone a recording captures from (or the one the next recording would use) and switches it from a submenu. The submenu lists System Default (<name>) and then exactly the list Settings → Audio → Microphone shows, with the stored choice checked. Choosing an item writes `AppSettings.micDeviceUID` and nothing else, so the macOS default input never changes and task .3's observer moves a running recording. The decisions and every string live in the pure `MicrophoneMenuState.resolve`. `MicrophoneDevices` holds the shared list (moved out of `AudioSettingsView`) and the default input's name from Core Audio via `MicInputDevice.systemDefaultInput()`. `MicrophoneController` publishes `devices` and `defaultInputName` and refreshes them at init, at `recordingStarted`, on `AVCaptureDevice` connect and disconnect notifications, and from a Core Audio `kAudioHardwarePropertyDefaultInputDevice` listener on the main queue. `AppState.microphoneMenuState` feeds the view with the hint set to nil, ready for task .5.
 
+Tests (14 new, each seen red first):
+- `MicrophoneMenuStateTests` (10, one per arm). `testARecordingNamesTheDeviceItsCaptureReports` covers the recording title from the reported device, with a different device chosen. `testIdleNamesTheChosenDeviceWhenItIsConnected` and `testIdleOnSystemDefaultNamesTheMacOSDefaultInput` cover the idle titles. `testARecordingWhoseCaptureNamesNoDeviceFallsBackToTheIdleTitle` covers a nil device and a nameless device. `testAChosenDeviceThatIsNotConnectedIsNamedMissingAndStaysChecked` checks the title idle and recording, plus the checked, disabled `Selected microphone (not connected)` item. `testNoInputDeviceSaysNoMicrophoneIsAvailable` and `testNoMicIsOneDisabledOffLineWithoutItems` cover the two error titles. `testTheItemsAreSystemDefaultThenTheSettingsListInOrder` uses a non-alphabetical input. `testTheCheckedItemIsTheStoredChoice` and `testTheMeetingAppHintPassesThroughUnchanged` cover the checkmark and the hint. A stub resolver turned all 10 red on wrong values.
+- `MicrophoneControllerTests` (+2). `testRefreshDevicesPublishesTheListAndTheDefaultInputNameTheProvidersReport` checks init and an explicit refresh. `testTheListIsRefreshedAtRecordingStartAndWhenADeviceConnectsOrDisconnects` posts on a private `NotificationCenter`. With the refresh calls left out, the test was red at init, recording start, connect and disconnect.
+- `MenuBarMicrophoneTests` (2, ViewInspector). `testChoosingAMicrophoneHandsItsUIDToTheSelection` finds `A11yID.menuMicrophonePicker`, then `ViewType.Picker`, runs `select(value: "HeadsetUID")` and checks the closure receives it. `testNoMicShowsTheOffLineAndNoPicker` is the noMic case. Before the section was rendered, both tests were red.
+- `MenuBarViewTests`, `MenuBarJobMenuTests`, `SettingsViewTests` and `SettingsInteractionTests` are unchanged and pass.
+
+Not covered by a unit test: the Core Audio default-input listener fires only when the user's macOS default input changes, which a test must not do (spec D1). It follows `MicCaptureHandler.installDeviceChangeListener`. The rendered dropdown is manual QA in this repo and the owner's check after merge (spec Verification). That covers inline-picker checkmarks, how the disabled item looks, and the off line. The app was not run here because installing a build is the conductor's step after push.
+
+Baseline: green. The focused filter `MicrophoneMenuState|MenuBar|MicrophoneController|SettingsView|SettingsInteraction` passed 234 tests with rc 0. `./scripts/lint.sh` found 0 violations in 717 files.
+Gates at HEAD 19a9546f:
+- The task filter passed 248 tests (rc 0).
+- The spec's app Quick filter plus the suites that build `AppState`, `Microphone|MeetingMicrophone|WatchLoopTests|MenuBar|AppState|WatchingController|SettingsView|SettingsInteraction`, passed 480 tests (rc 0).
+- `./scripts/lint.sh` found 0 violations in 721 files.
+- `./scripts/pre-push.sh` (release, Homebrew) gave rc 0 with no warnings in our targets.
+- `swift build -c release -Xswiftc -DAPPSTORE` gave rc 0.
+- A clean `xcodebuild build-for-testing`, then `swiftlint analyze --strict`, found 0 violations in 648 files. This ran before the last two edits, the picker items' modifier order and one doc-comment paragraph, which add no declaration.
+- The first release build warned that the stored `(String) -> Void` was passed to `Binding`'s `@Sendable` setter. Wrapping it in a closure removed the warning.
+- Line counts: `MenuBarView.swift` 396, `MicrophoneController.swift` 168, `AppState+Microphone.swift` 33.
+
+Assumption: every title starts with `Microphone: `. A chosen device that is not connected reads `Microphone: System Default (<name>) — selected microphone not connected` when idle and `Microphone: <recorded name> — selected microphone not connected` while recording. No input device reads `Microphone: None available` · alternatives: `Microphone: <name> (selected microphone not connected)`; `No microphone available` · flip at: `MicrophoneMenuState.swift:MicrophoneMenuState.resolve` and `title(naming:chosenMissing:)` · test: `testAChosenDeviceThatIsNotConnectedIsNamedMissingAndStaysChecked`, `testNoInputDeviceSaysNoMicrophoneIsAvailable` · rule 4
+Assumption: the not-connected suffix also shows during a recording, beside the recorded device's name. R1's error clause says the title says so, and the spec's edge case says the title names the device actually recording · alternatives: suffix only when idle · flip at: `MicrophoneMenuState.resolve` (the recording arm's `chosenMissing`) · test: `testAChosenDeviceThatIsNotConnectedIsNamedMissingAndStaysChecked` · rule 4
+Assumption: the entry carries the SF Symbol `mic` and the off line `mic.slash`, as a `Label` like the neighbouring items · alternatives: a bare `Text` without icon · flip at: `MenuBarView.swift:microphoneSection` · test: `MenuBarMicrophoneTests.testNoMicShowsTheOffLineAndNoPicker` · rule 4
+Decision: "no microphone available" means the AVFoundation list is empty and Core Audio names no default input. An empty list with a default name shows `System Default (<name>)` · rule 6 · the task's Approach names exactly "no input device and no default name".
+Decision: a reported device without a name falls back to the idle title, with no UID lookup in the list · rule 6 · a failed name read is rare and the spec names no lookup.
+Decision: the `Selected microphone (not connected)` item goes last, after the Settings list · rule 6 · R2 fixes System Default first and the list in order, and the missing choice is in neither.
+Decision: `MenuBarView.microphoneMenu` is an Optional (nil leaves the entry out) and has no `.hidden` state · rule 6 · the task allows "or similar", and production always passes a state. `onSelectMicrophone` precedes it in the property list, so the app's memberwise call does not end in a closure literal (SwiftLint `trailing_closure`).
+Decision: `resolve`'s `meetingAppHint` defaults to nil · rule 6 · this keeps five required parameters under SwiftLint's `function_parameter_count` without a suppression. `AppState.microphoneMenuState` passes nil explicitly for task .5 to replace. With "No Microphone" on, the hint still passes through but is not shown, because that entry has no submenu (and nothing is probed then).
+Decision: `MicrophoneController.init` also takes `notificationCenter` (default `.default`) · rule 6 · the connect and disconnect test posts on a private centre and does not broadcast a process-wide AVFoundation notification.
+Decision: a failed Core Audio listener install logs `Default input listener not installed (status: <OSStatus>)` at warning level, with no device name or UID · rule 6 · this mirrors `MicCaptureHandler`'s failed-listener line.
+Decision: `AudioSettingsView` keeps its `@State` list, `.onAppear` and `refreshAudioDevices()`, whose body now calls `MicrophoneDevices.available()` · rule 1 · the task says the picker and its tags stay as they are.
+
+Follow-ups: none filed by this task.
+Feature map: the repo has no `.flow/features/`. New user route: menu bar → Microphone → choose a device, which writes the same setting as Settings → Audio → Microphone.
+
+Tier: session (jev-unavailable(no_key)) — explicit routing block: implementer opus at xhigh
+
+stage: impl-review - ran [2026-10-09T07:59:46Z..2026-10-09T08:06:23Z] codex gpt-5.6-sol at xhigh (receipt model gpt-5.6-sol, effort xhigh). Three draws (correctness, contracts, integration) all returned SHIP with no findings. The validator was not dispatched because the verdict was SHIP, and the held phase lease was released. The round was finalized through `--merged-file` because the integration draw's text did not parse for the merge-plan route. The fan-out ran under `CODEX_SANDBOX=workspace-write` and `FLOW_VALIDATE_REVIEW=1`, the owner's standing override. `git status` afterwards showed only flowctl's `.flow/specs` ledger change.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 19a9546ff316196b63a0df970a144c01c1969e01
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh43-home swift test --parallel --filter 'MicrophoneMenuState|MenuBar|MicrophoneController|SettingsView|SettingsInteraction' (248 tests, rc 0), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh43-home swift test --parallel --filter 'Microphone|MeetingMicrophone|WatchLoopTests|MenuBar|AppState|WatchingController|SettingsView|SettingsInteraction' (480 tests, rc 0), ./scripts/lint.sh (0 violations in 721 files), ./scripts/pre-push.sh (rc 0), cd app/MeetingTranscriber && swift build -c release -Xswiftc -DAPPSTORE (rc 0), xcodebuild build-for-testing (clean) + swiftlint analyze --strict (0 violations in 648 files)
 - PRs:
