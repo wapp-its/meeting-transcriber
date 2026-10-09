@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import AudioTapLib
 
 // `@preconcurrency`: AVFoundation types lack Sendable annotations —
@@ -50,6 +51,12 @@ class DualSourceRecorder: RecordingProvider {
     private(set) var isRecording = false
     private(set) var recordingStartDate: Date = .distantPast
     private var startTimestamp: String?
+    /// The stem whose meeting-end cut this recorder stored and holds, from the
+    /// first `storePendingCut` until `clearPendingCut`, or until a stop that
+    /// throws hands the cut to recovery. Its own property because the cut
+    /// outlives `stop()`, which drops `startTimestamp`: the live cut runs after
+    /// the stop, and the stored cut is cleared only then.
+    private var pendingCutStem: String?
 
     var appLevelDBFS: Double {
         captureSession?.appLevelDBFS ?? -120
@@ -111,15 +118,21 @@ class DualSourceRecorder: RecordingProvider {
     /// `WatchingController` already makes one level up with `makeRecorder`.
     private let makeCaptureSession: CaptureSessionFactory
 
-    /// `makeCaptureSession`'s default wraps the factory in a closure rather
-    /// than naming it: a bare reference to a static declared in another file
-    /// compiles here and then fails to link.
+    /// Flushes every change to the stored meeting-end cut to disk.
+    /// Injectable so a test can make one sync fail.
+    private let pendingCutSync: PendingRecordingCut.Sync
+
+    /// The closure defaults wrap the static they call rather than naming it:
+    /// a bare reference to a static declared in another file compiles here
+    /// and then fails to link.
     init(
         recordingsDir: URL = DualSourceRecorder.defaultRecordingsDir,
         makeCaptureSession: @escaping CaptureSessionFactory = { try LiveCaptureSession.make($0) },
+        pendingCutSync: @escaping PendingRecordingCut.Sync = { try PendingRecordingCut.fullSync($0) },
     ) {
         self.recordingsDir = recordingsDir
         self.makeCaptureSession = makeCaptureSession
+        self.pendingCutSync = pendingCutSync
     }
 
     /// Remove leftover raw app temp files (current or legacy suffix) a previous
@@ -489,7 +502,20 @@ class DualSourceRecorder: RecordingProvider {
         guard isRecording else {
             throw RecorderError.notRecording
         }
+        do {
+            return try finishRecording()
+        } catch {
+            // The marker survives a stop that throws, so recovery re-mixes the
+            // recording from its tracks. Its stored cut goes along: released
+            // here, recovery applies it as its own, and a later clear no longer
+            // reaches it.
+            releasePendingCut()
+            throw error
+        }
+    }
 
+    /// `stop()` once it is known to be recording.
+    private func finishRecording() throws -> RecordingResult {
         isRecording = false
 
         // Stop capture session and get result
@@ -524,6 +550,63 @@ class DualSourceRecorder: RecordingProvider {
         // completed recording from being recovered twice.
         try? FileManager.default.removeItem(at: Self.inProgressMarker(stem: ts, in: recordingsDir))
         return recording
+    }
+
+    // MARK: - Stored meeting-end cut
+
+    /// Store the meeting-end cut of the recording in progress beside its
+    /// marker, under the marker's stem: recovery pairs the two by name.
+    ///
+    /// The stem is remembered and held before the write, whatever the write
+    /// ends in. One whose folder sync failed has published its record anyway,
+    /// so only a recorder that owns the stem by then can clear it again.
+    func storePendingCut(cutAt: Date, deadline: Date, startedAt: Date) throws {
+        guard isRecording, let stem = startTimestamp else {
+            throw RecorderError.notRecording
+        }
+        pendingCutStem = stem
+        PendingRecordingCut.hold(stem)
+        let record = PendingRecordingCut(stem: stem, cutAt: cutAt, startedAt: startedAt, deadline: deadline)
+        try Self.requireOnDisk(PendingRecordingCut.write(record, in: recordingsDir, sync: pendingCutSync))
+    }
+
+    /// Nothing stored covers a store that published nothing as well: there is
+    /// no record then that recovery could apply, so none to keep in step with
+    /// the live cut.
+    func recordPendingCutResolution(keptSeconds: TimeInterval, captureEndedAt: Date) throws {
+        guard let stem = pendingCutStem else { return }
+        let outcome = PendingRecordingCut.recordResolution(
+            stem: stem, in: recordingsDir, keptSeconds: keptSeconds, captureEndedAt: captureEndedAt, sync: pendingCutSync,
+        )
+        if case let .notPublished(error) = outcome, error as? PendingRecordingCut.ResolutionError == .noRecord {
+            return
+        }
+        try Self.requireOnDisk(outcome)
+    }
+
+    /// The hold is released after the removal whatever it ended in: the
+    /// question is settled, and a file the removal could not unlink is
+    /// recovery's from then on, which refuses an emptied one.
+    func clearPendingCut() -> PendingRecordingCut.RemoveOutcome {
+        guard let stem = pendingCutStem else { return .removed }
+        let outcome = PendingRecordingCut.remove(stem: stem, in: recordingsDir, sync: pendingCutSync)
+        releasePendingCut()
+        return outcome
+    }
+
+    /// Hand the stored cut over: recovery treats an unheld one as its own.
+    private func releasePendingCut() {
+        guard let stem = pendingCutStem else { return }
+        PendingRecordingCut.release(stem)
+        pendingCutStem = nil
+    }
+
+    private static func requireOnDisk(_ outcome: PendingRecordingCut.WriteOutcome) throws {
+        switch outcome {
+        case .written: return
+        case let .notPublished(error): throw PendingCutWriteError(published: false, underlying: error)
+        case let .publishedNotSynced(error): throw PendingCutWriteError(published: true, underlying: error)
+        }
     }
 
     /// Downmix interleaved multi-channel audio to mono. Passthrough if already
