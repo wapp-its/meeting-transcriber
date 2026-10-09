@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-49-pending-prompt-icon",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-10-09T05:15:18.043160Z",
+  "completion_reviewed_at": "2026-10-09T05:40:16.725516Z",
   "created_at": "2026-10-06T20:19:46.646530Z",
   "default_impl": null,
   "default_review": null,
@@ -264,6 +264,41 @@
       "timestamp": "2026-10-09T05:15:18.017934Z",
       "tool_calls": 22,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "4f677778eceaac79be4fd79ba8222435b89fb4cf0c3631c8cbab470d44fbde75",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "45d27a8239c527b1ad2653167a0300a9cff15472",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 5660,
+      "output_sha256": "3caa56c401131f140e9a80e8a211e67eb895bfe97158accc889be712d2370f7e",
+      "reservation_id": "a6a7447c585e49309b736ce74376a140",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-09T05:40:16.683512Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -271,7 +306,7 @@
     "impl:gh-49-show-a-pending-recording-prompt-on-the.2": 1,
     "impl:gh-49-show-a-pending-recording-prompt-on-the.3": 1,
     "plan": 1,
-    "plan#completion": 1
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -298,5 +333,5 @@
     "mergeBaseTracker": "## Problem\n\nWartet eine R\u00fcckfrage \u201eRecord \u2026 meeting?\u201c auf Antwort, sieht das Men\u00fcleisten-Symbol aus wie im Ruhezustand. Wer die Mitteilung verpasst hat, merkt nicht, dass ein erkanntes Meeting gerade nicht aufgenommen wird. Die R\u00fcckfrage bleibt f\u00fcnf Minuten offen (`consentPromptTimeout`), danach gilt sie als abgelehnt.\n\nDer vorhandene Zustand `BadgeKind.userAction` hilft nicht: Er wird mit derselben ruhenden Wellenform gezeichnet wie `.inactive`.\n\n## Wunsch\n\n- Solange eine R\u00fcckfrage offen ist (`WatchLoop.pendingConsentApp`), zeigt das Symbol das sichtbar an, z. B. mit einem Fragezeichen-Badge oder einem pulsierenden \u00dcberwachungspunkt (#41).\n- Ein Klick auf das Symbol zeigt im Men\u00fc oben \u201eAufnehmen? <App>\u201c mit Aufnehmen / Ignorieren, als R\u00fcckfallebene zur Mitteilung.\n\n## Abnahme\n\nR\u00fcckfrage offen \u2192 das Symbol unterscheidet sich vom Ruhezustand; Antwort gegeben oder abgelaufen \u2192 das Symbol ist wieder wie vorher.\n\nOptionaler Teil aus #41, dort bewusst nicht umgesetzt (erst das Pflichtst\u00fcck: \u00dcberwachung sichtbar, Schalter beim Start).",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/49"
   },
-  "updated_at": "2026-10-09T05:28:40.357768Z"
+  "updated_at": "2026-10-09T05:40:16.727848Z"
 }
