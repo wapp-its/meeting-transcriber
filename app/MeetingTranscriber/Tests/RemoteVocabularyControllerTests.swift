@@ -287,6 +287,30 @@ final class RemoteVocabularyControllerTests: XCTestCase {
         XCTAssertEqual(fetcher.requests.map(\.token), [nil, "glpat-second"], "One check, after the last change, with the trimmed token")
     }
 
+    /// A fetch can finish while a token change is still waiting for the
+    /// observer, its answer queued ahead of the change. That answer must not
+    /// land either: if the new token's check then failed, the old token's copy
+    /// would stay in use.
+    func testAnAnswerQueuedAheadOfATokenChangeDoesNotLand() async throws {
+        let controller = await startedWithCopy(debounce: .seconds(1))
+        let lastGood = RemoteVocabularyCopyInfo(termCount: 2, updatedAt: clock.date)
+        fetcher.holds = true
+        controller.refreshNow()
+        await waitFor(fetcher.heldCount == 1, timeout: .seconds(2))
+
+        fetcher.release(.modified(body: Data("Stale\n".utf8), validators: nil))
+        settings.remoteVocabularyToken = "glpat-new"
+        await waitFor(fetcher.heldCount == 1, timeout: .seconds(3))
+
+        XCTAssertEqual(fetcher.requests.last?.token, "glpat-new")
+        XCTAssertEqual(try Data(contentsOf: textFile), Self.terms, "The old token's answer did not replace the copy")
+        fetcher.release(.failed(.httpStatus(401)))
+        await waitForChecks(controller, count: 3)
+
+        XCTAssertEqual(controller.status, .failed(.httpStatus(401), lastGood: lastGood))
+        XCTAssertEqual(try Data(contentsOf: textFile), Self.terms)
+    }
+
     func testANewControllerOnTheSameCacheStartsFromTheStoredCopy() async {
         _ = await startedWithCopy()
         let lastGood = RemoteVocabularyCopyInfo(termCount: 2, updatedAt: clock.date)
@@ -336,6 +360,19 @@ final class RemoteVocabularyControllerTests: XCTestCase {
                 "failed (Access denied (HTTP 401) – check the access token), HTTP 401",
             ),
             (.failed(.offline), .failed(.offline), "failed (No connection to the server), HTTP none"),
+            (.failed(.timedOut), .failed(.timedOut), "failed (The server did not answer in time), HTTP none"),
+            // These failures follow an answer the fetcher read: a 200 it
+            // refused, a 304 it could not use, a redirect it did not follow.
+            (.failed(.notTextFile), .failed(.notTextFile), "failed (The address returned a web page, not a text file), HTTP 200"),
+            (.failed(.tooLarge), .failed(.tooLarge), "failed (The file is larger than 256 KB), HTTP 200"),
+            (
+                .failed(.unexpectedNotModified), .failed(.unexpectedNotModified),
+                "failed (The server reported no change for a copy this app does not have), HTTP 304",
+            ),
+            (
+                .failed(.insecureRedirect), .failed(.insecureRedirect),
+                "failed (The address redirects to an address without https), HTTP 3xx",
+            ),
             (
                 .failed(.invalidContent(.empty)), .modified(body: Data(" \n".utf8), validators: nil),
                 "failed (Vocabulary file contains no terms), HTTP 200",
