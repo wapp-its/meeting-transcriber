@@ -10,7 +10,7 @@
   "id": "gh-10-vocabulary-from-a-central-url",
   "impl_review_rounds": {
     "gh-10-vocabulary-from-a-central-url.1": 0,
-    "gh-10-vocabulary-from-a-central-url.2": 2
+    "gh-10-vocabulary-from-a-central-url.2": 0
   },
   "next_task": 1,
   "plan_review_rounds": 0,
@@ -318,10 +318,79 @@
       "task": "gh-10-vocabulary-from-a-central-url.2",
       "timestamp": "2026-10-09T11:21:58.323680Z",
       "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "648e6c02a72b00e4724484806fede21848b0b50ce74874e9feef500e01c9cb0e",
+      "backend": "codex",
+      "base_sha": "57347e67a87da2af0f0527cf9d6f5a57bc5fc25e",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-c884f007e335700803a79c4b8084eec3",
+            "classification": "introduced",
+            "findingId": "finding-c884f007e335700803a79c4b8084eec3",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "withdrawn"
+          },
+          {
+            "chainRoot": "finding-ba86a2134f98801907afeb3fb21d3f46",
+            "classification": "introduced",
+            "findingId": "finding-ba86a2134f98801907afeb3fb21d3f46",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-a18efd4e411acc10eba86086b884e20b",
+            "classification": "introduced",
+            "findingId": "finding-a18efd4e411acc10eba86086b884e20b",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-763d25abb2652c8722ac5a6426e74d70",
+            "classification": "introduced",
+            "findingId": "finding-763d25abb2652c8722ac5a6426e74d70",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "withdrawn"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "cab16bd6883c3a0d5125f5df7c85cd7dcd6e825f",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1182,
+      "output_sha256": "e42ed7743d8d1a500ab2b7d58feb5555effe5b6372f941df62e3b9e98769ae0f",
+      "reservation_id": "9ca12b868f4f49169a33e2e68cbdbce7",
+      "round_consumed": true,
+      "scope": "impl:gh-10-vocabulary-from-a-central-url.2",
+      "superseded_by": null,
+      "task": "gh-10-vocabulary-from-a-central-url.2",
+      "timestamp": "2026-10-09T11:24:30.632942Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-10-vocabulary-from-a-central-url.1": 1,
+    "impl:gh-10-vocabulary-from-a-central-url.2": 1,
     "plan": 1,
     "plan#completion": 0
   },
@@ -348,5 +417,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/10"
   },
-  "updated_at": "2026-10-09T11:21:58.351706Z"
+  "updated_at": "2026-10-09T11:24:30.661234Z"
 }
