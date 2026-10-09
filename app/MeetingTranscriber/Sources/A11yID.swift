@@ -59,6 +59,11 @@ enum A11yID {
         "jobRetryButton.\(index)"
     }
 
+    /// The menu's answers to the open recording prompt. No app name, for the
+    /// reason on `consentDeniedAppRemove`.
+    static let consentPromptRecord = "consentPromptRecord"
+    static let consentPromptIgnore = "consentPromptIgnore"
+
     static let recordOnlyBanner = "recordOnlyBanner"
     static let transcriptionSection = "transcriptionSection"
     static let protocolSection = "protocolSection"
