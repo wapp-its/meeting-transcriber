@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-43-mic-menu",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-10-09T09:30:28.058243Z",
+  "completion_reviewed_at": "2026-10-09T09:54:23.048548Z",
   "created_at": "2026-10-06T20:29:21.055422Z",
   "default_impl": null,
   "default_review": null,
@@ -492,6 +492,50 @@
       "task": null,
       "timestamp": "2026-10-09T09:30:28.017742Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "85fbd0cd9e6c065d253478794cbf0ee9902e93d20d59f0e1ef5bc9861ec01890",
+      "backend": "codex",
+      "base_sha": "47c550ada129a452cc2922d9f24653bb3212b497",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-2615152b59c676e3b4bb1c0cc4d7ebd7",
+            "classification": "introduced",
+            "findingId": "finding-2615152b59c676e3b4bb1c0cc4d7ebd7",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "3c491cbdcdfd6ae06cddcad2e1984d662f4a690d",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 3932,
+      "output_sha256": "1661c338c17de223fc3bb1d48a5c404ab989e3146d8fea89809f4b1900507466",
+      "reservation_id": "e8431e134b984671ab95e77dd29d8432",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-09T09:54:23.014779Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -501,7 +545,7 @@
     "impl:gh-43-microphone-in-the-menu-and-the-meeting.4": 1,
     "impl:gh-43-microphone-in-the-menu-and-the-meeting.5": 1,
     "plan": 1,
-    "plan#completion": 1
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -540,5 +584,5 @@
     "mergeBaseTracker": "## Problem\n\nDie App nimmt das Mikrofon aus Settings \u2192 Audio auf (Standard: \u201eSystem Default\u201c). Nutzt Teams/Zoom ein anderes Ger\u00e4t (z. B. das Headset, w\u00e4hrend das macOS-Standard-Eingabeger\u00e4t das eingebaute Mikrofon ist), wird die eigene Stimme vom falschen Mikrofon und viel zu leise aufgenommen (gemessen: ~25 dB leiser, siehe #4). Das manuelle Festlegen in den Einstellungen hilft nur, solange man daran denkt.\n\n## Wunsch\n\n1. **Automatisch dem Mikrofon der Meeting-App folgen:** Beim Start einer Aufnahme ermitteln, welches Eingabeger\u00e4t die erkannte Meeting-App gerade benutzt, und dieses aufnehmen (Einstellung \u201ewie die Meeting-App\u201c, als neuer Standard denkbar).\n2. **Im Men\u00fcleisten-Men\u00fc** das aktuell verwendete Eingabeger\u00e4t anzeigen und per Untermen\u00fc schnell wechseln k\u00f6nnen (R\u00fcckfallebene, wenn 1 nicht eindeutig ist).\n3. Warnen, wenn das aufgenommene Mikrofon nicht das der Meeting-App ist.\n\n## Machbarkeit (noch zu belegen)\n\nmacOS liefert pro Prozess die Ger\u00e4te, mit denen er gerade Audio austauscht (`kAudioProcessPropertyDevices`, Core-Audio-Prozessobjekte, macOS 14.2+). Die App liest das schon f\u00fcr die **Ausgabe** (`ProcessOutputState` in AudioTapLib); f\u00fcr die **Eingabe** ist es dieselbe Eigenschaft mit Eingabe-Scope. Offen: Meeting-Apps k\u00f6nnen \u00fcber ein eigenes virtuelles Ger\u00e4t (\u201eMicrosoft Teams Audio\u201c) oder ein Sprachverarbeitungs-Aggregat aufnehmen; dann zeigt die Eigenschaft nicht direkt das physische Mikrofon. **Erster Schritt:** kleine Messsonde w\u00e4hrend eines echten Teams- und Zoom-Calls, die pro Prozess die Eingabeger\u00e4te ausgibt (nur Ger\u00e4tenamen, kein Ton).\n\nBezug: #4 (eigene Stimme zu leise).",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/43"
   },
-  "updated_at": "2026-10-09T09:42:58.584071Z"
+  "updated_at": "2026-10-09T09:54:23.050443Z"
 }
