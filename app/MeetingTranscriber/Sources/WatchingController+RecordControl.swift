@@ -6,14 +6,16 @@ import Foundation
 ///
 /// Its own file because that one sits at the line cap; the handful of members it
 /// reaches into (`settings`, `watchLoop`, `manualStartTask`, `joinStarts`,
-/// `joinManualStart`, `beginManualRecording`, `stopManualRecording`,
-/// `startWatching`) are internal rather than private for exactly that.
+/// `joinManualStart`, `join(while:)`, `beginManualRecording`,
+/// `stopManualRecording`, `startWatching`) are internal rather than private for
+/// exactly that.
 ///
-/// The whole surface is about one recording shape, `RecordingSource.micOnly`.
+/// The verbs are about one recording shape, `RecordingSource.micOnly`.
 /// Everything else the loop can be doing — an app-picker recording, an
 /// auto-detected meeting — is somebody else's recording here: a start refuses
 /// rather than clobbering it, and a stop leaves it alone rather than ending a
-/// meeting the caller never asked about.
+/// meeting the caller never asked about. The one way past that is a caller
+/// asking for it by name: a stop with `scope: "any"` (`applyRecordStopAny`).
 @MainActor
 extension WatchingController {
     /// Whether a microphone-only recording is in progress.
@@ -111,17 +113,46 @@ extension WatchingController {
     /// documents, and the same reason — a stop that reached across and ended
     /// somebody else's meeting would be far worse than a 200 that did nothing.
     private func applyRecordStop() -> RecordControlOutcome {
-        guard isRecordingMicrophoneOnly else { return .unchanged }
-        let loop = watchLoop
-        let errorBeforeStop = loop?.lastError
+        guard isRecordingMicrophoneOnly, let loop = watchLoop else { return .unchanged }
+        let errorBeforeStop = loop.lastError
         stopManualRecording()
-        if isRecordingMicrophoneOnly { return .failed }
-        // A stop whose recorder threw is not a success, however idle the loop
-        // looks afterwards: `WatchLoop.stopManualRecording` skips the enqueue on
-        // a throw, so there is no job, no transcript and no protocol, and this
-        // controller has already dropped the loop that knows why. Answering 200
-        // there tells the caller their recording is safe when it is gone.
-        if let errorAfterStop = loop?.lastError, errorAfterStop != errorBeforeStop {
+        return verdict(onStopOf: loop, errorBeforeStop: errorBeforeStop)
+    }
+
+    /// Stop whatever is recording, through the menu's "Stop Recording": the
+    /// opt-in `{"action":"stop","scope":"any"}`. Settles in-flight starts
+    /// first, like every record action.
+    ///
+    /// A detected meeting's recording ends at the loop's next poll, not here,
+    /// so the answer waits for the loop to leave `.recording`, under the same
+    /// bound as the joins: read straight after the request, the verdict would
+    /// see the meeting still recording, and the body would describe it so.
+    func applyRecordStopAny() async -> RecordControlOutcome {
+        guard await joinStarts() else { return .failed }
+        guard let loop = watchLoop, loop.state == .recording else { return .unchanged }
+        let errorBeforeStop = loop.lastError
+        let isDetectedMeeting = !loop.isManualRecording
+        stopRecording()
+        if isDetectedMeeting, await !join(while: { loop.state == .recording }) {
+            return .failed
+        }
+        return verdict(onStopOf: loop, errorBeforeStop: errorBeforeStop)
+    }
+
+    /// Whether a stop that has run handed its recording on, judged on the loop
+    /// that was recording. A manual stop leaves this controller without it.
+    ///
+    /// A stop whose recorder threw is not a success, however idle the loop
+    /// looks afterwards: `WatchLoop` skips the enqueue on a throw, so there is
+    /// no job, no transcript and no protocol. A detected meeting's loop reports
+    /// that as `.error`; a record-only write that failed leaves no state change,
+    /// only a new `lastError`. The loop clears that error when a detected
+    /// recording starts, so the comparison holds for one recording on a loop
+    /// that outlives many. Answering 200 for any of these tells the caller
+    /// their recording is safe when it is gone.
+    private func verdict(onStopOf loop: WatchLoop, errorBeforeStop: String?) -> RecordControlOutcome {
+        if loop.state == .recording || loop.state == .error { return .failed }
+        if let errorAfterStop = loop.lastError, errorAfterStop != errorBeforeStop {
             return .failed
         }
         return .changed

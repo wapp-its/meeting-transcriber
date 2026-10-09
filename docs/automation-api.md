@@ -66,7 +66,7 @@ per connection; exceeding it closes the connection without sending a response.
 | `GET`  | `/v1/watch` | Read whether the app is watching for meetings. |
 | `POST` | `/v1/watch` | Start, stop or toggle meeting watching. |
 | `GET`  | `/v1/record` | Read whether a microphone-only recording is running. |
-| `POST` | `/v1/record` | Start, stop or toggle a microphone-only recording. |
+| `POST` | `/v1/record` | Start, stop or toggle a microphone-only recording; with `"scope":"any"`, stop any recording. |
 
 A query string is stripped before routing, so `/v1/jobs/<id>?foo=bar` still
 resolves the id. The one query parameter with meaning is `include=transcript`
@@ -305,16 +305,36 @@ curl -sS -X POST "$BASE/v1/record" \
 that fires from a button, key or schedule, for the reason spelled out under
 `POST /v1/watch`.
 
+**Ending any recording.** A `stop` may carry `"scope": "any"`, its only value:
+
+```bash
+curl -sS -X POST "$BASE/v1/record" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"stop","scope":"any"}'
+```
+
+That ends whatever is recording, as the menu bar's *Stop Recording* does: a
+microphone-only or app-picker recording as a plain stop of it would, and an
+auto-detected meeting too. A detected meeting ends as from the menu: it is
+processed like any meeting that ended, meeting watching stays on, and its app is
+not detected again until its call signal has gone, so a call window left open
+does not start a new recording. That stop takes effect at the next detection
+poll, so the response waits for it, up to 20 seconds. `scope` with `start` or
+`toggle` is refused. Without `scope`, `stop` keeps its narrower meaning below.
+
 The response body is a [`RecordStatusDTO`](#recordstatusdto) describing the state
 **after** the action.
 
 Responses:
 
 - `200 OK` — the request was satisfied, covering both "the state changed" and
-  "it was already like that". A `stop` while something *else* is being recorded
-  is also `200`: no microphone recording is running, which is what was asked
-  for, and that other recording is deliberately left alone. This endpoint only
-  ever stops the recording it could have started.
+  "it was already like that". A plain `stop` while something *else* is being
+  recorded is also `200`: no microphone recording is running, which is what was
+  asked for, and that other recording is deliberately left alone. A plain `stop`
+  only ever stops the recording it could have started. With `scope: "any"`,
+  `200` means the recording was stopped and handed to processing, or that
+  nothing was recording.
 - `409 Conflict` — refused because another recording owns the watch loop: an
   auto-detected meeting, or an app-picker recording. Starting would clobber it.
   Stop that recording first, or use `POST /v1/watch` if it is a detected
@@ -328,8 +348,9 @@ Responses:
   body to tell the two apart. **Retrying does not help**: unlike `503` this
   answer is stable until someone changes a setting, so a retry loop should stop
   on it.
-- `400 Bad Request` — the body is undecodable or `action` is not one of the
-  three verbs. Unlike the codes above this one carries an **empty** body, not a
+- `400 Bad Request` — the body is undecodable, `action` is not one of the three
+  verbs, or `scope` is anything but `any` or comes with an action other than
+  `stop`. Unlike the codes above this one carries an **empty** body, not a
   `RecordStatusDTO`, because nothing was applied and there is no resulting state
   to report.
 - `503 Service Unavailable` — the start was attempted and did not produce a
@@ -337,7 +358,11 @@ Responses:
   unanswered microphone permission dialog), or the recorder itself refused to
   start, which a device that is absent or held by another process looks like. A
   `stop` answers `503` when the recording could not be handed to the pipeline,
-  i.e. the audio is gone; the job you would poll for does not exist.
+  i.e. the audio is gone; the job you would poll for does not exist. With
+  `scope: "any"` that holds for every kind of recording, including a
+  record-only one whose files could not be written. A detected meeting whose
+  stop has not taken effect within 20 seconds also answers `503`; the stop stays
+  requested, so the meeting still ends at the next detection poll.
 
 Retrying is right for `503` and pointless for `412`. That is the whole reason
 they are separate codes.
@@ -555,7 +580,9 @@ as `null`, following the same convention as the other DTOs.
 - `recording`: whether a **microphone-only** recording is in progress.
   Deliberately narrower than "something is recording": an app-picker recording
   and an auto-detected meeting are reported by `otherRecordingActive` instead,
-  so a client is never invited to `stop` a recording it did not start.
+  so a client is never invited to `stop` a recording it did not start. A client
+  that does mean to end one asks for that by name, with `"scope": "any"` on a
+  `stop`.
 - `startPending`: a start has been accepted but is not recording yet. It waits
   on the microphone permission gate, which on a first run means an OS dialog
   somebody has to answer, so this window is not always short. Without this field
@@ -580,13 +607,13 @@ as `null`, following the same convention as the other DTOs.
 |------|---------|
 | `200` | Success. Body is the relevant DTO (or `{"jobIDs":[...]}` for `POST /v1/jobs`). |
 | `202` | `POST /v1/transcribe` only: job still running after the wait. Poll `GET /v1/jobs/<id>`. |
-| `400` | Missing/empty required field, undecodable JSON body, or a `path` that does not exist. |
+| `400` | Missing/empty required field, undecodable JSON body, a `path` that does not exist, or on `POST /v1/record` a `scope` other than `any` or one sent with an action other than `stop`. |
 | `401` | Missing or wrong bearer token. |
 | `403` | Rejected by the Origin or Host guard. |
 | `404` | Unknown job id. Also `GET /v1/jobs/<id>/naming` when the job is not awaiting naming (the GET folds wrong-state into `404`; the POST naming routes use `409` instead). |
 | `409` | Confirm/skip naming on a job that exists but is not awaiting naming. Also `POST /v1/watch` while a manual recording owns the watch loop, and `POST /v1/record` while any other recording owns it. |
 | `412` | `POST /v1/record` only: nothing would be captured ("No Microphone" is set, or the mic permission is denied/broken). Stable until a setting changes, so do not retry. |
-| `503` | `POST /v1/watch` and `POST /v1/record`: the action was attempted and did not take. On `/v1/watch` that means the state did not settle within 20 seconds; on `/v1/record` also a recorder that would not start, or a stop whose audio could not be handed to the pipeline. Retryable, unlike `412`. On `/v1/watch` a *denied* microphone gives `200`, not this; on `/v1/record` it gives `412`. |
+| `503` | `POST /v1/watch` and `POST /v1/record`: the action was attempted and did not take. On `/v1/watch` that means the state did not settle within 20 seconds; on `/v1/record` also a recorder that would not start, a stop whose audio could not be handed to the pipeline, or a `"scope":"any"` stop of a detected meeting that did not take effect within 20 seconds. Retryable, unlike `412`. On `/v1/watch` a *denied* microphone gives `200`, not this; on `/v1/record` it gives `412`. |
 
 ## Typical flows
 

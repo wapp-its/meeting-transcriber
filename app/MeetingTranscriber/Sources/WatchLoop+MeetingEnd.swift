@@ -42,6 +42,17 @@ extension WatchLoop {
 
         do {
             while !Task.isCancelled {
+                // Ahead of this poll's own decision, so a countdown or the cap
+                // arriving at the same poll does not override the person.
+                if let requestedAt = takeStopByHandRequest() {
+                    diagnostics.notice("recording_stopped_by_hand trigger=auto")
+                    holdRedetection(of: meeting)
+                    // Ends as Stop Watching ends it, but only an answer given
+                    // before the stop may settle the question: a Keep
+                    // recording tapped after it must not keep the countdown.
+                    let answer = takeMeetingEndAnswer().flatMap { $0.receivedAt < requestedAt ? $0 : nil }
+                    return WatchLoopEndPolicy.cutWhenWatchingStops(phase: phase, answer: answer)
+                }
                 let poll = MeetingEndPoll(
                     now: nowProvider(),
                     meetingActive: detector.isMeetingActive(meeting),

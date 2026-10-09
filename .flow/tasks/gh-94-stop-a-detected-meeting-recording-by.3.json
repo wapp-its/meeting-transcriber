@@ -12,7 +12,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-94-stop-a-detected-meeting-recording-by",
   "spec_path": ".flow/tasks/gh-94-stop-a-detected-meeting-recording-by.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "End any recording from the automation API with stop and scope any",
   "updated_at": "2026-10-08T08:15:18.241242Z"
 }

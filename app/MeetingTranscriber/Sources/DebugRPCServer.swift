@@ -93,6 +93,7 @@
         let watchControl: (WatchAction) async -> WatchControlOutcome // POST /v1/watch
         let recordStatus: () -> RecordStatusDTO // GET /v1/record
         let recordControl: (RecordAction) async -> RecordControlOutcome // POST /v1/record
+        let recordStopAny: () async -> RecordControlOutcome // POST /v1/record {"scope":"any"}
         var idempotency = IdempotencyStore() // Idempotency-Key -> job IDs; internal for the +V1 extension
         private let expectedAuth: String
         private var listener: NWListener?
@@ -123,6 +124,7 @@
             watchControl: @escaping (WatchAction) async -> WatchControlOutcome = { _ in .failed },
             recordStatus: @escaping () -> RecordStatusDTO = { .notRecording },
             recordControl: @escaping (RecordAction) async -> RecordControlOutcome = { _ in .failed },
+            recordStopAny: @escaping () async -> RecordControlOutcome = { .failed },
         ) {
             self.port = NWEndpoint.Port(rawValue: port) ?? NWEndpoint.Port.any
             self.expectedAuth = "Bearer \(token)"
@@ -142,6 +144,7 @@
             self.watchControl = watchControl
             self.recordStatus = recordStatus
             self.recordControl = recordControl
+            self.recordStopAny = recordStopAny
         }
 
         /// Generate a 32-byte hex token, persist atomically with mode 0600, return it.

@@ -75,7 +75,8 @@
         /// - `GET  /v1/watch` — watching status
         /// - `POST /v1/watch` — start/stop/toggle watching `{action}`
         /// - `GET  /v1/record` — microphone-recording status
-        /// - `POST /v1/record` — start/stop/toggle a microphone recording `{action}`
+        /// - `POST /v1/record` — start/stop/toggle a microphone recording `{action}`,
+        ///   or end any recording `{"action":"stop","scope":"any"}`
         func routeV1(_ request: HTTPRequest, path: String) async -> HTTPResponse {
             let idempotencyKey = request.headers["idempotency-key"]
             // `path` is query-stripped; read the opt-in off the raw target.
@@ -205,11 +206,19 @@
         /// The contrast with `/v1/watch` is deliberate: a denied microphone
         /// answers `200` there, because app audio still records without it. Here
         /// nothing would, so 200 would be a lie.
+        ///
+        /// A `stop` with `scope: "any"` goes to a seam of its own, so the verb
+        /// seam and its callers keep the microphone-only meaning; its outcomes
+        /// take the same codes.
         private func recordControlResponse(body: Data) async -> HTTPResponse {
             guard let payload = try? JSONDecoder().decode(RecordActionPayload.self, from: body) else {
                 return HTTPResponse.badRequest()
             }
-            switch await recordControl(payload.action) {
+            let outcome: RecordControlOutcome = switch payload.scope {
+            case .any: await recordStopAny()
+            case nil: await recordControl(payload.action)
+            }
+            switch outcome {
             case .changed, .unchanged: return jsonResponse(recordStatus())
             case .blocked: return jsonResponse(recordStatus(), status: 409, reason: "Conflict")
             case .refused: return jsonResponse(recordStatus(), status: 412, reason: "Precondition Failed")

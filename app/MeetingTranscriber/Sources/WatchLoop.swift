@@ -74,6 +74,10 @@ class WatchLoop {
     /// both, the way the consent extension owns `pendingConsentApp`.
     var meetingEndQuestionID: String?
     var meetingEndAnswer: ReceivedMeetingEndAnswer?
+    /// When "Stop Recording" was chosen, parked for the wait's next poll (`WatchLoop+StopByHand.swift`).
+    var stopByHandRequestedAt: Date?
+    /// Apps kept out of detection until their signal has gone once (`WatchLoop+RedetectionHold.swift`).
+    var redetectionHolds = RedetectionHolds()
 
     /// Wall-clock source. Defaults to `Date()`; tests inject a `TestClock`
     /// so timing-sensitive paths become deterministic instead of racing
@@ -214,6 +218,7 @@ class WatchLoop {
         // Notification Center offering to record with watching switched off.
         declineParkedConsent()
         cleanupManualRecording()
+        redetectionHolds.removeAll()
         update { next in
             next.phase = .idle
             next.currentMeeting = nil
@@ -331,13 +336,15 @@ class WatchLoop {
 
     private func watchLoop() async {
         while !Task.isCancelled {
+            releaseEndedRedetectionHolds()
             // A prompt answered since the last poll comes first: the answer
             // arrives out of band, but recordings only ever start here.
             // Re-checked because up to a poll interval has passed since the
             // answer, and the call may have ended in it.
-            if let approved = takeApprovedConsentMeeting(), detector.isMeetingActive(approved) {
+            if let approved = takeApprovedConsentMeeting(), detector.isMeetingActive(approved),
+               !appsHeldFromDetection.contains(approved.pattern.appName) {
                 if await runMeeting(approved) { return }
-            } else if let meeting = detector.checkOnce(excluding: appsExcludedFromDetection) {
+            } else if let meeting = detector.checkOnce(excluding: appsExcludedFromDetection.union(appsHeldFromDetection)) {
                 // A detected meeting asks before recording unless its app
                 // records without asking. See WatchLoop+Consent.swift.
                 // Asking does NOT block this loop — that is the whole point:
@@ -390,6 +397,7 @@ class WatchLoop {
     // MARK: - Meeting Handling
 
     func handleMeeting(_ meeting: DetectedMeeting) async throws {
+        defer { stopByHandRequestedAt = nil }
         let title = Self.cleanTitle(meeting.windowTitle)
 
         // --- Recording ---
@@ -397,6 +405,7 @@ class WatchLoop {
             next.phase = .recording
             next.currentMeeting = meeting
             next.detail = "Recording: \(title)"
+            next.lastError = nil
         }
 
         let source = RecordingSource.forApp(pid: meeting.windowPID, noMic: noMic)

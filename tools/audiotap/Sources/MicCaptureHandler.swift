@@ -72,6 +72,11 @@ public class MicCaptureHandler: @unchecked Sendable {
     /// fires on main while the attempt runs on `restartQueue`, and the render
     /// thread reads the capture state per buffer.
     let arbiter = OSAllocatedUnfairLock(initialState: RestartArbiter())
+    /// Orders `stop()`'s seal against a restart attempt's check-and-build, so an
+    /// attempt queued before a stop builds nothing after it. Taken only there.
+    /// Lock order: this, then `arbiter`, never the reverse. The session factory
+    /// runs under it, so a factory must never call back into the handler.
+    let attemptBuildLock = NSLock()
 
     /// Restart attempts run here, never on the main queue: the call that brings
     /// an engine up can block forever, and on the main queue that takes the whole
@@ -398,8 +403,9 @@ public class MicCaptureHandler: @unchecked Sendable {
         // that decides the rest of this method: is a restart attempt currently
         // inside the engine? If so, every engine call below would block behind
         // the mutex that attempt holds, and stopping a recording would freeze the
-        // caller (issue #588).
-        let decision = arbiter.withLock { $0.handle(.stopRequested) }
+        // caller (issue #588). Under `attemptBuildLock`, so an attempt still
+        // queued on the restart queue builds nothing once this has returned.
+        let decision = attemptBuildLock.withLock { arbiter.withLock { $0.handle(.stopRequested) } }
         stopStallWatchdog()
         cancelPendingConfigChangeRestart()
         if let listener = deviceChangeListener {

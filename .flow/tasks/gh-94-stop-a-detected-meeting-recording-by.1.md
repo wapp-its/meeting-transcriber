@@ -55,9 +55,42 @@ Builds the watch-loop side of R2–R5: a stop request that the meeting-end wait 
 - [ ] Focused run green, read from the log file: `cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh94-home swift test --parallel --filter "RedetectionHolds|WatchLoop|RecordOnly|MeetingDetector|PowerAssertion" > /private/tmp/mt-gh94-t1.log 2>&1; echo "exit=$?"` (never pipe the run into tail/head/grep).
 - [ ] `PATH="$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH" ./scripts/lint.sh` reports 0 violations, and `./scripts/pre-push.sh` (release build) is clean.
 ## Done summary
-TBD
+The watch loop can now end a detected meeting's recording by hand. `WatchLoop.stopDetectedRecording()` parks a timestamped request that the meeting-end wait acts on at its next poll, through the same stop, cut and enqueue as every other meeting end. The stopped app is then held out of detection (`RedetectionHolds`) until one watching poll finds its signal gone. No UI yet (task .2 wires the menu).
 
+Integrated onto feat/gh-94-stop-detected-recording as 6f719cef (per-app re-detection holds) and 70ebb830 (stop a detected meeting's recording by hand); base f0db8ca5. Worker commits b3256759/e12c3ffd on wave/gh-94.1 were cherry-picked unchanged.
+
+stage: impl-review - ran [21:32:50..21:38:10] SHIP, 0 findings, 3 draws (correctness, contracts, integration) all SHIP; receipt /tmp/impl-review-receipt-846594bd1b60-gh-94-stop-a-detected-meeting-recording-by.1.json (model: codex gpt-5.6-sol xhigh)
+stage: wave-join - ran (cherry-pick of 2 commits, no collision)
+
+Tier: session (jev-unavailable(no_key)); explicit invocation: opus at xhigh; actual model: claude-opus-5-5 (host-reported model id; effort not exposed by the host)
+
+Gates (logs under /private/tmp)
+- Spec Quick command in the worker's workspace (`mt-gh94-tests.log`) exit 0, 176 tests (163 + 13 new), 0 failures.
+- Conductor's integrated verify on the target (`mt-gh94-verify-t1.log`) exit 0, 176 tests.
+- Task acceptance command (`mt-gh94-t1.log`) exit 1, 284 tests. The only failures are the 5 WatchLoopE2ETests that need a downloaded WhisperKit model and fail under the fresh CFFIXED_USER_HOME, identically before the change (`mt-gh94-t1-baseline.log`). The other 279 pass, including all 13 new tests and all 13 WatchLoopMeetingEndTests (unchanged). Accepted as environmental per the repository's verification notes; CI is the gate for those.
+- `./scripts/lint.sh` with the pinned tools exit 0, 0 violations, 0 files to format.
+- `./scripts/pre-push.sh` exit 0, release build with 0 warnings.
+- `WatchLoop.swift` is 588 lines, so `cleanTitle`/`transcriberState` stayed in place and `WatchLoopState.swift` is untouched.
+- Mutation check: dropping the answer-before-stop filter turned "Stop then Keep" and "Stop, Keep, Stop" red; dropping the request clear in `handleMeeting` let a stale request end the next recording at 0 s. Both reverted byte-identical (`mt-gh94-t1-mutant.log`).
+- Not run: CI's `swiftlint analyze` (needs a clean xcodebuild).
+
+Tests per requirement (Tests/WatchLoopStopByHandTests.swift unless noted)
+- R2: testAStopByHandEndsAtTheNextPollAndKeepsTheWholeRecording, testRecordOnlyWritesTheStoppedMeetingWithAnAutoTrigger. Errors: testARecorderThatFailsToStopReportsTheErrorAndTheAppStaysHeld, testAStopIsRefusedWhenNoDetectedMeetingRecords, testARequestMadeWhileCaptureStartsDoesNotEndTheNextRecording.
+- R3: testAStopByHandDuringTheQuestionWithdrawsItAndCutsBack, testOnlyAKeepRecordingTappedBeforeTheStopKeepsTheWholeRecording (Keep at 20 s, Keep then Stop, Stop then Keep, Stop Keep Stop).
+- R4: testAStoppedAppIsHeldUntilItsSignalHasGoneOnce, testHoldsArePerAppAndStopWatchingDiscardsThem, plus Tests/RedetectionHoldsTests.swift (4 tests).
+- R5: exact notice lines asserted in the R2 and recorder-failure tests, the release line in both hold tests.
+
+Decisions (worker, rule 6 unless noted)
+- `RedetectionHolds.hold` keeps the first meeting when an app is held again; all three detectors' `isMeetingActive` key on `pattern.appName`, so the choice cannot change when a hold is released.
+- The same-poll tap tests tap at t = 30 s: a stop at 20.1 s with 30 s tracks makes `RecordingCut.keptSeconds` follow the audio, so only a stop at the tracks' end gives the 15 s cut the acceptance names.
+- The hold tests run through `start()` with event waits and the virtual clock as the poll counter, because an asking app's consent prompt task can finish one poll later depending on scheduling.
+- The approved-consent branch skips a held app as the task asks; that guard has no test because no reachable path leads to it today (a held app is excluded from `checkOnce`, so it can never get a prompt or an approval).
+- Test MARK comments carry no spec R-ids; this code goes to the original project's readers.
+
+Open for later tasks (integration notes in the run notes dir, gh-94.1-integration.md): task .3's anchor `WatchLoop.swift:396-400` now sits at about 404-408, and the file has 11 lines left before the 600-line lint cap.
+
+stage: plan-sync - skipped(config: planSync.enabled=false)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 6f719cefce31ce33a5078dd1fc6b36027e9e234c, 70ebb830d011546374a3acaf1ed3413d8b76e5d9
+- Tests: worker (wave/gh-94.1): cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh94-home swift test --parallel --filter "RedetectionHolds|WatchLoopStopByHand|WatchLoopMeetingEnd|WatchingControllerStopRecording|WatchingControllerRecordControl|MenuBarView|RecordActionPayload|RPCRecordStatus|DebugRPCServerIntegration" > /private/tmp/mt-gh94-tests.log 2>&1 -> exit 0, 176 tests (163 baseline + 13 new), 0 failures, worker (wave/gh-94.1): cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh94-home swift test --parallel --filter "RedetectionHolds|WatchLoop|RecordOnly|MeetingDetector|PowerAssertion" > /private/tmp/mt-gh94-t1.log 2>&1 -> exit 1, 284 tests; the only failures are the 5 WatchLoopE2ETests model-download tests (modelNotLoaded under the fresh CFFIXED_USER_HOME) that failed identically before any edit (/private/tmp/mt-gh94-t1-baseline.log, exit 1, 271 tests); 279 pass incl. all 13 new tests and all 13 WatchLoopMeetingEndTests, worker (wave/gh-94.1): PATH="$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH" ./scripts/lint.sh > /private/tmp/mt-gh94-t1-lint-final.log 2>&1 -> exit 0, 0 violations in 705 files, 0 files need formatting, worker (wave/gh-94.1): ./scripts/pre-push.sh > /private/tmp/mt-gh94-t1-prepush.log 2>&1 -> exit 0, release build passed, 0 warnings, conductor integrated verify (feat/gh-94-stop-detected-recording @ 70ebb830): cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh94-home swift test --parallel --filter "RedetectionHolds|WatchLoopStopByHand|WatchLoopMeetingEnd|WatchingControllerStopRecording|WatchingControllerRecordControl|MenuBarView|RecordActionPayload|RPCRecordStatus|DebugRPCServerIntegration" > /private/tmp/mt-gh94-verify-t1.log 2>&1 -> exit 0, 176 tests, impl-review receipt: /tmp/impl-review-receipt-846594bd1b60-gh-94-stop-a-detected-meeting-recording-by.1.json -> SHIP (codex gpt-5.6-sol xhigh, 3 draws: correctness/contracts/integration all SHIP, 0 findings)
 - PRs:

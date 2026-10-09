@@ -147,6 +147,25 @@ Two things differ from a watch key, and both matter for a button:
   (app audio only)" is on in Settings, or the microphone permission is denied.
   Unlike the other error codes this one does not clear by pressing again.
 
+### A key that ends any recording
+
+A plain `stop` ends only the microphone recording that `start` began; a meeting
+the app detected, or one started from the app picker, is left running. To end
+whatever is recording, as the menu's *Stop Recording* does, send the same
+request with `"scope":"any"`:
+
+```bash
+curl -sS --fail-with-body -X POST http://127.0.0.1:9876/v1/record \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"stop","scope":"any"}'
+```
+
+Meeting watching stays on, and the app whose meeting you ended is not recorded
+again until its call has really ended. A detected meeting stops at the app's next
+check for meetings, so the key can take a few seconds to answer. `mt-cli` has no
+flag for this yet.
+
 ## Start and stop beat toggle
 
 `toggle` is the obvious binding and the worst one, because a button press is a

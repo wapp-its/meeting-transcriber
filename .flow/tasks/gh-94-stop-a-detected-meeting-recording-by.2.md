@@ -42,9 +42,45 @@ Wires the menu to task .1 (R1, R2's entry point, R6): one `WatchingController.st
 
 
 ## Done summary
-TBD
+The menu now shows "Stop Recording" for every running recording, a detected meeting included. `WatchingController.stopRecording()` sends a manual recording to the existing `stopManualRecording()` and a detected meeting to task .1's `WatchLoop.stopDetectedRecording()`, so watching stays on. `AppState.canStopRecording` (the loop is recording, any kind) decides when the menu scene passes the stop closure.
 
+Integrated onto feat/gh-94-stop-detected-recording as 07b8c8cf (feat: offer Stop Recording in the menu for every recording) and 86a651a4 (docs: list the stop-by-hand and re-detection hold files); base a36bd26b. Worker commits 354aacbd/316a4b16 on wave/gh-94.2 were cherry-picked unchanged.
+
+stage: impl-review - ran [22:01:37..22:09:55] SHIP, 0 findings, 1 draw (correctness; panel rule: small diff in one area, delegation only); receipt /tmp/impl-review-receipt-846594bd1b60-gh-94-stop-a-detected-meeting-recording-by.2.json (model: codex gpt-5.6-sol xhigh). An earlier draw [21:56:35..22:00:34] also returned SHIP but its round was refunded: the conductor committed a .flow line re-pin before the finalize, which refused on head_moved.
+stage: wave-join - ran (cherry-pick of 2 commits, no collision)
+
+Tier: session (jev-unavailable(no_key)); explicit invocation: opus at xhigh; actual model: claude-opus-5-5 (host-reported model id; effort not exposed by the host)
+
+Gates (logs under /private/tmp)
+- baseline: green via handoff (verified at 70ebb830 by the conductor's integrated verify, 176 tests); only `.flow/` paths changed since. Lint baseline exit 0 (`mt-gh94-t2-lint-baseline.log`).
+- Task acceptance command (`mt-gh94-t2.log`) exit 0, 193 tests, all 5 new ones included; `WatchingControllerRecordControlTests` and `MenuBarViewTests` unchanged and green.
+- Spec Quick command (`mt-gh94-t2-quick.log`) exit 0, 181 tests (176 + 5 new).
+- Conductor's integrated verify on the target (`mt-gh94-verify-t2.log`) exit 0, 286 tests.
+- `./scripts/lint.sh` with the pinned tools (`mt-gh94-t2-lint.log`) exit 0, 0 violations, 0/707 files to format.
+- `./scripts/pre-push.sh --with-appstore` (`mt-gh94-t2-prepush.log`) exit 0, both release variants, 0 compiler warnings.
+- `flowctl gate classify` returned FULL (Swift code changed). No GATE_SKIPPED lines.
+- Mutation check against the new suite, then reverted byte-identically: four mutations at once each turned its own test red (`mt-gh94-t2-mutant1.log`); routing a detected stop to `stopManualRecording()` failed the detected-stop test on 6 assertions (`mt-gh94-t2-mutant2.log`).
+- Not run: CI's `swiftlint analyze` (needs a clean xcodebuild).
+- Build logs carry SwiftPM "Stale file" warnings from the cloned `.build` cache and pre-existing actor-isolation warnings in `ViewInspectorIdentifierTests.swift`; both predate this task.
+
+Tests per acceptance criterion (Tests/WatchingControllerStopRecordingTests.swift)
+- Detected stop: testStoppingADetectedMeetingEndsItsRecordingAndWatchingCarriesOn (loop leaves `.recording` within 1 s, stays on the controller with `isWatching` true, recorder stopped, 1 job, no second `.recording` entry over 0.5 s).
+- Manual stop and watching-only no-op: testStoppingAManualMicrophoneRecordingEndsItAsAManualStopDoes, testWithTheLoopOnlyWatchingNothingChanges.
+- `canStopRecording`: testTheMenuOffersAStopForEveryRecordingAndNotWhileOnlyWatching (watching-only false, detected true, manual microphone true).
+- R6 pin: testAPlainRecordStopLeavesADetectedMeetingRecording (`applyRecordAction(.stop)` returns `.unchanged`; after 300 ms the meeting still records and its recorder was never stopped).
+- Doc rows: `docs/architecture-macos.md` lists all four new source files.
+
+Decisions (worker, rule 6)
+- The doc comment on `AppState.isManualRecording` now says the `/state` snapshot and the automation API read the controller's wide predicate (`AppState+RPC.swift:89,119`); the property is kept as the task asks.
+- `AppState.swift` would have reached 602 lines; condensing two doc comments brought it to 598 (2 below the strict 600-line cap; task .3 adds a closure there).
+- `stopRecording()` returns early unless the loop is `.recording`, because `stopManualRecording()` drops the loop whatever it is doing; pinned by testWithTheLoopOnlyWatchingNothingChanges.
+- The R6 pin lives in the new test file because Touches names only that test file.
+- Two commits under the atomic-commit rule: the menu change with its own doc row, and the three doc rows for task .1's files separately.
+
+Integration notes for tasks .3 and .4 are in the run notes dir (gh-94.2-integration.md).
+
+stage: plan-sync - skipped(config: planSync.enabled=false)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 07b8c8cf4f7cf3b13babcb2fc335edf4037297dc, 86a651a4d46a98a704dbdc59175ec27103e9a5a8
+- Tests: worker (wave/gh-94.2): cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh94-home swift test --parallel --filter "WatchingController|MenuBarView|RPCManualRecordingState|AppStateTests|WatchLoopStopByHand" > /private/tmp/mt-gh94-t2.log 2>&1 (exit 0, 193 tests), worker (wave/gh-94.2): cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh94-home swift test --parallel --filter "RedetectionHolds|WatchLoopStopByHand|WatchLoopMeetingEnd|WatchingControllerStopRecording|WatchingControllerRecordControl|MenuBarView|RecordActionPayload|RPCRecordStatus|DebugRPCServerIntegration" > /private/tmp/mt-gh94-t2-quick.log 2>&1 (exit 0, 181 tests), worker (wave/gh-94.2): PATH="$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH" ./scripts/lint.sh > /private/tmp/mt-gh94-t2-lint.log 2>&1 (exit 0, 0 violations, 0/707 files to format), worker (wave/gh-94.2): ./scripts/pre-push.sh --with-appstore > /private/tmp/mt-gh94-t2-prepush.log 2>&1 (exit 0, both release variants, 0 warnings), conductor integrated verify (feat/gh-94-stop-detected-recording @ 86a651a4): cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh94-home swift test --parallel --filter "WatchingController|MenuBarView|RPCManualRecordingState|AppStateTests|WatchLoopStopByHand|RedetectionHolds|WatchLoopMeetingEnd|RecordActionPayload|RPCRecordStatus|DebugRPCServerIntegration" > /private/tmp/mt-gh94-verify-t2.log 2>&1 -> exit 0, 286 tests, impl-review receipt: /tmp/impl-review-receipt-846594bd1b60-gh-94-stop-a-detected-meeting-recording-by.2.json -> SHIP (codex gpt-5.6-sol xhigh, 1 draw: correctness SHIP, 0 findings; the first round's draw also returned SHIP but was refunded because the conductor committed bookkeeping before finalize)
 - PRs:
