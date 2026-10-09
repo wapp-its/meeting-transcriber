@@ -144,19 +144,24 @@ enum RecoveredCut {
     /// re-mixed and before the orphan scan queues them. One failing never
     /// stops the others.
     ///
+    /// Returns the stems left unsettled because an original track is still
+    /// under its hidden name. The orphan scan after this pass must pass them
+    /// over: it takes any recording whose mix is on its path, and one queued
+    /// now would be processed uncut and without that track, which nothing
+    /// would process afterwards. Every later pass restores it first.
+    ///
     /// - Parameter rename: the atomic rename for the restores and the cut,
     ///   injectable so a test can fail them.
+    @discardableResult
     static func apply(
         _ collected: [PendingRecordingCut],
         in dir: URL,
         diagnostics: any DiagnosticsLogging,
         rename: @escaping (URL, URL) throws -> Void = RecordingCut.rename,
         sync: @escaping PendingRecordingCut.Sync = PendingRecordingCut.fullSync,
-    ) {
+    ) -> Set<String> {
         let pass = Pass(dir: dir, diagnostics: diagnostics, rename: rename, sync: sync)
-        for record in collected {
-            pass.settle(record)
-        }
+        return Set(collected.filter { !pass.settle($0) }.map(\.stem))
     }
 
     /// The paths of one recording's three tracks in the staging folder.
@@ -184,35 +189,40 @@ enum RecoveredCut {
         let rename: (URL, URL) throws -> Void
         let sync: PendingRecordingCut.Sync
 
-        func settle(_ record: PendingRecordingCut) {
+        /// Settle one stored cut. False when an original track stays under
+        /// its hidden name: the recording is not settled and the stored cut
+        /// stays.
+        func settle(_ record: PendingRecordingCut) -> Bool {
             let tracks = Tracks(stem: record.stem, in: dir)
             // First, whatever is on disk: an original an earlier cut's
             // rollback left under its hidden name goes back on its path, so
             // the mix counts as present and the orphan scan finds the
-            // recording. Until it can, the recording is not settled.
+            // recording.
             let hidden = tracks.all.compactMap { path -> (path: URL, backup: URL)? in
                 let backup = RecordingCut.backupURL(for: path)
                 return exists(path) || !exists(backup) ? nil : (path, backup)
             }
             if let failure = moveBack(hidden) {
-                leaveUnsettled(failure, tracks: tracks)
-                return
+                logRestoreFailed(failure)
+                return false
             }
             // With every hidden original back, a missing mix is either one the
             // re-mix could not build yet (its marker is still there, so a later
             // pass retries) or a recording that is gone.
             guard exists(tracks.mix) else {
-                if exists(DualSourceRecorder.inProgressMarker(stem: record.stem, in: dir)) { return }
-                refuse(stem: record.stem, .stale)
-                return
+                if !exists(DualSourceRecorder.inProgressMarker(stem: record.stem, in: dir)) {
+                    refuse(stem: record.stem, .stale)
+                }
+                return true
             }
             let mixDuration = RecordingCut.duration(of: tracks.mix)
             switch decide(record: record, mixDuration: mixDuration) {
             case let .refuse(reason):
                 refuse(stem: record.stem, reason)
+                return true
 
             case let .cut(kept):
-                cut(record, keepingFirst: kept, mixDuration: mixDuration, tracks: tracks)
+                return cut(record, keepingFirst: kept, mixDuration: mixDuration, tracks: tracks)
             }
         }
 
@@ -221,7 +231,7 @@ enum RecoveredCut {
             keepingFirst kept: TimeInterval,
             mixDuration: TimeInterval?,
             tracks: Tracks,
-        ) {
+        ) -> Bool {
             // Resolved before any track changes, so a pass that dies inside
             // the cut leaves the next one this same point to finish at. A
             // failed store does not stop the cut.
@@ -244,8 +254,7 @@ enum RecoveredCut {
             do {
                 try RecordingCut.apply(to: recording, keepingFirst: kept, rename: rename)
             } catch {
-                failed(error, record: record, tracks: tracks)
-                return
+                return failed(error, record: record)
             }
             // What the mix holds now, not `kept`: a resolved cut read back
             // from disk may lie past the recording's end.
@@ -253,41 +262,28 @@ enum RecoveredCut {
             let removed = max(0, (mixDuration ?? keptOfMix) - keptOfMix)
             diagnostics.notice("recovered_cut applied removed_s=\(Int(removed.rounded())) kept_s=\(Int(keptOfMix.rounded()))")
             remove(stem: record.stem)
+            return true
         }
 
         /// A cut that failed. With every original back on its path the
         /// recording is queued uncut. The cut's own rollback may have left
         /// some under their hidden names, which are put back once here first.
-        private func failed(_ error: any Error, record: PendingRecordingCut, tracks: Tracks) {
+        private func failed(_ error: any Error, record: PendingRecordingCut) -> Bool {
             if case let RecordingCut.CutError.rollbackIncomplete(uncut) = error {
                 if let failure = moveBack(uncut.map { (path: $0.key, backup: $0.value) }) {
-                    leaveUnsettled(failure, tracks: tracks)
-                    return
+                    logRestoreFailed(failure)
+                    return false
                 }
                 diagnostics.warning("recovered_cut_failed rollback_incomplete tracks_moved=\(uncut.count) \(fields(error))")
             } else {
                 diagnostics.warning("recovered_cut_failed \(fields(error))")
             }
             remove(stem: record.stem)
+            return true
         }
 
-        /// An original that stays hidden leaves the recording unsettled: the
-        /// stored cut stays, and the recording must stay out of the queue
-        /// too. The orphan scan after this pass takes any recording whose mix
-        /// is on its path, and one queued now would be processed uncut and
-        /// without the hidden track, which nothing would process afterwards.
-        /// So the mix joins the hidden originals under its own hidden name,
-        /// unless an original is already kept there, and every pass restores
-        /// it first: the recording is queued once all its tracks are back.
-        private func leaveUnsettled(_ failure: (left: Int, error: any Error), tracks: Tracks) {
+        private func logRestoreFailed(_ failure: (left: Int, error: any Error)) {
             diagnostics.warning("recovered_cut_failed restore tracks_left=\(failure.left) \(fields(failure.error))")
-            let backup = RecordingCut.backupURL(for: tracks.mix)
-            guard exists(tracks.mix), !exists(backup) else { return }
-            do {
-                try rename(tracks.mix, backup)
-            } catch {
-                diagnostics.warning("recovered_cut_failed hide_mix \(fields(error))")
-            }
         }
 
         /// Rename each hidden original back onto its path, once. Nil when

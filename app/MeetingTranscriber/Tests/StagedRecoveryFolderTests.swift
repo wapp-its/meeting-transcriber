@@ -88,6 +88,26 @@ final class StagedRecoveryFolderTests: XCTestCase {
         XCTAssertFalse(fixture.storedCutExists)
     }
 
+    /// A recording the pass left unsettled (an original track still under its
+    /// hidden name) is passed over by the pass's orphan scan and released
+    /// afterwards, so a later pass can queue it; every other recording is
+    /// queued as before.
+    func testTheOrphanScanPassesOverARecordingThePassLeftUnsettled() async throws {
+        let dir = try makeTempDirectory(prefix: "StagedRecoveryOrphans")
+        let unsettled = dir.appendingPathComponent("20260311_100000_mix.wav")
+        let settled = dir.appendingPathComponent("20260311_110000_mix.wav")
+        for mix in [unsettled, settled] {
+            try Data(repeating: 0xFF, count: 100).write(to: mix)
+        }
+        let registry = InFlightRunRegistry()
+        let queue = try PipelineQueue(logDir: makeTempDirectory(prefix: "StagedRecoveryLog"), stagingDir: dir, inFlightRuns: registry)
+
+        await PipelineController.recoverOrphans(into: queue, holdingBack: [unsettled], recordingsDir: dir)
+
+        XCTAssertEqual(queue.jobs.map(\.meetingTitle), ["Recovered Recording (20260311_110000)"])
+        XCTAssertTrue(registry.claimedAudioPaths.isEmpty, "the hold ends with the scan")
+    }
+
     /// A queue rebuilt while the previous pass still runs starts a second
     /// pass on the same folder. It waits for the first, which has settled the
     /// stored cut by then, so the recording is cut once and not deeper.

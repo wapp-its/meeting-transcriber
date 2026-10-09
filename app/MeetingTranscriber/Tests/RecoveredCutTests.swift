@@ -125,7 +125,8 @@ final class RecoveredCutTests: XCTestCase {
         return log
     }
 
-    private func recover(_ fixture: StagedRecordingFixture, _ log: RecordingDiagnostics) {
+    @discardableResult
+    private func recover(_ fixture: StagedRecordingFixture, _ log: RecordingDiagnostics) -> Set<String> {
         PipelineController.recoverStagingFolder(fixture.dir, levelBalance: false, diagnostics: log)
     }
 
@@ -445,13 +446,6 @@ final class RecoveredCutTests: XCTestCase {
         XCTAssertEqual(try fixture.hiddenFiles(), [])
     }
 
-    /// The groups the orphan scan after the pass would queue: any with a mix
-    /// on its path.
-    private func queueable(_ fixture: StagedRecordingFixture) throws -> [String] {
-        let urls = try FileManager.default.contentsOfDirectory(at: fixture.dir, includingPropertiesForKeys: nil)
-        return PairedRecordingResolver.resolve(urls: urls).paired.filter { $0.mix != nil }.map(\.stem)
-    }
-
     private func exists(_ fixture: StagedRecordingFixture, _ suffix: String, hidden: Bool = false) -> Bool {
         let url = fixture.url(suffix)
         return FileManager.default.fileExists(atPath: (hidden ? RecordingCut.backupURL(for: url) : url).path)
@@ -459,33 +453,32 @@ final class RecoveredCutTests: XCTestCase {
 
     /// The mic swap fails, then putting the app track back fails while the
     /// mix goes back, and so does the extra restore. The recording is not
-    /// settled: the stored cut stays, resolved before the cut, and the mix
-    /// is hidden too so the orphan scan cannot queue it without its app
-    /// track. The next complete pass restores both and finishes the cut.
-    func testAnOriginalTheCutsRollbackLeftHiddenAndThatCannotBePutBackKeepsTheRecordingOutOfTheQueue() throws {
+    /// settled: the stored cut stays, resolved before the cut, and the pass
+    /// reports it so its orphan scan passes the visible mix over. The next
+    /// complete pass restores the app track and finishes the cut.
+    func testAnOriginalTheCutsRollbackLeftHiddenAndThatCannotBePutBackKeepsTheRecordingUnsettled() throws {
         let fixture = try makeFixture("rollback-stuck")
         let log = makeLog()
         try fixture.stoppedRecording()
         try fixture.storeCut(startedAt: byStart.startedAt, cutAt: byStart.cutAt)
 
         let collected = RecoveredCut.collect(in: fixture.dir, diagnostics: log)
-        RecoveredCut.apply(collected, in: fixture.dir, diagnostics: log, rename: renameFailing(on: [3, 4, 6]))
+        let unsettled = RecoveredCut.apply(collected, in: fixture.dir, diagnostics: log, rename: renameFailing(on: [3, 4, 6]))
 
+        XCTAssertEqual(unsettled, [fixture.stem])
         guard case let .valid(stored) = PendingRecordingCut.read(stem: fixture.stem, in: fixture.dir) else {
             XCTFail("the stored cut must stay while an original is hidden")
             return
         }
         XCTAssertEqual(stored.keptSeconds, 8, "resolved before any track was cut")
-        for suffix in [RecordingFileSuffix.mix, RecordingFileSuffix.app] {
-            XCTAssertFalse(exists(fixture, suffix), suffix)
-            XCTAssertTrue(exists(fixture, suffix, hidden: true), suffix)
-        }
-        XCTAssertEqual(try queueable(fixture), [])
+        XCTAssertTrue(exists(fixture, RecordingFileSuffix.mix))
+        XCTAssertFalse(exists(fixture, RecordingFileSuffix.app))
+        XCTAssertTrue(exists(fixture, RecordingFileSuffix.app, hidden: true))
         XCTAssertEqual(log.lines(.warning, startingWith: "recovered_cut_failed"), [
             "recovered_cut_failed restore tracks_left=1 domain=NSPOSIXErrorDomain code=5",
         ])
 
-        recover(fixture, log)
+        XCTAssertEqual(recover(fixture, log), [])
 
         for suffix in RecordingFileSuffix.all {
             XCTAssertEqual(try fixture.frames(suffix), byStart.frames, suffix)
@@ -495,9 +488,9 @@ final class RecoveredCutTests: XCTestCase {
     }
 
     /// A track sits under its hidden name and cannot be renamed back: the
-    /// recording is not judged stale, the stored cut stays, a visible mix is
-    /// hidden as well so the recording is not queued without that track, and
-    /// the next complete pass with a working rename restores it and cuts it.
+    /// recording is not judged stale, the stored cut stays, the pass reports
+    /// the recording as unsettled, and the next complete pass with a working
+    /// rename restores the track and cuts it.
     func testAnOriginalThatCannotBePutBackKeepsTheStoredCutUntilALaterPassRestoresIt() throws {
         let failingRestore: (URL, URL) throws -> Void = { source, destination in
             if source.pathExtension == "uncut" { throw POSIXError(.EIO) }
@@ -515,17 +508,17 @@ final class RecoveredCutTests: XCTestCase {
             try fixture.storeCut(startedAt: byStart.startedAt, cutAt: byStart.cutAt)
 
             let collected = RecoveredCut.collect(in: fixture.dir, diagnostics: log)
-            RecoveredCut.apply(collected, in: fixture.dir, diagnostics: log, rename: rename)
+            let unsettled = RecoveredCut.apply(collected, in: fixture.dir, diagnostics: log, rename: rename)
 
+            XCTAssertEqual(unsettled, [fixture.stem], hidden)
             XCTAssertTrue(fixture.storedCutExists, hidden)
             XCTAssertTrue(exists(fixture, hidden, hidden: true), hidden)
-            XCTAssertFalse(exists(fixture, RecordingFileSuffix.mix), hidden)
-            XCTAssertEqual(try queueable(fixture), [], hidden)
+            XCTAssertFalse(exists(fixture, hidden), hidden)
             XCTAssertEqual(log.lines(.warning, startingWith: "recovered_cut_failed"), [
                 "recovered_cut_failed restore tracks_left=1 domain=NSPOSIXErrorDomain code=5",
             ], hidden)
 
-            recover(fixture, log)
+            XCTAssertEqual(recover(fixture, log), [], hidden)
 
             for suffix in RecordingFileSuffix.all {
                 XCTAssertEqual(try fixture.frames(suffix), byStart.frames, "\(hidden): \(suffix)")

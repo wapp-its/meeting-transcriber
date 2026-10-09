@@ -52,10 +52,12 @@ extension PipelineController {
             // per-file rewrites run off-main and don't block startup (same
             // reason the orphan scan offloads its own filesystem work).
             let staging = q.stagingDir
-            await Task.detached(priority: .utility) {
+            let unsettled = await Task.detached(priority: .utility) {
                 recoverStagingFolder(staging, levelBalance: levelBalance, diagnostics: diagnostics)
             }.value
-            await q.recoverOrphanedRecordings()
+            await recoverOrphans(
+                into: q, holdingBack: unsettled.map { staging.appendingPathComponent($0 + RecordingFileSuffix.mix) },
+            )
         }
         stagedRecoveryPass = pass
         return pass
@@ -71,17 +73,42 @@ extension PipelineController {
     ///   3. re-mix crashed recordings (raw app .tmp + mic) into a _mix.wav,
     ///   4. delete any temp the re-mix couldn't use,
     ///   5. apply the collected cuts to the recordings that now have a mix.
+    /// Returns the stems step 5 left unsettled, which the orphan scan must
+    /// pass over (`RecoveredCut.apply`).
+    @discardableResult
     nonisolated static func recoverStagingFolder(
         _ staging: URL,
         levelBalance: Bool,
         diagnostics: any DiagnosticsLogging,
-    ) {
+    ) -> Set<String> {
         let pendingCuts = RecoveredCut.collect(in: staging, diagnostics: diagnostics)
         let repaired = WavHeaderRepair.repairUnfinalized(in: staging)
         if repaired > 0 { logger.info("Repaired \(repaired) unfinalized recording(s) on launch") }
         let recovered = DualSourceRecorder.recoverCrashedRecordings(in: staging, levelBalance: levelBalance)
         if recovered > 0 { logger.info("Recovered \(recovered) crashed recording(s) on launch") }
         DualSourceRecorder.cleanupTempFiles(recordingsDir: staging)
-        RecoveredCut.apply(pendingCuts, in: staging, diagnostics: diagnostics)
+        return RecoveredCut.apply(pendingCuts, in: staging, diagnostics: diagnostics)
+    }
+
+    /// The orphan scan, passing over the mixes in `holdingBack`. Each is held
+    /// in the queue's run registry, which the scan already skips as audio a
+    /// run is busy with, for as long as the scan runs, and released after
+    /// it, so the next pass, which restores the hidden track first, can
+    /// queue it.
+    static func recoverOrphans(
+        into q: PipelineQueue,
+        holdingBack mixes: [URL],
+        recordingsDir: URL = AppPaths.recordingsDir,
+    ) async {
+        let holds = mixes.map { (id: UUID(), mix: $0) }
+        for hold in holds {
+            _ = q.inFlightRuns.begin(jobID: hold.id, mixPath: hold.mix)
+        }
+        defer {
+            for hold in holds {
+                q.inFlightRuns.end(jobID: hold.id)
+            }
+        }
+        await q.recoverOrphanedRecordings(recordingsDir: recordingsDir)
     }
 }
