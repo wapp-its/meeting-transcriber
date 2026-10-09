@@ -146,6 +146,8 @@ Task gh-43-microphone-in-the-menu-and-the-meeting.1 validates the core approach 
 
 Maintainability (plan review): duplication - task .1 copies the fake engine-session helpers from the stall-watchdog tests and task .5 copies the PID-translation and device-list reads from the capture library (accepted: test doubles stay private per suite, and the app keeps its own status-keeping reads); structure - none identified
 
+FIT: GO · 2026-10-09 · base 47c550ad · engine flow-next 8.1.1 · since the plan review gh-44 (the dependency), gh-73, gh-54, gh-94, gh-4, gh-1, gh-12, gh-7 and two upstream merges landed; the restart path still claims and launches as described (handleDeviceChange now returns Bool, attempts build only under the gh-73 seal check, a selection restart through handleDeviceChange is charged to neither budget), the menu puts gh-94 controls under the status line and the Microphone entry fits after the watch controls, no spec claims this scope; AppState.swift is at 599 and DualSourceRecorder.swift at 591 lines, so the planned extension files are mandatory
+
 ## Resolved via Research
 <!-- provenance: plan (inline research by the planning session; scouts were not dispatched) on 2026-10-06 -->
 
