@@ -103,6 +103,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `Settings/GeneralSettingsView.swift` | Mode (Record-only) · Apps to Watch (Teams/Zoom/Webex/Browser/WeChat/Tencent Meeting/FaceTime/WhatsApp) · Record Without Asking (per native/mic-input app) · Detection (Poll Interval, Grace Period) |
 | `Settings/AudioSettingsView.swift` | Microphone device · VAD (enabled + threshold) · Per-Channel Indicator |
 | `Settings/TranscriptionSettingsView.swift` | ASR engine picker · engine-specific options · model status · Live transcription (PoC) toggle |
+| `Settings/VocabularySourceSettingsView.swift` | "Vocabulary source" picker (Local file / URL); for URL the address, the Keychain-backed access token, "Update now" and the status line from `RemoteVocabularyController` |
 | `Settings/SpeakersSettingsView.swift` | Diarization · Mic Speaker Name · Known Voices · Recognition Stats · Experimental Diarization Tuning |
 | `Settings/OutputSettingsView.swift` | LLM provider · protocol language · output folder · custom prompt |
 | `Settings/CommandProviderSettingsView.swift` | Codex CLI note · custom command editor, model and placeholder notes (`#if !APPSTORE`) |
@@ -118,7 +119,8 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `AppSettings.swift` | `@Observable` settings persisted to UserDefaults |
 | `AppSettings+Computed.swift` | Values derived from stored `AppSettings` toggles, split out to keep `AppSettings.swift` under the line cap |
 | `AppSettings+OutputDirectory.swift` | Everything derived from `customOutputDirBookmark`, split out to keep `AppSettings.swift` under the line cap |
-| `AppSettings+Vocabulary.swift` | Custom-vocabulary file selection, sandbox bookmark resolution, and validation state — shared by both ASR engines |
+| `AppSettings+Vocabulary.swift` | Custom-vocabulary file selection, sandbox bookmark resolution, and validation state — shared by both ASR engines; `effectiveVocabularyPath` / `effectiveVocabularyBookmark` hand the engines the local file or the URL source's cached copy |
+| `RemoteVocabularyController.swift` | Keeps the URL source's cached copy current (launch, 2 s after a change, "Update now", hourly), adopts only valid downloads, and publishes the `RemoteVocabularyStatus` Settings shows; owned by `AppState` as `remoteVocabulary` |
 | `LegacyDefaultsMigration.swift` | One-shot carry-over of settings from the pre-rename bundle identifier, since `UserDefaults` is scoped per identifier |
 | `UpdateChecker.swift` | Checks GitHub releases for newer versions, drives the menu bar update badge |
 | `Settings/PickerLanguages.swift` | Language picker entries for WhisperKit and Parakeet language selectors |
@@ -165,6 +167,9 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `ParakeetTokenGrouping.swift` | Pure token-grouping logic extracted from `ParakeetEngine` (testable) |
 | `ParakeetVocabularyConfiguration.swift` | Identity of one Parakeet CTC vocabulary configuration (path + bookmark + file revision) and its preparation lifecycle |
 | `VocabularyFileAccess.swift` | Resolves persisted sandbox access for the shared custom-vocabulary/terminology files, brackets reads with the matching security scope |
+| `RemoteVocabulary.swift` | URL vocabulary source types: `VocabularySource`, address validation (https with a host), validators, failures and the Settings status sentences |
+| `RemoteVocabularyFetcher.swift` | One conditional GET (ETag / Last-Modified, optional `Authorization: Bearer`) over its own uncached `URLSession`: refuses redirects to http and, with a token, to another host; caps the body and the total time |
+| `RemoteVocabularyCache.swift` | One cached copy plus JSON sidecar per address and bundle identifier in `AppPaths.remoteVocabularyCacheDirectory`; atomic replace, sidecar trusted only when it matches the text |
 | `TerminologyNormalizer.swift` | Opt-in post-ASR canonical-spelling rules (`Canonical => variant \| variant`), engine-independent |
 | `StreamingTranscriber.swift` | Per-channel live transcription actor (FluidVAD streaming → `engine.transcribeSamples` → partial/final captions) |
 | `PipelineQueue.swift` | Decouples recording from post-processing, sequential job pipeline |
@@ -508,6 +513,7 @@ Full design rationale (why the two remedies can't compose, the model provisionin
 ### Custom Vocabulary & Terminology Normalization
 
 - **Custom vocabulary** is one shared one-term-per-line file (`AppSettings.customVocabularyPath`, resolved through `VocabularyFileAccess` for sandbox bookmark access), not per engine. Parakeet always applies it via CTC boosting. WhisperKit applies it only when `AppSettings.whisperKitVocabularyPromptEnabled` (off by default) is on, via `WhisperVocabularyPrompt` turning the file into a bounded decoder-prompt hint — WhisperKit shares its 224-token decoder context between that prompt and generated tokens, so a dense recording can lose whole sentences to it; Parakeet is the recommended engine for vocabulary boosting.
+- **Vocabulary source:** one at a time, chosen in Settings → Transcription (`AppSettings.vocabularySource`): the local file above (the default), or a URL (`remoteVocabularyURL`, for example a file in a GitHub or GitLab repository, with an optional access token kept only in the Keychain and sent as `Authorization: Bearer`). `RemoteVocabularyController` keeps a cached copy of the URL source current with conditional requests (`RemoteVocabularyFetcher`, `RemoteVocabularyCache`). The engines read `AppSettings.effectiveVocabularyPath`, which for the URL source is the copy kept for the configured address: nothing is merged with the local file and nothing falls back to it, a failed check keeps the last good copy (also across a restart), and with no copy yet the engines run without vocabulary. Settings shows the copy's term count, when it last changed and when the server was last reached, or why the last check failed.
 - **Terminology normalization** (`TerminologyNormalizer`) is a separate, engine-independent post-ASR pass, applied to transcript segments right after transcription: opt-in `Canonical => spoken variant | another variant` rules, configured in Settings → Transcribe → Terminology Rules.
 
 ---
@@ -725,7 +731,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 |---|---|---|---|
 | **General** | Apps to Watch · Detection | `settings` | — |
 | **Audio** | Microphone · VAD | `settings` | `audioDevices` |
-| **Transcription** | Engine + per-engine options + status | `settings`, three engines | — |
+| **Transcription** | Engine + per-engine options + vocabulary source + status | `settings`, three engines, `remoteVocabulary?` | — |
 | **Speakers** | Diarization · Speaker Identity · Known Voices · Recognition Stats · Experimental Diarization Tuning | `settings`, `recognitionStatsLog`, `enrollmentDiarizerFactory` | `knownVoicesSheet` |
 | **Output** | LLM Provider · Protocol Language · Output Folder · Prompt | `settings` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`, `hasCustomPrompt` |
 | **Advanced** | Permissions · Diagnostics | — | `micPermission`, `screenRecordingOK`, `accessibilityOK` |
@@ -736,6 +742,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 - `diarize` hides the diarizer-mode picker and Expected Speakers stepper
 - `vadEnabled` hides the VAD threshold slider
 - `transcriptionEngine` switches between WhisperKit / Parakeet option panels
+- `vocabularySource` switches between the local vocabulary file row and the URL controls (address, token, "Update now", status)
 - `protocolProvider` switches between Claude CLI / Codex CLI / Custom Command / OpenAI-compatible / None panels
 - `#if APPSTORE` removes the Claude CLI, Codex CLI and Custom Command provider options entirely
 - `updateChecker == nil` hides the entire Updates section in About
