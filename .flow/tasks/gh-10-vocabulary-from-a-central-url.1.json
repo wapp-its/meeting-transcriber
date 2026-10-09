@@ -9,7 +9,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-10-vocabulary-from-a-central-url",
   "spec_path": ".flow/tasks/gh-10-vocabulary-from-a-central-url.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Fetcher, cache and status types for a remote vocabulary",
   "updated_at": "2026-10-06T20:34:22.128459Z"
 }

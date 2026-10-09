@@ -478,7 +478,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-10-vocabulary-from-a-central-url.md",
-  "status": "open",
+  "status": "done",
   "title": "Vocabulary from a central URL",
   "tracker": {
     "baseHashFlow": null,
@@ -492,5 +492,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/10"
   },
-  "updated_at": "2026-10-09T12:01:30.866104Z"
+  "updated_at": "2026-10-09T12:12:14.243222Z"
 }
