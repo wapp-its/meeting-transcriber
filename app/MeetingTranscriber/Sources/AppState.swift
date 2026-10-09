@@ -114,10 +114,10 @@ extension AppNotifying {
 
 /// Observable ViewModel that composes the app's concern-specific controllers
 /// (`engines`, `watching`, `pipeline`, `permissions`, `channelHealth`,
-/// `liveTranscription`, `rpcController`) and exposes the derived UI properties
-/// (badge, status label) the menu-bar scene binds to. It wires the controllers
-/// together rather than owning their state — new concern state belongs in a
-/// controller, not here.
+/// `microphone`, `liveTranscription`, `rpcController`) and exposes the derived
+/// UI properties (badge, status label) the menu-bar scene binds to. It wires the
+/// controllers together rather than owning their state — new concern state
+/// belongs in a controller, not here.
 ///
 /// Extracted from `MeetingTranscriberApp` so badge/watching logic and
 /// `BadgeKind.compute(...)` are testable without the `@main` App struct.
@@ -166,6 +166,11 @@ final class AppState {
     /// `WatchingController` wires its `start()` / `stop()` to `WatchLoop` state
     /// transitions, and the menu-bar icon + RPC snapshot read its flags.
     let channelHealth: ChannelHealthController
+
+    /// Which microphone the app records from: hands a changed choice to the
+    /// running recording and publishes the device it records from.
+    /// `WatchingController` attaches it on the same transitions as `channelHealth`.
+    let microphone: MicrophoneController
 
     /// Observable state for the live caption overlay. Always present (the
     /// `LiveCaptionsOverlay` window observes this); content is only populated
@@ -261,13 +266,11 @@ final class AppState {
             verboseDiagnostics: { [settings] in settings.verboseDiagnostics },
             warmupQueue: warmupQueue,
         )
+        self.microphone = MicrophoneController(settings: settings, notifier: notifier)
         self.watching = WatchingController(
-            settings: settings,
-            notifier: notifier,
-            pipeline: pipeline,
-            channelHealth: channelHealth,
-            permissions: permissions,
-            liveTranscription: liveTranscription,
+            settings: settings, notifier: notifier, pipeline: pipeline,
+            channelHealth: channelHealth, permissions: permissions,
+            liveTranscription: liveTranscription, microphone: microphone,
         )
 
         #if !APPSTORE
@@ -537,21 +540,6 @@ final class AppState {
     /// the recording would begin a moment later regardless.
     var canStopRecording: Bool {
         watching.isRecording
-    }
-
-    /// Menu-bar **top-half** red tint: mic channel silent, OR both channels
-    /// silent (`recordingSilentActive` paints both halves). Hoisted out of the
-    /// menu-bar body for the same type-check-budget reason as
-    /// `hasPermissionProblem` — reading two `channelHealth.*` flags through the
-    /// sub-controller inline is more than the body can afford on slow CI.
-    var micSilentOverlay: Bool {
-        channelHealth.micSilentOverlay
-    }
-
-    /// Menu-bar **bottom-half** red tint: app-audio channel silent, OR both
-    /// channels silent. See `micSilentOverlay`.
-    var appSilentOverlay: Bool {
-        channelHealth.appSilentOverlay
     }
 
     // Internal (not private): also formats `postedAt` in the RPC snapshot

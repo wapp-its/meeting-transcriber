@@ -38,6 +38,25 @@ protocol RecordingProvider {
     /// that does not simulate capture never looks broken.
     var appSignalAges: ChannelSignalAges { get }
     var micSignalAges: ChannelSignalAges { get }
+
+    /// The microphone the running capture reports it records from, nil
+    /// without a microphone capture. Default nil.
+    var micInputDevice: MicInputDevice? { get }
+
+    /// Whether a microphone is being captured right now: one was requested,
+    /// it started and it has not given up. Default false.
+    var microphoneTrackActive: Bool { get }
+
+    /// The process ids this recording tapped when it started: empty for a
+    /// microphone-only recording and outside a recording, and without the
+    /// helper processes an app starts later. Default empty.
+    var tappedPIDs: [pid_t] { get }
+
+    /// Move the running microphone capture to the device with `deviceUID`,
+    /// nil meaning the system default. Does nothing without a microphone
+    /// capture; the next recording reads the choice when it starts. Default:
+    /// does nothing.
+    func selectMicrophone(deviceUID: String?)
 }
 
 extension ChannelSignalAges {
@@ -76,4 +95,18 @@ extension RecordingProvider {
     var micSignalAges: ChannelSignalAges {
         .deliveringSignalNow
     }
+
+    var micInputDevice: MicInputDevice? {
+        nil
+    }
+
+    var microphoneTrackActive: Bool {
+        false
+    }
+
+    var tappedPIDs: [pid_t] {
+        []
+    }
+
+    func selectMicrophone(deviceUID _: String?) {}
 }

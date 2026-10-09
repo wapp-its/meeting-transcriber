@@ -12,9 +12,45 @@ import Foundation
 ///
 /// Both fields are optional separately: CoreAudio can answer one property and
 /// decline the other, and a name without a UID is still worth printing.
-struct MicInputDevice: Equatable, Sendable {
-    let uid: String?
-    let name: String?
+///
+/// Public because the app names the microphone a recording captures
+/// (`MicCaptureHandler.activeInputDevice`) and the one a recording would use
+/// (`systemDefaultInput()`).
+public struct MicInputDevice: Equatable, Sendable {
+    public let uid: String?
+    public let name: String?
+
+    public init(uid: String?, name: String?) {
+        self.uid = uid
+        self.name = name
+    }
+
+    /// The macOS default input device, nil when there is none or CoreAudio
+    /// does not answer.
+    ///
+    /// Core Audio's `kAudioHardwarePropertyDefaultInputDevice`, not
+    /// AVFoundation's default capture device: it is the device the capture
+    /// engine follows when nothing is pinned, so it is what "System Default"
+    /// records, and AVFoundation's device order is documented as unrelated to
+    /// it. Several CoreAudio property reads, so not for a render thread.
+    public static func systemDefaultInput() -> Self? {
+        systemDefaultInputDeviceID().map(Self.init(deviceID:))
+    }
+
+    /// The device's UID and name as CoreAudio reports them.
+    init(deviceID: AudioDeviceID) {
+        self.init(
+            uid: readCFStringAudioProperty(deviceID, kAudioDevicePropertyDeviceUID),
+            name: readCFStringAudioProperty(deviceID, kAudioObjectPropertyName),
+        )
+    }
+
+    static func systemDefaultInputDeviceID() -> AudioDeviceID? {
+        guard case let .value(deviceID) = defaultDeviceReading(
+            selector: kAudioHardwarePropertyDefaultInputDevice,
+        ), deviceID != kAudioObjectUnknown else { return nil }
+        return deviceID
+    }
 }
 
 /// The `[debug] Mic input device:` line.

@@ -59,6 +59,10 @@ enum A11yID {
         "jobRetryButton.\(index)"
     }
 
+    /// The device picker in the menu bar's Microphone submenu. One fixed
+    /// value: no device UID or name in it, for the reason the job rows give.
+    static let menuMicrophonePicker = "menuMicrophonePicker"
+
     static let recordOnlyBanner = "recordOnlyBanner"
     static let transcriptionSection = "transcriptionSection"
     static let protocolSection = "protocolSection"

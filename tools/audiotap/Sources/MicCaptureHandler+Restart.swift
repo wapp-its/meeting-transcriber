@@ -123,13 +123,14 @@ extension MicCaptureHandler {
             )
             return
         }
-        var rate: Double?
+        var started: (rate: Double, device: MicInputDevice?)?
         var thrown: (any Error)?
         do {
-            rate = try startEngine(deviceUID: deviceUID, on: candidate)
+            started = try startEngine(deviceUID: deviceUID, on: candidate)
         } catch {
             thrown = error
         }
+        let result = started
         let failure = thrown
         let succeeded = failure == nil
 
@@ -142,7 +143,7 @@ extension MicCaptureHandler {
             // Publication happens on the main queue, where stop() also runs, so
             // the two are totally ordered instead of racing on `session`.
             DispatchQueue.main.async { [weak self] in
-                self?.adopt(candidate, deviceUID: deviceUID, generation: generation, rate: rate, trigger: trigger)
+                self?.adopt(candidate, deviceUID: deviceUID, generation: generation, started: result, trigger: trigger)
             }
 
         case .retry:
@@ -183,9 +184,10 @@ extension MicCaptureHandler {
         _ candidate: any MicEngineSessionProviding,
         deviceUID: String?,
         generation: Int,
-        rate: Double?,
+        started: (rate: Double, device: MicInputDevice?)?,
         trigger: MicRestartTrigger,
     ) {
+        let rate = started?.rate
         // Read before the arbiter resumes capturing, so a buffer the render
         // thread delivers in between is still credited to this adoption.
         let adoptedAt = stallClock()
@@ -195,14 +197,19 @@ extension MicCaptureHandler {
             return
         }
         session = candidate
+        activeInputDevice = started?.device
         restartRetryCount = 0
         configChangePolicy.engineStarted(at: adoptedAt)
         cancelPendingConfigChangeRestart()
         installConfigChangeObserver()
         noteAdoptionForStallWatchdog(at: adoptedAt, trigger: trigger, onSelectedDevice: deviceUID != nil, rate: rate)
-        // A stall restart's adoption is logged by the watchdog, at a retained
-        // level; a device change keeps its line as it was.
-        if trigger.stallRestart == nil {
+        // A stall restart's adoption is logged by the watchdog and a
+        // selection's here, both at a retained level; a device change keeps
+        // its line as it was.
+        if trigger == .deviceSelected {
+            let line = MicSelectionLogLine.adopted(rate: rate)
+            logger.log(level: line.level, "\(line.text, privacy: .public)")
+        } else if trigger.stallRestart == nil {
             logger.info(
                 "Mic: engine restarted on \(deviceUID != nil ? "selected" : "default") device (\(Int(rate ?? 0)) Hz)",
             )
@@ -210,6 +217,7 @@ extension MicCaptureHandler {
         if let rate, rate <= 0 {
             logger.warning("Mic: hardware format rate is \(rate) after restart — may produce incorrect audio")
         }
+        applyPendingSelection(adoptedDeviceUID: deviceUID)
     }
 
     /// The attempt for `generation` never came back. Abandon the microphone
@@ -227,6 +235,7 @@ extension MicCaptureHandler {
         outputFile = nil
         stopStallWatchdog()
         cancelPendingConfigChangeRestart()
+        endDeviceSelection()
         onGiveUp?()
     }
 
@@ -255,6 +264,7 @@ extension MicCaptureHandler {
             outputFile = nil
             stopStallWatchdog()
             cancelPendingConfigChangeRestart()
+            endDeviceSelection()
             onGiveUp?()
 
         case let .retry(delay):
@@ -268,17 +278,17 @@ extension MicCaptureHandler {
                 // Re-resolve the target now rather than reusing the one captured
                 // when the backoff started: a device change during the backoff is
                 // ignored by design, so this is where a newer reality is picked up.
-                self.launchRestartAttempt(
-                    deviceUID: self.currentRestartTarget() ?? deviceUID,
-                    generation: generation,
-                    trigger: trigger,
-                )
+                // A selection made since then is taken exactly as it resolves,
+                // the default included: the captured target is the previous
+                // device, which is the one failing.
+                let target = self.selectionPending ? self.currentRestartTarget() : self.currentRestartTarget() ?? deviceUID
+                self.launchRestartAttempt(deviceUID: target, generation: generation, trigger: trigger)
             }
         }
     }
 
     /// The device a restart should aim at right now, or nil to take the default.
-    private func currentRestartTarget() -> String? {
+    func currentRestartTarget() -> String? {
         guard let uid = selectedDeviceUID else { return nil }
         return isDevicePresent(uid) ? uid : nil
     }

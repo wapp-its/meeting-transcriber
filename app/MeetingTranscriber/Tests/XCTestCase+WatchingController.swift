@@ -70,6 +70,8 @@ extension XCTestCase {
     /// - Parameter channelFaultWindow: the channel-health window. Zero (the
     ///   default) lets the first tick decide; see
     ///   `WatchingControllerChannelFaultTests` for when that is not enough.
+    /// - Parameter microphone: handed through to the controller; nil (the
+    ///   default) leaves recordings without a microphone controller.
     func makeWatchingController(
         logDir: URL,
         notifier: any AppNotifying = RecordingNotifier(),
@@ -81,6 +83,7 @@ extension XCTestCase {
         permissionHealth: HealthCheckResult? = nil,
         startJoinTimeout: Duration = WatchingController.defaultStartJoinTimeout,
         channelFaultWindow: TimeInterval = 0,
+        microphone: MicrophoneController? = nil,
         makeDetector: @escaping () -> any MeetingDetecting = { makeSilentDetector() },
         makeRecorder: @escaping @MainActor () -> any RecordingProvider = { makeMockRecorder() },
     ) -> WatchingController {
@@ -147,6 +150,7 @@ extension XCTestCase {
             channelHealth: channelHealth,
             permissions: permissions,
             liveTranscription: liveTranscription,
+            microphone: microphone,
             ensureMicAccess: ensureMicAccess,
             requestScreenRecording: requestScreenRecording,
             requestAccessibility: requestAccessibility,
