@@ -49,7 +49,10 @@ class WatchLoop {
     /// app; injectable so tests need not wait it out.
     let meetingEndCountdown: TimeInterval
     let noMic: Bool
-    let micDeviceUID: String?
+    /// Dynamic accessor — read at every recording start, like
+    /// `verboseDiagnostics` below, so a microphone chosen while watching is on
+    /// reaches the next recording without restarting watching.
+    let micDeviceUID: () -> String?
     /// Dynamic accessor — read at recording-start time so toggling the setting
     /// at runtime takes effect on the next recording without an app restart.
     let verboseDiagnostics: () -> Bool
@@ -146,7 +149,7 @@ class WatchLoop {
         maxDuration: TimeInterval = 14400,
         meetingEndCountdown: TimeInterval = WatchLoop.meetingEndQuestionCountdown,
         noMic: Bool = false,
-        micDeviceUID: String? = nil,
+        micDeviceUID: @escaping () -> String? = { nil },
         verboseDiagnostics: @escaping () -> Bool = { false },
         recordOnly: @escaping () -> Bool = { false },
         recordOnlyDestination: @escaping () -> RecordOnlyDestination = {
@@ -278,7 +281,7 @@ class WatchLoop {
 
         let recorder = await recorderFactory()
         try recorder.start(
-            source: source, micDeviceUID: micDeviceUID,
+            source: source, micDeviceUID: micDeviceUID(),
             debugLogging: verboseDiagnostics(),
         )
 
@@ -412,7 +415,7 @@ class WatchLoop {
         let recorder = await recorderFactory()
         try recorder.start(
             source: source,
-            micDeviceUID: micDeviceUID,
+            micDeviceUID: micDeviceUID(),
             debugLogging: verboseDiagnostics(),
         )
         activeRecorder = recorder

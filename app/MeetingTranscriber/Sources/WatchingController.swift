@@ -244,7 +244,7 @@ final class WatchingController {
                     pollInterval: settings.pollInterval,
                     endGracePeriod: settings.endGrace,
                     noMic: settings.noMic,
-                    micDeviceUID: settings.micDeviceUID.isEmpty ? nil : settings.micDeviceUID,
+                    micDeviceUID: { [settings] in settings.micDeviceUID.isEmpty ? nil : settings.micDeviceUID },
                     verboseDiagnostics: { [settings] in settings.verboseDiagnostics },
                     recordOnly: { [settings] in settings.recordOnly },
                     // Decided per write, not per poll: the loop calls this once
@@ -471,7 +471,7 @@ final class WatchingController {
             pipelineQueue: pipeline.queue,
             pollInterval: settings.pollInterval,
             noMic: settings.noMic,
-            micDeviceUID: settings.micDeviceUID.isEmpty ? nil : settings.micDeviceUID,
+            micDeviceUID: { [settings] in settings.micDeviceUID.isEmpty ? nil : settings.micDeviceUID },
             verboseDiagnostics: { [settings] in settings.verboseDiagnostics },
             recordOnly: { [settings] in settings.recordOnly },
             // Same seam as the auto-watch loop above: per write, through the

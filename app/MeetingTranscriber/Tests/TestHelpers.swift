@@ -243,7 +243,7 @@ func makeTestWatchLoop(
         pollInterval: 0.05,
         endGracePeriod: 0.1,
         noMic: noMic,
-        micDeviceUID: micDeviceUID,
+        micDeviceUID: { micDeviceUID },
         recordOnly: recordOnly,
         recordOnlyDestination: { .unscoped(recordOnlyOutputDir()) },
         notifier: notifier,

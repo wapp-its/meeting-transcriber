@@ -24,6 +24,25 @@ final class WatchLoopMicrophoneChoiceTests: XCTestCase {
         func reset(appName _: String?) {}
     }
 
+    /// One loop, two recordings, the choice changed in between: the second
+    /// opens with the new device.
+    func testTheNextRecordingOfALoopOpensWithTheChoiceMadeSinceTheLastOne() async throws {
+        var choice: String? = "BuiltInUID"
+        let recorder = makeMockRecorder()
+        let loop = WatchLoop(detector: makeSilentDetector(), recorderFactory: { recorder }, micDeviceUID: { choice })
+        loop.permissionChecker = { .allHealthy }
+        // This process, so the target stays alive while each recording runs.
+        try await loop.startManualRecording(pid: getpid(), appName: "Chrome", title: "First")
+        XCTAssertEqual(recorder.capturedMicDeviceUID, "BuiltInUID", "precondition")
+        loop.stopManualRecording()
+
+        choice = "HeadsetUID"
+        try await loop.startManualRecording(pid: getpid(), appName: "Chrome", title: "Second")
+        defer { loop.stop() }
+
+        XCTAssertEqual(recorder.capturedMicDeviceUID, "HeadsetUID")
+    }
+
     /// Through `WatchingController`, on the loop it built when watching
     /// started: a choice made after that reaches the next detected meeting,
     /// and watching is not restarted to get there.
