@@ -55,9 +55,36 @@ Give the existing finished-job store the fields the window needs (app, meeting s
 
 
 ## Done summary
-TBD
+The finished-job history now keeps each job's app, meeting start, enqueue time, measured audio length and participants, which the Transcriptions window (tasks .2 to .4) reads to list finished jobs after a restart. TerminalJobStore stores each record flat next to the unchanged /v1 status, so history files written before this change load with every record and the previous build still reads files written now. The history keeps the newest 1000 jobs (was 200), and stage 1 measures each recording's length from the 16 kHz audio before VAD trims it.
 
+Tier: session (jev-unavailable(no_key)) -> explicit invocation opus at xhigh (actual: claude-opus-5-5)
+
+stage: impl-review - ran [2026-10-08T11:09:41Z..2026-10-08T11:19:36Z]
+
+The review ran on codex gpt-5.6-sol at xhigh with three draws (correctness, contracts, integration). Each draw returned SHIP with no findings, and the validator pass did not run because nothing was found. Receipt /tmp/impl-review-receipt-372726e60d63-gh-13-transcriptions-window.1.json, fan-out rid 999422145f954e848c3c23c7d0b2c28b. An earlier fan-out (rid 609a340d) was stopped by the host's 600 s command limit before it finalized, and flowctl refunded it as a transport failure, so it used no review round.
+
+Acceptance criteria, each covered by a focused test re-run at f4da9cf2 (240 tests, rc 0, /private/tmp/gh13/t1-tests3.log):
+- A legacy terminal_jobs.json of plain JobStatusDTO objects loads every record with nil extras and empty participants (R9). TerminalJobRecordTests.testAHistoryWrittenBeforeTheExtraFieldsLoadsEveryRecord
+- A record with every field set survives a re-created store unchanged (R3). TerminalJobRecordTests.testARecordWithEveryFieldSurvivesARestart
+- The status lookup(jobID:) returns encodes none of appName, meetingStartTime, enqueuedAt, audioDuration, participants (R9). TerminalJobRecordTests.testTheStatusALookupReturnsCarriesNoneOfTheHistoryFields
+- R9 error case, a file written now stays readable as [JobStatusDTO] by the previous build. TerminalJobRecordTests.testAHistoryWrittenNowStaysReadableAsTheStatusShape
+- The default cap is 1000, and 1001 records keep the newest 1000 (R2). TerminalJobStoreTests.testDefaultCapKeepsTheNewestThousand
+- A single-source job run to .done leaves app, participants, meeting start, enqueue time and a duration of 0.5 s +/- 0.05 (R2, R3). PipelineQueueHistoryRecordTests.testAFinishedJobLeavesWhatTheWindowLists
+- A dual-source job's duration equals the longer 16 kHz track, with either track the longer one (R2). PipelineQueueHistoryRecordTests.testADualSourceJobLastsAsLongAsItsLongerTrack
+- TerminalJobStoreTests (element type adapted only), PipelineControllerTests, PipelineQueueRetryTests, EmptyTrackSurvivesTests and PipelineQueueTests pass in the same run.
+- Lint re-run at f4da9cf2 with the pinned SwiftFormat 0.63.0 and SwiftLint 0.65.1 returned rc 0 (0 of 703 files need formatting, 0 violations, /private/tmp/gh13/lint3.log).
+- ./scripts/pre-push.sh --with-appstore re-run at f4da9cf2 returned rc 0 (Homebrew and App Store release builds, /tmp/gh13/prepush3.out).
+
+Baseline before the edit was green (62 tests in TerminalJobStoreTests, PipelineControllerTests, PipelineQueueRetryTests and EmptyTrackSurvivesTests, /private/tmp/gh13/baseline-tests.log). The new tests failed to build before TerminalJobRecord existed (/private/tmp/gh13/red-build.log). A mutation run (dual source reading the app track only, default cap 200, single-source duration not recorded) turned four assertions red, and the sources were restored byte-identical before the commit.
+
+Decisions:
+- recordAudioDuration(jobID:frames:) takes the 16 kHz frame count instead of seconds. The frames-to-seconds conversion lives in one place, and transcribeDualSource stays under SwiftLint's 60-line body cap. resolveTrackViability now takes the two frame counts, so each track is read once.
+- The JobStatusDTO.swift doc comment (lines 3 to 6) was corrected because "the wire shape and the stored shape are the same" stopped being true. The task's Approach names this edit and its Touches list does not. The type itself is unchanged.
+
+Follow-ups: none new. docs/automation-api.md still says "cap 200", and task .2 owns that edit.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: f4da9cf2684730a7e7b36818db03be5c5514f428
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh13-home swift test --parallel --filter 'TerminalJobRecordTests|TerminalJobStoreTests|PipelineQueueHistoryRecordTests|PipelineControllerTests|PipelineQueueRetryTests|EmptyTrackSurvivesTests|PipelineQueueTests' (rc 0, 240 tests, /private/tmp/gh13/t1-tests3.log), PATH=$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH ./scripts/lint.sh (rc 0, /private/tmp/gh13/lint3.log), ./scripts/pre-push.sh --with-appstore (rc 0, /tmp/gh13/prepush3.out)
 - PRs:

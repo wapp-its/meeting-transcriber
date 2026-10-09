@@ -39,6 +39,7 @@ final class MenuBarViewTests: XCTestCase {
         onRecordMicrophone: @escaping () -> Void = {},
         noMic: Bool = false,
         manualRecordingPendingOrActive: Bool = false,
+        onShowAllTranscriptions: @escaping () -> Void = {},
     ) -> MenuBarView {
         MenuBarView(
             status: status,
@@ -57,6 +58,7 @@ final class MenuBarViewTests: XCTestCase {
             onOpenSettings: {},
             onNameSpeakers: onNameSpeakers,
             onProcessFiles: {},
+            onShowAllTranscriptions: onShowAllTranscriptions,
             onDismissJob: { _ in },
             onQuit: {},
         )
@@ -386,6 +388,29 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertTrue(called)
     }
 
+    /// The way into the Transcriptions window is there whatever else the menu
+    /// shows: while recording with a job line above it, and idle with none.
+    func testAllTranscriptionsItemIsAlwaysShownAndCallsItsCallback() throws {
+        let queue = PipelineQueue()
+        var job = PipelineJob(
+            meetingTitle: "Standup", appName: "Teams",
+            mixPath: URL(fileURLWithPath: "/tmp/mix.wav"), appPath: nil, micPath: nil, micDelay: 0,
+        )
+        job.state = .error
+        queue.insertJobForTesting(job)
+        let recording = try makeView(status: makeStatus(state: .recording), pipelineQueue: queue).inspect()
+        XCTAssertNoThrow(try recording.find(viewWithAccessibilityIdentifier: A11yID.allTranscriptionsMenuItem))
+
+        var called = false
+        // swiftlint:disable:next trailing_closure
+        let item = try makeView(status: makeStatus(state: .idle), onShowAllTranscriptions: { called = true })
+            .inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.allTranscriptionsMenuItem)
+        XCTAssertNoThrow(try item.find(text: "All Transcriptions..."))
+        try item.button().tap()
+        XCTAssertTrue(called)
+    }
+
     // MARK: - State label
 
     func testNilStatusShowsIdleLabel() throws {
@@ -450,9 +475,11 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertNoThrow(try body.find(text: "Transcribing... 0s"))
     }
 
-    func testDismissButtonShownForCompletedJob() throws {
+    /// A done line opens its protocol and has no Dismiss: it leaves the menu
+    /// once three later jobs have finished.
+    func testDoneJobOffersOpenAndNoDismiss() throws {
         let queue = PipelineQueue()
-        let job = PipelineJob(
+        var job = PipelineJob(
             meetingTitle: "Retro",
             appName: "Zoom",
             mixPath: URL(fileURLWithPath: "/tmp/mix.wav"),
@@ -460,9 +487,12 @@ final class MenuBarViewTests: XCTestCase {
             micPath: nil,
             micDelay: 0,
         )
-        queue.enqueue(job)
-        queue.updateJobState(id: job.id, to: .done)
+        let protocolURL = URL(fileURLWithPath: "/tmp/Retro.md")
+        job.protocolPath = protocolURL
+        job.state = .done
+        queue.insertJobForTesting(job)
 
+        var openedURL: URL?
         let sut = MenuBarView(
             status: makeStatus(),
             isWatching: false,
@@ -475,7 +505,7 @@ final class MenuBarViewTests: XCTestCase {
             manualRecordingPendingOrActive: false,
             onStopManualRecording: nil,
             onOpenLastProtocol: {},
-            onOpenProtocol: { _ in },
+            onOpenProtocol: { openedURL = $0 },
             onOpenProtocolsFolder: {},
             onOpenSettings: {},
             onNameSpeakers: nil,
@@ -484,7 +514,9 @@ final class MenuBarViewTests: XCTestCase {
             onQuit: {},
         )
         let body = try sut.inspect()
-        XCTAssertNoThrow(try body.find(text: "Dismiss"))
+        XCTAssertThrowsError(try body.find(button: "Dismiss"))
+        try body.find(button: "Open").tap()
+        XCTAssertEqual(openedURL, protocolURL)
     }
 
     func testProcessFilesButtonCallsCallback() throws {
@@ -514,9 +546,11 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertTrue(called)
     }
 
+    /// Dismiss stays on a job waiting for speaker names, the one line it is
+    /// left on, next to Name Speakers.
     func testDismissButtonCallsCallbackWithJobID() throws {
         let queue = PipelineQueue()
-        let job = PipelineJob(
+        var job = PipelineJob(
             meetingTitle: "Standup",
             appName: "Teams",
             mixPath: URL(fileURLWithPath: "/tmp/mix.wav"),
@@ -524,8 +558,8 @@ final class MenuBarViewTests: XCTestCase {
             micPath: nil,
             micDelay: 0,
         )
-        queue.enqueue(job)
-        queue.updateJobState(id: job.id, to: .done)
+        job.state = .speakerNamingPending
+        queue.insertJobForTesting(job)
 
         var dismissedID: UUID?
         let sut = MenuBarView(
@@ -549,11 +583,13 @@ final class MenuBarViewTests: XCTestCase {
             onQuit: {},
         )
         let body = try sut.inspect()
+        XCTAssertNoThrow(try body.find(button: "Name Speakers"))
         try body.find(button: "Dismiss").tap()
         XCTAssertEqual(dismissedID, job.id)
     }
 
-    func testDismissButtonShownForErrorJob() throws {
+    /// A failed line offers Remove instead of Dismiss.
+    func testRemoveButtonShownForErrorJob() throws {
         let queue = PipelineQueue()
         let job = PipelineJob(
             meetingTitle: "Sprint",
@@ -587,7 +623,8 @@ final class MenuBarViewTests: XCTestCase {
             onQuit: {},
         )
         let body = try sut.inspect()
-        XCTAssertNoThrow(try body.find(text: "Dismiss"))
+        XCTAssertNoThrow(try body.find(button: "Remove"))
+        XCTAssertThrowsError(try body.find(button: "Dismiss"))
         XCTAssertNoThrow(try body.find(text: "Failed"))
     }
 

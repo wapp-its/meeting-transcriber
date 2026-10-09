@@ -118,6 +118,13 @@ struct PipelineJob: Identifiable, Codable {
     /// reader. It has to live on the job because the transcript is rendered
     /// again after the pipeline finishes, by the late re-diarization.
     var trackViability: DualTrackViability?
+    /// The recording's length in seconds, written by stage 1 once the 16 kHz
+    /// audio exists: the resampled mix for a single-source job, the longer of
+    /// the two resampled tracks for a dual-source one. Nil means not measured
+    /// (the job has not reached stage 1, the audio held no frames, or the
+    /// snapshot predates this field). A retry keeps it: it re-measures the
+    /// same audio.
+    var audioDuration: TimeInterval?
     /// The echo detector's verdict, once the transcription stage has run it.
     /// Nil for single-source jobs and whenever no verdict was possible.
     var echo: EchoDetectionDTO?

@@ -59,6 +59,37 @@ enum A11yID {
         "jobRetryButton.\(index)"
     }
 
+    /// Menu bar job row's Remove button on a failed job, addressed by ROW
+    /// INDEX for the same reason as `jobRetryButton`.
+    static func jobRemoveButton(_ index: Int) -> String {
+        "jobRemoveButton.\(index)"
+    }
+
+    /// Menu bar item that opens the Transcriptions window.
+    static let allTranscriptionsMenuItem = "allTranscriptionsMenuItem"
+
+    // Transcriptions window. Its rows show meeting titles and participants,
+    // so the per-row buttons are addressed by ROW INDEX in the filtered list,
+    // like `jobRetryButton`, and no identifier carries a title, participant or
+    // path.
+    static let transcriptionsSearchField = "transcriptionsSearchField"
+
+    static func transcriptionOpenButton(_ index: Int) -> String {
+        "transcriptionOpenButton.\(index)"
+    }
+
+    static func transcriptionRevealButton(_ index: Int) -> String {
+        "transcriptionRevealButton.\(index)"
+    }
+
+    static func transcriptionRetryButton(_ index: Int) -> String {
+        "transcriptionRetryButton.\(index)"
+    }
+
+    static func transcriptionRemoveButton(_ index: Int) -> String {
+        "transcriptionRemoveButton.\(index)"
+    }
+
     static let recordOnlyBanner = "recordOnlyBanner"
     static let transcriptionSection = "transcriptionSection"
     static let protocolSection = "protocolSection"

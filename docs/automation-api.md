@@ -153,7 +153,7 @@ curl -sS -X POST "$BASE/v1/jobs" \
 
 Read a job's current status. Answers for both live (in-flight) jobs and finished
 jobs that have already been reaped from the in-memory queue: terminal records
-are persisted to a small file-backed store (cap 200, owner-only) that survives
+are persisted to a small file-backed store (cap 1000, owner-only) that survives
 both the queue's 60-second cleanup of finished jobs and an app restart. A slow
 poller therefore never loses the transcript/protocol paths.
 
@@ -161,15 +161,16 @@ Responses:
 
 - `200 OK` with a [JobStatusDTO](#jobstatusdto).
 - `404 Not Found` if the id is unknown (never enqueued, or aged out of the
-  terminal store), and for a job cancelled before it finished, which leaves no
-  terminal record.
+  terminal store), for a job cancelled before it finished, which leaves no
+  terminal record, and for a failed job the user removed, which takes its
+  terminal record with it.
 
 A job in `error` is not necessarily final: the user can retry it from the menu
-bar, which moves it back to `waiting` under the **same id**, and the stale
-`error` record is dropped from the terminal store at that moment. A poller that
-sees `error` and keeps polling may therefore see the job run again and end in
-`done`. If a retried job is then cancelled, the id answers `404`, not the
-earlier error.
+bar or the Transcriptions window, which moves it back to `waiting` under the
+**same id**, and the stale `error` record is dropped from the terminal store at
+that moment. A poller that sees `error` and keeps polling may therefore see the
+job run again and end in `done`. If a retried job is then cancelled, the id
+answers `404`, not the earlier error.
 
 ```bash
 curl -sS "$BASE/v1/jobs/<id>" -H "Authorization: Bearer $TOKEN"
