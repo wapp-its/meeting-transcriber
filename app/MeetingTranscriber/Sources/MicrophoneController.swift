@@ -25,6 +25,10 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Microph
 ///   captures from, refreshed once a second from a value the capture layer
 ///   keeps, so no tick reads the hardware.
 ///
+/// - It probes, every five seconds, which input devices the tapped meeting app
+///   uses, logs it, and warns once when the app can tell that the meeting app
+///   records from another microphone (`MicrophoneController+MeetingProbe.swift`).
+///
 /// Attached or not, it also holds the microphone list and the default input's
 /// name that the menu bar's Microphone entry shows.
 ///
@@ -57,7 +61,17 @@ final class MicrophoneController {
     /// The macOS default input's name, which "System Default" records.
     private(set) var defaultInputName: String?
 
-    private let settings: AppSettings
+    /// `<App> uses <devices>` while the latest meeting-app probe found the
+    /// meeting app on another microphone (`MicrophoneController+MeetingProbe.swift`).
+    var meetingAppHint: String?
+
+    let settings: AppSettings
+    let notifier: any AppNotifying
+    let log: any DiagnosticsLogging
+    let probeReader: @Sendable ([pid_t]) -> [MeetingInputProcess]
+    /// Where the probe's Core Audio reads run, never the main queue.
+    let probeQueue = DispatchQueue(label: "com.meetingtranscriber.meeting-microphone-probe", qos: .utility)
+    @ObservationIgnored var meetingProbe = MeetingProbeState()
     private let listDevices: () -> [MicrophoneDevice]
     private let readDefaultInputName: () -> String?
 
@@ -65,11 +79,17 @@ final class MicrophoneController {
 
     init(
         settings: AppSettings,
+        notifier: any AppNotifying = SilentNotifier(),
+        log: any DiagnosticsLogging = OSLogDiagnostics(category: "MeetingMicrophone"),
+        probeReader: @escaping @Sendable ([pid_t]) -> [MeetingInputProcess] = { MeetingMicrophoneProbe.read(pids: $0) },
         listDevices: @escaping () -> [MicrophoneDevice] = MicrophoneDevices.available,
         readDefaultInputName: @escaping () -> String? = MicrophoneDevices.systemDefaultInputName,
         notificationCenter: NotificationCenter = .default,
     ) {
         self.settings = settings
+        self.notifier = notifier
+        self.log = log
+        self.probeReader = probeReader
         self.listDevices = listDevices
         self.readDefaultInputName = readDefaultInputName
         observeMicrophoneChoice()
@@ -97,20 +117,25 @@ final class MicrophoneController {
         }
     }
 
-    /// Detach: end the tick loop and forget the recording and its device.
+    /// Detach: end the tick loop and forget the recording, its device and its
+    /// meeting-app probe.
     func recordingStopped() {
         tickTask?.cancel()
         tickTask = nil
         attachment = nil
         recordedDevice = nil
+        endMeetingProbe()
     }
 
-    /// Publish the attached recorder's device. Assigns only on a change, since
-    /// every assignment of an observed property notifies its observers.
+    /// Publish the attached recorder's device, and probe the meeting app's
+    /// microphone when it is due. Assigns only on a change, since every
+    /// assignment of an observed property notifies its observers.
     func tick() {
         guard let attachment else { return }
-        let device = attachment.recorderProvider()?.micInputDevice
+        let recorder = attachment.recorderProvider()
+        let device = recorder?.micInputDevice
         if recordedDevice != device { recordedDevice = device }
+        probeMeetingMicrophoneIfDue(recorder)
     }
 
     /// Read the device list and the default input's name again. Assigns only

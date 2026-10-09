@@ -4,7 +4,9 @@ import Foundation
 /// channels, split out of `AppState.swift`, which sits at the 600-line cap.
 extension AppState {
     /// The menu bar's Microphone entry. During a recording it names the device
-    /// the capture reports (`microphone.recordedDevice`), not the setting.
+    /// the capture reports (`microphone.recordedDevice`), not the setting, and
+    /// carries `microphone.meetingAppHint` while the meeting app is found on
+    /// another microphone.
     var microphoneMenuState: MicrophoneMenuState {
         .resolve(
             noMic: settings.noMic,
@@ -12,7 +14,7 @@ extension AppState {
             devices: microphone.devices,
             defaultInputName: microphone.defaultInputName,
             recordedDevice: microphone.recordedDevice,
-            meetingAppHint: nil,
+            meetingAppHint: microphone.meetingAppHint,
         )
     }
 

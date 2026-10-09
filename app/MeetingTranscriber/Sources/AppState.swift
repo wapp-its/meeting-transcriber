@@ -266,7 +266,7 @@ final class AppState {
             verboseDiagnostics: { [settings] in settings.verboseDiagnostics },
             warmupQueue: warmupQueue,
         )
-        self.microphone = MicrophoneController(settings: settings)
+        self.microphone = MicrophoneController(settings: settings, notifier: notifier)
         self.watching = WatchingController(
             settings: settings, notifier: notifier, pipeline: pipeline,
             channelHealth: channelHealth, permissions: permissions,
