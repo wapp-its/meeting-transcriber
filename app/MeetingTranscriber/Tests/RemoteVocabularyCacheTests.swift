@@ -192,7 +192,9 @@ final class RemoteVocabularyCacheTests: XCTestCase {
     func testDiscardAllRemovesOnlyThisBundlesOtherAddresses() throws {
         let cache = makeCache()
         let otherBundle = RemoteVocabularyCache(directory: directory, bundleID: "com.example.transcriber.dev")
-        let dashedBundle = RemoteVocabularyCache(directory: directory, bundleID: "\(Self.bundleID)-beta")
+        // Extends this bundle's identifier with a dash, an address-key-shaped
+        // part and a dot, so its files share this bundle's prefix and key shape.
+        let dashedBundle = RemoteVocabularyCache(directory: directory, bundleID: "\(Self.bundleID)-0123456789abcdef.beta")
         for store in [cache, otherBundle, dashedBundle] {
             try store.store(Data("Northstar\n".utf8), metadata: metadata(etag: "\"v1\""))
             try store.store(Data("Aster\n".utf8), metadata: metadata(etag: "\"v1\"", url: Self.otherAddress))

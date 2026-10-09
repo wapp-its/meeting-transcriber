@@ -8,7 +8,9 @@
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-10-vocabulary-from-a-central-url",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-10-vocabulary-from-a-central-url.1": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -135,15 +137,70 @@
       "task": null,
       "timestamp": "2026-10-06T20:35:31.939122Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "d371f79ca093a3f571fa4cd8667c5aa8d2015834510180c1c800dd700eb43569",
+      "backend": "codex",
+      "base_sha": "d9565a5121908813299d525a2c06337dc625dda4",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-1f2cbb4b08d484d93d640cf5f8c30508",
+            "classification": "introduced",
+            "findingId": "finding-1f2cbb4b08d484d93d640cf5f8c30508",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-6e15f0733d3a19997515c1fe24407db8",
+            "classification": "introduced",
+            "findingId": "finding-6e15f0733d3a19997515c1fe24407db8",
+            "firstSeenThisRound": true,
+            "severity": "P3",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "3d8a67b70ef64f3653409e546c5674cbadb9a024",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1791,
+      "output_sha256": "12e48a8e45f3bbd6454e8a7a17108b61ca20147f81df73733290c4157f763dbf",
+      "reservation_id": "e70ec91586f547b9829c93502f4b2806",
+      "round_consumed": true,
+      "scope": "impl:gh-10-vocabulary-from-a-central-url.1",
+      "superseded_by": null,
+      "task": "gh-10-vocabulary-from-a-central-url.1",
+      "timestamp": "2026-10-09T10:39:41.098145Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-10-vocabulary-from-a-central-url.1": 1,
     "plan": 1,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-10-vocabulary-from-a-central-url.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-10-vocabulary-from-a-central-url.md",
@@ -161,5 +218,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/10"
   },
-  "updated_at": "2026-10-06T20:54:53.329832Z"
+  "updated_at": "2026-10-09T10:39:46.044551Z"
 }

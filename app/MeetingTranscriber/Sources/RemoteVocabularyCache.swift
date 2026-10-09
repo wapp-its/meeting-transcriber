@@ -84,8 +84,10 @@ struct RemoteVocabularyCache {
         )
     }
 
-    /// Replaces the copy for `metadata.url` with `text`. Throws on any failure;
-    /// a throw before the final rename leaves the previous pair untouched.
+    /// Replaces the copy for `metadata.url` with `text`. Throws on any failure.
+    /// A failed text or sidecar write leaves the previous pair untouched; a
+    /// failed rename leaves the previous text under the new sidecar, which
+    /// `load` then distrusts.
     func store(_ text: Data, metadata: RemoteVocabularyMetadata) throws {
         try commit(text, metadata: metadata, failingAt: nil)
     }
@@ -192,17 +194,20 @@ struct RemoteVocabularyCache {
         try encoder.encode(sidecar).write(to: Self.sidecarFile(for: textURL), options: .atomic)
     }
 
-    /// This bundle's prefix followed by an address key and a dot. Checking the
-    /// key, not just the prefix, keeps a bundle whose identifier extends this
-    /// one with a dash (`com.a` and `com.a-b`) out of reach.
+    /// Exactly this bundle's prefix, an address key, and one of the three
+    /// suffixes this type writes (text, sidecar, temporary text). Matching the
+    /// whole name, not just the prefix, keeps a bundle whose identifier extends
+    /// this one with a dash (`com.a` and `com.a-0123456789abcdef.b`) out of reach.
     private func isOwnFile(_ name: String) -> Bool {
         let prefix = Self.filePrefix(bundleID: bundleID)
         guard name.hasPrefix(prefix) else { return false }
         let rest = name.dropFirst(prefix.count)
         let key = rest.prefix(Self.addressKeyLength)
-        return key.count == Self.addressKeyLength
-            && key.allSatisfy(\.isHexDigit)
-            && rest.dropFirst(Self.addressKeyLength).first == "."
+        guard key.count == Self.addressKeyLength, key.allSatisfy(\.isHexDigit) else { return false }
+        let suffix = rest.dropFirst(Self.addressKeyLength)
+        if suffix == ".txt" || suffix == ".json" { return true }
+        guard suffix.hasPrefix(".txt."), suffix.hasSuffix(".tmp") else { return false }
+        return UUID(uuidString: String(suffix.dropFirst(".txt.".count).dropLast(".tmp".count))) != nil
     }
 
     private func remove(_ url: URL) {
