@@ -8,7 +8,9 @@
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-49-show-a-pending-recording-prompt-on-the",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-49-show-a-pending-recording-prompt-on-the.1": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -119,15 +121,53 @@
       "task": null,
       "timestamp": "2026-10-06T20:37:55.024048Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "c216a0916d946af7c77abc7254065660147d54b027001926adfdf9fc9b0f9ff8",
+      "backend": "codex",
+      "base_sha": "133164419d75a70ac5ab2c0c1b1511c6e8d4c2d0",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "e17b5a852f53e38fcadae2027cb8cdd5b79c8f30",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "7432cecef5604530a5d49ab45636ca36",
+      "round_consumed": true,
+      "scope": "impl:gh-49-show-a-pending-recording-prompt-on-the.1",
+      "superseded_by": null,
+      "task": "gh-49-show-a-pending-recording-prompt-on-the.1",
+      "timestamp": "2026-10-09T04:35:58.864357Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-49-show-a-pending-recording-prompt-on-the.1": 1,
     "plan": 1,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-49-show-a-pending-recording-prompt-on-the.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-49-show-a-pending-recording-prompt-on-the.md",
@@ -145,5 +185,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/49"
   },
-  "updated_at": "2026-10-06T20:54:52.630823Z"
+  "updated_at": "2026-10-09T04:35:59.125873Z"
 }
