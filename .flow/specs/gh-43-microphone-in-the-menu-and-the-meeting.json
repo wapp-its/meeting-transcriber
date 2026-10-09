@@ -516,7 +516,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-43-microphone-in-the-menu-and-the-meeting.md",
-  "status": "open",
+  "status": "done",
   "title": "Microphone in the menu and the meeting app's input",
   "tracker": {
     "baseHashFlow": null,
@@ -530,5 +530,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/43"
   },
-  "updated_at": "2026-10-09T09:30:28.060999Z"
+  "updated_at": "2026-10-09T09:38:21.745305Z"
 }
