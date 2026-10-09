@@ -106,6 +106,8 @@ Task gh-60-cut-a-recovered-recording-back-after-a.4 validates the core approach 
 - **A8 · Staged recovery passes run one at a time in the process.** flip at: recovery gains its own per-recording ownership · test: two passes started back to back on the same staging folder cut and queue the recording once · alternatives: per-recording claims in the hold set, rejected because the orphan scan of an overlapping pass could still queue a recording mid-cut · status: active [agent-inferred 2026-10-07]
 DIRECTION: GO — four M-sized tasks on existing seams (recorder, launch recovery, gh-54's cut), no new subsystem; nothing an existing tool gives, and the stored record carries gh-46's pause work without change.
 
+FIT: GO · 2026-10-09 · base 47c550ad · engine flow-next 8.1.1 · gh-73, gh-94 and gh-4's cut-back remix landed on the same seams and claim none of this scope; the recovery entry moved to PipelineController+ProductionEnvironment.swift and gained levelBalance (tasks re-pinned); remixing a recovered cut as the live path does since gh-4 A9 is a follow-up, not built here
+
 ## Memory findings
 
 | Track | Category | Entry | Why relevant |

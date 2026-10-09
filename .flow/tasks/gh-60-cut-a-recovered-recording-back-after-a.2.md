@@ -12,16 +12,16 @@ The recorder owns the staging folder and the stem, so writing, updating and remo
 
 ### Approach
 - `RecordingProvider` (`RecordingProvider.swift:6`): add `storePendingCut(cutAt:deadline:startedAt:) throws`, `recordPendingCutResolution(keptSeconds:captureEndedAt:) throws` and `clearPendingCut()` returning task 1's removal outcome. No-op defaults in the existing protocol extension (`RecordingProvider.swift:51`), the pattern the level and give-up properties use, so the other doubles need no change.
-- `DualSourceRecorder`: `storePendingCut` first remembers the current recording's stem (`startTimestamp`, the marker's stem, `DualSourceRecorder.swift:415-421`) in its own property and holds it, THEN writes the record into `recordingsDir` (spec: a failed write may still have published its record, so the recorder must own it before writing). The remembered stem survives `stop()` (which nils `startTimestamp`, `:490-491`). A notPublished or publishedNotSynced outcome throws an error that carries which one it was (task 3 logs `published=`); the stem stays remembered and held in both cases. Not recording → throw `RecorderError.notRecording`, write nothing, remember nothing.
+- `DualSourceRecorder`: `storePendingCut` first remembers the current recording's stem (`startTimestamp`, the marker's stem, `DualSourceRecorder.swift:424-431`) in its own property and holds it, THEN writes the record into `recordingsDir` (spec: a failed write may still have published its record, so the recorder must own it before writing). The remembered stem survives `stop()` (which nils `startTimestamp`, `:500-501`). A notPublished or publishedNotSynced outcome throws an error that carries which one it was (task 3 logs `published=`); the stem stays remembered and held in both cases. Not recording → throw `RecorderError.notRecording`, write nothing, remember nothing.
 - Give `DualSourceRecorder.init` an injectable sync function, defaulting to task 1's production sync, and pass it to every `PendingRecordingCut` call; it is the seam the sync-failure test below uses.
 - `recordPendingCutResolution` updates that record through `PendingRecordingCut.recordResolution`; nothing stored → no-op.
 - `clearPendingCut` removes it (task 1's sequence, emptying fallback included) and releases the hold; nothing stored → quiet no-op that reports removed.
-- `stop()` never removes the stored cut (the live cut has not run when it returns). When `stop()` throws while a cut is stored, release the hold and keep the file, so recovery owns it together with the surviving marker (`:505-512`). Task 3 clears a settled question's cut before calling `stop()`, so only a cut-carrying stop reaches this.
+- `stop()` never removes the stored cut (the live cut has not run when it returns). When `stop()` throws while a cut is stored, release the hold and keep the file, so recovery owns it together with the surviving marker (`:515-523`). Task 3 clears a settled question's cut before calling `stop()`, so only a cut-carrying stop reaches this.
 - `MockRecorder`: one ordered call log for start, store (with arguments), resolution (with arguments), clear and stop; let a test make each of store, resolution, clear and stop fail; and let a test run a closure inside `recordPendingCutResolution` (task 3 uses it to check the tracks are still uncut at that moment).
 
 ### Investigation targets
 **Required** (read before coding):
-- `app/MeetingTranscriber/Sources/DualSourceRecorder.swift:395-514` — start (stem, marker) and stop (marker removal after the mix)
+- `app/MeetingTranscriber/Sources/DualSourceRecorder.swift:405-526` — start (stem, marker) and stop (marker removal after the mix)
 - `app/MeetingTranscriber/Sources/RecordingProvider.swift` — protocol and default extension
 - `app/MeetingTranscriber/Tests/DualSourceRecorderLifecycleTests.swift` — `FakeCaptureSession`, marker lifecycle assertions to mirror
 
