@@ -756,7 +756,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-60-cut-a-recovered-recording-back-after-a.md",
-  "status": "open",
+  "status": "done",
   "title": "Cut a recovered recording back after a crash during the countdown",
   "tracker": {
     "baseHashFlow": "1db8107491204296b68fa83b3105249fef865417e37f58be41c7630f0c26763c",
@@ -770,5 +770,5 @@
     "mergeBaseTracker": "Folgearbeit zu #54.\n\n## Problem\nSt\u00fcrzt die App ab oder wird sie beendet, w\u00e4hrend der 2-Minuten-Countdown aus #54 l\u00e4uft, holt die Wiederherstellung beim n\u00e4chsten Start die Aufnahme **ungeschnitten** zur\u00fcck. Damit landen die Countdown-Minuten (Raumaudio nach dem Meeting) doch im Transkript und Protokoll, entgegen der Entscheidung in #54 (ohne Antwort wird auf Signalverlust + Nachlaufzeit zur\u00fcckgeschnitten).\n\nHeute (vor #54) war das Fenster nur die Nachlaufzeit von 15 s, jetzt bis zu gut 2 Minuten.\n\n## Wunsch\nDen ausstehenden Schnittpunkt neben der Markierung der laufenden Aufnahme speichern, sobald der Countdown beginnt, und bei der Wiederherstellung anwenden; nach \u201eWeiter aufnehmen\u201c oder zur\u00fcckkehrendem Signal wieder entfernen.\n\n## Abnahme\nCountdown l\u00e4uft, App wird hart beendet \u2192 nach Neustart wird die Aufnahme verarbeitet und endet am selben Punkt wie bei abgelaufenem Countdown.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/60"
   },
-  "updated_at": "2026-10-09T02:48:29.612387Z"
+  "updated_at": "2026-10-09T02:56:23.675227Z"
 }
