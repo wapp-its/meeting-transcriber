@@ -1,3 +1,9 @@
+// swiftlint:disable file_length
+//
+// The composition root grows by a stored property, a factory and an init line
+// per concern controller, while the logic lives in the controllers. Suppressed
+// rather than split: the split is moving `AppNotifying` and `SilentNotifier`
+// into their own file, worth doing on a quiet tree, not in a feature branch.
 import AppKit
 import Foundation
 import Observation
@@ -143,6 +149,11 @@ final class AppState {
     /// etc. by the Settings UI + RPC snapshot.
     let engines: EngineController
 
+    /// Downloads and refreshes the vocabulary of the URL source and publishes
+    /// its status for Settings. Inert until the menu-bar `.task` calls
+    /// `start()`, so constructing an `AppState` touches no cache file.
+    let remoteVocabulary: RemoteVocabularyController
+
     /// Watching / recording lifecycle concern (the active `WatchLoop`, the
     /// auto-detect toggle, manual recording start/stop, the recorder factory,
     /// and the state-change handler), extracted into its own controller. It
@@ -219,6 +230,10 @@ final class AppState {
         UpdateChecker()
     }
 
+    private static func makeRemoteVocabulary(settings: AppSettings) -> RemoteVocabularyController {
+        RemoteVocabularyController(settings: settings)
+    }
+
     // MARK: - Init
 
     init(
@@ -243,11 +258,10 @@ final class AppState {
         // simultaneous ANE / compiler peak that starves the system on a join).
         let warmupQueue = ModelWarmupQueue()
         self.engines = EngineController(settings: settings, warmupQueue: warmupQueue)
+        self.remoteVocabulary = Self.makeRemoteVocabulary(settings: settings)
         self.permissions = PermissionsController(notifier: notifier)
         self.updateChecker = updateChecker ?? Self.makeUpdateChecker()
-        self.pipeline = PipelineController(
-            settings: settings, notifier: notifier, queueEnvironment: pipelineEnvironment,
-        )
+        self.pipeline = PipelineController(settings: settings, notifier: notifier, queueEnvironment: pipelineEnvironment)
         self.channelHealth = ChannelHealthController(
             notifier: notifier,
             debounceSeconds: { [settings] in settings.asymmetricSilenceWarningSeconds },

@@ -197,6 +197,9 @@ struct MeetingTranscriberApp: App {
             appState.updateChecker.startPeriodicChecks(settings: appState.settings)
         }
         .task {
+            appState.remoteVocabulary.start()
+        }
+        .task {
             await appState.permissions.check()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in

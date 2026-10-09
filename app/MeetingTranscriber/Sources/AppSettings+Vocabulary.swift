@@ -42,6 +42,47 @@ enum CustomVocabularyValidation: Equatable {
     }
 }
 
+/// The vocabulary both engines read, whichever source supplies it.
+extension AppSettings {
+    /// The downloaded copies of the URL source, named for this build's bundle
+    /// identifier because the dev and release builds share the data directory.
+    var remoteVocabularyCache: RemoteVocabularyCache {
+        RemoteVocabularyCache(
+            directory: remoteVocabularyCacheDirectory,
+            bundleID: Bundle.main.bundleIdentifier ?? "MeetingTranscriber",
+        )
+    }
+
+    /// The local file for `.file`. For `.url`, the copy kept for the address
+    /// configured now, or "" when that address is not fetched: the path is
+    /// derived from the address, so terms downloaded for another address can
+    /// never be read, and with no copy yet the engines run without vocabulary
+    /// rather than falling back to the local file.
+    var effectiveVocabularyPath: String {
+        switch vocabularySource {
+        case .file:
+            customVocabularyPath
+
+        case .url:
+            if case .success = RemoteVocabulary.validateAddress(remoteVocabularyURL) {
+                RemoteVocabularyCache.textFile(
+                    in: remoteVocabularyCache.directory,
+                    bundleID: remoteVocabularyCache.bundleID,
+                    address: remoteVocabularyURL,
+                ).path
+            } else {
+                ""
+            }
+        }
+    }
+
+    /// The local file's bookmark for `.file`; the cache needs none, it lives
+    /// in the app's own data directory.
+    var effectiveVocabularyBookmark: Data? {
+        vocabularySource == .file ? customVocabularyBookmark : nil
+    }
+}
+
 /// Security-scoped vocabulary-file handling. The plain path remains for UI
 /// display and migration from earlier releases; reads must use the resolved URL
 /// so the App Store build retains access after a relaunch.
