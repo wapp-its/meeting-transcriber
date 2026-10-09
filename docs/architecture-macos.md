@@ -242,6 +242,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `PairedRecordingResolver.swift` | Groups recording URLs into dual-source groups (app + mic pairs, singletons) for reimport |
 | `AudioCapturing.swift` | The part of `AudioTapLib.AudioCaptureSession` one recording drives — the consumer-side protocol `DualSourceRecorder` depends on |
 | `DualSourceRecorder+BuildRecording.swift` | Turning a finished capture session into the files the pipeline consumes, split out of `DualSourceRecorder` |
+| `DualSourceRecorder+Microphone.swift` | The running recording's microphone device, whether a microphone track is being captured, and switching it to another device, forwarded to the capture session; the tapped process ids it reports beside them are stored in `DualSourceRecorder` for the recording's lifetime |
 | `RecordingSource.swift` | What a single recording captures (app PID + mic on/off), replacing an untyped tuple |
 | `ManualRecordingInfo.swift` | Info about a manually started recording session, as opposed to one a detector started |
 | `ManualRecordingRequest.swift` | What the user asked `WatchingController` to record by hand (app-picker vs. microphone-only) |
