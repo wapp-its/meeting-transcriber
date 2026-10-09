@@ -156,6 +156,76 @@ final class NotificationManagerSchedulingTests: XCTestCase {
         XCTAssertEqual(fake.removedIdentifiers, [posted.identifier])
     }
 
+    // MARK: - answerConsentPrompt (the menu's answer, by prompt id)
+
+    private func makeQuestion() -> ConsentQuestion {
+        ConsentQuestion(app: "Zoom", title: "Record Zoom meeting?", body: "A meeting is active in Zoom.")
+    }
+
+    /// The menu answers the prompt it shows by that prompt's id, as a
+    /// notification tap does, and the answered prompt is withdrawn like any other.
+    func testAnswerConsentPromptResolvesThePromptWithThatIdAndWithdrawsIt() async {
+        for (granted, expected) in [(true, ConsentAnswer.granted), (false, .declined)] {
+            let (manager, fake) = makeManager()
+            manager.setUp()
+            let question = makeQuestion()
+            let task = Task { await manager.askToRecord(question) }
+
+            guard let posted = await firstPostedRequest(from: fake) else {
+                XCTFail("no consent notification posted")
+                return
+            }
+            XCTAssertEqual(posted.identifier, question.id.uuidString, "posted under the question's id")
+            XCTAssertEqual(posted.content.title, question.title)
+            XCTAssertEqual(posted.content.body, question.body)
+
+            XCTAssertTrue(manager.answerConsentPrompt(id: question.id, granted: granted))
+            let answer = await task.value
+            XCTAssertEqual(answer, expected)
+            XCTAssertEqual(fake.removedIdentifiers, [question.id.uuidString])
+        }
+    }
+
+    /// Two prompts parked at once, even with the same text: an answer by id
+    /// reaches only its own. Resolving whatever is parked would answer a
+    /// prompt the user never saw in the menu.
+    func testAnsweringOneOfTwoParkedPromptsResolvesOnlyThatOne() async {
+        let (manager, fake) = makeManager()
+        manager.setUp()
+        let first = makeQuestion()
+        let second = makeQuestion()
+        let firstTask = Task { await manager.askToRecord(first) }
+        let secondTask = Task { await manager.askToRecord(second) }
+        await waitFor(fake.added.count == 2)
+        XCTAssertEqual(fake.added.count, 2, "precondition: both prompts parked")
+
+        XCTAssertTrue(manager.answerConsentPrompt(id: second.id, granted: true))
+        let secondAnswer = await secondTask.value
+        XCTAssertEqual(secondAnswer, .granted)
+        XCTAssertEqual(fake.removedIdentifiers, [second.id.uuidString], "only the answered prompt is withdrawn")
+
+        XCTAssertTrue(manager.answerConsentPrompt(id: first.id, granted: false), "the other prompt is still parked")
+        let firstAnswer = await firstTask.value
+        XCTAssertEqual(firstAnswer, .declined)
+        XCTAssertEqual(fake.removedIdentifiers, [second.id.uuidString, first.id.uuidString])
+    }
+
+    func testAnsweringAnIdThatIsNotParkedResolvesNothing() async {
+        let (manager, fake) = makeManager()
+        manager.setUp()
+        let parked = makeQuestion()
+        let task = Task { await manager.askToRecord(parked) }
+        guard await firstPostedRequest(from: fake) != nil else {
+            XCTFail("no consent notification posted")
+            return
+        }
+
+        XCTAssertFalse(manager.answerConsentPrompt(id: UUID(), granted: true))
+        XCTAssertTrue(fake.removedIdentifiers.isEmpty, "the parked prompt stays in Notification Center")
+        XCTAssertTrue(manager.answerConsentPrompt(id: parked.id, granted: false), "and stays parked")
+        _ = await task.value
+    }
+
     // MARK: - urgency
 
     /// The mapping that makes a capture failure survive Do Not Disturb. The

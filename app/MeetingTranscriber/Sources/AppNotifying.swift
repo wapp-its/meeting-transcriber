@@ -21,11 +21,31 @@ protocol AppNotifying {
     @MainActor
     func askToRecord(title: String, body: String) async -> ConsentAnswer
 
+    /// The same prompt, posted and parked under `question.id` so that
+    /// `answerConsentPrompt(id:granted:)` can answer exactly this one. The
+    /// consent gate asks through this form.
+    ///
+    /// A requirement next to the title/body form with a default that forwards
+    /// to it, which is the shape the `notify` comment above warns about. Here
+    /// the default fails closed: a notifier without it still asks and still
+    /// gets its answer, its prompt just cannot be answered from the menu
+    /// (`answerConsentPrompt` defaults to false), and nothing is ever granted
+    /// that the user did not grant.
+    @MainActor
+    func askToRecord(_ question: ConsentQuestion) async -> ConsentAnswer
+
     /// Resolve a parked `askToRecord` prompt programmatically (the debug-RPC
     /// consent hook, issue #503); returns whether one was waiting. Lives on the
     /// same seam as `askToRecord` so park + resolve share it. Defaults to false
     /// (no prompt) for notifiers without a real coordinator.
     func resolveBrowserConsent(granted: Bool) -> Bool
+
+    /// Answer the parked prompt whose id is `id`, as a tap on its notification
+    /// would: the menu's Record / Ignore. Answers only that prompt, never
+    /// another one parked beside it. False when that prompt is not waiting
+    /// (not registered yet, already resolved, unknown id); defaults to false,
+    /// answering nothing, for notifiers without a real coordinator.
+    func answerConsentPrompt(id: UUID, granted: Bool) -> Bool
 
     /// Ask whether a detected meeting whose signal is gone has ended ("Keep
     /// recording" / "Stop now"), returning at once. `onAnswer` runs when an
@@ -100,8 +120,20 @@ extension AppNotifying {
 
     // swiftlint:enable async_without_await
 
+    /// Asks through the title/body form, so every notifier without an id of
+    /// its own keeps working; why that fails closed is on the requirement.
+    @MainActor
+    func askToRecord(_ question: ConsentQuestion) async -> ConsentAnswer {
+        await askToRecord(title: question.title, body: question.body)
+    }
+
     /// No prompt to resolve by default — only `NotificationManager` parks one.
     func resolveBrowserConsent(granted _: Bool) -> Bool {
+        false
+    }
+
+    /// No prompt to answer by default — only `NotificationManager` parks one.
+    func answerConsentPrompt(id _: UUID, granted _: Bool) -> Bool {
         false
     }
 }
