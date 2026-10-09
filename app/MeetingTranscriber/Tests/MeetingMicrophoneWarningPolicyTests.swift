@@ -169,6 +169,31 @@ final class MeetingMicrophoneWarningPolicyTests: XCTestCase {
         )
     }
 
+    /// A name read that fails after the first probe, and its recovery, are
+    /// changes, although only the `[debug]` line shows them.
+    func testAChangedNameReadingIsAChange() {
+        var policy = Policy()
+        let unnamed = MeetingInputDevice(objectID: 81, uid: Self.usbMic.uid, name: .failed(-50), transport: Self.usbMic.transport)
+        let probes: [(device: MeetingInputDevice, tag: String?, debug: String?)] = [
+            (Self.usbMic, "first", "81 name=Desk USB Microphone transport=USB"),
+            (unnamed, "change", "81 name=?(-50) transport=USB"),
+            (Self.usbMic, "change", "81 name=Desk USB Microphone transport=USB"),
+            (Self.usbMic, nil, nil),
+        ]
+        for (step, probe) in probes.enumerated() {
+            let outcome = record(&policy, .mismatch([probe.device]), [Self.teams([probe.device]), Self.idleHelper])
+            var lines: [Policy.Line] = []
+            if let tag = probe.tag {
+                lines = [
+                    Policy.Line(level: .notice, text: "Meeting app microphone (\(tag)): exe=MSTeams pid=4242 isRunningInput=true inputDevices=[81/USB/other]"),
+                    Policy.Line(level: .warning, text: "Meeting app microphone verdict (\(tag)): mismatch processesWithAudioObject=2/3 capturingInput=1"),
+                ]
+            }
+            XCTAssertEqual(outcome.lines, lines, "probe \(step + 1)")
+            XCTAssertEqual(outcome.debugLine, probe.debug.map { "[debug] Meeting app microphone devices: \($0)" }, "probe \(step + 1)")
+        }
+    }
+
     func testTransportsWithoutAPhysicalKindAreNamedOrGivenAsTheirCode() {
         let labels: [(UInt32, String)] = [
             (kAudioDeviceTransportTypeAggregate, "Aggregate"),

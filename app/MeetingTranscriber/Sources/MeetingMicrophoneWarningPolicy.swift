@@ -69,6 +69,9 @@ struct MeetingMicrophoneWarningPolicy {
     /// What the last first or change entry showed, without its tag; empty
     /// before the first, since every entry has its verdict line.
     private var lastEntry: [String] = []
+    /// That entry's `[debug]` line. Compared too, so a device name that changes
+    /// or stops being readable is a change although no unconditional line moves.
+    private var lastDebugLine: String?
 
     init(limits: Limits = .production) {
         self.limits = limits
@@ -112,7 +115,8 @@ struct MeetingMicrophoneWarningPolicy {
         let capturing = processes.count { $0.isRunningInput == .value(true) }
         let verdictText = "\(verdict.logLabel) processesWithAudioObject=\(processes.count)/\(tappedCount) capturingInput=\(capturing)"
         let entry = processTexts + [verdictText]
-        guard entry != lastEntry else { return outcome }
+        let debugLine = Self.debugLine(logged)
+        guard entry != lastEntry || debugLine != lastDebugLine else { return outcome }
 
         let tag: String
         if lastEntry.isEmpty {
@@ -132,10 +136,11 @@ struct MeetingMicrophoneWarningPolicy {
             return outcome
         }
         lastEntry = entry
+        lastDebugLine = debugLine
         outcome.lines = processTexts.map { Line(level: .notice, text: "Meeting app microphone (\(tag)): \($0)") }
         let verdictLevel: Line.Level = if case .mismatch = verdict { .warning } else { .notice }
         outcome.lines.append(Line(level: verdictLevel, text: "Meeting app microphone verdict (\(tag)): \(verdictText)"))
-        outcome.debugLine = Self.debugLine(logged)
+        outcome.debugLine = debugLine
         return outcome
     }
 
