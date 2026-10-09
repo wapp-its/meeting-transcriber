@@ -50,9 +50,66 @@ The proof point: launch recovery of staged recordings applies a stored cut befor
 - [ ] Two production passes started back to back on the same staging folder cut the recording once (frame count, one `applied` line); `StagedRecoveryFolderTests` also shows the step works in the queue's staging folder.
 - [ ] No captured log line contains the stem or a path; focused tests pass (spec Quick commands); lint clean.
 ## Done summary
-TBD
+A recording the app died with while the meeting-end question was open is now cut back at launch recovery before the orphan scan queues it, so the room audio recorded while asking reaches neither the transcript nor the protocol. `RecoveredCut` (new) collects stored cuts before header repair and re-mix, places the cut with the live two-estimate rule (or applies a stored `keptSeconds` unchanged), refuses a recording whose capture ended more than 5 minutes past the deadline, restores originals a failed rollback left hidden, and logs one line per settled stored cut. Staged recovery passes now run one at a time, and a recording left unsettled is held back from that pass's orphan scan.
 
+stage: impl-review - ran [2026-10-09T01:04:35Z..2026-10-09T01:26:46Z] (codex gpt-5.6-sol xhigh per receipt; round 1 three draws correctness/contracts/integration all NEEDS_WORK, validator kept 4 of 4; round 2 NEEDS_WORK on one finding; round 3 SHIP)
+
+Tier: session (jev-unavailable(no_key)); explicit invocation: opus at xhigh; actual model: claude-opus-5-5 (host metadata)
+
+baseline: green via handoff (spec focused filter verified at d2db03e1 by task .1; only .flow/ changed since); lint 0 violations before any edit
+
+### Tests per acceptance criterion
+
+All in `app/MeetingTranscriber/Tests/RecoveredCutTests.swift` unless named otherwise. Every `RecoveredCutTests` test checks at teardown that no captured line carries the stem or a `/`.
+
+- decide (stored value, live rule, deadline boundary both sides, no capture end, nothing to keep): `testDecideKeepsAResolvedCutAndPlacesAnUnresolvedOneByTheLiveRule`
+- crashed dual-source recording: `testACrashedDualSourceRecordingIsCutBeforeItIsQueued`
+- microphone-only crash and orphan shape: `testAMicrophoneOnlyCrashAndAStoppedButUncutRecordingAreCutTheSameWay`
+- idempotence (already cut, partial swap, plus a resolved value of 1e300 that used to trap): `testAResolvedCutIsFinishedAtItsPointAndNeverCutDeeper`
+- app-only interrupted after the re-mix: `testAnAppOnlyRecordingInterruptedAfterItsReMixIsCutWhereOnePassCutsIt`
+- ran past the deadline: `testAStoredCutBesideARecordingThatRanPastTheDeadlineIsRefused`
+- invalid (unreadable, other recording) and held: `testInvalidStoredCutsAreRemovedAndAHeldOneIsLeftAlone`
+- marker without mix, stale, restorable hidden mix: `testAStoredCutWithoutAMixWaitsForItsMarkerIsStaleWithoutAndCutsARestoredMix`
+- cut failure: `testACutThatFailsLeavesTheOriginalsAndQueuesTheRecordingUncut`; rollback failure the extra restore fixes: `testAnOriginalTheCutsRollbackLeftHiddenIsPutBack`; rollback failure it cannot fix: `testAnOriginalTheCutsRollbackLeftHiddenAndThatCannotBePutBackKeepsTheRecordingUnsettled`; persistent restore failure then a complete second pass: `testAnOriginalThatCannotBePutBackKeepsTheStoredCutUntilALaterPassRestoresIt`; the orphan scan passing over an unsettled recording: `StagedRecoveryFolderTests.testTheOrphanScanPassesOverARecordingThePassLeftUnsettled`
+- collect before header repair: `testTheCaptureEndIsReadBeforeHeadersAreRepairedAndTracksReMixed`. `WavHeaderRepair` restores the file's modification date after a repair, so the order against the repair alone is not observable through modification times. The test pins collect before the re-mix, which deletes the raw app temp whose write time is the capture end.
+- two production passes back to back: `StagedRecoveryFolderTests.testTwoPassesStartedBackToBackCutTheRecordingOnce`; the queue's staging folder: `StagedRecoveryFolderTests.testTheStoredCutIsAppliedInTheQueuesStagingFolder`
+- spec edge case A7 (a failed `keptSeconds` store still cuts): `testACutWhoseResolutionCannotBeStoredStillCuts`
+
+Every guard was mutation-checked. Each of these edits turns its test red: removing the pass serialization, moving collect after the re-mix, not storing the capture end, skipping the restore, a strict deadline boundary, not storing `keptSeconds`, ignoring the hold, skipping the marker wait, restoring the trapping frame conversion (the test process dies with `Double value cannot be converted to Int64`), dropping the orphan-scan hold or its release, and not reporting unsettled stems. The back-to-back test first stayed green without serialization, because it counted only applied lines. It now asserts every line and goes red, since the racing pass logs `recovered_cut_failed domain=NSCocoaErrorDomain code=4` on the cut's shared working files.
+
+Verification: spec Quick filter 127 of 127 passed on the final tree, `./scripts/lint.sh` 0 violations, and CI's `swiftlint analyze --strict` after a clean `xcodebuild build-for-testing` found 0 violations in 642 files.
+
+### Decisions
+
+- API shape. `RecoveredCut` is an enum with `decide(record:mixDuration:) -> Decision`, `collect(in:diagnostics:sync:) -> [PendingRecordingCut]` and `apply(_:in:diagnostics:rename:sync:) -> Set<String>` (the stems left unsettled), with a private `Pass` struct holding the folder, the sink and the injectable rename and sync. The alternative was a stateful pass object. Flip at `RecoveredCut.swift`.
+- Log category `RecoveredCut` through `OSLogDiagnostics`, the same subsystem sink as gh-54's `WatchLoop` lines (the persistent log streams by subsystem). The alternative was reusing the `WatchLoop` category. Flip at `PipelineController.recoverStagedRecordings` in `PipelineController+ProductionEnvironment.swift`.
+- Serialization. `@MainActor private(set) static var stagedRecoveryPass: Task<Void, Never>?` on `PipelineController`, and each pass awaits the previous one before anything, orphan scan included. The getter stays readable so a test can wait for a production pass. Flip at `PipelineController+ProductionEnvironment.swift`.
+- The pass's folder steps live in `nonisolated static func recoverStagingFolder(_:levelBalance:diagnostics:)`, so the tests drive the exact production sequence synchronously. `startStagedRecovery(into:levelBalance:diagnostics:)` is the production pass with an injectable sink, and `recoverStagedRecordings(into:levelBalance:)` passes `OSLogDiagnostics`.
+- Unsettled recording barrier. A recording with an original track still hidden is held back from the orphan scan by claiming its mix in the queue's `InFlightRunRegistry` for as long as the scan runs (`PipelineController.recoverOrphans(into:holdingBack:recordingsDir:)`), because the scan already skips audio a run holds. The reviewer asked for an exclusion argument on the orphan scan, which needs `PipelineQueue+Recovery.swift` (outside this task's Touches). An intermediate fix that hid the mix by renaming it was rejected in review round 2 as fallible. Flip at `recoverOrphans`, or add `excluding:` to `recoverOrphanedRecordings` if Touches is widened.
+- `RecordingCut.backupURL(for:)` is an internal static beside `sibling(of:suffix:)`, and `swapIn` now uses it.
+- `RecordingCut.apply` compares the kept frame count with the track length in `Double` before converting to `AVAudioFramePosition`. This is behaviour-preserving for every representable value and also covers the live cut path. It stops a stored `keptSeconds` far past the recording's end from crashing every launch.
+- The applied line reports `kept_s` as the mix's length after the cut and `removed_s` as the length before minus after, both rounded to whole seconds. The decided value can exceed the recording.
+- When `recordResolution` fails in collect, the value read from disk is used for this pass and the failure is logged as `recovered_cut_store_failed value=capture_end outcome=<not_published|not_synced> domain=… code=…`. A published-but-unsynced write is logged as a failure, per the spec.
+- Invalid-reason mapping. `otherRecording` logs `other_recording`. Every other `InvalidReason` (unreadable, empty, unknown version, times out of order, non-positive `keptSeconds`) logs `unreadable`.
+- Line levels. `recovered_cut applied` and `recovered_cut refused reason=…` are notices. `recovered_cut_failed …`, `recovered_cut_store_failed …` and `recovered_cut_remove_failed outcome=<not_synced|emptied|failed> …` are warnings. A failed removal is logged because the spec makes a failed sync a failure of the operation.
+- The stale judgment checks only mix and marker. The restore step runs first and leaves the entry unsettled when any restore fails, so "no hidden original left" already holds when the judgment runs.
+- Test seam. `collect` and `apply` take `sync:` (mirroring `PendingRecordingCut`) so A7 is testable with a sync that fails on regular files only.
+- Review findings declined. (1, part) A held stem with a visible mix could be queued by the orphan scan between its live stop and its live cut. That window predates this change, and the hold governs only the stored cut. (4) A process death inside a successful swap leaves the cut's hidden `.uncut` original behind. The spec's Boundaries leave the cut's hidden working files uncleaned. A draw's finding that marker reaping turns a marker-without-mix cut stale was dropped at merge as a false positive, because `cleanupTempFiles` reaps a marker only when no track is rescuable, so `stale` is the correct outcome.
+- The `PendingRecordingCut.swift` carve-out was not used. The stem is derived from the file name inside `RecoveredCut`.
+
+### Follow-ups noticed, not fixed
+
+- The recovered cut does not remix a level-balanced recording after the cut as the live `cutBack` does since gh-4 (`RecordingCut.remixBalanced`). Decided at the 2026-10-09 fit check as a PR follow-up.
+- Hidden `.<stem>_pending_cut.json.<UUID>.writing` temps a crash mid-write leaves are ignored by the scan and not swept.
+- Hidden `.uncut` and `.cutting.wav` working files a crash inside a cut leaves are not cleaned up (spec Boundaries, review finding 4). Such a file can hold the full-length original, including the post-meeting audio.
+- On a queue rebuild, the orphan scan can queue a just-stopped live recording before its live cut and enqueue (pre-existing). The new hold-back can now cover held stems with a few lines.
+- The production wiring from unsettled stems to held mix paths has no direct test, because the production orphan scan reads the real recordings folder. `recoverOrphans` and `RecoveredCut.apply` are tested separately.
+- The production orphan scan still reads `AppPaths.recordingsDir` instead of the queue's staging folder (pre-existing; the task said to leave it).
+- `docs/architecture-macos.md` should name `RecoveredCut` and the recovery step (spec Boundaries). That file is outside this task's Touches.
+- No user route to a mapped feature changed.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: f545040556e2e43d89e1194ad98bf17d52520fef, 6e191ac5bd4ec77c630181c5008a922d3f350640, c3eb6db70558a308744c3c95f6b870afad48afc1, a81226f8ccd3110164eacc57e96638c7a1e9ed57, 8f868a91dfe8120eaa55cc7aef630095f1a9b93c
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh60-home swift test --parallel --filter 'PendingRecordingCut|RecoveredCut|DualSourceRecorder|WatchLoopMeetingEnd|StagedRecovery|RecordingCut' (127/127 passed, exit 0), PATH="$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH" ./scripts/lint.sh (0 violations, exit 0), xcodebuild clean build-for-testing + swiftlint analyze --strict (0 violations in 642 files, exit 0)
 - PRs:
