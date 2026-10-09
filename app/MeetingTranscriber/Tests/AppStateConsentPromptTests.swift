@@ -72,6 +72,31 @@ final class AppStateConsentPromptTests: XCTestCase {
         XCTAssertNil(state.pendingConsentQuestion)
     }
 
+    /// Drives the icon's question mark: it follows whatever loop is current,
+    /// so a removed or replaced loop takes its question with it.
+    func testAwaitingUserAnswerFollowsTheCurrentLoopsOpenQuestion() {
+        let state = makeState()
+        XCTAssertFalse(state.awaitingUserAnswer, "no loop")
+
+        let (loop, _) = makeTestWatchLoop(notifier: AnswerRecordingNotifier())
+        state.watching.watchLoop = loop
+        XCTAssertFalse(state.awaitingUserAnswer, "no open question")
+        loop.pendingConsentQuestion = makeQuestion()
+        XCTAssertTrue(state.awaitingUserAnswer, "open question")
+        loop.pendingConsentQuestion = nil
+        XCTAssertFalse(state.awaitingUserAnswer, "question ended")
+
+        loop.pendingConsentQuestion = makeQuestion()
+        state.watching.watchLoop = nil
+        XCTAssertFalse(state.awaitingUserAnswer, "loop removed")
+
+        state.watching.watchLoop = loop
+        XCTAssertTrue(state.awaitingUserAnswer, "loop with an open question back")
+        let (replacement, _) = makeTestWatchLoop(notifier: AnswerRecordingNotifier())
+        state.watching.watchLoop = replacement
+        XCTAssertFalse(state.awaitingUserAnswer, "loop replaced by one without a question")
+    }
+
     func testAnsweringTheOpenQuestionAnswersItsPromptById() {
         let (state, loop, notifier) = makeStateWithLoop()
         let question = makeQuestion()
