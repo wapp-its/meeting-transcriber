@@ -439,7 +439,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-13-transcriptions-window.md",
-  "status": "open",
+  "status": "done",
   "title": "Transcriptions window",
   "tracker": {
     "baseHashFlow": null,
@@ -453,5 +453,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/13"
   },
-  "updated_at": "2026-10-09T03:28:57.216899Z"
+  "updated_at": "2026-10-09T03:33:14.779679Z"
 }
