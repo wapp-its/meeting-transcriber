@@ -54,6 +54,12 @@ enum AppPaths {
     static let livenessMarker = dataDir
         .appendingPathComponent("\(Bundle.main.bundleIdentifier ?? "MeetingTranscriber").running")
 
+    /// Downloaded vocabulary copies (`RemoteVocabularyCache`). The file names
+    /// carry the bundle identifier for the same reason as `livenessMarker`:
+    /// the dev and release builds share `dataDir` and must not read or delete
+    /// each other's copies.
+    static let remoteVocabularyCacheDirectory = dataDir.appendingPathComponent("vocabulary", isDirectory: true)
+
     /// Legacy IPC directory (`~/.meeting-transcriber/`) used before sandbox migration.
     private static let legacyIpcDir = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".meeting-transcriber", isDirectory: true)

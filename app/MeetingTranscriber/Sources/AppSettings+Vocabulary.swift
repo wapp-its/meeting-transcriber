@@ -20,6 +20,26 @@ enum CustomVocabularyValidation: Equatable {
         case let .ready(termCount): "Vocabulary file can be read: \(termCount) unique term\(termCount == 1 ? "" : "s")."
         }
     }
+
+    /// Judges vocabulary contents against the limits both engines apply, for
+    /// the local file and for a downloaded copy alike. The size is checked
+    /// before `contents` is called, so an oversized file is never decoded.
+    static func validate(byteCount: UInt64, contents: () -> String?) -> Self {
+        guard byteCount <= UInt64(WhisperVocabularyPrompt.maximumFileBytes) else { return .tooLarge }
+        guard let contents = contents() else { return .unavailable }
+        let terms = WhisperVocabularyPrompt.terms(from: contents)
+        guard !terms.isEmpty else { return .empty }
+        guard terms.count <= WhisperVocabularyPrompt.maximumTermCount else { return .tooManyTerms }
+        guard terms.allSatisfy({ $0.utf8.count <= WhisperVocabularyPrompt.maximumTermBytes }) else {
+            return .termTooLong
+        }
+        return .ready(termCount: terms.count)
+    }
+
+    /// Validates downloaded bytes; bytes that are not UTF-8 are `.unavailable`.
+    static func validate(data: Data) -> Self {
+        validate(byteCount: UInt64(data.count)) { String(data: data, encoding: .utf8) }
+    }
 }
 
 /// Security-scoped vocabulary-file handling. The plain path remains for UI
@@ -74,15 +94,9 @@ extension AppSettings {
         }
         customVocabularyValidation = VocabularyFileAccess.withAccess(to: url) { url in
             guard let revision = WhisperVocabularyPrompt.fileRevision(at: url.path) else { return .unavailable }
-            guard revision.fileSize <= UInt64(WhisperVocabularyPrompt.maximumFileBytes) else { return .tooLarge }
-            guard let contents = try? String(contentsOf: url, encoding: .utf8) else { return .unavailable }
-            let terms = WhisperVocabularyPrompt.terms(from: contents)
-            guard !terms.isEmpty else { return .empty }
-            guard terms.count <= WhisperVocabularyPrompt.maximumTermCount else { return .tooManyTerms }
-            guard terms.allSatisfy({ $0.utf8.count <= WhisperVocabularyPrompt.maximumTermBytes }) else {
-                return .termTooLong
+            return CustomVocabularyValidation.validate(byteCount: revision.fileSize) {
+                try? String(contentsOf: url, encoding: .utf8)
             }
-            return .ready(termCount: terms.count)
         }
     }
 
