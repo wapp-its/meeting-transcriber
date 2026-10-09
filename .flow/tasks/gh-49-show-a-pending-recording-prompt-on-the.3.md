@@ -59,9 +59,40 @@ Tests:
 
 
 ## Done summary
-TBD
+Whoever misses the "Record <App> meeting?" notification now sees a question mark at the top right of the menu bar icon, in place of the watching dot, for as long as the prompt is open; once it is answered, expires or is declined, the dot is back. `MenuBarIcon.image` gained `questionOverlay` (default false) with its own pre-rendered template cache, and the menu-bar label feeds it from `AppState.awaitingUserAnswer`, which is true while the current watch loop has an open question. `BadgeKind`, `BadgeKind.compute` and the `badge` value are unchanged.
 
+The mark is the bold system font's "?" glyph outline (CoreText) at 9 pt, with a 1 pt margin cleared around it the way the dot clears its ring. Measured with a throwaway probe, it spans y 11.18 to 17.70 of the 18 pt icon, and its cleared margin stops at y 10.18, 1.18 pt above the midline. The bottom-right badges are therefore drawn exactly as without the prompt.
+
+Tests per acceptance item:
+- Top half differs, bottom half pixel-identical, for every badge with and without the permission overlay. The same test also checks that something is drawn where the dot was and that the dot is not drawn underneath: `MenuBarIconQuestionTests.testEveryBadgeShowsTheQuestionInTheTopHalfAndLeavesTheBottomHalfAlone`.
+- Template image without red overlays: `testTheQuestionKeepsTheIconATemplate`. Animated badges still animate: `testAnimatedBadgesKeepAnimatingUnderTheQuestion`.
+- `awaitingUserAnswer` is checked with no loop, without a question, with an open question, after the question ends, after the loop is removed and after it is replaced by a loop without a question: `AppStateConsentPromptTests.testAwaitingUserAnswerFollowsTheCurrentLoopsOpenQuestion`. The label wiring itself (`menuBarLabel` passing `questionOverlay: appState.awaitingUserAnswer`) is covered only by the release build, because the scene's private `AnimatedMenuBarIcon` has no test seam.
+- Snapshot references `testQuestionMarkSnapshots.inactive.png` and `testQuestionMarkSnapshots.recording.png` were recorded on a first run and passed on a second, with the suite run alone and without `--parallel`.
+- Red first, observed: with the flag plumbed through and no drawing, the render test failed on both paths. The cached path drew nothing in place of the dot, and the red-overlay path still drew the dot.
+
+Gates:
+- Baseline green: task filter, 58 tests.
+- Final task filter: 62 tests, rc 0.
+- Spec Quick command: 77 tests, rc 0.
+- Snapshot suite run alone: 7 tests, rc 0 on the confirm run.
+- `./scripts/lint.sh` with the pinned SwiftFormat 0.63.0 and SwiftLint 0.65.1: 0 violations in 717 files.
+- `./scripts/pre-push.sh --with-appstore`: rc 0, both release variants, 148 s.
+- Line budgets: `MenuBarIcon.swift` 559 lines, `TestHelpers.swift` 600 lines (untouched). `CLAUDE.md` is untouched, and `docs/architecture-macos.md` describes the mark.
+
+Decisions:
+- The mark is a CoreText glyph outline rather than an `NSAttributedString` draw. The outline's bounding box is exact, so placing it inside the top half does not depend on the font's ascender and line-height metrics. The bold system font, 9 pt and the 1 pt cleared margin are the defaults the task allowed ("bold, legible at 18 pt, top half only").
+- The comment on `awaitingUserAnswer` names the later feeder generically (the "meeting seems to have ended" question). It does not name the fork issue number, because no fork issue ids appear in `Sources/` and code travels to the original unchanged.
+- `questionCache` renders with the watching flag off, because the question mark replaces the dot whatever the watching flag says. The render test checks that the image with watching on equals the image with watching off.
+- One reviewer (correctness draw) per the impl-review panel rule. The diff stays in one area (the icon and its single input) and touches no persisted or shared state, concurrency, security or data layout.
+- The review ran with `CODEX_SANDBOX=workspace-write`, the owner's standing setting the conductor named, and the reviewer left no files in the tree. `--validate` was armed but had nothing to validate on SHIP.
+- The reviewer reported that the snapshot suite crashed in its sandbox (`NSScreen.main == nil`, SnapshotTesting's diff renderer) on unchanged references as well as the new ones. That crash is environmental, and the local runs above passed.
+
+Tier: session (jev-unavailable(no_key)); project routing block: implementer opus at xhigh
+
+stage: impl-review - ran [..2026-10-09T05:09:36Z] (codex:gpt-5.6-sol:xhigh, 1 draw correctness, SHIP, 0 findings; --validate had nothing to validate)
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 10206073e54b70d8b498fa7ba5f07fc6f40792f4, 773f031d8934ad0799b92e45394ea61cbd61fd37, 6f9cfc8062b2e1cabac41e22453ce81e6967b63c, 9db3074e6ada07244966d542ff35bc703907c0f3
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh49/home swift test --parallel --filter 'MenuBarIconQuestionTests|MenuBarIconWatchingTests|MenuBarIconTests|MenuBarIconNextFrameTests|AppStateConsentPromptTests' (62 tests, rc 0), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh49/home swift test --filter MenuBarIconSnapshotTests (run alone, record then confirm: 7 tests, rc 0 on the confirm run), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh49/home swift test --parallel --filter 'WatchLoopAskBeforeRecordingTests|MenuBarViewConsentPromptTests|MenuBarIconQuestionTests|AppStateConsentPromptTests|NotificationManagerSchedulingTests|ConsentPromptCoordinatorTests|MenuBarIconWatchingTests|WatchLoopBrowserConsentTests' (spec quick command, 77 tests, rc 0), ./scripts/lint.sh with pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1 (0 violations, rc 0), ./scripts/pre-push.sh --with-appstore (rc 0, both release variants)
 - PRs:
