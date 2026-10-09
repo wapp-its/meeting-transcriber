@@ -284,7 +284,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-49-show-a-pending-recording-prompt-on-the.md",
-  "status": "open",
+  "status": "done",
   "title": "Show a pending recording prompt on the menu bar icon",
   "tracker": {
     "baseHashFlow": null,
@@ -298,5 +298,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/49"
   },
-  "updated_at": "2026-10-09T05:15:18.046857Z"
+  "updated_at": "2026-10-09T05:23:47.674035Z"
 }
