@@ -93,7 +93,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `AppState.swift` | `@Observable @MainActor` composition root — wires the concern controllers (`engines`, `watching`, `pipeline`, `permissions`, `channelHealth`, `liveTranscription`, `rpcController`) and exposes the derived UI state (badge, status label) rather than owning it |
 | `LivenessMarker.swift` | Process-lifetime marker (issue #703): written at launch, touched once a minute, removed by a clean AppKit quit; the next launch reads it as `PreviousExit` to tell a crash, kill or power loss from a quit, which the per-recording marker cannot do for an idle app |
 | `PreviousExitNotice.swift` | Wording of the launch-time notification for a run that ended without a quit: the window in which nothing was watching for meetings |
-| `MenuBarView.swift` | Menu bar dropdown (state, actions, meeting info) |
+| `MenuBarView.swift` | Menu bar dropdown (state, actions, meeting info; at the top, the open recording prompt with Record / Ignore) |
 | `JobMenuSummary.swift` | Status text and symbol of a job's single line in the menu bar dropdown |
 | `MenuBarIcon.swift` | Renders the animated waveform icon + badge overlays (watching dot, permission, record-only, channel-silent) |
 | `AppPickerView.swift` | App picker sheet for manual recording of any running app |
