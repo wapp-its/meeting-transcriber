@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-10-remote-vocabulary",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-09T12:01:30.863226Z",
   "created_at": "2026-10-06T20:18:22.941395Z",
   "default_impl": null,
   "default_review": null,
@@ -422,6 +422,42 @@
       "task": "gh-10-vocabulary-from-a-central-url.3",
       "timestamp": "2026-10-09T11:52:40.557544Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "ff0fb112324a5e7674d81102767ae45432ebf847c2bce155cbbe93fedece79f9",
+      "backend": "codex",
+      "base_sha": "47c550ada129a452cc2922d9f24653bb3212b497",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "9775207f24223a1049d279085fad11930e06864d",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 586457,
+      "output_sha256": "81d7aa9802e740cba6717f23962e15ba54bd6beef341345481764a627d4a10d4",
+      "reservation_id": "0fa5c2c8ea1e4c2c9270d297b5ce28da",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-09T12:01:30.830890Z",
+      "tool_calls": 36,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -429,12 +465,13 @@
     "impl:gh-10-vocabulary-from-a-central-url.2": 1,
     "impl:gh-10-vocabulary-from-a-central-url.3": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-10-vocabulary-from-a-central-url.1": 0,
     "impl:gh-10-vocabulary-from-a-central-url.2": 0,
     "impl:gh-10-vocabulary-from-a-central-url.3": 0,
@@ -455,5 +492,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/10"
   },
-  "updated_at": "2026-10-09T11:52:45.355611Z"
+  "updated_at": "2026-10-09T12:01:30.866104Z"
 }
