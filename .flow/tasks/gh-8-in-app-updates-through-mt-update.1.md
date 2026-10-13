@@ -33,9 +33,9 @@ Write the tests first from the spec's contract table and R-IDs, see them fail, t
 
 ### Investigation targets
 **Required** (read before coding):
-- `app/MeetingTranscriber/Sources/ClaudeCLIProtocolGenerator.swift:427-450` — environment builder pattern to mirror
+- `app/MeetingTranscriber/Sources/ClaudeCLIProtocolGenerator.swift:364-375` — environment builder pattern to mirror
 - `app/MeetingTranscriber/Sources/PreviousExitNotice.swift` — pure notice-text type pattern
-- `app/MeetingTranscriber/Sources/UpdateChecker.swift:1-104` — existing models and error type; do not change them
+- `app/MeetingTranscriber/Sources/UpdateChecker.swift:1-106` — existing models and error type; do not change them
 
 **Optional** (reference as needed):
 - `app/MeetingTranscriber/Tests/DefaultsSuite.swift` — throwaway UserDefaults suites for the store tests

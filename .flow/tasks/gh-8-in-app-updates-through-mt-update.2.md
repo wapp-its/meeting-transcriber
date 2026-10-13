@@ -17,18 +17,18 @@ The process layer: `MtUpdateProvider`, the real `MtUpdateInstalling` (task 1's p
 - `check()`: truncate/create the check log, `Process` with arguments `["--check", "--porcelain"]`, `environment = MtUpdateEnvironment.build(base:home:)`, `currentDirectoryURL = homeDirectory`, stdin `FileHandle.nullDevice`, stdout and stderr the same `FileHandle` on the check log. Run it bounded, in the shape of `runBounded` (termination handler installed before `run()`, a one-shot resume guard) but with group semantics, which is why it is not shared with the Claude CLI generator (do not refactor that one): at the limit send SIGTERM to the process group (`kill(-pid, SIGTERM)`; the child leads its own group), SIGKILL to the group one second later, then poll `kill(-pid, 0)` every 100 ms and return only once it fails with `ESRCH`, so no `git` mt-update started outlives the check (spec, Edge Cases). After exit read the log and return `MtUpdatePorcelain.parse(exit:output:)`; at the limit `.failed(.timedOut)`; when `run()` throws or the log cannot be opened, `.failed(.notStartable(<reason>))`.
 - Exit mapping: `terminationReason == .uncaughtSignal` → `.signaled(terminationStatus)`, else `.exited(terminationStatus)`.
 - `startInstall(onExit:)`: truncate/create the install log; `Process` with no arguments, same environment and working directory, stdin `FileHandle.nullDevice`, stdout and stderr the log `FileHandle` — never a `Pipe` (spec, Install); termination handler set before `run()` maps the status and calls `onExit`; after `run()` read the child's start time and return `MtUpdateLaunch(pid:processStart:)`. Throw when the log cannot be opened or `run()` fails.
-- Start time and liveness: `sysctl` with `[CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]` and `kp_proc.p_starttime`, pattern `DualSourceRecorder.swift:187-194` (there for the own pid). `isRunning(_:)` is true only when the call succeeds, the returned size is non-zero (a missing pid returns success with size 0), and, when the record has a start time, it equals the live one to the microsecond.
+- Start time and liveness: `sysctl` with `[CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]` and `kp_proc.p_starttime`, pattern `DualSourceRecorder.swift:209-218` (there for the own pid). `isRunning(_:)` is true only when the call succeeds, the returned size is non-zero (a missing pid returns success with size 0), and, when the record has a start time, it equals the live one to the microsecond.
 - `currentBuild()`: `BuildIdentity(gitCommitHash: bundle.gitCommitHash, executableModified: <modification date of bundle.executableURL>)`; pattern for the date read: `AboutSettingsView.buildDate`.
 
 ### Investigation targets
 **Required** (read before coding):
-- `app/MeetingTranscriber/Sources/ClaudeCLIProtocolGenerator+SessionPersistence.swift:85-147` — bounded child run writing to a file
-- `app/MeetingTranscriber/Sources/ClaudeCLIProtocolGenerator.swift:46-80` — termination handler before `run()`
-- `app/MeetingTranscriber/Sources/DualSourceRecorder.swift:180-194` — process start time via sysctl
-- `app/MeetingTranscriber/Sources/PersistentDiagnosticLog.swift:52-61` — log directory
+- `app/MeetingTranscriber/Sources/ClaudeCLIProtocolGenerator+SessionPersistence.swift:110-148` — bounded child run writing to a file
+- `app/MeetingTranscriber/Sources/CLIProcessRunner.swift:225-240` — termination handler before `run()` (the same construct; the shared CLI runner from gh-7 holds it now)
+- `app/MeetingTranscriber/Sources/DualSourceRecorder.swift:205-220` — process start time via sysctl
+- `app/MeetingTranscriber/Sources/PersistentDiagnosticLog.swift:52-63` — log directory
 
 **Optional** (reference as needed):
-- `app/MeetingTranscriber/Tests/ClaudeCLIProtocolGeneratorSessionPersistenceTests.swift:55-85` — fake `#!/bin/sh` scripts in a temp folder
+- `app/MeetingTranscriber/Tests/ClaudeCLIProtocolGeneratorSessionPersistenceTests.swift:58-82` — fake `#!/bin/sh` scripts in a temp folder
 - `app/MeetingTranscriber/Sources/Bundle+AppVersion.swift` — `gitCommitHash`
 
 ### Key context

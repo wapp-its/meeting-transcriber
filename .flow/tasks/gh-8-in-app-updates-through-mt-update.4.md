@@ -13,20 +13,20 @@ The two places a person meets the feature: About → Updates and the menu-bar me
 ### Approach
 - `A11yID`: `updateInstallButton` (About) and `menuInstallUpdateButton` (menu). Never add either to the `/ui/press` allowlist in `DebugRPCServer+UIPress.swift`: a press ends the app.
 - `AboutSettingsView` (`AboutSettingsView.swift:59-113`): new stored properties `updateInstallBlockedReason: String? = nil` and `onInstallUpdate: (() -> Void)? = nil`. When `updateChecker.isMtUpdateMode`: keep the "Check for Updates" toggle; hide "Include Pre-Releases"; a secondary caption "Updates are built on this Mac by mt-update."; "Check Now" also disabled while installing; the status label shows `lastError` / "Update available: <summary>" / "Up to date" as today. While installing: a small `ProgressView` with "Installing update… Meeting Transcriber restarts when the build is done and nothing is recording or processing." Otherwise, with a summary: the "Install Update" button (`A11yID.updateInstallButton`, calls `onInstallUpdate`), disabled when a reason is set, a check runs or the callback is nil, and under it the reason or "Builds the new version (about 5–10 minutes), then restarts Meeting Transcriber." A set `lastInstallError` shows as a red label. GitHub mode: today's section, untouched (the "Download" button stays).
-- `MenuBarView` (`MenuBarView.swift:208-220`): same two new defaulted `var`s (existing memberwise call sites in the tests keep compiling). In mt-update mode: installing → a disabled "Installing Update…" item; a summary → "Install Update: <summary>" (`A11yID.menuInstallUpdateButton`), disabled when a reason is set, a check runs or the callback is nil. GitHub mode unchanged.
+- `MenuBarView` (`MenuBarView.swift:323-336`): same two new defaulted `var`s (existing memberwise call sites in the tests keep compiling). In mt-update mode: installing → a disabled "Installing Update…" item; a summary → "Install Update: <summary>" (`A11yID.menuInstallUpdateButton`), disabled when a reason is set, a check runs or the callback is nil. GitHub mode unchanged.
 - `SettingsView`: forward both values to `AboutSettingsView` (pattern: the `namingDialogActive`/`pipelineBusy` pass-through).
-- `MeetingTranscriberApp`: pass `appState.updateInstallBlockedReason` and `{ appState.installUpdate() }` to both `MenuBarView` (`:133-160`) and `SettingsView` (`:255-278`), read through single-member `AppState` accessors only (300 ms type-check limit on these bodies; see the note above `body`).
+- `MeetingTranscriberApp`: pass `appState.updateInstallBlockedReason` and `{ appState.installUpdate() }` to both `MenuBarView` (`:144-196`) and `SettingsView` (`:278-300`), read through single-member `AppState` accessors only (300 ms type-check limit on these bodies; see the note above `body`).
 
 ### Investigation targets
 **Required** (read before coding):
 - `app/MeetingTranscriber/Sources/Settings/AboutSettingsView.swift:59-113` — section to extend
-- `app/MeetingTranscriber/Sources/MenuBarView.swift:1-70,208-220` — properties, body split, update item
-- `app/MeetingTranscriber/Sources/MeetingTranscriberApp.swift:111-160,255-278` — scene composition and the type-check note
+- `app/MeetingTranscriber/Sources/MenuBarView.swift:1-75,323-336` — properties, body split, update item
+- `app/MeetingTranscriber/Sources/MeetingTranscriberApp.swift:120-200,278-300` — scene composition and the type-check note
 - `app/MeetingTranscriber/Sources/A11yID.swift` — identifier conventions
 
 **Optional** (reference as needed):
 - `app/MeetingTranscriber/Tests/AboutSettingsViewTests.swift:75-112` — update-section tests
-- `app/MeetingTranscriber/Tests/MenuBarViewTests.swift:764-790` — update-item tests
+- `app/MeetingTranscriber/Tests/MenuBarViewTests.swift:802-830` — update-item tests
 - `CLAUDE.md` "GUI Testing" — locate by `A11yID`, one wiring test per control
 
 ### Key context
