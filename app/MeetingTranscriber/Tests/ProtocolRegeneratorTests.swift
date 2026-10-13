@@ -172,6 +172,23 @@ final class ProtocolRegeneratorTests: XCTestCase {
         }
     }
 
+    func testAFolderWhereTheStagingFileGoesIsLeftAlone() async throws {
+        try writeMeeting()
+        let blocker = folder.appendingPathComponent("\(basename).md.regenerating", isDirectory: true)
+        try FileManager.default.createDirectory(at: blocker, withIntermediateDirectories: false)
+        try Data("kept".utf8).write(to: blocker.appendingPathComponent("note.txt"))
+        let sut = makeRegenerator()
+
+        try await sut.regenerate(target(), options: Self.options)
+
+        XCTAssertEqual(try text(at: blocker.appendingPathComponent("note.txt")), "kept")
+        XCTAssertEqual(try text(at: md), oldProtocol)
+        guard case .failed = sut.phase else {
+            XCTFail("expected a failure, got \(sut.phase)")
+            return
+        }
+    }
+
     /// The provider's error text stays out of the window and the notification:
     /// an endpoint's error body can echo what it was sent (R9).
     func testAThrowingGeneratorChangesNoFileAndRepeatsNothingItSaid() async throws {

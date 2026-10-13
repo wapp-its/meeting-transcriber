@@ -366,6 +366,10 @@ final class ProtocolRegenerator {
         let staging = target.folder.appendingPathComponent("\(target.basename).md.regenerating")
         do {
             try ops.createEmpty(staging)
+        } catch {
+            throw ProtocolRegenerationError.writeFailed(error.localizedDescription)
+        }
+        do {
             try ops.restrictToOwner(staging)
             try ops.write(data, staging)
         } catch {
