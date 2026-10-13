@@ -16,7 +16,9 @@ enum ProtocolRegenerationError: LocalizedError, Equatable {
     case recordOnly
     case meetingBusy
     case filesChanged
-    case generationFailed(String)
+    /// Carries no detail: a provider's error text can repeat what it was
+    /// sent (`ProtocolError.httpError` holds the endpoint's error body).
+    case generationFailed
     case writeFailed(String)
     /// The new file could not be put in place and the old one could not be
     /// moved back: it is kept under this name beside its path.
@@ -39,8 +41,8 @@ enum ProtocolRegenerationError: LocalizedError, Equatable {
         case .filesChanged:
             "The meeting's files changed while the protocol was being made, so nothing was replaced."
 
-        case let .generationFailed(reason):
-            "Protocol generation failed: \(reason)"
+        case .generationFailed:
+            "Protocol generation failed, so nothing was replaced."
 
         case let .writeFailed(reason):
             "The new protocol could not be saved, so the previous one was left in place: \(reason)"
@@ -333,7 +335,8 @@ final class ProtocolRegenerator {
                 instructions: instructions,
             )
         } catch {
-            throw ProtocolRegenerationError.generationFailed(error.localizedDescription)
+            logger.warning("protocol_regeneration_provider_failed type=\(String(describing: type(of: error)), privacy: .public)")
+            throw ProtocolRegenerationError.generationFailed
         }
         // A Retry may have started, or even finished and rewritten both
         // files, while the provider was working.

@@ -172,19 +172,24 @@ final class ProtocolRegeneratorTests: XCTestCase {
         }
     }
 
-    func testAThrowingGeneratorChangesNoFile() async throws {
+    /// The provider's error text stays out of the window and the notification:
+    /// an endpoint's error body can echo what it was sent (R9).
+    func testAThrowingGeneratorChangesNoFileAndRepeatsNothingItSaid() async throws {
         try writeMeeting()
         let before = try folderContents()
-        let generator = MockProtocolGen()
-        generator.shouldThrow = true
+        let background = "Confidential: merger with ACME"
         let notifier = RecordingNotifier()
-        let sut = makeRegenerator(generator: generator, notifier: notifier)
+        let sut = makeRegenerator(generator: EchoingFailureGenerator(), notifier: notifier)
 
-        try await sut.regenerate(target(), options: Self.options)
+        try await sut.regenerate(target(), options: MeetingProtocolOptions(template: .builtIn, rawBackground: background))
 
         XCTAssertEqual(try folderContents(), before)
-        XCTAssertEqual(sut.phase, .failed(ProtocolRegenerationError.generationFailed("Mock protocol error").localizedDescription))
+        XCTAssertEqual(sut.phase, .failed(ProtocolRegenerationError.generationFailed.localizedDescription))
         XCTAssertEqual(notifier.calls.map(\.title), [ProtocolRegenerator.failedTitle])
+        for shown in [notifier.calls.map(\.body).joined(), ProtocolRegenerationError.generationFailed.localizedDescription] {
+            XCTAssertFalse(shown.contains(background), shown)
+            XCTAssertFalse(shown.contains(transcriptText), shown)
+        }
     }
 
     // MARK: - Transcript from the protocol
@@ -295,6 +300,16 @@ final class ProtocolRegeneratorTests: XCTestCase {
         let warning = ProtocolTemplateStore(directory: templates).resolve(.file(name: "Gone")).warning
         XCTAssertNotNil(warning)
         XCTAssertEqual(sut.phase, .succeeded(md, warnings: [warning].compactMap(\.self)))
+    }
+}
+
+/// A provider whose error repeats what it was sent, as an endpoint's error
+/// body can (`ProtocolError.httpError` carries that body).
+private struct EchoingFailureGenerator: ProtocolGenerating {
+    func generate(
+        transcript: String, title _: String, diarized _: Bool, meetingStartTime _: Date?, instructions: ProtocolInstructions,
+    ) throws -> String {
+        throw ProtocolError.httpError(400, "rejected: \(instructions.background ?? "") \(transcript)")
     }
 }
 
