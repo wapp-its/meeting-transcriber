@@ -8,11 +8,15 @@ import XCTest
 /// `WatchLoopBrowserConsentTests` keeps the browser-specific cases.
 @MainActor
 final class WatchLoopAskBeforeRecordingTests: XCTestCase {
+    // The helpers down to `severalPolls()` that are not private are shared with
+    // WatchLoopAskBeforeRecordingTests+Menu.swift, which a private one would not reach.
+    // swiftlint:disable test_case_accessibility
+
     /// Confirms the meetings in `confirmed`, first one first, the way the real
     /// detectors do when several apps are in a call: a poll returns the first
     /// confirmed meeting that is not excluded. A call counts as running while
     /// its app is in `running`.
-    private final class ScriptedDetector: MeetingDetecting {
+    final class ScriptedDetector: MeetingDetecting {
         var confirmed: [DetectedMeeting]
         var running: Set<String>
 
@@ -65,8 +69,10 @@ final class WatchLoopAskBeforeRecordingTests: XCTestCase {
 
     /// Parks every prompt until the test answers it, like the real
     /// notification does for up to `NotificationManager.consentPromptTimeout`.
-    private final class ParkingNotifier: AppNotifying {
+    final class ParkingNotifier: AppNotifying {
         private(set) var prompts: [(title: String, body: String)] = []
+        /// The id the parked prompt was asked under, as the real coordinator keys it.
+        private(set) var parkedID: UUID?
         private var continuation: CheckedContinuation<ConsentAnswer, Never>?
 
         var isParked: Bool {
@@ -81,9 +87,16 @@ final class WatchLoopAskBeforeRecordingTests: XCTestCase {
             return await withCheckedContinuation { self.continuation = $0 }
         }
 
+        @MainActor
+        func askToRecord(_ question: ConsentQuestion) async -> ConsentAnswer {
+            parkedID = question.id
+            return await askToRecord(title: question.title, body: question.body)
+        }
+
         func answer(_ answer: ConsentAnswer) {
             let parked = continuation
             continuation = nil
+            parkedID = nil
             parked?.resume(returning: answer)
         }
 
@@ -92,11 +105,18 @@ final class WatchLoopAskBeforeRecordingTests: XCTestCase {
             answer(granted ? .granted : .declined)
             return true
         }
+
+        /// Answers only the prompt parked under `id`, like the real coordinator.
+        func answerConsentPrompt(id: UUID, granted: Bool) -> Bool {
+            guard isParked, parkedID == id else { return false }
+            answer(granted ? .granted : .declined)
+            return true
+        }
     }
 
     /// Hands out a fresh recorder per recording, so a test can count starts.
     @MainActor
-    private final class Recorders {
+    final class Recorders {
         private(set) var all: [MockRecorder] = []
 
         var starts: Int {
@@ -113,11 +133,11 @@ final class WatchLoopAskBeforeRecordingTests: XCTestCase {
 
     // MARK: - Meetings
 
-    private func meeting(_ pattern: AppMeetingPattern, owner: String) -> DetectedMeeting {
+    func meeting(_ pattern: AppMeetingPattern, owner: String) -> DetectedMeeting {
         DetectedMeeting(pattern: pattern, windowTitle: "\(pattern.appName) Call", ownerName: owner, windowPID: 4321)
     }
 
-    private var teams: DetectedMeeting {
+    var teams: DetectedMeeting {
         meeting(.teams, owner: "MSTeams")
     }
 
@@ -144,7 +164,7 @@ final class WatchLoopAskBeforeRecordingTests: XCTestCase {
 
     // MARK: - Loop
 
-    private func makeLoop(
+    func makeLoop(
         detector: any MeetingDetecting,
         notifier: any AppNotifying,
         recordWithoutAsking: [String] = [],
@@ -174,9 +194,11 @@ final class WatchLoopAskBeforeRecordingTests: XCTestCase {
     }
 
     /// Long enough for several 0.05 s polls, for asserting that nothing happens.
-    private func severalPolls() async {
+    func severalPolls() async {
         try? await Task.sleep(nanoseconds: 300_000_000)
     }
+
+    // swiftlint:enable test_case_accessibility
 
     // MARK: - R1 / R5: every answer, for every kind of app
 

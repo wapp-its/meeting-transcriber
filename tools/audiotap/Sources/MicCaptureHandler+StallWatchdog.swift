@@ -17,6 +17,9 @@ enum MicRestartTrigger: Equatable {
     case configurationChanged
     /// The stall watchdog, with the restart's number in this recording.
     case stall(restart: Int)
+    /// Another microphone was chosen during the recording (see
+    /// `+DeviceSelection`). Charged to no budget, like a device change.
+    case deviceSelected
 
     var stallRestart: Int? {
         guard case let .stall(restart) = self else { return nil }
@@ -28,6 +31,7 @@ enum MicRestartTrigger: Equatable {
         switch self {
         case .defaultInputChanged, .configurationChanged: "device change"
         case let .stall(restart): "stall restart \(restart)"
+        case .deviceSelected: "device selection"
         }
     }
 }

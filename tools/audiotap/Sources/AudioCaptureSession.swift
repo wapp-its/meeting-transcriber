@@ -339,6 +339,27 @@ public class AudioCaptureSession {
         micCapture?.currentSignalAges ?? .unknown
     }
 
+    /// The microphone the running capture reports it records from, nil
+    /// without a microphone capture. See `MicCaptureHandler.activeInputDevice`.
+    public var micInputDevice: MicInputDevice? {
+        micCapture?.activeInputDevice
+    }
+
+    /// Whether a microphone is being captured: one was requested, it started
+    /// and it has not given up. A requested microphone whose start failed
+    /// leaves the session running on the app track alone, so the
+    /// configuration cannot answer this.
+    public var microphoneTrackActive: Bool {
+        micCapture != nil && !micCaptureGaveUp
+    }
+
+    /// Move the running microphone capture to the device with `deviceUID`, nil
+    /// meaning the system default. Does nothing without a microphone capture.
+    /// See `MicCaptureHandler.selectDevice(uid:)`.
+    public func selectMicrophone(deviceUID: String?) {
+        micCapture?.selectDevice(uid: deviceUID)
+    }
+
     /// Stop all capture and return the result.
     public func stop() -> AudioCaptureResult {
         appCapture?.stop()

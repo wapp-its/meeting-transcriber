@@ -50,9 +50,28 @@ Capture library (`tools/audiotap`, AudioTapLib) only. Let a running microphone c
 - [ ] `MicCaptureHandler.swift` stays under 600 lines; `cd tools/audiotap && swift test --parallel` is green (log read from a file) and `./scripts/lint.sh` passes with the pinned tools.
 - [ ] `docs/architecture-macos.md` has a row for `MicCaptureHandler+DeviceSelection.swift`.
 ## Done summary
-TBD
+A running microphone capture now moves to another chosen device in the same recording and file, and the capture library reports which device it records from. `MicCaptureHandler.selectDevice(uid:)` claims the restart arbiter's single attempt and launches it the way a device change does, charged to neither the stall nor the configuration-change budget. A choice made while a restart runs is marked pending and applied after that restart's adoption, so the last choice wins. A retry after a failed attempt aims at exactly what the pending choice resolves to (System Default or an unconnected device give nil, never the failing previous device). `activeInputDevice` is read where the engine session comes up and published at the first start and each adoption; it is nil before start, after stop and after both give-ups. `AudioCaptureSession` forwards `micInputDevice` and `selectMicrophone(deviceUID:)` and reports `microphoneTrackActive`. `MicInputDevice` is public with `systemDefaultInput()` from Core Audio's default-input property. The arbiter's transition table is unchanged.
 
+Tests: `MicCaptureHandlerDeviceSelectionTests` (9 tests, one per acceptance case: one attempt on the new UID and its adoption, same UID launches nothing, absent UID targets the default, deferred selections and last-wins, backoff selection without an extra attempt, System Default and unconnected UID during a failing device's backoff receive nil, nothing after stop or give-up, active device nil before start, after stop and after both give-ups with the pending mark cleared, the three log lines notice level without UID or name); `AudioCaptureSessionTracksTests` (microphoneTrackActive for no mic, failed mic start, running; forwards inert without a mic and reaching the running capture). Both budgets are asserted unchanged in the selection, deferred and backoff tests.
+Red-to-green: with the retry fix reverted, `testSystemDefaultOrAnUnconnectedDeviceChosenDuringABackoffIsWhatTheRetryAimsAt` failed with the retry receiving `["HeadsetUID"]` instead of `[nil]` for both choices; green with the fix.
+Gates: baseline green (audiotap `swift test --parallel` 521 tests rc=0, lint 0 violations); at HEAD b8d8c02b audiotap 532 tests rc=0, `./scripts/lint.sh` 0 violations with the pinned tools, `app/MeetingTranscriber` `swift build` rc=0. `MicCaptureHandler.swift` is 595 lines.
+
+Decision: `testNoDeviceIsReadWhenDebugLoggingIsOff` in `tools/audiotap/Tests/MicEngineSessionSeamTests.swift` (a file outside the declared Touches) now pins one device read per start with verbose logging off, renamed `testTheDeviceIsReadOncePerStartWithDebugLoggingOff` · rule 1 · the task's Approach makes the `boundInputDevice` read unconditional (it feeds `activeInputDevice`), so the old zero-read pin contradicts the acceptance; the debug line reuses the one read
+Decision: the `AudioCaptureSession` tests live in `AudioCaptureSessionTracksTests.swift`, not the new file · rule 6 · the strict lint's `single_test_class` rule forbids a second test class per file, and the task names that file as the style to follow
+Decision: the selection restart claims and launches through its own `launchSelectionRestart()` (claim, log, `restartLaunched(byStall: false)`, launch) rather than calling `handleDeviceChange(.deviceSelected)` · rule 6 · the task's Approach spells out that sequence, and it writes the restarting line before the attempt's own lines
+Decision: "a capture was started" for the pending mark is read from the arbiter phase (attempt in flight, backing off or committing), and a selection on a never-started or sealed handler only stores the choice · rule 1 · task Key context says tell sealed from busy by the arbiter's state, never by guessing
+Decision: the deferred selection's extra restart at adoption writes the same notice "restarting capture" line again · rule 6 · it marks when the deferred choice is launched; no new wording
+Decision: the first start now reads the bound device on the main thread (three Core Audio property reads beside `hardwareFormat`, which already runs there at first start); during a restart the read runs on the restart queue under the attempt's deadline · rule 1 · task Approach and spec Architecture
+
+Follow-ups: none filed by this task.
+Feature map: no user route changed (library only).
+
+Tier: session (jev-unavailable(no_key)) - explicit routing block: implementer opus at xhigh
+
+stage: impl-review - ran [2026-10-09T06:11Z..2026-10-09T06:20:32Z] codex gpt-5.6-sol at xhigh, three draws (correctness, contracts, integration) all SHIP, no findings, validator not dispatched (SHIP)
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 9ceda22cced9f5a9c4a439319f0c4f04ab6586d8, 896ed454e2bd485fd4b7fc9cddc0513d1f921b6d, b8d8c02b55f6633ab55e3ee03c2c61383f634b66
+- Tests: cd tools/audiotap && swift test --parallel (532 tests, rc=0), ./scripts/lint.sh with pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1 (0 violations), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh43-home swift build (rc=0)
 - PRs:

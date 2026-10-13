@@ -47,7 +47,10 @@ class DualSourceRecorder: RecordingProvider {
     /// `AudioCapturing` role rather than the concrete `AudioCaptureSession`,
     /// which is what removes the `@available` gate from this property — the
     /// reason the storage used to be a type-erased `AnyObject` plus a cast.
-    private var captureSession: (any AudioCapturing)?
+    /// Readable for the microphone forwarders in `DualSourceRecorder+Microphone.swift`.
+    private(set) var captureSession: (any AudioCapturing)?
+    /// The process ids this recording tapped, empty outside one (`RecordingProvider.tappedPIDs`).
+    private(set) var tappedPIDs: [pid_t] = []
     private(set) var isRecording = false
     private(set) var recordingStartDate: Date = .distantPast
     private var startTimestamp: String?
@@ -488,6 +491,7 @@ class DualSourceRecorder: RecordingProvider {
             throw error
         }
         captureSession = session
+        tappedPIDs = effectivePids
 
         isRecording = true
         recordingStartDate = Date()
@@ -517,6 +521,7 @@ class DualSourceRecorder: RecordingProvider {
     /// `stop()` once it is known to be recording.
     private func finishRecording() throws -> RecordingResult {
         isRecording = false
+        tappedPIDs = []
 
         // Stop capture session and get result
         guard let session = captureSession else {

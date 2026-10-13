@@ -11,7 +11,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-43-microphone-in-the-menu-and-the-meeting",
   "spec_path": ".flow/tasks/gh-43-microphone-in-the-menu-and-the-meeting.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "Microphone entry in the menu bar menu with the shared device list",
   "updated_at": "2026-10-06T20:38:11.394367Z"
 }
