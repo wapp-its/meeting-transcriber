@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-13T14:40:18.590686Z",
+  "depends_on": [
+    "gh-105-watching-pauses-during-a-recording-and.1"
+  ],
+  "id": "gh-105-watching-pauses-during-a-recording-and.2",
+  "priority": null,
+  "spec": "gh-105-watching-pauses-during-a-recording-and",
+  "spec_path": ".flow/tasks/gh-105-watching-pauses-during-a-recording-and.2.md",
+  "status": "todo",
+  "title": "Resume watching after a manual recording ends",
+  "updated_at": "2026-10-13T14:40:18.590686Z"
+}
