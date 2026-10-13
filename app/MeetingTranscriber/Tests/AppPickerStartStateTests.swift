@@ -52,11 +52,12 @@ final class AppPickerStartStateTests: XCTestCase {
         XCTAssertFalse(AppPickerStartState.microphoneBlockedByNoMic.allowsStart)
     }
 
-    /// A missing selection is visible on screen; a recording running behind the
-    /// dialog and a setting made elsewhere are not, so those get words.
-    func testOnlyTheInvisibleBlockersExplainThemselves() {
+    /// Every disabled Start says why (R5): the missing selection in the
+    /// dialog's own words, a recording running behind the dialog and a setting
+    /// made elsewhere in theirs. Only a ready Start says nothing.
+    func testEveryBlockerExplainsItself() {
         XCTAssertNil(AppPickerStartState.ready.explanation)
-        XCTAssertNil(AppPickerStartState.noSelection.explanation)
+        XCTAssertEqual(AppPickerStartState.noSelection.explanation, "Choose what to record: the microphone only, or one of the running apps.")
         XCTAssertNotNil(AppPickerStartState.manualRecordingActive.explanation)
         XCTAssertNotNil(AppPickerStartState.microphoneBlockedByNoMic.explanation)
     }

@@ -3,11 +3,11 @@ import Foundation
 /// Whether the start dialog can start a recording, and if not, why.
 ///
 /// A value rather than booleans in the view because the blockers are not
-/// interchangeable. A missing selection is visible on screen and needs no words;
-/// a recording already running is invisible from the dialog and is the reason a
-/// press would otherwise appear to do nothing. So the recording case outranks the
-/// selection case: picking a source would not help, and saying "pick one" there
-/// would send the user the wrong way.
+/// interchangeable. A missing selection is visible on screen; a recording already
+/// running is invisible from the dialog and is the reason a press would
+/// otherwise appear to do nothing. So the recording case outranks the selection
+/// case: picking a source would not help, and saying "pick one" there would send
+/// the user the wrong way.
 enum AppPickerStartState: Equatable {
     /// Nothing in the way.
     case ready
@@ -46,11 +46,16 @@ enum AppPickerStartState: Equatable {
         self == .ready
     }
 
-    /// What to tell the user, or nil when the state speaks for itself.
+    /// What to tell the user, or nil when nothing is in the way. The spec's
+    /// R5 asks for an explanation on every disabled Start, the missing
+    /// selection included.
     var explanation: String? {
         switch self {
-        case .ready, .noSelection:
+        case .ready:
             nil
+
+        case .noSelection:
+            "Choose what to record: the microphone only, or one of the running apps."
 
         case .manualRecordingActive:
             "Another recording is already starting or under way. The menu bar shows it once it is running."
