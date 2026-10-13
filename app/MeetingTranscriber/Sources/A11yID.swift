@@ -106,6 +106,22 @@ enum A11yID {
     static let codexProviderNote = "codexProviderNote"
     static let customCommandEditor = "customCommandEditor"
     static let customCommandModelField = "customCommandModelField"
+    static let protocolTemplateDefaultPicker = "protocolTemplateDefaultPicker"
+    static let protocolTemplateNameField = "protocolTemplateNameField"
+    static let protocolTemplateCreateButton = "protocolTemplateCreateButton"
+    static let protocolTemplatesOpenFolderButton = "protocolTemplatesOpenFolderButton"
+
+    /// A template row's Edit button, addressed by ROW INDEX, never by template
+    /// name: the name is user input, for the reason on `consentDeniedAppRemove`.
+    static func protocolTemplateEdit(_ index: Int) -> String {
+        "protocolTemplateEdit.\(index)"
+    }
+
+    /// A template row's Delete button, addressed like `protocolTemplateEdit`.
+    static func protocolTemplateDelete(_ index: Int) -> String {
+        "protocolTemplateDelete.\(index)"
+    }
+
     static let includeFullTranscriptToggle = "includeFullTranscriptToggle"
     static let saveRawTranscriptToggle = "saveRawTranscriptToggle"
     static let outputFolderSection = "outputFolderSection"
