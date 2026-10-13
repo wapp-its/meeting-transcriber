@@ -127,6 +127,12 @@ cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh-8-test-home swift
 - **A7 · No confirmation dialog; the caption under the button says the app rebuilds and restarts.** flip at: the owner asks for a confirmation · test: the About view test · status: active [agent-assumed 2026-10-06]
 - **A8 · Open speaker namings do not block an install, as in mt-update.** flip at: the owner loses typed names to an update · test: the install-gate unit test · status: active [agent-inferred 2026-10-06]
 
+FIT: GO · 2026-10-13 · base 557170da · engine flow-next 8.6.0 · nothing material moved since the plan of 2026-10-06; task line anchors re-pinned after fast-forwarding the spec branch to wapp/main
+  - no open or merged spec and no design doc claims update checks or installs; gh-46 only notes that mt-update waits for a paused recording
+  - every cited construct exists (`buildEnvironment`, `runBounded`, `makeUpdateChecker`, `currentBadge`, `updateStatusSnapshot`, `GitCommitHash`, `PreviousExitNotice`, `AppNotifying`); `UpdateChecker.swift` and `AboutSettingsView.swift` are unchanged
+  - gh-7 added the pipe-based `CLIProcessRunner`; task 2 keeps its own file-backed, process-group-bounded runner on purpose (the install child must never write to a pipe), as the plan review's maintainability note already accepts
+  - `origin/tools:mt-update.sh` still has no `--porcelain`, so R3's message is what the app shows until the tools change lands, as the Boundaries say
+
 Maintainability (plan review): duplication - task 2 keeps the bounded-run scaffolding of the Claude CLI help probe, with its own process-group cleanup; structure - `UpdateChecker.checkNow` gains a top-level mode dispatch, with the mt-update logic in its extension.
 
 ## Requirement coverage
