@@ -44,8 +44,8 @@ Offer to load a newly picked stock WhisperKit model right away (R5 for stock pic
 
 
 ## Done summary
-TBD
-
+Blocked:
+Stale claim from a loop tick that the weekly usage limit cut off on 2026-10-09 (no worker alive, no commits). Released by the coordinating session on 2026-10-13 so the loop can restart the task.
 ## Evidence
 - Commits:
 - Tests:
