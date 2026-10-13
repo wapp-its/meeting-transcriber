@@ -54,9 +54,44 @@ Build the Hugging Face catalog client the browser will use: the two API calls fr
 
 
 ## Done summary
-Blocked:
-Stale claim from a loop tick that the weekly usage limit cut off on 2026-10-09 (no worker alive, no commits). Released by the coordinating session on 2026-10-13 so the loop can restart the task.
+Added `HuggingFaceModelCatalog`, the client for the two Hugging Face Hub API calls the model browser needs: a `whisperkit`-tagged search and a repository listing with sizes, parsed into loadable variants, a labelled license with a non-commercial mark, the gated flag, and the error mapping from the spec's API Contracts. It runs against fixtures recorded with curl. The early proof point holds: the live API finds `spert/flix-swissgerman-whisperkit` and lists `flix-swissgerman-large-v3_8bit` (1,627,283,096 bytes, "Apache 2.0").
+
+stage: impl-review - ran [e8937d79..7fabb21e] SHIP round 1, 0 findings (codex gpt-5.6-sol xhigh, 3-reviewer panel; receipt /tmp/impl-review-receipt-0c368c08d3d4-gh-9-find-and-preload-models-from-hugging.1.json). Integration: lane commit f8b8bb69 cherry-picked onto e8937d79 as 7fabb21e; bookkeeping b49c9e04.
+
+Tier: implementer - opus at xhigh (explicit invocation) (model: claude-opus-5-5)
+
+### Evidence (all measured)
+
+- baseline: green via handoff (conductor's spec-base run at a971da58, 137/137; no path changed since). Lint baseline was run anyway: 0 violations.
+- Red first: the tests were written before the source and failed to compile (`cannot find type 'HuggingFaceModelCatalog'`).
+- `cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh9-t1-home swift test --parallel --filter HuggingFace > /private/tmp/gh9-t1.log 2>&1`: exit 0, 37 tests (17 `HuggingFaceModelCatalogTests`, 1 `HuggingFaceLicenseTests`, 2 live tests skipped, 17 existing token tests). No environmental failures in this filter.
+- Live: `MEETINGTRANSCRIBER_HF_LIVE_TESTS=1 … swift test --filter HuggingFaceCatalogLiveTests > /private/tmp/gh9-live.log`: exit 0, both passed against huggingface.co (0.28 s and 0.11 s). Without the variable both are reported `skipped`.
+- Mutation check (AC 1): with the folder-completeness check replaced by `!files.isEmpty`, `testGcoliHasNoLoadableVariantAndANonCommercialLicense` and `testAVariantIsAValidFolderHoldingEveryRequiredFile` go red. With the `nc` rule changed from component to substring, `testLabelAndNonCommercialMark` goes red ("unc-research"). After each break the source was restored byte-identical (`cmp`).
+- `PATH=/private/tmp/gh9tick/lint-bin:$PATH ./scripts/lint.sh`: exit 0, 0/769 files need formatting, 0 violations.
+- `swift build -c release`: exit 0.
+- CI-only `swiftlint analyze --strict`, run over a clean `xcodebuild build-for-testing` log: 0 violations in the new files. 2 hits that predate this task are in `Sources/RecordingProvider.swift:144,146` (`unused_declaration`). That file is untouched here and came in with the gh-60 merge. The PR's `analyze` job will fail on them unless they are fixed on wapp/main (noted in NOTES_DIR).
+- The error cases R2/R3/R6 name have one test each: 401/403 refused, 404, 429, 500, transport failure, cancellation (a real `Task.cancel()` on an in-flight request), unreadable body, invalid repository id (no request sent), and bearer only for a non-empty trimmed token (nil, "", "  ", "abc", " abc\n", on both calls).
+
+### Choices
+
+- DECIDED (rule 1): the commit carries a `Task:` trailer, as the fork's gh-10 commits on wapp/main do and as worker.md asks. Neither the commit message nor the code names a fork issue number.
+- DECIDED (rule 6): `HuggingFaceModelSummary.downloads` is `Int?`, so nil when the API leaves the count out. It is not defaulted to 0; task .3 decides how to show a missing count.
+- DECIDED (rule 6): the listing's `id` is the requested repository id, not the response's `id` field. The two are equal for every id the search returns, and this avoids a second validation path.
+- DECIDED (rule 6): `modelCardURL` is a stored, non-optional `URL` (`https://huggingface.co/<id>`) that the catalog builds.
+- DECIDED (rule 6): a `+` in the search query is sent as `%2B`. URLComponents leaves `+` alone, and form decoding reads it as a space. `testSearchSendsTheQueryAsTyped` pins this.
+- DECIDED (rule 6): license selection works the same whether `other` comes from the card or from a `license:` tag: in both cases `license_name` is preferred. Known labels, the `cc-` prefix and the `nc` component match case-insensitively. An unknown id is shown as written.
+- DECIDED (rule 6): a listing without `siblings` counts as a malformed response; `tags`, `cardData` and `gated` are optional. Otherwise a broken response would read as "No variant this app can load".
+- DECIDED (rule 6): only HTTP 200 counts as success (spec: "other non-200"). A non-HTTP response maps to `.malformedResponse`. Any non-cancellation transport error, `URLError` or not, maps to `.unreachable`.
+- DECIDED (rule 6): log lines carry only the call kind ("search"/"listing") and the HTTP status or error type, at `.warning` level. The repository id is not logged either, because a private repository's name may be sensitive.
+- DECIDED (rule 6): there is no redirect guard for the bearer token, unlike `RemoteVocabularyFetcher`. The host is fixed to huggingface.co, which the token belongs to. gh-10 needs its guard because a URL the user types can redirect anywhere. Worth a reviewer's glance, since the decision concerns where the token can travel.
+- DECIDED (rule 6): the unit tests hold the client as `any HuggingFaceModelCataloging`. Without a caller through the protocol, CI's `unused_declaration` flagged both protocol requirements (measured locally).
+
+### Follow-ups (not built)
+
+- `Sources/RecordingProvider.swift:144,146` unused declarations break CI's `analyze` job at the spec base (this predates gh-9).
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 7fabb21ed91bccc3e6206788a4700e0f187d14a5, b49c9e04948509f4c940cda4fd3d06a5f8462566
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh9-t1-home swift test --parallel --filter HuggingFace > /private/tmp/gh9-t1.log 2>&1 (exit 0, 37 tests: 17 HuggingFaceModelCatalogTests, 1 HuggingFaceLicenseTests, 2 HuggingFaceCatalogLiveTests skipped, 17 existing token tests), cd app/MeetingTranscriber && MEETINGTRANSCRIBER_HF_LIVE_TESTS=1 CFFIXED_USER_HOME=/private/tmp/gh9-t1-home swift test --filter HuggingFaceCatalogLiveTests > /private/tmp/gh9-live.log 2>&1 (exit 0, 2 passed against huggingface.co; without the variable 2 skipped), PATH=/private/tmp/gh9tick/lint-bin:$PATH ./scripts/lint.sh (exit 0, SwiftFormat 0.63.0 0/769 need formatting, SwiftLint 0.65.1 0 violations), cd app/MeetingTranscriber && swift build -c release (exit 0), xcodebuild clean build-for-testing + swiftlint analyze --strict (0 violations in the new files; 2 pre-existing unused_declaration hits in Sources/RecordingProvider.swift:144,146, untouched), mutation check: variant completeness rule broken -> 2 catalog tests red; nc-component rule broken -> license test red; source restored byte-identical, integrated at b49c9e04948509f4c940cda4fd3d06a5f8462566: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh9-t1-home swift test --parallel --filter 'HuggingFace' (exit 0, no failures; parallel mode prints failures only); PATH=/private/tmp/gh9tick/lint-bin:$PATH ./scripts/lint.sh (exit 0, 0 violations)
 - PRs:
