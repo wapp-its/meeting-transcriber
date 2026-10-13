@@ -58,7 +58,9 @@ final class AppSettingsRecordWithoutAskingTests: XCTestCase {
     }
 
     /// An app added through "Add App…" always asks, so with it as the only
-    /// watched app the prompt still has to reach the user; denied, it does not.
+    /// watched app the prompt still has to reach the user; denied under its own
+    /// key, it does not. A denied name does not count it out: the name may
+    /// belong to a different app.
     func testAnAddedAppCountsAsAskingUntilDenied() throws {
         let settings = try AppSettings(defaults: makeDefaults())
         settings.watchTeams = false
@@ -68,6 +70,9 @@ final class AppSettingsRecordWithoutAskingTests: XCTestCase {
         XCTAssertTrue(settings.anyWatchedAppAsksFirst, "the added app asks")
 
         settings.consentDeniedApps = ["com.example.not-installed"]
-        XCTAssertFalse(settings.anyWatchedAppAsksFirst, "the added app is denied under its display name")
+        XCTAssertTrue(settings.anyWatchedAppAsksFirst, "its display name denied is not the added app denied")
+
+        settings.consentDeniedApps = ["custom:com.example.not-installed"]
+        XCTAssertFalse(settings.anyWatchedAppAsksFirst, "the added app is denied under its own key")
     }
 }
