@@ -34,8 +34,9 @@ struct WhisperKitModelLoadOffer: Equatable {
 final class WhisperKitModelChoice {
     private(set) var loadOffer: WhisperKitModelLoadOffer?
 
-    /// Offer to load `selection`, unless the engine already loads or holds exactly it.
-    /// `isOnDisk` is asked only when an offer is made.
+    /// Offer to load `selection`, unless the answer would decide nothing: the engine
+    /// already holds exactly it, or a load is in flight. `isOnDisk` is asked only when
+    /// an offer is made.
     func offerLoad(
         for selection: WhisperKitModelSelection,
         sizeBytes: Int64?,
@@ -51,18 +52,28 @@ final class WhisperKitModelChoice {
         loadOffer = WhisperKitModelLoadOffer(selection: selection, sizeBytes: sizeBytes, isOnDisk: isOnDisk(selection))
     }
 
-    /// False only when the engine already requests exactly `chosen` and has it loaded
-    /// or is loading it. The engine's request may still be the previous model when
-    /// this runs, because the settings observer applies a change a main-actor turn
-    /// later, so a different model always reads as a change.
+    /// False when the engine already holds exactly `chosen`, and whenever a load is in
+    /// flight, whichever model it is for: `WhisperKitEngine.loadModel` goes on to the
+    /// model requested when it finishes, so the chosen model loads next whatever the
+    /// answer, and "Later" could not hold. The engine's request may still be the
+    /// previous model when this runs, because the settings observer applies a change a
+    /// main-actor turn later, so a different model always reads as a change.
     static func shouldOffer(
         chosen: WhisperKitModelSelection,
         engineVariant: String,
         engineOrigin: WhisperKitModelOrigin,
         engineState: EngineModelState,
     ) -> Bool {
-        let engineRequestsChosen = chosen.variant == engineVariant && chosen.origin == engineOrigin
-        return !engineRequestsChosen || engineState == .unloaded
+        switch engineState {
+        case .downloading, .loading:
+            false
+
+        case .loaded:
+            chosen.variant != engineVariant || chosen.origin != engineOrigin
+
+        case .unloaded:
+            true
+        }
     }
 
     /// "Load now". Loads the offer it is given, not whatever `loadOffer` holds by the

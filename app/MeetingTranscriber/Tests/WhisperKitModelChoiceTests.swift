@@ -20,9 +20,18 @@ final class WhisperKitModelChoiceTests: XCTestCase {
         var loads: [WhisperKitModelSelection] = []
     }
 
+    /// What the engine reported while a load was in flight.
+    private final class InFlightProbe {
+        var engineState: EngineModelState?
+    }
+
     /// Install a source that loads every model from a temporary folder into a
     /// WhisperKit instance that loads nothing (`WhisperKitEngineModelOriginTests`).
-    private func installRecordingSource(on engine: WhisperKitEngine) async throws -> LoadRecorder {
+    /// `onPipe` runs while a model is being built, so with the engine `.loading`.
+    private func installRecordingSource(
+        on engine: WhisperKitEngine,
+        onPipe: (@MainActor (WhisperKitModelSelection) async -> Void)? = nil,
+    ) async throws -> LoadRecorder {
         let pipe = try await WhisperKit(WhisperKitConfig(verbose: false, load: false, download: false))
         let folder = try makeTempDirectory(prefix: "wk-choice")
         let recorder = LoadRecorder()
@@ -33,7 +42,10 @@ final class WhisperKitModelChoiceTests: XCTestCase {
                     return folder
                 },
                 download: { _, _ in throw URLError(.networkConnectionLost) },
-                makePipe: { _, _ in pipe },
+                makePipe: { variant, _ in
+                    await onPipe?(WhisperKitModelSelection(variant: variant, origin: origin))
+                    return pipe
+                },
             )
         }
         return recorder
@@ -41,11 +53,13 @@ final class WhisperKitModelChoiceTests: XCTestCase {
 
     // MARK: - When to offer
 
-    func testShouldOfferOnlyWhenTheChosenModelIsNotAlreadyLoadedOrLoading() {
+    func testShouldOfferOnlyWhenTheAnswerDecidesWhatLoads() {
         let smallFromAnotherRepository = WhisperKitModelSelection(variant: small.variant, origin: swissGerman.origin)
         let cases: [(engine: WhisperKitModelSelection, state: EngineModelState, expected: Bool, why: String)] = [
             (turbo, .loaded, true, "another variant is loaded"),
-            (turbo, .loading, true, "another variant is loading"),
+            (turbo, .unloaded, true, "another variant is requested but not loaded"),
+            (turbo, .downloading, false, "a load in flight goes on to the chosen model whatever the answer"),
+            (turbo, .loading, false, "a load in flight goes on to the chosen model whatever the answer"),
             (smallFromAnotherRepository, .loaded, true, "the same folder name from another repository is another model"),
             (small, .unloaded, true, "the chosen model is requested but not loaded"),
             (small, .loaded, false, "the chosen model is loaded"),
@@ -89,6 +103,30 @@ final class WhisperKitModelChoiceTests: XCTestCase {
         choice.offerLoad(for: small, sizeBytes: 486_487_465, engine: engine) { _ in true }
 
         XCTAssertNil(choice.loadOffer)
+    }
+
+    /// A load already running when the pick lands (the launch preload, say) goes on
+    /// to the picked model once it finishes, so "Later" could not hold. The picker's
+    /// order is kept: the offer is decided first, and the settings observer applies
+    /// the pick to the engine a main-actor turn later.
+    func testAPickDuringALoadOffersNothingAndTheLoadGoesOnToIt() async throws {
+        let engine = WhisperKitEngine()
+        let choice = WhisperKitModelChoice()
+        let probe = InFlightProbe()
+        let small = small
+        let recorder = try await installRecordingSource(on: engine) { [turbo] loading in
+            guard loading == turbo else { return }
+            probe.engineState = engine.modelState
+            choice.offerLoad(for: small, sizeBytes: 486_487_465, engine: engine) { _ in false }
+            engine.applyModelVariant(small.variant, origin: small.origin)
+        }
+
+        await engine.loadModel(for: turbo)
+
+        XCTAssertEqual(probe.engineState, .loading, "Precondition: the pick landed while a load was in flight")
+        XCTAssertNil(choice.loadOffer)
+        XCTAssertEqual(recorder.loads, [turbo, small], "The load in flight went on to the picked model")
+        XCTAssertEqual(engine.modelState, .loaded)
     }
 
     // MARK: - Load now / Later
