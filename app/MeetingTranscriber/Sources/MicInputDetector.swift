@@ -124,8 +124,9 @@ class MicInputDetector: MeetingDetecting {
     /// Injectable window list for title lookup, mirroring PowerAssertionDetector.
     var windowListProvider: () -> [[String: Any]] = MeetingDetector.systemWindowList
 
-    /// Apps the user answered "Never for this app" about, so they never reach
-    /// confirmation. Same reason as `PowerAssertionDetector.isIdentityDenied`:
+    /// Apps the user answered "Never for this app" about, by identity key
+    /// (`AppMeetingPattern.identityKey`), so they never reach confirmation.
+    /// Same reason as `PowerAssertionDetector.isIdentityDenied`:
     /// a denied app holding the mic would otherwise re-confirm every few polls
     /// for as long as it does, and each skip at the consent gate resets every
     /// app's confirmation count.
@@ -150,7 +151,7 @@ class MicInputDetector: MeetingDetecting {
         self.patterns = patterns
         self.confirmationCount = confirmationCount
         matchers = patterns.reduce(into: [:]) { dict, pattern in
-            dict[pattern.meetingPattern.appName] = MeetingTitleMatcher(pattern: pattern.meetingPattern)
+            dict[pattern.meetingPattern.identityKey] = MeetingTitleMatcher(pattern: pattern.meetingPattern)
         }
     }
 
@@ -166,6 +167,9 @@ class MicInputDetector: MeetingDetecting {
         guard !patterns.isEmpty else { return nil }
 
         let processes = processProvider()
+        // Every piece of per-app state is filed under the identity key, so an
+        // added app never shares it with a same-named one; the name is only
+        // for the title and owner the person reads.
         var hitsThisRound: Set<String> = []
         var firstMatch: [String: pid_t] = [:]
         // The pattern that matched, kept rather than looked up again by name:
@@ -178,39 +182,39 @@ class MicInputDetector: MeetingDetecting {
                 logUnmatchedRunningInput(bundleID: process.bundleID)
                 continue
             }
-            let appName = pattern.meetingPattern.appName
-            if isIdentityDenied(appName) { continue }
-            if let until = cooldownUntil[appName], Date() < until { continue }
-            guard !hitsThisRound.contains(appName) else { continue }
-            hitsThisRound.insert(appName)
-            firstMatch[appName] = tapRootPID(for: process, pattern: pattern)
-            matchedPattern[appName] = pattern.meetingPattern
-            consecutiveHits[appName, default: 0] += 1
+            let key = pattern.meetingPattern.identityKey
+            if isIdentityDenied(key) { continue }
+            if let until = cooldownUntil[key], Date() < until { continue }
+            guard !hitsThisRound.contains(key) else { continue }
+            hitsThisRound.insert(key)
+            firstMatch[key] = tapRootPID(for: process, pattern: pattern)
+            matchedPattern[key] = pattern.meetingPattern
+            consecutiveHits[key, default: 0] += 1
         }
 
-        for (appName, hits) in consecutiveHits where !excludedApps.contains(appName) {
-            if hits >= confirmationCount, let pid = firstMatch[appName],
-               let meetingPattern = matchedPattern[appName] {
-                let title = matchers[appName]?.selectWindowTitle(from: windowListProvider())
-                    ?? PowerAssertionDetector.placeholderTitle(appName: appName)
+        for (key, hits) in consecutiveHits where !excludedApps.contains(key) {
+            if hits >= confirmationCount, let pid = firstMatch[key],
+               let meetingPattern = matchedPattern[key] {
+                let title = matchers[key]?.selectWindowTitle(from: windowListProvider())
+                    ?? PowerAssertionDetector.placeholderTitle(appName: meetingPattern.appName)
                 return DetectedMeeting(
                     pattern: meetingPattern,
                     windowTitle: title,
-                    ownerName: appName,
+                    ownerName: meetingPattern.appName,
                     windowPID: pid,
                 )
             }
         }
 
-        for appName in consecutiveHits.keys where !hitsThisRound.contains(appName) {
-            consecutiveHits[appName] = 0
+        for key in consecutiveHits.keys where !hitsThisRound.contains(key) {
+            consecutiveHits[key] = 0
         }
 
         return nil
     }
 
     func isMeetingActive(_ meeting: DetectedMeeting) -> Bool {
-        let candidates = patterns.filter { $0.meetingPattern.appName == meeting.pattern.appName }
+        let candidates = patterns.filter { $0.meetingPattern.identityKey == meeting.pattern.identityKey }
         guard !candidates.isEmpty else { return false }
         return processProvider().contains { process in
             process.isRunningInput && candidates.contains { $0.matches(bundleID: process.bundleID) }

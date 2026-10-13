@@ -246,8 +246,98 @@ final class MicInputDetectorTests: XCTestCase {
         XCTAssertEqual(meeting.pattern.appName, "Whatsapp")
         XCTAssertTrue(detector.isMeetingActive(meeting))
 
-        detector.reset(appName: meeting.pattern.appName)
-        XCTAssertNil(detector.checkOnce(), "cooldown must apply under the name the meeting was reported with")
+        detector.reset(appName: meeting.pattern.identityKey)
+        XCTAssertNil(detector.checkOnce(), "cooldown must apply under the key the meeting was reported with")
+    }
+
+    // MARK: - Same-named apps
+
+    /// Built-in WeChat beside an app added under the same name, both holding
+    /// the microphone. Confirms in one poll, so a reset, which still restarts
+    /// every app's count, shows only what its cooldown does.
+    private func sameNamedWeChat() -> MicInputDetector {
+        let detector = MicInputDetector(
+            patterns: MicInputDetector.patterns(watching: ["WeChat"])
+                + [customPattern(appName: "WeChat", bundleID: "com.example.wechat")],
+            confirmationCount: 1,
+        )
+        detector.windowListProvider = { [] }
+        detector.mainAppPIDProvider = { _ in nil }
+        detector.processProvider = { [snapshot("com.tencent.xinWeChat", pid: 1), snapshot("com.example.wechat", pid: 2)] }
+        return detector
+    }
+
+    func testANeverForOneOfTwoSameNamedAppsLeavesTheOtherDetected() {
+        let addedKey = "custom:com.example.wechat"
+
+        let builtInDenied = sameNamedWeChat()
+        builtInDenied.isIdentityDenied = { $0 == "WeChat" }
+        XCTAssertEqual(builtInDenied.checkOnce()?.pattern.identityKey, addedKey, "denying the built-in leaves the added one detected")
+        XCTAssertNil(builtInDenied.checkOnce(excluding: [addedKey]), "and the built-in is not")
+
+        let addedDenied = sameNamedWeChat()
+        addedDenied.isIdentityDenied = { $0 == addedKey }
+        XCTAssertEqual(addedDenied.checkOnce()?.pattern.identityKey, "WeChat", "denying the added one leaves the built-in detected")
+        XCTAssertNil(addedDenied.checkOnce(excluding: ["WeChat"]), "and the added one is not")
+    }
+
+    func testAResetCoolsDownOnlyTheSameNamedAppItNames() throws {
+        let detector = sameNamedWeChat()
+        let builtIn = try XCTUnwrap(detector.checkOnce(excluding: ["custom:com.example.wechat"]))
+        XCTAssertEqual(builtIn.pattern.identityKey, "WeChat")
+
+        detector.reset(appName: builtIn.pattern.identityKey)
+        XCTAssertEqual(detector.checkOnce()?.pattern.identityKey, "custom:com.example.wechat", "the added one is detected on the next poll")
+        XCTAssertNil(detector.checkOnce(excluding: ["custom:com.example.wechat"]), "while the built-in cools down")
+    }
+
+    func testOneOfTwoSameNamedAppsHoldingTheMicDoesNotKeepTheOthersMeetingActive() throws {
+        let detector = sameNamedWeChat()
+        let builtIn = try XCTUnwrap(detector.checkOnce(excluding: ["custom:com.example.wechat"]))
+        let added = try XCTUnwrap(detector.checkOnce(excluding: ["WeChat"]))
+
+        detector.processProvider = { [snapshot("com.example.wechat")] }
+        XCTAssertFalse(detector.isMeetingActive(builtIn), "the added app's microphone use must not keep the built-in's meeting active")
+        XCTAssertTrue(detector.isMeetingActive(added))
+
+        detector.processProvider = { [snapshot("com.tencent.xinWeChat")] }
+        XCTAssertFalse(detector.isMeetingActive(added), "nor the built-in's the added app's")
+        XCTAssertTrue(detector.isMeetingActive(builtIn))
+    }
+
+    func testTwoAddedAppsWithTheSameNameKeepSeparateCooldownsAndLiveness() throws {
+        let detector = MicInputDetector(
+            patterns: [customPattern(appName: "Meet", bundleID: "com.a.meet"), customPattern(appName: "Meet", bundleID: "com.b.meet")],
+            confirmationCount: 1,
+        )
+        detector.windowListProvider = { [] }
+        detector.mainAppPIDProvider = { _ in nil }
+        detector.processProvider = { [snapshot("com.a.meet", pid: 1), snapshot("com.b.meet", pid: 2)] }
+
+        let first = try XCTUnwrap(detector.checkOnce(excluding: ["custom:com.b.meet"]))
+        XCTAssertEqual(first.pattern.identityKey, "custom:com.a.meet")
+        detector.reset(appName: first.pattern.identityKey)
+        let second = try XCTUnwrap(detector.checkOnce(), "the other one is not cooled down")
+        XCTAssertEqual(second.pattern.identityKey, "custom:com.b.meet")
+
+        detector.processProvider = { [snapshot("com.b.meet")] }
+        XCTAssertFalse(detector.isMeetingActive(first), "one added app's microphone use must not keep the other's meeting active")
+        XCTAssertTrue(detector.isMeetingActive(second))
+    }
+
+    /// Each of two same-named apps is titled by its own matcher, and an added
+    /// app's meeting shows its display name, never its key.
+    func testEachSameNamedAppTitlesItsMeetingWithItsOwnMatcherAndName() throws {
+        let detector = sameNamedWeChat()
+        detector.windowListProvider = { [["kCGWindowOwnerName": "微信", "kCGWindowName": "Call with Alice"]] }
+
+        let builtIn = try XCTUnwrap(detector.checkOnce(excluding: ["custom:com.example.wechat"]))
+        XCTAssertEqual(builtIn.windowTitle, "Call with Alice", "the built-in's matcher knows its localized owner name")
+
+        let added = try XCTUnwrap(detector.checkOnce(excluding: ["WeChat"]))
+        XCTAssertEqual(added.windowTitle, "WeChat Call")
+        XCTAssertEqual(added.ownerName, "WeChat")
+        XCTAssertEqual(added.pattern.appName, "WeChat")
     }
 
     @MainActor

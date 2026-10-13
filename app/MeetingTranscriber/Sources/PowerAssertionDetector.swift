@@ -366,8 +366,10 @@ class PowerAssertionDetector: MeetingDetecting {
                 // `pattern.appName` would compare a category token against a
                 // process name for `.perProcess` patterns, so nothing would ever
                 // match and every browser recording would stop at the end grace.
+                // The meeting's identity key equals its name for every meeting
+                // this detector reports; an added app's key matches no pattern.
                 for pattern in patterns
-                    where pattern.identifies(meetingAppName: meeting.pattern.appName, processName: processName) {
+                    where pattern.identifies(meetingAppName: meeting.pattern.identityKey, processName: processName) {
                     if matchAssertion(processName: processName, assertName: assertName, assertType: assertType, pattern: pattern) {
                         return true
                     }

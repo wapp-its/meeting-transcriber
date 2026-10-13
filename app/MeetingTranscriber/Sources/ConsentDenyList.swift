@@ -14,8 +14,10 @@ import Foundation
 /// way to stop being asked about an app is a setting, not an answer:
 /// `AppSettings.recordWithoutAskingApps`, which this list outranks.
 ///
-/// Entries are app identities exactly as the detectors report them (for a
-/// browser, the process name off the power assertion), and they are matched
+/// Entries are identity keys exactly as the detectors report them
+/// (`AppMeetingPattern.identityKey`): a built-in app's name, for a browser
+/// the process name off the power assertion, for an app added through
+/// "Add App…" `custom:<bundleID>` (`AddedAppIdentity`). They are matched
 /// exactly: a looser rule here would silence an app the user was never asked
 /// about.
 struct ConsentDenyList: Equatable {

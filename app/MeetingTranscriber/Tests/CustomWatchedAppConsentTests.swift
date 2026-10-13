@@ -80,11 +80,13 @@ final class CustomWatchedAppConsentTests: XCTestCase {
         detector.processProvider = {
             [MicInputDetector.AudioProcessSnapshot(bundleID: "com.example.callapp.helper", pid: 555, isRunningInput: true)]
         }
-        detector.isIdentityDenied = { $0 == "CallApp" }
+        detector.isIdentityDenied = { $0 == "custom:com.example.callapp" }
 
         XCTAssertNil(detector.checkOnce())
 
-        detector.isIdentityDenied = { _ in false }
+        // Another app can carry the same display name, so a denial of the
+        // name no longer reaches an added app.
+        detector.isIdentityDenied = { $0 == "CallApp" }
         XCTAssertEqual(detector.checkOnce()?.pattern.appName, "CallApp")
     }
 }
