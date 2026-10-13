@@ -73,9 +73,52 @@ Tests first (this is a bug fix): write the new tests below, run them, see them f
 - [ ] Only the two named existing tests changed their assertions, each for the changed requirement as the commit message says; every other test in the verification filter passes unchanged (R8).
 - [ ] `./scripts/lint.sh` passes with the pinned tools.
 ## Done summary
-TBD
+Every meeting pattern now carries an identity key (`custom:<bundleID>` for an app added through "Add App…", the name for built-in apps and browsers). The microphone detector, the assertion detector's liveness check, the default excluding poll, the consent gate and the re-detection holds file their state under that key; a microphone-holding process is filed under the pattern whose matching bundle ID is longest, so two added apps with prefix-related bundle IDs stay apart too. Everything a person reads still shows the display name, including `pendingConsentApp` on `/state` and `/v1/watch`. Built-in apps and browsers behave exactly as before, because their key equals their name.
 
+stage: implement - ran (model: claude-opus-5-5; worker in lane worktree, parallel-wave handover)
+stage: impl-review - ran [2026-10-13T14:45Z..15:02Z] (model: gpt-5.6-sol xhigh; round 1 three-draw fan-out: correctness NEEDS_WORK, contracts SHIP, integration SHIP; one P1 finding fixed in a4d2e4ac; round 2 SHIP, no surviving findings)
+stage: plan-sync - skipped(config: planSync.enabled=false)
+
+Tier: implementer - opus (explicit invocation) (model: claude-opus-5-5)
+
+baseline: green (task verification filter, 572 tests, rc 0, pre-edit at 1f4b14b3)
+
+### Commits (base 1f4b14b3)
+- 989607d3 feat(app): give every meeting pattern an identity key
+- 1220fbdf refactor(test): share the consent loop test doubles
+- 94a34db6 fix(app): keep added apps apart from same-named apps
+- a4d2e4ac fix(app): file a mic process under its most specific added app (review fix: `MicPattern.matchLength(bundleID:)` plus `MicInputDetector.mostSpecificPattern(for:)` used by both detection and liveness; `matches(bundleID:)` removed, no caller left; regression test `testPrefixRelatedAddedAppsAreFiledUnderTheMostSpecificBundleID`, red before the fix on both assertions, green after)
+
+### Acceptance → tests
+- identityKey is the name for built-ins and browsers; an added app gets `custom:<bundleID>` (R8, R4): `AddedAppIdentityTests` (4).
+- MicInputDetector keys counters, cooldowns, deny checks, title matchers and liveness by key (R1, R2, R3): `MicInputDetectorTests.testANeverForOneOfTwoSameNamedAppsLeavesTheOtherDetected`, `testAResetCoolsDownOnlyTheSameNamedAppItNames`, `testOneOfTwoSameNamedAppsHoldingTheMicDoesNotKeepTheOthersMeetingActive`, `testTwoAddedAppsWithTheSameNameKeepSeparateCooldownsAndLiveness`, `testPrefixRelatedAddedAppsAreFiledUnderTheMostSpecificBundleID`, `testEachSameNamedAppTitlesItsMeetingWithItsOwnMatcherAndName`.
+- A built-in Zoom call assertion does not keep an added "Zoom" active, with a control showing the built-in's own meeting still is (R3): `CompositeMeetingDetectorTests.testABuiltInCallDoesNotKeepASameNamedAddedAppsMeetingActive`.
+- The consent gate keys the deny list, both cooldowns, the open prompt, the waiting set and every reset (R1, R2, R4): `WatchLoopAddedAppIdentityTests` (4 tests through `start()`): Never, Ignore (`.declined`) and no answer (`.expired`) in both directions; a Never on the added app stores `custom:com.example.zoom` only; while the added app's prompt is parked, `pendingConsentApp == "Zoom"` and the gate excludes `["custom:com.example.zoom"]`; a decline resets the detector only under the added app's key; a granted added app records with `currentMeeting?.pattern.appName == "Zoom"`.
+- Re-detection holds are keyed by identity: `RedetectionHoldsTests.testAnAddedAppIsHeldUnderItsKeyBesideASameNamedBuiltIn`.
+- The loop-test doubles exist once, in `ConsentLoopDoubles`, used by both loop suites; every assertion in `WatchLoopAskBeforeRecordingTests` is unchanged.
+- `AppState+RPC.swift` is unchanged; `WatchLoop.swift` stays at 589 lines.
+- Only the two named tests changed their assertions, for the changed requirement as the fix commit says.
+
+### Gates
+- Task verification filter plus `RedetectionHolds`, `--skip WatchLoopE2ETests`: rc 0, 591 tests (worker, lane). After the review fix, on the integrated branch: rc 0, 135 tests over `MicInputDetector|CustomWatchedApp|CompositeMeetingDetector|MeetingDetectorExclusion|WatchingController|WatchLoopAddedApp|WatchLoopAskBeforeRecording`.
+- The spec's settings suites (`AppSettingsRecordWithoutAsking|GeneralSettingsConsentDenyList`): rc 0, 9 tests.
+- `./scripts/lint.sh` with the pinned SwiftFormat 0.63.0 and SwiftLint 0.65.1: rc 0, 0 violations in 714 files, before and after the review fix.
+- Not run: `swiftlint analyze` (CI only; `AddedAppIdentity.bundleID(fromKey:)` gets its production caller in task .2), `./scripts/pre-push.sh`, the installed app (two same-named call apps holding the microphone are not available; the loop tests drive the real `start()` poll loop).
+
+### Decisions
+1. Rule 1 (task: keep `makeLoop` per suite or move it): per suite; the new suite has a two-parameter version.
+2. Rule 6: the existing loop suite reaches the shared doubles through private typealiases, so its body is untouched.
+3. Rule 1 (acceptance: every detector reset by identity key, proven by the loop suite): `ConsentLoopDoubles.ScriptedDetector` records each reset's key.
+4. Rule 1 (R8, A6): `PendingConsent.appName` holds `meeting.pattern.appName` exactly, so `pendingConsentApp` stays identical for built-ins.
+5. Rule 1 (task: log lines may keep the key): consent and `redetect_hold_set` log lines log the identity key.
+6. Rule 6: `RedetectionHolds` added to the verification filter, since the stated filter does not match that suite.
+7. Rule 6 (conductor): the review's validator pass was not run for round 1; its single finding was confirmed by reading `MicInputDetector.checkOnce` (first-match helper-prefix selection) before the fix.
+8. Rule 1 (CI `unused_declaration`): `MicPattern.matches(bundleID:)` removed once the longest-match helper replaced its last caller; task .3's reference re-pointed to `matchLength(bundleID:)`.
+
+### Open / follow-ups
+- Until task .2 lands, a legacy name entry on the deny list no longer suppresses an added app of that name (asks again: the safe direction); task .2's one-shot migration adds the key. Both ship in the same PR.
+- Open fork PR #109 edits `WatchLoop.swift`, `WatchLoop+Consent.swift` and `WatchLoopAskBeforeRecordingTests.swift`; whichever lands second must use the stored `pendingConsent` and `ConsentLoopDoubles`.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 989607d35ce23ac0d3d44130b528e057d73d1e5d, 1220fbdf25c61932a622da8a36d5c7d677ff29f6, 94a34db6d6354b7365461202d59b66e5a0143655, a4d2e4ac4f38268cf6868460104862703cea65b7
+- Tests: swift test --parallel --skip WatchLoopE2ETests --filter "MicInputDetector|CustomWatchedApp|CompositeMeetingDetector|MeetingDetectorExclusion|WatchingController|WatchLoopAddedApp|WatchLoopAskBeforeRecording" (rc 0, 135 tests at a4d2e4ac); worker lane filter rc 0, 591 tests at 94a34db6; settings suites rc 0, 9 tests, PATH="/private/tmp/gh52-tick/lint-bin:$PATH" ./scripts/lint.sh (rc 0, 0 violations)
 - PRs:
