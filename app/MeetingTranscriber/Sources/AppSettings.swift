@@ -121,8 +121,11 @@ enum ProtocolProvider: String, CaseIterable {
     }
 }
 
+// The class body is the registry itself (`@Observable` needs every stored
+// setting inside the class), so its 400-line cap counts features for the same
+// reason the file length does; see the note at the top of the file.
 @Observable
-final class AppSettings {
+final class AppSettings { // swiftlint:disable:this type_body_length
     /// Backing store. Production callers pass nothing → `.standard`. Tests
     /// inject their own `UserDefaults(suiteName:)` so parallel test
     /// processes don't race on the shared on-disk plist.
@@ -147,6 +150,11 @@ final class AppSettings {
     /// nothing → the account `huggingFaceToken`; tests inject an in-memory or
     /// failing store, for the reason given at `apiKeyAccount`.
     @ObservationIgnored let huggingFaceTokenStore: HuggingFaceTokenStore
+
+    /// Keychain account backing `remoteVocabularyToken`. Production callers
+    /// pass nothing → the account `remoteVocabularyToken`; tests inject a
+    /// unique account, for the reason given at `apiKeyAccount`.
+    @ObservationIgnored private let remoteVocabularyTokenAccount: String
 
     // MARK: - Apps to Watch
 
@@ -407,6 +415,24 @@ final class AppSettings {
         didSet { defaults.set(whisperKitVocabularyPromptEnabled, forKey: "whisperKitVocabularyPromptEnabled") }
     }
 
+    /// Where the vocabulary comes from. `.file` (the default, also for existing
+    /// installations) is the local file above; with `.url` both engines read
+    /// only the downloaded copy, see `effectiveVocabularyPath`.
+    var vocabularySource: VocabularySource {
+        didSet { defaults.set(vocabularySource.rawValue, forKey: "vocabularySource") }
+    }
+
+    /// The address of the URL source as entered; normalized
+    /// (`RemoteVocabulary.normalizedAddress`) wherever it is used.
+    var remoteVocabularyURL: String {
+        didSet { defaults.set(remoteVocabularyURL, forKey: "remoteVocabularyURL") }
+    }
+
+    /// Bumped by every set of `remoteVocabularyToken`. The Keychain cannot be
+    /// observed, so this counter is how `RemoteVocabularyController` learns
+    /// that the token changed. Not persisted.
+    private(set) var remoteVocabularyTokenRevision = 0
+
     func updateWhisperKitCustomModelFolder(path: String, bookmark: Data?) {
         whisperKitCustomModelFolderPath = path
         whisperKitCustomModelFolderBookmark = bookmark
@@ -613,6 +639,22 @@ final class AppSettings {
         }
     }
 
+    /// Access token for the URL source, sent as `Authorization: Bearer`. Kept
+    /// only in the Keychain (an empty value deletes the item), never in
+    /// UserDefaults or the cache sidecar. Every set bumps
+    /// `remoteVocabularyTokenRevision`.
+    var remoteVocabularyToken: String {
+        get { KeychainHelper.read(key: remoteVocabularyTokenAccount) ?? "" }
+        set {
+            if newValue.isEmpty {
+                KeychainHelper.delete(key: remoteVocabularyTokenAccount)
+            } else {
+                KeychainHelper.save(key: remoteVocabularyTokenAccount, value: newValue)
+            }
+            remoteVocabularyTokenRevision += 1
+        }
+    }
+
     #if !APPSTORE
         /// API key for the Claude CLI protocol generator, entered by the user
         /// in Settings → Protocol Generation. Empty means use the CLI's own
@@ -642,6 +684,11 @@ final class AppSettings {
     /// `defaults`, so a test can exercise the fallback without resolving to the
     /// user's real Downloads folder, which is one step from writing into it.
     let defaultOutputDir: URL
+
+    /// Where the URL source's downloaded copies live:
+    /// `AppPaths.remoteVocabularyCacheDirectory` in production. Injected, like
+    /// `defaultOutputDir`, so a test never reads or deletes the user's copies.
+    let remoteVocabularyCacheDirectory: URL
 
     // MARK: - Diagnostics
 
@@ -681,13 +728,17 @@ final class AppSettings {
         apiKeyAccount: String = "openAIAPIKey",
         claudeAPIKeyAccount: String = "claudeAPIKey",
         huggingFaceTokenStore: HuggingFaceTokenStore = .keychain(account: "huggingFaceToken"),
+        remoteVocabularyTokenAccount: String = "remoteVocabularyToken",
         defaultOutputDir: URL = AppPaths.downloadsProtocolsDir,
+        remoteVocabularyCacheDirectory: URL = AppPaths.remoteVocabularyCacheDirectory,
     ) {
         self.defaults = defaults
         self.apiKeyAccount = apiKeyAccount
         self.claudeAPIKeyAccount = claudeAPIKeyAccount
         self.huggingFaceTokenStore = huggingFaceTokenStore
+        self.remoteVocabularyTokenAccount = remoteVocabularyTokenAccount
         self.defaultOutputDir = defaultOutputDir
+        self.remoteVocabularyCacheDirectory = remoteVocabularyCacheDirectory
 
         watchTeams = defaults.object(forKey: "watchTeams") as? Bool ?? true
         watchZoom = defaults.object(forKey: "watchZoom") as? Bool ?? true
@@ -732,6 +783,9 @@ final class AppSettings {
         customVocabularyPath = defaults.string(forKey: "customVocabularyPath") ?? ""
         customVocabularyBookmark = defaults.data(forKey: "customVocabularyBookmark")
         whisperKitVocabularyPromptEnabled = defaults.object(forKey: "whisperKitVocabularyPromptEnabled") as? Bool ?? false
+        vocabularySource = defaults.string(forKey: "vocabularySource")
+            .flatMap(VocabularySource.init(rawValue:)) ?? .file
+        remoteVocabularyURL = defaults.string(forKey: "remoteVocabularyURL") ?? ""
         let savedTerminologyRules = defaults.string(forKey: "terminologyRulesText") ?? ""
         terminologyRulesText = savedTerminologyRules
         terminologyRulesValidation = TerminologyNormalizer(rulesText: savedTerminologyRules).diagnostics

@@ -56,9 +56,55 @@ Write the tests first for each contract below (clear contracts, spec R2/R3/R5), 
 - [ ] `AppPaths.remoteVocabularyCacheDirectory` exists as a constant under `dataDir`.
 - [ ] Focused tests, lint and `swift build -c release` pass.
 ## Done summary
-TBD
+Built the self-contained remote-vocabulary pieces, with no wiring into settings, engines or UI yet. They are: a shared validation for downloaded bytes (the local-file results are unchanged), the source enum and address validation, a URLSession fetcher (conditional GET, no URL cache, Bearer token, refused redirects, 256 KB cap, total deadline), the per-bundle and per-address on-disk cache with a text → sidecar → rename commit, and the status type with its Settings sentences. The early proof point holds: a 304 reaches the caller through a real URLSession, the Bearer header goes out, a cross-host redirect with a token is refused, the body is capped, and replacing a copy gives a new file revision.
 
+stage: impl-review - ran [2026-10-09T10:29Z..2026-10-09T10:40Z]
+
+Tier: session (jev-unavailable(no_key)); implementer opus at xhigh (project routing block) · actual: claude-opus-5-5 (host metadata)
+
+Verification (all measured, after the last code change):
+- baseline: green (focused filter, 69 tests, suite_rc=0; lint 0 violations), recorded before any edit.
+- `swift test --parallel --filter "RemoteVocabulary|CustomVocabularyValidation|CustomVocabularyTests|AppSettingsTests|TranscriptionSettingsVocabulary"`: suite_rc=0, 114 tests (RemoteVocabularyFetcherTests 14, RemoteVocabularyCacheTests 10, RemoteVocabularyTests 5, CustomVocabularyValidationTests 2, CustomVocabularyTests 14, AppSettingsTests 60, TranscriptionSettingsVocabularyTests 9).
+- `./scripts/lint.sh` with the pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1: 0 violations in 718 files.
+- `swift build -c release`: clean, no warnings in our targets.
+- Fetcher tests repeated 10 times on one build: 10/10 green (140 passes), to rule out a flaky redirect stub.
+- Mutation check: disabling the byte cap, the cross-host check, or the sidecar hash check, or renaming before the sidecar write, each turned the intended tests red. Originals restored byte-identical (`cmp`).
+- Not run: `swiftlint analyze` (CI-only, it needs an xcodebuild log). Every new declaration is referenced from app code or tests.
+
+Review: Codex `gpt-5.6-sol` at `xhigh`, 3 draws (correctness, contracts, integration), all SHIP; finalized VERDICT=SHIP; receipt `/tmp/impl-review-receipt-3dc1fc7d306f-gh-10-vocabulary-from-a-central-url.1.json` (model and effort confirmed). Both kept findings were fixed after the verdict in 50cc1e8e, test first:
+- integration P2: `discardAll(except:)` deleted another bundle's files when that bundle's identifier extends this one with a dash, a key-shaped part and a dot (`com.a-0123456789abcdef.beta`). The task says other bundles' files are never touched. The test went red first; the fix now matches the whole file name.
+- contracts P3: the `store` doc claimed a failed rename leaves the pair untouched; corrected.
+
+Decisions:
+1. (rule 6) `updateMetadata(_:describing:)` takes the text the server's answer was checked against and hashes that text. It never re-reads the file from disk, so a file that changed underneath fails `load`'s hash check instead of getting validators. The task named the method `updateMetadata(_:)`.
+2. (rule 1) The sidecar JSON is flat, `{url, sha256, etag, lastModified, updatedAt, checkedAt}`, with ISO-8601 dates, as spec § Architecture "Cache" lists. `RemoteVocabularyMetadata` is the Codable type; a private wrapper adds `sha256` without nesting.
+3. (rule 6) An address beginning with `https://` that `URL(string:)` cannot parse (for example a space in the host) is `.missingHost`; anything not beginning with `https://` is `.notHTTPS`, which matches its sentence "must start with https://".
+4. (rule 6) The DEBUG fault seam is the entry point `storeForTesting(_:metadata:failingAt:)`, not a closure installed like `ParakeetEngine.installVocabularyPreparationForTesting`. A private stored closure needs an explicit init, and the pinned SwiftFormat rejects that init as `redundantMemberwiseInit`, because it cannot see the `#if DEBUG` property.
+5. (rule 6) `discardAll(except:)` also removes this bundle's leftover temporary files from an interrupted commit. Their names carry the bundle prefix, so no extra code was needed.
+6. (rule 6) The deadline race uses a non-throwing `withTaskGroup`, not `withThrowingTaskGroup`. When the caller cancels, both children return `.cancelled`.
+7. (rule 6) The redirect test stub signals the redirect and then also delivers the 3xx as the response. Without that, a refused redirect hung until the deadline, the URLProtocol unreliability the task warned of. With it, the refused cross-host case is tested through the stub as well as the pure policy.
+8. (rule 6) The declared-length test sends a 1 KB first chunk. URLSession holds the response back until it has bytes, and 1 KB is far below the limit, so only the declared length can end the fetch early.
+9. (rule 6) I ran the verification filter wider than the task's, adding `CustomVocabularyTests`, because that class, not the two the task named, holds the local-file validation cases that pin the refactor.
+10. (rule 6) The two kept findings were fixed after a SHIP verdict without a second review round: the round's verdict was already SHIP, and both findings came from SHIP draws. The fix went red before green; the focused tests, lint and release build all pass on it.
+11. (rule 1) Commits carry the `Task: gh-…` trailer, following the worker template and earlier fork task commits.
+12. (rule 1) The review ran with `CODEX_SANDBOX=workspace-write` as the dispatch instructed. No network or full access was granted. Afterwards the tree held only flowctl's own `.flow/` review bookkeeping, committed with the fix.
+13. (rule 6) Process deviation: for most contracts I wrote the implementation before its new tests, not test first as the task's approach asks. The mutation check above stands in as evidence that the tests can fail. The review fix did follow red → green.
+
+ASSUME: the Settings sentences the spec does not quote are built as written: address problems "<problem> – no vocabulary in use", inactive, "Checking the address…", current "<n> terms · updated <date> · checked <date>", failed without a copy "<failure> · no vocabulary in use", 404 "Not found (HTTP 404) – check the address", other statuses "The server answered with HTTP <code>", "The file is larger than 256 KB", "The download could not be saved", unexpected 304, cancelled; invalid content reuses the local file's sentence without its period · alternatives: B — no "– no vocabulary in use" tail on address problems; C — the local file's sentences verbatim with the period · flip at: app/MeetingTranscriber/Sources/RemoteVocabulary.swift:RemoteVocabularyStatus.message(formatDate:) and RemoteVocabularyFailure.message · test: RemoteVocabularyTests.testStatusMessages, RemoteVocabularyTests.testFailureMessages
+ASSUME: two refusal cases: `.redirectToOtherServer` (the spec's "…the token is not sent there", only when a token is set) and `.insecureRedirect` ("The address redirects to an address without https"), so a refusal without a token never claims a token was withheld · alternatives: B — one "redirect refused" case with the spec's sentence for both · flip at: app/MeetingTranscriber/Sources/RemoteVocabularyFetcher.swift:RemoteVocabularyFetcher.redirectRefusal(from:to:tokenPresent:) · test: RemoteVocabularyFetcherTests.testRedirectPolicy, RemoteVocabularyFetcherTests.testCrossHostRedirectWithATokenIsRefused
+ASSUME: `updateMetadata` binds the sidecar to the passed text's hash · alternatives: B — `updateMetadata(_:)` hashing the file on disk; C — metadata carrying the hash, set by the caller · flip at: app/MeetingTranscriber/Sources/RemoteVocabularyCache.swift:RemoteVocabularyCache.updateMetadata(_:describing:) · test: RemoteVocabularyCacheTests.testUpdatingMetadataLeavesTheTextFileUntouched, RemoteVocabularyCacheTests.testUntrustedSidecarIsDeletedAndTheTextKeptWithoutValidators
+
+Notes for task .2:
+- `RemoteVocabularyStatus.current` takes a non-optional `checkedAt`. A copy loaded with an untrusted sidecar has `checkedAt == nil`, so before its first check it shows as `.checking` or `.failed(_, lastGood:)`, never as `.current`.
+- `RemoteVocabularyCache(directory:bundleID:)` has no default bundle identifier. Production passes `Bundle.main.bundleIdentifier ?? "MeetingTranscriber"`, as `AppPaths.livenessMarker` does.
+
+Follow-ups (not part of this task):
+- Instruction conflict: `.claude/rules/wapp-fork.md` says commit messages carry no `gh-N` ids, and `submit.sh` refuses such messages. The worker template and earlier fork task commits use `Task: gh-…` trailers, so this branch's commits would need rewording before any submission to the original.
+- Instruction conflict: the impl-review skill says never to set `CODEX_SANDBOX`; this dispatch required `workspace-write`.
+- No user route changed, so the feature map needs no update.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 3d8a67b70ef64f3653409e546c5674cbadb9a024, 50cc1e8e5f545b64b34322eb31e2e62605b4f3a6
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh10-home swift test --parallel --filter "RemoteVocabulary|CustomVocabularyValidation|CustomVocabularyTests|AppSettingsTests|TranscriptionSettingsVocabulary" (suite_rc=0, 114 tests), ./scripts/lint.sh (pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1: 0 violations), cd app/MeetingTranscriber && swift build -c release (clean)
 - PRs:
