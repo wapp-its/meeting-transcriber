@@ -108,41 +108,41 @@
             .cliFailed(Int(exitCode), stderrText)
         }
 
-        /// Decodes `stderrData`, logs the raw exit/stderr/text, and builds the
-        /// error `generate()` throws on a nonzero exit — pulled out of
-        /// `generate()` itself to keep that function's body short.
+        /// Decodes `stderrData`, logs the exit and the sizes of what the CLI
+        /// wrote, and builds the error `generate()` throws on a nonzero exit —
+        /// pulled out of `generate()` itself to keep that function's body short.
+        ///
+        /// Nothing the subprocess wrote reaches the log: the prompt carries
+        /// the meeting's background info, and a CLI that echoes its input on
+        /// failure would put it into the exported diagnostics (the accumulated
+        /// text is a complete generated protocol on any run that got far
+        /// enough, never safe to log either). The failure message still
+        /// reaches the person through the error's description.
         static func handleFailure(
             exitCode: Int32, stderrData: Data, text: String, resultEvent: ResultEventInfo?,
         ) -> ProtocolError {
             let stderrText = String(data: stderrData, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            // The accumulated text is a complete generated protocol on any run
-            // that got far enough to produce one (the CLI runs without
-            // --include-partial-messages, so only whole assistant messages are
-            // ever emitted) — never safe to log at .public. Kept .private,
-            // unchanged from the redaction in PR #692's 4th commit.
-            logger.error(
-                "claude_cli_failed exit=\(exitCode, privacy: .public) stderr=\(stderrText, privacy: .public) text=\(text, privacy: .private)",
-            )
-            // The terminal result event's own error fields are CLI-authored
-            // diagnostic metadata, never generated content by construction —
-            // restores the .public visibility PR #692 traded away, for
-            // cliFailed AND (via PipelineQueue+Stages.swift's shared catch-all
-            // log site) for cliNotFound/timeout/emptyProtocol/OpenAI-provider
-            // failures too, none of which ever carried content in the first
-            // place.
             let publicMessage = publicFailureMessage(resultEvent: resultEvent, stderrText: stderrText)
+            let reasonSource = failureReasonSource(resultEvent: resultEvent, stderrText: stderrText)
             logger.error(
-                "claude_cli_failed_reason exit=\(exitCode, privacy: .public) reason=\(publicMessage, privacy: .public)",
+                "claude_cli_failed exit=\(exitCode, privacy: .public) stderr_bytes=\(stderrData.count, privacy: .public) text_bytes=\(text.utf8.count, privacy: .public) reason_source=\(reasonSource, privacy: .public)",
             )
             return makeFailureError(exitCode: exitCode, stderrText: publicMessage)
         }
 
-        /// The message surfaced to the user and logged at `.public`. Prefers
-        /// the result event's own error text (see `resultEventFailureReason`
-        /// — never generated content); then real stderr output (also always
-        /// safe — stderr can be empty for a given failure, but never unsafe);
-        /// then a fixed placeholder. Deliberately does NOT fall back to the
+        /// Where `publicFailureMessage` took its text from, for the log line
+        /// that may not carry the text itself.
+        static func failureReasonSource(resultEvent: ResultEventInfo?, stderrText: String) -> String {
+            if resultEventFailureReason(resultEvent) != nil { return "result_event" }
+            if !stderrText.isEmpty { return "stderr" }
+            return "none"
+        }
+
+        /// The message surfaced to the user (never logged, see
+        /// `handleFailure`). Prefers the result event's own error text (see
+        /// `resultEventFailureReason` — never generated content); then real
+        /// stderr output; then a fixed placeholder. Deliberately does NOT fall back to the
         /// accumulated `text` — that would reopen the leak PR #692's 4th
         /// commit closed, for the sake of a case not yet observed in
         /// practice (a nonzero exit whose terminal result event carries no

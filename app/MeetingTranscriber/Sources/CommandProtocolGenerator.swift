@@ -30,7 +30,6 @@
 
         static let codexUpdateHint = "This Codex CLI does not know an option the app needs (such as --ephemeral). Update Codex."
         private static let maxReasonLength = 300
-        private static let maxLoggedOutputBytes = 2048
 
         /// The Codex CLI preset. `--ephemeral` keeps the run out of Codex's
         /// session store, `--skip-git-repo-check` lets it run in the run
@@ -170,11 +169,11 @@
             }
             let elapsed = Self.seconds(since: started)
             guard output.status == 0 else {
+                // Sizes only: the program received the prompt with the
+                // meeting's background info, and one that echoes its input on
+                // failure would otherwise put it into the exported diagnostics.
                 logger.error(
-                    "command_failed tool=\(tool, privacy: .public) exit=\(output.status, privacy: .public) elapsed=\(elapsed, privacy: .public)s",
-                )
-                logger.error(
-                    "command_failed_output stdout=\(Self.logExcerpt(output.stdout), privacy: .private) stderr=\(Self.logExcerpt(output.stderr), privacy: .private)",
+                    "command_failed tool=\(tool, privacy: .public) exit=\(output.status, privacy: .public) elapsed=\(elapsed, privacy: .public)s stdout_bytes=\(output.stdout.count, privacy: .public) stderr_bytes=\(output.stderr.count, privacy: .public)",
                 )
                 throw ProtocolError.commandFailed(tool: tool, exitCode: output.status, reason: failureReason?(output))
             }
@@ -277,10 +276,6 @@
         }
 
         // MARK: - Logging
-
-        private static func logExcerpt(_ data: Data) -> String {
-            lossyText(data.prefix(maxLoggedOutputBytes))
-        }
 
         /// `data` as UTF-8 with invalid sequences replaced, so one bad byte
         /// does not lose the whole text (hence not the failable initializer).

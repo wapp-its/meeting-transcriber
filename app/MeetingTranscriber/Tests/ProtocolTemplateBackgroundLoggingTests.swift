@@ -26,6 +26,39 @@ final class ProtocolTemplateBackgroundLoggingTests: XCTestCase {
         XCTAssertEqual(offenders, [], "Log statements that read the background info:\n" + offenders.joined(separator: "\n"))
     }
 
+    /// What a provider wrote back can echo the prompt it received, so no log
+    /// statement may carry a subprocess's or an endpoint's output either:
+    /// not its stderr, not its stdout, not an HTTP error body, not the
+    /// failure message derived from them.
+    func testNoLogStatementReadsProviderOutput() throws {
+        let sources = URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources")
+        let files = try FileManager.default.subpathsOfDirectory(atPath: sources.path).filter { $0.hasSuffix(".swift") }
+
+        var offenders: [String] = []
+        for file in files {
+            let source = try String(contentsOf: sources.appendingPathComponent(file), encoding: .utf8)
+            for statement in Self.logStatements(in: source) where Self.readsProviderOutput(statement) {
+                offenders.append("\(file): \(statement.prefix(160))")
+            }
+        }
+
+        XCTAssertEqual(offenders, [], "Log statements that read a provider's output:\n" + offenders.joined(separator: "\n"))
+    }
+
+    func testTheScanCatchesLoggedProviderOutput() {
+        let source = """
+        logger.error("claude_cli_failed exit=\\(exitCode, privacy: .public) stderr=\\(stderrText, privacy: .public)")
+        logger.error("command_failed_output stdout=\\(Self.logExcerpt(output.stdout), privacy: .private)")
+        logger.error("openai_http_error body=\\(errorBody, privacy: .public)")
+        logger.error("claude_cli_failed exit=\\(exitCode, privacy: .public) stderr_bytes=\\(stderrData.count, privacy: .public)")
+        logger.error("command_failed stdout_bytes=\\(output.stdout.count, privacy: .public) body_length=\\(errorBody.count, privacy: .public)")
+        """
+
+        XCTAssertEqual(Self.logStatements(in: source).filter(Self.readsProviderOutput).count, 3)
+    }
+
     /// A provider's failure text can echo the prompt it rejected, so the
     /// summary the pipeline logs names the case and its code only.
     func testProviderFailuresLogWithoutTheirText() {
@@ -74,6 +107,15 @@ final class ProtocolTemplateBackgroundLoggingTests: XCTestCase {
             searchStart = match.upperBound
         }
         return statements
+    }
+
+    /// The names the generators give a subprocess's or an endpoint's output
+    /// and the messages derived from it.
+    /// A byte count of that output is allowed: it says how much came back,
+    /// not what.
+    private static func readsProviderOutput(_ statement: Substring) -> Bool {
+        let names = #"\b(stderrText|stdoutText|errorBody|publicMessage|logExcerpt|output\.stdout|output\.stderr)\b(?!\.count\b)(?!\.utf8\.count\b)"#
+        return statement.range(of: names, options: .regularExpression) != nil
     }
 
     /// The job's field, or the `background` field of its instructions.
