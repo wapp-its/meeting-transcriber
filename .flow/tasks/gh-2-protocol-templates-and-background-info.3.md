@@ -50,9 +50,53 @@ Turns the app picker into the one "Start with options…" dialog and carries its
 - [ ] `cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/<scratch> swift test --parallel --filter "AppPicker|MenuBar|ManualRecording|WatchingController|MeetingProtocolOptions|ProtocolDestination|ProtocolOptions|RPCManualRecording" > /private/tmp/<scratch>/t3.log 2>&1` passes (read the log file).
 - [ ] `./scripts/lint.sh` passes with the pinned tools, and `swift build -c release -Xswiftc -DAPPSTORE` compiles.
 ## Done summary
-TBD
+The app picker is now the one start dialog behind the renamed menu item "Start Recording with Options…" (shortcut R): a "Microphone only" row above the running apps, the optional title (disabled for the microphone), a caption saying whether app recordings also take the microphone, and the shared protocol options form (template picker with the default preselected, background info editor with its hint, the destination notice, and the record-only note). Start hands the chosen source and options to WatchingController, which carries them through the watch loop into the job. "Record Microphone Only", /v1/record and detected meetings pass no options and keep the default template stamped at enqueue.
 
+stage: impl-review - ran [..2026-10-13] (codex gpt-5.6-sol at xhigh, one round, SHIP, 0 findings; receipt /tmp/impl-review-receipt-gh2-gh-2-protocol-templates-and-background-info.3-r1.json, effort xhigh)
+Tier: implementer - opus (explicit invocation) (model: claude-opus-5-5)
+
+Baseline: green before any edit (276 tests, the task's acceptance filter, rc=0).
+
+Commit: eefd34dc feat(app): start dialog with protocol template and background info.
+- New: Sources/MeetingProtocolOptions.swift (MeetingProtocolOptions, ProtocolOptionsDraft, ProtocolDestination, ProtocolOptionsContext), Sources/ProtocolOptionsForm.swift, Sources/WatchLoop+ProtocolOptions.swift (the job is built there, which keeps WatchLoop.swift at 592 lines), Sources/WatchingController+ProtocolOptions.swift (startRecording(_:protocolOptions:), the dialog's route).
+- Changed: AppPickerView (StartRecordingSource, StartRecordingDraft, new inputs noMic / optionsContext / draft, onStartRecording(ManualRecordingRequest, MeetingProtocolOptions)), AppPickerStartState.resolve(source:noMic:startWouldBeRefused:) with the new microphoneBlockedByNoMic case, MenuBarView (item renamed, recordAppLabel(noMic:) removed), MeetingTranscriberApp (window "Start Recording", same id record-app), AppState.protocolOptionsContext(), ManualRecordingInfo.protocolOptions, the WatchingController / WatchLoop parameters, three A11yID constants.
+
+Acceptance evidence:
+- R6 values: ProtocolDestinationTests (localhost, 127.0.0.1, ::1, a remote host, a 127.-prefixed host name, two unparseable endpoints, None, Claude CLI / Codex CLI / custom command, the three exact notice sentences). MeetingProtocolOptionsTests (trim, blank and whitespace-only to nil, draft options and reset, context: built-in first, folder order, settings read, missing default -> built-in, case-only rename -> listed spelling).
+- R5 start state: AppPickerStartStateTests (refused start, no selection, Microphone only with noMic and its explanation, ready for an app and for the microphone, an app stays ready with noMic, precedence).
+- Views: ProtocolOptionsFormTests (picker writes draft.template, editor writes draft.background, notice from the context, record-only note only in record-only mode). AppPickerViewTests (preset app selection: Start hands over .app(pid: 200, appName: "Safari", title: "Standup") with the draft's trimmed options; Microphone only hands over .microphone; untitled app named after the app; refused-start explanation; Microphone only with noMic disabled with its explanation; noMic caption; the form's notice inside the dialog). MenuBarViewTests: the renamed item exists, hides while recording, calls its closure; "Record Microphone Only" tests unchanged and green.
+- R4/R5 plumbing: ManualRecordingTests.testARecordingStartedWithOptionsEnqueuesAJobCarryingThem (app and microphone, template and background on the job) and testARecordingStartedWithoutOptionsGetsTheDefaultTemplateAndNoBackground (stamped default, nil background). WatchingControllerManualRecordingTests.testTheDialogsStartHandsItsOptionsToTheRecording (both sources), testAStartWithoutOptionsCarriesNone (the /v1/record call shape).
+- R5 error: WatchingControllerManualRecordingTests.testTheDialogsMicrophoneStartIsRefusedWhileNoMicrophoneIsSet (no loop, exactly the "Microphone Recording Refused" notification).
+- Mutation checks, each reverted afterwards, each turned its test red: the dialog's microphone route bypassing startMicrophoneRecording; the job dropping the background; Start handing over fixed options instead of the draft's.
+
+Gates on eefd34dc:
+- Acceptance filter "AppPicker|MenuBar|ManualRecording|WatchingController|MeetingProtocolOptions|ProtocolDestination|ProtocolOptions|RPCManualRecording": 297 tests, rc=0.
+- ./scripts/lint.sh with the pinned SwiftFormat 0.63.0 and SwiftLint 0.65.1: rc=0, 0 violations.
+- swift build -c release -Xswiftc -DAPPSTORE: rc=0.
+- Not run: CI's swiftlint analyze (unused_declaration), which needs a clean xcodebuild build; every new declaration is referenced by reading, and recordAppLabel(noMic:) is gone with its two tests. Not run: swift build -c release for the Homebrew variant.
+
+DECIDED:
+- The dialog reads its ProtocolOptionsContext when the window opens (optionsContext is a closure, cached in @State on appear), not as a value computed in the scene: a Window's content is built when the scene body is evaluated, so a value would miss templates created since (in Finder or Settings). Before onAppear (and in ViewInspector tests) the view reads the closure directly.
+- The dialog's Start goes through a new WatchingController.startRecording(_:protocolOptions:), which calls startManualRecording / startMicrophoneRecording, never beginManualRecording; that makes the "No Microphone" refusal testable on the dialog's real route.
+- The menu closure keeps its name onRecordApp (it opens the window whose id stays record-app); only the label changed. The label uses the "…" character as the spec writes it, although older items use "...".
+- In record-only mode the destination notice stays visible, dimmed with the form, and the record-only note is added undimmed below it, as the spec lists both.
+- ProtocolDestination checks loopback as localhost, ::1 or a dotted-quad 127.x.x.x (case-insensitive), from URL.host(percentEncoded: false); an endpoint with no parseable host is remote ("the configured endpoint") even though the OpenAI generator would then fall back to its localhost default, as R6 says.
+- StartRecordingDraft lives in AppPickerView.swift; StartRecordingSource is a top-level enum there, used by AppPickerStartState.
+- The window is 440 x 620 with the list at a minimum height of 160.
+- No new log lines; the background text reaches no log, notification, /state or /v1 response. The record-app window stays off the RPC allowlists (existing tests pin /ui/tree and /ui/press).
+
+ASSUMED: none beyond the spec's copy.
+
+BLOCKED: none.
+
+Owner checks (not checked live here):
+- Return inside the background editor next to Start's .keyboardShortcut(.defaultAction): not checked live. If Return starts the recording instead of adding a line, Start needs another key binding.
+- Look of the start dialog, the "Microphone only" row selection in the real List, and the record-only dimming.
+
+Follow-ups (not fixed): none new. No .flow/features map exists; the user route that changed is the menu item "Record App + Microphone..." / "Record App Audio..." -> "Start Recording with Options…", and its window title "Record App" -> "Start Recording".
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: eefd34dcf205365d4b275f6e6d9038f62fc5599f
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh2-home swift test --parallel --filter "AppPicker|MenuBar|ManualRecording|WatchingController|MeetingProtocolOptions|ProtocolDestination|ProtocolOptions|RPCManualRecording" (297 tests, rc=0), ./scripts/lint.sh with pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1 (rc=0, 0 violations), cd app/MeetingTranscriber && swift build -c release -Xswiftc -DAPPSTORE (rc=0)
 - PRs:
