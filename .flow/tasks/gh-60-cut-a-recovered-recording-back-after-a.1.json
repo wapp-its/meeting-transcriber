@@ -9,7 +9,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-60-cut-a-recovered-recording-back-after-a",
   "spec_path": ".flow/tasks/gh-60-cut-a-recovered-recording-back-after-a.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Stored meeting-end cut: record, durable write and removal, process hold",
   "updated_at": "2026-10-06T23:14:48.484643Z"
 }

@@ -14,12 +14,16 @@ import XCTest
 /// recovery and the orphan scan walk.
 @MainActor
 final class DualSourceRecorderLifecycleTests: XCTestCase {
+    // The double and the helpers down to `startMicOnly` are shared with
+    // DualSourceRecorderLifecycleTests+PendingCut.swift, which a private one would not reach.
+    // swiftlint:disable test_case_accessibility
+
     // MARK: - Doubles
 
     /// A capture session that touches nothing: it throws what the test staged,
     /// records what the recorder asked for, and reports back the file the test
     /// wrote.
-    private final class FakeCaptureSession: AudioCapturing {
+    final class FakeCaptureSession: AudioCapturing {
         var startError: (any Error)?
         /// The tracks `stop()` reports, set by a test after `start()` has
         /// picked the URLs and the test has written fixture audio there.
@@ -58,31 +62,40 @@ final class DualSourceRecorderLifecycleTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func makeRecorder(dir: URL) -> (DualSourceRecorder, FakeCaptureSession) {
+    func makeRecorder(
+        dir: URL,
+        pendingCutSync: @escaping PendingRecordingCut.Sync = { try PendingRecordingCut.fullSync($0) },
+    ) -> (DualSourceRecorder, FakeCaptureSession) {
         let session = FakeCaptureSession()
-        let recorder = DualSourceRecorder(recordingsDir: dir) { configuration in
-            session.lastConfiguration = configuration
-            return session
-        }
+        let recorder = DualSourceRecorder(
+            recordingsDir: dir,
+            makeCaptureSession: { configuration in
+                session.lastConfiguration = configuration
+                return session
+            },
+            pendingCutSync: pendingCutSync,
+        )
         return (recorder, session)
     }
 
     /// Stems of the markers in `dir`, read through the same suffix rule the
     /// janitor and crash recovery use rather than a second copy of it.
-    private func markerStems(in dir: URL) throws -> [String] {
+    func markerStems(in dir: URL) throws -> [String] {
         try FileManager.default.contentsOfDirectory(atPath: dir.path)
             .compactMap { RecordingFileSuffix.stripInProgress(from: $0) }
     }
 
     /// Start a microphone-only recording and hand back the mic track's URL, so
     /// the test can stage what the session will report at `stop()`.
-    private func startMicOnly(
+    func startMicOnly(
         recorder: DualSourceRecorder,
         session: FakeCaptureSession,
     ) throws -> URL {
         try recorder.start(source: .micOnly)
         return try XCTUnwrap(session.lastConfiguration?.micOutputURL)
     }
+
+    // swiftlint:enable test_case_accessibility
 
     // MARK: - start
 

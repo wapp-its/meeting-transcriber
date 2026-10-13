@@ -64,6 +64,29 @@ final class RecordingCutTests: XCTestCase { // swiftlint:disable:this balanced_x
 
     // MARK: - The cut
 
+    /// The cut copies take the originals' places on their paths, so each
+    /// keeps its original's creation date: the orphan scan ages a recording by
+    /// that date, and a cut must not make a two-day-old recording look new.
+    func testACutKeepsEachTracksCreationDate() throws {
+        let mix = try makeTrack("r_mix.wav", seconds: 10)
+        let mic = try makeTrack("r_mic.wav", seconds: 10)
+        let twoDaysAgo = Date(timeIntervalSinceNow: -2 * 86400)
+        for url in [mix, mic] {
+            try FileManager.default.setAttributes([.creationDate: twoDaysAgo], ofItemAtPath: url.path)
+        }
+
+        try RecordingCut.apply(to: recording(mix: mix, app: nil, mic: mic), keepingFirst: 4)
+
+        XCTAssertEqual(try AVAudioFile(forReading: mix).length, 64000, "the cut itself happened")
+        for url in [mix, mic] {
+            let created = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: url.path)[.creationDate] as? Date)
+            XCTAssertEqual(
+                created.timeIntervalSince1970, twoDaysAgo.timeIntervalSince1970, accuracy: 1,
+                "\(url.lastPathComponent) was made young again by the cut",
+            )
+        }
+    }
+
     /// Kept at 4 s with the microphone starting 0.5 s late: mix and app keep
     /// 4 s, the microphone 3.5 s, and every kept frame is the original's.
     func testEveryTrackEndsAtTheSamePointAndKeepsItsOwnAudio() throws {

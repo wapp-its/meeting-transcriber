@@ -12,7 +12,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-60-cut-a-recovered-recording-back-after-a",
   "spec_path": ".flow/tasks/gh-60-cut-a-recovered-recording-back-after-a.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Let the recorder store, hold and clear the pending cut beside its marker",
   "updated_at": "2026-10-06T23:14:49.401268Z"
 }
