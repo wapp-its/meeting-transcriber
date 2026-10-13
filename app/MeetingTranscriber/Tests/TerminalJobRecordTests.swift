@@ -73,6 +73,21 @@ final class TerminalJobRecordTests: XCTestCase {
         }
     }
 
+    func testARecordWrittenBeforeMeetingStartedAtDecodesWithoutIt() throws {
+        // A record as this build's predecessor wrote it: every key but the new one.
+        let json = """
+        [{"jobID":"1B4E28BA-2FA1-11D2-883F-0016D3CCA427","state":"done","meetingTitle":"Standup",\
+        "transcriptPath":"/out/standup.txt","protocolPath":"/out/standup.md","warnings":[],\
+        "meetingStartTime":780000000}]
+        """
+        try Data(json.utf8).write(to: storePath)
+
+        let record = try XCTUnwrap(TerminalJobStore(path: storePath).records.first)
+
+        XCTAssertNil(record.status.meetingStartedAt)
+        XCTAssertEqual(record.meetingStartTime, Date(timeIntervalSinceReferenceDate: 780_000_000))
+    }
+
     // MARK: - Round trip
 
     func testARecordWithEveryFieldSurvivesARestart() {

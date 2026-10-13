@@ -40,6 +40,7 @@ final class MenuBarViewTests: XCTestCase {
         noMic: Bool = false,
         manualRecordingPendingOrActive: Bool = false,
         onShowAllTranscriptions: @escaping () -> Void = {},
+        onRegenerateProtocol: @escaping () -> Void = {},
     ) -> MenuBarView {
         MenuBarView(
             status: status,
@@ -59,6 +60,7 @@ final class MenuBarViewTests: XCTestCase {
             onNameSpeakers: onNameSpeakers,
             onProcessFiles: {},
             onShowAllTranscriptions: onShowAllTranscriptions,
+            onRegenerateProtocol: onRegenerateProtocol,
             onDismissJob: { _ in },
             onQuit: {},
         )
@@ -407,6 +409,18 @@ final class MenuBarViewTests: XCTestCase {
             .inspect()
             .find(viewWithAccessibilityIdentifier: A11yID.allTranscriptionsMenuItem)
         XCTAssertNoThrow(try item.find(text: "All Transcriptions..."))
+        try item.button().tap()
+        XCTAssertTrue(called)
+    }
+
+    func testRegenerateProtocolCallsItsClosure() throws {
+        var called = false
+        // swiftlint:disable:next trailing_closure
+        let item = try makeView(status: makeStatus(state: .idle), onRegenerateProtocol: { called = true })
+            .inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.regenerateProtocolMenuItem)
+
+        XCTAssertNoThrow(try item.find(text: "Regenerate Protocol…"))
         try item.button().tap()
         XCTAssertTrue(called)
     }

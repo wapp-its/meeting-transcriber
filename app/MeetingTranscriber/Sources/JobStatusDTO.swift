@@ -16,10 +16,16 @@ struct JobStatusDTO: Codable, Equatable {
     /// Absent when the job was not dual-source, or when no honest verdict was
     /// possible (a silent track, or less than one analysis window).
     let echo: EchoDetectionDTO?
+    /// When the recording started, ISO 8601 in UTC. Absent for a job with no
+    /// live recording (an import, a recovered recording), and in records
+    /// written before this field. `TerminalJobRecord.meetingStartTime` holds
+    /// the same moment for the history; both come from the job's start.
+    let meetingStartedAt: String?
 
-    /// Spelled out rather than left to the memberwise init so `echo` can default
-    /// to nil: it is an addition to an existing wire shape, and every caller
-    /// that predates it means exactly "no verdict".
+    /// Spelled out rather than left to the memberwise init so `echo` and
+    /// `meetingStartedAt` can default to nil: each is an addition to an
+    /// existing wire shape, and every caller that predates it means exactly
+    /// "no verdict" / "no recording start".
     init(
         jobID: String,
         state: JobState,
@@ -29,6 +35,7 @@ struct JobStatusDTO: Codable, Equatable {
         error: String?,
         warnings: [String],
         echo: EchoDetectionDTO? = nil,
+        meetingStartedAt: String? = nil,
     ) {
         self.jobID = jobID
         self.state = state
@@ -38,6 +45,7 @@ struct JobStatusDTO: Codable, Equatable {
         self.error = error
         self.warnings = warnings
         self.echo = echo
+        self.meetingStartedAt = meetingStartedAt
     }
 }
 
@@ -136,6 +144,7 @@ extension JobStatusDTO {
             error: job.error,
             warnings: job.warnings,
             echo: job.echo,
+            meetingStartedAt: job.meetingStartTime.map { ISO8601DateFormatter().string(from: $0) },
         )
     }
 }

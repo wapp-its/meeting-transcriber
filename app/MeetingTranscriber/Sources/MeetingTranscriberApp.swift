@@ -136,6 +136,7 @@ struct MeetingTranscriberApp: App {
         settingsWindow
         recordAppWindow
         transcriptionsWindow
+        regenerateProtocolWindow
     }
 
     // MARK: - Menu Bar
@@ -166,6 +167,7 @@ struct MeetingTranscriberApp: App {
             } : nil,
             onProcessFiles: processAudioFiles,
             onShowAllTranscriptions: { bringWindowToFront(id: TranscriptionsView.windowID) },
+            onRegenerateProtocol: { bringWindowToFront(id: RegenerateProtocolView.windowID) },
             onRemoveFailedJob: { id in appState.pipeline.removeFailedJob(id: id) },
             onDismissJob: { id in appState.pipelineQueue.removeJob(id: id) },
             consentQuestion: appState.pendingConsentQuestion,
@@ -340,6 +342,24 @@ struct MeetingTranscriberApp: App {
             .onAppear { appState.pipeline.prepareTranscriptionsWindow() }
         }
         .defaultSize(width: 760, height: 520)
+    }
+
+    private var regenerateProtocolWindow: some Scene {
+        Window("Regenerate Protocol", id: RegenerateProtocolView.windowID) {
+            RegenerateProtocolView(
+                phase: appState.protocolRegenerator.phase,
+                optionsContext: { appState.protocolOptionsContext() },
+                latestTarget: { appState.protocolRegenerator.latestTarget() },
+                chooseFile: { RegenerateProtocolView.chooseFile(startingIn: appState.settings.effectiveOutputDir) },
+                resolveFile: { try appState.protocolRegenerator.target(for: $0) },
+                onGenerate: { target, options in
+                    Task { await appState.protocolRegenerator.regenerate(target, options: options) }
+                },
+                onClose: { closeWindow(id: RegenerateProtocolView.windowID) },
+            )
+            .onAppear { appState.protocolRegenerator.clearResult() }
+        }
+        .windowResizability(.contentSize)
     }
 
     // MARK: - Speaker Naming Window

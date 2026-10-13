@@ -31,6 +31,8 @@ struct MenuBarView: View {
     let onProcessFiles: () -> Void
     /// Opens the Transcriptions window.
     var onShowAllTranscriptions: () -> Void = {}
+    /// Opens the Regenerate Protocol window.
+    var onRegenerateProtocol: () -> Void = {}
     /// Remove on a failed job: off the menu and out of the history for good.
     var onRemoveFailedJob: (UUID) -> Void = { _ in }
     /// Dismiss on a job waiting for speaker names.
@@ -319,6 +321,13 @@ struct MenuBarView: View {
         } label: {
             Label("Open Protocols Folder", systemImage: "folder")
         }
+
+        Button {
+            onRegenerateProtocol()
+        } label: {
+            Label("Regenerate Protocol…", systemImage: "arrow.triangle.2.circlepath")
+        }
+        .accessibilityIdentifier(A11yID.regenerateProtocolMenuItem)
     }
 
     @ViewBuilder private var updateSection: some View {

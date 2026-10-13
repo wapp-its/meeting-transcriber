@@ -82,6 +82,10 @@ final class AppState {
     /// installation to it.
     let liveTranscription: LiveTranscriptionCoordinator
 
+    /// "Regenerate Protocol…": a new protocol for a finished meeting, one run
+    /// at a time and outside the pipeline queue.
+    let protocolRegenerator: ProtocolRegenerator
+
     #if !APPSTORE
         /// Debug RPC server lifecycle (launch gate, settings-driven start/stop,
         /// token rotation), extracted into its own controller. `AppState` supplies
@@ -130,6 +134,21 @@ final class AppState {
         RemoteVocabularyController(settings: settings)
     }
 
+    private static func makeProtocolRegenerator(
+        settings: AppSettings, notifier: any AppNotifying, pipeline: PipelineController,
+    ) -> ProtocolRegenerator {
+        ProtocolRegenerator(environment: ProtocolRegenerator.Environment(
+            generatorFactory: { [pipeline] in pipeline.makeProtocolGenerator() },
+            templateStore: .production,
+            includeFullTranscript: { [settings] in settings.includeFullTranscriptInProtocol },
+            recordOnly: { [settings] in settings.recordOnly },
+            queuedJobs: { [pipeline] in pipeline.queue.jobs },
+            records: { [pipeline] in pipeline.terminalJobStore.records },
+            outputDir: { [settings] in settings.effectiveOutputDir },
+            notifier: notifier,
+        ))
+    }
+
     // MARK: - Init
 
     init(
@@ -158,6 +177,7 @@ final class AppState {
         self.permissions = PermissionsController(notifier: notifier)
         self.updateChecker = updateChecker ?? Self.makeUpdateChecker()
         self.pipeline = PipelineController(settings: settings, notifier: notifier, queueEnvironment: pipelineEnvironment)
+        self.protocolRegenerator = Self.makeProtocolRegenerator(settings: settings, notifier: notifier, pipeline: pipeline)
         self.channelHealth = ChannelHealthController(
             notifier: notifier,
             debounceSeconds: { [settings] in settings.asymmetricSilenceWarningSeconds },
