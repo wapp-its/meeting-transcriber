@@ -58,9 +58,52 @@ Tests first for the two pure functions and the migration (clear contracts), then
 
 
 ## Done summary
-TBD
+Settings → General now lists an added app's "Never" entry as "<display name> (added app)" (its bundle ID when the app is not installed). Remove still deletes only that stored entry. The consent-visibility warning counts an added app out only when its own `custom:<bundleID>` key is denied. On the first `AppSettings` init, every added app whose display name or bundle ID was on the deny list gains its key. No entry is removed, and a defaults flag stops the step from ever running again.
 
+stage: impl-review - ran [..2026-10-13T15:45Z] (model: gpt-5.6-sol xhigh; three-draw fan-out in the lane worktree: correctness SHIP, contracts SHIP, integration SHIP, no findings)
+stage: plan-sync - skipped(config: planSync.enabled=false)
+
+Tier: implementer - opus (explicit invocation) (model: claude-opus-5-5)
+
+baseline: green (task verification filter, rc 0, 170 tests, pre-edit at 37d24869)
+
+### Commits (base 37d24869)
+- b4610d58 fix(app): count an added app out of the consent warning only by its key
+- 0d4786a5 feat(app): show an added app's deny entry under its name
+- 8aa7450c feat(app): carry name-based deny entries over to added-app keys once
+
+### Acceptance → tests
+- R4 Settings row. `ConsentDenyList.displayName(for:resolveAppName:)` turns a key into "<name> (added app)" and leaves every other entry unchanged. Tests are `ConsentDenyListTests.testAnAddedAppsKeyReadsAsItsNameMarkedAsAdded` (injected resolver gives "Zoom (added app)", and the production resolver falls back to the bundle ID) and `testABuiltInOrBrowserEntryReadsAsStored`. The view wiring is `GeneralSettingsConsentDenyListTests.testAnAddedAppsEntryIsListedByNameAndRemovedAlone`: with `["Zoom", "custom:com.example.not-installed"]` the section shows "Zoom" and "com.example.not-installed (added app)", and tapping `consentDeniedAppRemove(1)` leaves `["Zoom"]`. It was red on the old code ("Search did not find a match").
+- Row identifiers stay index-based and carry no name or key. `ForEach` and `A11yID.consentDeniedAppRemove(index)` are unchanged, the new test locates the row by index, and `testRemoveIdentifiersCarryNoAppNames` passes unchanged.
+- R5 migration. The pure carry-over is `ConsentDenyListTests.testMigrationAddsTheKeyOfEveryAddedAppItsEntriesNameAndRemovesNothing`, with six table rows: a name match, no match, a bundle-ID entry, two added apps named "Meet", a key already listed, and built-in and browser order kept. An extra assertion covers A3, where the same added Zoom is not installed, so its name cannot match. The init round trip is `ConsentDenyListMigrationTests` (2 tests). `["Finder", "Zoom"]` with `com.apple.finder` added loads and persists as `["Finder", "Zoom", "custom:com.apple.finder"]` and sets the flag. After the user sets `["Finder"]`, a second init keeps `["Finder"]`. A fresh suite yields `[]`, sets the flag and writes no list. Both tests were red on the old code. A mutation run with the flag guard removed made the runs-once assertion fail with `["Finder", "custom:com.apple.finder"]`, and the source was restored after.
+- R6 readiness. `AppSettingsRecordWithoutAskingTests.testAnAddedAppCountsAsAskingUntilDenied` is the one changed existing test, a changed requirement that commit b4610d58 states. Denying the display name (here the bundle ID) leaves the app asking, and denying `custom:com.example.not-installed` counts it out. Both assertions were red on the old code.
+- R8. No other existing test changed. All 170 baseline tests in the filter still pass.
+
+### Gates
+- `cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh52-tick/lane2-home swift test --parallel --filter "ConsentDenyList|AppSettings|GeneralSettings|BrowserConsentReadiness|MicInputDetector|SettingsInteraction"` gave rc 0 with 176 tests (170 baseline + 6 new), log at /private/tmp/gh52-tick/lane2-t2-tests.log.
+- `PATH="/private/tmp/gh52-tick/lint-bin:$PATH" ./scripts/lint.sh` with SwiftFormat 0.63.0 and SwiftLint 0.65.1 gave rc 0, 0/716 files to format and 0 violations in 716 files.
+- `swift build -c release` gave rc 0, "Build complete!", and no warning or error lines.
+- `swift build --build-tests` on the intermediate state of 0d4786a5 (display-name half only) gave rc 0.
+- `flowctl gate classify --base 37d24869` reported FULL (Swift code), so the focused gates above apply. They ran on bytes identical to HEAD (checked with `cmp` after the commit split).
+- Not run: `swiftlint analyze` (CI only). Every new declaration has a production caller. `displayName` is called from `GeneralSettingsView`, `migratingAddedAppNames` from the loader, and the loader from `AppSettings.init`. `AddedAppIdentity.bundleID(fromKey:)` now has its first production caller in `displayName`.
+- Not run: the installed app. The branch is not pushed, and the conductor owns integration and `mt-update`. The ViewInspector test drives the real `GeneralSettingsView`, and the migration tests drive the real `AppSettings.init` over a throwaway defaults suite.
+
+### Decisions
+1. Rule 1 (spec A4, task step 1). The row text is "<name> (added app)", resolved through `MicInputDetector.appDisplayName(bundleID:)`. Switch point is `ConsentDenyList.displayName(for:resolveAppName:)`. Tests are `ConsentDenyListTests.testAnAddedAppsKeyReadsAsItsNameMarkedAsAdded` and `GeneralSettingsConsentDenyListTests.testAnAddedAppsEntryIsListedByNameAndRemovedAlone`.
+2. Rule 1 (spec A2, A3, R5, task steps 1 to 3). The migration was built as specified. It is additive, appends keys after the existing entries, runs once behind `consentDeniedAppsAddedAppKeysMigrated`, sets the flag on a fresh install, and writes the list back only when it changed. No choice was left open.
+3. Rule 6. `migratingAddedAppNames` matches only against the legacy entries it was given. It appends through `ConsentDenyList.denying`, which already makes the append idempotent.
+4. Rule 6. The loader writes the list before the flag. A run stopped between the two writes then repeats an idempotent migration instead of skipping it.
+5. Rule 6. The flag key is private to `AppSettings+ConsentDenyMigration.swift`. `ConsentDenyListMigrationTests` spells it as a literal, so a rename fails a test. A rename would re-run the migration on every existing install.
+6. Rule 6. Following the test-mass rule, the pure migration cases are one table-driven test plus the A3 assertion. `displayName` gets two tests.
+7. Rule 6. The Settings row test searches for texts inside `A11yID.consentDenyListSection`, because the General tab also has a "Zoom" watch toggle that an unscoped `find(text:)` would match.
+8. Rule 6. The work is three atomic commits (readiness, Settings rows, migration). The intermediate commit was built with tests on its own.
+9. Rule 1. Phase 1b is inert because `IMPLEMENTER: opus` is the in-host session model. `worker-bridge.md` was read after the implementation instead of before Phase 1.5, and that changed nothing.
+
+### Open / follow-ups
+- Accepted by the spec (A3). An added app that is not installed during the first launch of this build cannot be matched by name. It asks again once reinstalled, and its old name row stays removable.
+- Accepted by the spec. Downgrading to an older build lists `custom:` entries raw, and the added app asks again.
+- No overlap with task .3's files. Integration notes are in the run notes dir as `task2-integration.md`.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: b4610d587780dbc140642bade5ab1a0a06c6dd4f, 0d4786a58c3e26994af3e3d9a1000f70e4fd0cc9, 8aa7450c2fba86a63058af200c834a0386cec465, e6812ed538d13e923be5bfac0e9f6e84fe678eb4
+- Tests: swift test --parallel --skip WatchLoopE2ETests --filter "ConsentDenyList|AppSettings|GeneralSettings|BrowserConsentReadiness|MicInputDetector|SettingsInteraction" (rc 0 on the integrated target; worker lane gates in the summary), PATH="/private/tmp/gh52-tick/lint-bin:$PATH" ./scripts/lint.sh (rc 0)
 - PRs:
