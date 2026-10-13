@@ -12,7 +12,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-49-show-a-pending-recording-prompt-on-the",
   "spec_path": ".flow/tasks/gh-49-show-a-pending-recording-prompt-on-the.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "Show a question mark on the menu bar icon while a prompt is open",
   "updated_at": "2026-10-06T20:36:49.736963Z"
 }

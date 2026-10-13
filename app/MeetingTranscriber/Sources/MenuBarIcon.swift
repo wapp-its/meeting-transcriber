@@ -103,18 +103,21 @@ enum MenuBarIcon {
     /// Pre-rendered frames keyed by BadgeKind. Populated once eagerly when
     /// the type is first referenced. The type is `@MainActor`, so the
     /// initialiser runs on MainActor and can safely read NSApp/NSAppearance.
-    private static let cache: [BadgeKind: [NSImage]] = renderAllFrames(watchingOverlay: false)
+    private static let cache: [BadgeKind: [NSImage]] = renderAllFrames(watchingOverlay: false, questionOverlay: false)
 
     /// The same frames with the watching dot, so watching keeps the cached,
     /// template path.
-    private static let watchingCache: [BadgeKind: [NSImage]] = renderAllFrames(watchingOverlay: true)
+    private static let watchingCache: [BadgeKind: [NSImage]] = renderAllFrames(watchingOverlay: true, questionOverlay: false)
 
-    private static func renderAllFrames(watchingOverlay: Bool) -> [BadgeKind: [NSImage]] {
+    /// The same frames with the question mark, which replaces the dot.
+    private static let questionCache: [BadgeKind: [NSImage]] = renderAllFrames(watchingOverlay: false, questionOverlay: true)
+
+    private static func renderAllFrames(watchingOverlay: Bool, questionOverlay: Bool) -> [BadgeKind: [NSImage]] {
         var result: [BadgeKind: [NSImage]] = [:]
         for badge in BadgeKind.allCases {
             let count = badge.isAnimated ? frameCount : 1
             result[badge] = (0 ..< count).map { frame in
-                renderImage(badge: badge, frame: frame, watchingOverlay: watchingOverlay)
+                renderImage(badge: badge, frame: frame, watchingOverlay: watchingOverlay, questionOverlay: questionOverlay)
             }
         }
         return result
@@ -136,10 +139,16 @@ enum MenuBarIcon {
     /// so the icon tells "watching, nothing going on" from "not watching". It is drawn in the
     /// icon's own colour, so it keeps the template path and needs no colour of its own, and it
     /// sits clear of the bottom-right corner the other badges use.
+    ///
+    /// `questionOverlay` draws a question mark at the top right in place of the dot while a
+    /// question waits for the user's answer (`AppState.awaitingUserAnswer`). Like the dot it is
+    /// drawn in the icon's own colour, so it keeps the template path, and it stays in the top
+    /// half of the icon, so the bottom-right badges are drawn as without it.
     static func image(
         badge: BadgeKind,
         animationFrame: Int = 0,
         watchingOverlay: Bool = false,
+        questionOverlay: Bool = false,
         permissionOverlay: Bool = false,
         recordOnlyOverlay: Bool = false,
         micSilentOverlay: Bool = false,
@@ -153,14 +162,16 @@ enum MenuBarIcon {
             return renderImage(
                 badge: badge, frame: frame,
                 watchingOverlay: watchingOverlay,
+                questionOverlay: questionOverlay,
                 permissionOverlay: permissionOverlay,
                 recordOnlyOverlay: recordOnlyOverlay,
                 micSilentOverlay: micSilentOverlay,
                 appSilentOverlay: appSilentOverlay,
             )
         }
-        guard let frames = (watchingOverlay ? watchingCache : cache)[badge] else {
-            return renderImage(badge: badge, frame: animationFrame, watchingOverlay: watchingOverlay)
+        let frameCache = if questionOverlay { questionCache } else if watchingOverlay { watchingCache } else { cache }
+        guard let frames = frameCache[badge] else {
+            return renderImage(badge: badge, frame: animationFrame, watchingOverlay: watchingOverlay, questionOverlay: questionOverlay)
         }
         return frames[animationFrame % frames.count]
     }
@@ -171,6 +182,7 @@ enum MenuBarIcon {
         badge: BadgeKind,
         frame: Int,
         watchingOverlay: Bool = false,
+        questionOverlay: Bool = false,
         permissionOverlay: Bool = false,
         recordOnlyOverlay: Bool = false,
         micSilentOverlay: Bool = false,
@@ -212,7 +224,9 @@ enum MenuBarIcon {
                 }
             }
 
-            if watchingOverlay {
+            if questionOverlay {
+                drawQuestionMark(in: rect, color: foreground)
+            } else if watchingOverlay {
                 drawWatchingDot(in: rect, color: foreground)
             }
 
@@ -417,6 +431,38 @@ enum MenuBarIcon {
         ctx.restoreGraphicsState()
         color.setFill()
         circle(size).fill()
+    }
+
+    // MARK: - Question Mark (in place of the watching dot, in the icon's colour)
+
+    /// Built like the watching dot: clears a margin around the mark first, then
+    /// fills it. It draws the glyph's outline rather than laid-out text, so its
+    /// extent is exact and does not depend on the font's line metrics.
+    private static func drawQuestionMark(in rect: NSRect, color: NSColor) {
+        guard let ctx = NSGraphicsContext.current else { return }
+        let font = NSFont.boldSystemFont(ofSize: 9) as CTFont
+        let gap: CGFloat = 1.0
+        let inset: CGFloat = 0.3
+        var character = UniChar(UInt8(ascii: "?"))
+        var glyph = CGGlyph()
+        guard CTFontGetGlyphsForCharacters(font, &character, &glyph, 1),
+              let outline = CTFontCreatePathForGlyph(font, glyph, nil)
+        else { return }
+        let bounds = outline.boundingBoxOfPath
+        var placement = CGAffineTransform(
+            translationX: rect.maxX - inset - bounds.maxX, y: rect.maxY - inset - bounds.maxY,
+        )
+        guard let placed = outline.copy(using: &placement) else { return }
+        let mark = NSBezierPath(cgPath: placed)
+        ctx.saveGraphicsState()
+        ctx.compositingOperation = .clear
+        mark.lineWidth = 2 * gap
+        mark.lineJoinStyle = .round
+        mark.fill()
+        mark.stroke()
+        ctx.restoreGraphicsState()
+        color.setFill()
+        mark.fill()
     }
 
     // MARK: - Record-Only Badge (solid red dot in bottom-right)
