@@ -150,6 +150,26 @@ enum A11yID {
     static let huggingFaceTokenSaveButton = "huggingFaceTokenSaveButton"
     static let huggingFaceTokenRemoveButton = "huggingFaceTokenRemoveButton"
     static let huggingFaceTokenProblem = "huggingFaceTokenProblem"
+
+    // Hugging Face model browser, a sheet over Settings. `/ui/tree` prunes
+    // sheets, so the repository ids and variant names in the row identifiers
+    // below never reach it; they are the names the rows already show.
+    static let huggingFaceSearchField = "huggingFaceSearchField"
+
+    /// One search result, addressed by its repository id.
+    static func huggingFaceResult(_ repoID: String) -> String {
+        "huggingFaceResult.\(repoID)"
+    }
+
+    static let huggingFaceBackButton = "huggingFaceBackButton"
+    static let huggingFaceModelCardLink = "huggingFaceModelCardLink"
+
+    /// One variant's "Use" button, addressed by the variant's folder name.
+    static func huggingFaceUseVariant(_ name: String) -> String {
+        "huggingFaceUseVariant.\(name)"
+    }
+
+    static let huggingFaceCancelButton = "huggingFaceCancelButton"
     static let whisperKitLoadFailureMessage = "whisperKitLoadFailureMessage"
     static let terminologyRulesEditor = "terminologyRulesEditor"
 
