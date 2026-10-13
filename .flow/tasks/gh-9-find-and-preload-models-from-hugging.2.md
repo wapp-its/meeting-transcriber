@@ -44,9 +44,45 @@ Offer to load a newly picked stock WhisperKit model right away (R5 for stock pic
 
 
 ## Done summary
-Blocked:
-Stale claim from a loop tick that the weekly usage limit cut off on 2026-10-09 (no worker alive, no commits). Released by the coordinating session on 2026-10-13 so the loop can restart the task.
+Picking another stock WhisperKit model in Settings -> Transcription now sets a load offer ("Load the new model now?") that names the stock-table download size, or says the model is already on this Mac. "Load now" and the existing "Load Model" button both load through `WhisperKitEngine.loadModel(for:)`, which applies the selection before loading. The six stock entries moved into `WhisperKitStockModel` with their measured sizes, and `SettingsView` owns the `WhisperKitModelChoice` state object that task 4 extends.
+
+Tier: implementer - opus at xhigh (explicit invocation) (model: claude-opus-5-5)
+
+stage: impl-review - ran [a971da58..7a29f0cc in lane .2] SHIP round 4 after 3 NEEDS_WORK rounds (codex gpt-5.6-sol xhigh; receipt /tmp/impl-review-receipt-4c2b6b7cd60e-gh-9-find-and-preload-models-from-hugging.2.json). Fix commits cherry-picked onto the spec branch as 0fb6b35a, c9f22297, 40eb15c8; review bookkeeping merged by the conductor. Assumption A6 (deferred load on "Later") recorded in the spec.
+
+### Acceptance
+
+- AC1 (offer set with model, table size and on-disk flag; none for the loaded or loading model; none for "Custom model..."): `TranscriptionSettingsLoadOfferTests.testPickingAStockModelOffersToLoadItWithItsTableSize`, `testPickingTheCustomEntryOffersNothing`; `WhisperKitModelChoiceTests.testShouldOfferOnlyWhenTheChosenModelIsNotAlreadyLoadedOrLoading` (7-row table), `testOfferLoadRecordsTheModelItsSizeAndWhetherItIsOnDisk`, `testRepickingTheLoadedModelOffersNothing` (idle-pipe trick).
+- AC2 (`accept` loads exactly the offered variant and origin while the engine held another; `decline` loads nothing): `WhisperKitModelChoiceTests.testAcceptLoadsExactlyTheOfferedModelWhileTheEngineHeldAnother` (source records `[turbo, swissGerman]`), `testDeclineClearsTheOfferAndLoadsNothing`.
+- AC3 ("Load Model" through the same helper; existing settings tests green): `TranscriptionSettingsLoadOfferTests.testLoadModelLoadsTheSelectedModelThroughTheSharedHelper`. A mutation run that bypassed the helper's apply step turned it red (located turbo instead of the custom selection), and restoring the helper turned it green again.
+- AC4: the acceptance command ran 179 tests, 178 passed. The one failure is environmental (below). `./scripts/lint.sh` with the pinned tools reported 0 violations in 771 files. `swift build -c release` exited 0.
+- A4 (stock table lists all six entries with a size): `WhisperKitModelChoiceTests.testTheStockTableListsThePickerEntriesInOrderWithASize`.
+
+### Environmental failures
+
+- `WhisperKitEngineTests.testTranscribeGermanAudio` failed with "unloaded is not equal to loaded" in the parallel run. Two parallel test processes downloaded `openai_whisper-small` into the fresh scratch home at the same time. The log shows NSURLError -1005 and a NSCocoaErrorDomain Code=4 move of a `weight.bin.*.incomplete` file. Run alone afterwards it passed in 6.9 s (rc=0). The test sets `engine.modelVariant` and calls `loadModel()` directly, so it never reaches this task's code.
+
+### Extra checks
+
+- I ran a clean `xcodebuild build-for-testing` followed by `swiftlint analyze --strict`, the CI-only step. Analyze found 0 `unused_declaration` hits in this task's files and 2 in `Sources/RecordingProvider.swift:144,146` (the `storePendingCut` / `recordPendingCutResolution` default bodies). This task does not touch that file. I infer the two hits predate this task and did not measure them at the base.
+- Type-check timings in the touched files peak at 31.7 ms (`loadSelectedModel()`). `whisperKitModelPicker` and `body` stay under 11 ms, far below the 300 ms gate.
+
+### Choices
+
+- DECIDED (rule 1): the commit message carries no `Task:` trailer and no spec or issue id. Rule source is the fork's working rules ("write commit messages for the original's readers: no gh-N/fn-N ids"), and `submit.sh` refuses such messages. The evidence file names the commit explicitly.
+- DECIDED (rule 1): re-picking the selected stock entry while the engine is `.unloaded` makes an offer. The task's `shouldOffer` definition returns false only when the engine requests exactly this model and its state is not `.unloaded`.
+- DECIDED (rule 6): `offerLoad` leaves an existing offer in place when `shouldOffer` says no, matching the task text ("sets the offer unless shouldOffer says no"). The alert is modal, so a second pick cannot happen while an offer is pending.
+- DECIDED (rule 6): the alert attaches inside `whisperKitModelPicker`, on the Picker, through `View.whisperKitLoadOfferAlert(_:engine:)` in `TranscriptionSettingsView+ModelChoice.swift`. Putting it there keeps the alert's generic closures out of the picker's type-check and out of the struct's type body. The "Load Model" action moved to the same file as `loadSelectedModel()`.
+- DECIDED (rule 6): `WhisperKitModelChoice.isOnDiskInProduction` is `nonisolated`. The view's default value for `isModelOnDisk` is a non-isolated closure, and a main-actor static func would not convert to that type.
+- DECIDED (rule 6): I added one wiring test for "Load Model" beyond the two picker tests the task lists, because AC3 names the button and no test covered its action. The A4 table test lives in `WhisperKitModelChoiceTests`, since Touches names no stock-model test file.
+
+### For task 4
+
+- `WhisperKitModelChoice` holds only `loadOffer` today. Task 4 adds the open-browser state to it. "Use" then calls `modelChoice.offerLoad(for:sizeBytes:engine:isOnDisk:)` with the listed variant's size from the sheet's `onDismiss`.
+- `TranscriptionSettingsView` gained `modelChoice` and `isModelOnDisk` properties, both with defaults, so every existing call site still compiles.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: e8937d792c8dfdb333160c98936666fdeb35e0f2, 0fb6b35ac399c5e5825d14f1ab9f1b06a1290d45, c9f222970ccd668a8c0aa259b2ece555e5f0b4e8, 40eb15c8043072c4c53efe68f4165a425c185ed8, 1305c3b50b48243065167570ec08967a288e249a
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh9-t2-home swift test --parallel --filter 'WhisperKitModelChoice|WhisperKitModelLoadOffer|TranscriptionSettings|SettingsInteraction|SettingsView|WhisperKitEngine' > /private/tmp/gh9-t2.log 2>&1 (rc=1: 179 tests, 178 passed; 1 environmental: WhisperKitEngineTests.testTranscribeGermanAudio, parallel first download of openai_whisper-small in the fresh scratch home; green alone afterwards, rc=0, 6.9 s), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh9-t2-home swift test --parallel --filter 'WhisperKitModelChoiceTests|TranscriptionSettingsLoadOfferTests' (rc=0, 10 tests, after the lint-driven test edits), PATH=/private/tmp/gh9tick/lint-bin:$PATH ./scripts/lint.sh (rc=0, 0 violations in 771 files), cd app/MeetingTranscriber && swift build -c release (rc=0), xcodebuild clean build-for-testing + swiftlint analyze --strict (build rc=0; analyze rc=2: 2 unused_declaration in Sources/RecordingProvider.swift:144,146, a file this task does not touch; none in this task's files), integrated at 1556c5e9ce847abe949067186653fb535a37730d: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh9-t2-home swift test --parallel --filter 'WhisperKitModelChoice|WhisperKitModelLoadOffer|TranscriptionSettings|SettingsInteraction|SettingsView|WhisperKitEngine' (exit 0, no failures; parallel mode prints failures only); PATH=/private/tmp/gh9tick/lint-bin:$PATH ./scripts/lint.sh (exit 0, 0 violations)
 - PRs:
