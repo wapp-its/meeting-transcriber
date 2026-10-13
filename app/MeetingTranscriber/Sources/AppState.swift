@@ -1,9 +1,3 @@
-// swiftlint:disable file_length
-//
-// The composition root grows by a stored property, a factory and an init line
-// per concern controller, while the logic lives in the controllers. Suppressed
-// rather than split: the split is moving `AppNotifying` and `SilentNotifier`
-// into their own file, worth doing on a quiet tree, not in a feature branch.
 import AppKit
 import Foundation
 import Observation
