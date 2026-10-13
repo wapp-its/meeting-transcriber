@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-10-remote-vocabulary",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-10-13T14:29:22.169094Z",
+  "completion_reviewed_at": "2026-10-13T15:34:42.563682Z",
   "created_at": "2026-10-06T20:18:22.941395Z",
   "default_impl": null,
   "default_review": null,
@@ -528,6 +528,41 @@
       "task": null,
       "timestamp": "2026-10-13T14:29:22.148301Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "4f8b616129f967a53349e39655858d212b0d0193df582379e2b2b3737409628e",
+      "backend": "codex",
+      "base_sha": "0c4c4a0ba50690168f88ad74217fe6d407cc6234",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 2,
+      "head_sha": "84589602699a9de57a3563dce87b415be384043e",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 6091,
+      "output_sha256": "a8b653642efe29d6b8f365d64a8eb7610b6773e6b0cb7e50b29ba8dea452d434",
+      "reservation_id": "3f4e7719d4cd4ce6bb815a30f6fbf54a",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-13T15:34:42.308008Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -535,7 +570,7 @@
     "impl:gh-10-vocabulary-from-a-central-url.2": 2,
     "impl:gh-10-vocabulary-from-a-central-url.3": 1,
     "plan": 1,
-    "plan#completion": 2
+    "plan#completion": 3
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -562,5 +597,5 @@
     "mergeBaseTracker": "## Problem\n\nDas Vokabular f\u00fcr die Transkription (Namen, Fachbegriffe) kommt heute aus einer lokalen Datei (`AppSettings+Vocabulary.swift`). In einer Organisation pflegt aber idealerweise eine Stelle die Liste zentral (Namen der Gremiumsmitglieder, Organisationseinheiten, Abk\u00fcrzungen), und alle bekommen denselben Stand.\n\n## Wunsch\n\nAls Quelle neben der lokalen Datei eine **URL** zulassen, z. B. die Raw-Adresse einer Datei in einem Git-Repository (GitLab/GitHub):\n\n- beim Start und periodisch laden (mit ETag/Last-Modified, damit nur \u00c4nderungen \u00fcbertragen werden),\n- lokal zwischenspeichern und **offline** mit dem letzten Stand weiterarbeiten,\n- optional mit Zugangstoken (privates Repository), im Schl\u00fcsselbund gespeichert,\n- Stand und Zeitpunkt der letzten Aktualisierung in den Einstellungen anzeigen.\n\nGleiches Prinzip sp\u00e4ter f\u00fcr Terminologie-Regeln (`terminologyRules`) und Protokoll-Vorlagen (#2).\n\n## Abnahme\n\n- URL auf eine Vokabeldatei gesetzt \u2192 Begriffe werden verwendet; \u00c4nderung im Repository \u2192 nach dem n\u00e4chsten Abgleich \u00fcbernommen.\n- Ohne Netz \u2192 letzter Stand bleibt aktiv, Hinweis in den Einstellungen.\n\nPasst zur zentralen Vorkonfiguration (#11).",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/10"
   },
-  "updated_at": "2026-10-13T14:29:22.170346Z"
+  "updated_at": "2026-10-13T15:34:42.636536Z"
 }
