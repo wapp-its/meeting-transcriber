@@ -60,9 +60,52 @@ Builds the template engine without any UI: template identity and the folder stor
 - [ ] `cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/<scratch> swift test --parallel --filter "ProtocolGenerator|ProtocolTemplate|MeetingPromptMetadata|OpenAIProtocolGenerator|ClaudeCLIProtocolGenerator|PipelineQueue|PipelineSnapshot|PipelineJob|AppSettings|RPCSettingsState" > /private/tmp/<scratch>/t1.log 2>&1` passes (read the log file, never pipe into tail/head/grep).
 - [ ] `./scripts/lint.sh` passes with the pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1 from `scripts/tool-versions.sh` (fetched into a temp dir, first on `PATH`; no `brew install`), and `swift build -c release -Xswiftc -DAPPSTORE` compiles.
 ## Done summary
-TBD
+A queued job now carries its protocol template by name and optional background info, and every provider (OpenAI-compatible, Claude CLI, command) receives them as ProtocolInstructions. The built-in template without background still sends the byte-identical prompt, the old custom prompt migrates into the new "Protocol Templates" folder as the default, and the pipeline snapshot that now holds the background text is owner-only.
 
+stage: impl-review - ran [..2026-10-13T17:58:51Z] (codex gpt-5.6-sol at xhigh, one round, SHIP, 0 findings; start time not recorded)
+Tier: implementer - opus (explicit invocation) (model: claude-opus-5-5)
+
+Baseline: green (530 tests, the task's acceptance filter plus CommandProtocolGenerator, before any edit).
+
+Commits:
+- 02c309ae test(app) pins the four pre-template system prompts (built-in, with and without meeting start, plain and diarized, Europe/Zurich), recorded against the old code before the refactor.
+- f26f15a2 feat(app) adds ProtocolTemplates.swift (ProtocolTemplateID, ProtocolTemplateName, ProtocolTemplateStore, ProtocolTemplateMigration), ProtocolInstructions and the document helpers, the job fields, admission stamp, generateProtocol resolution, the setting, the /state flag and the migration call.
+- ce4cc214 fix(app) writes pipeline_queue.tmp empty at mode 0600 before filling it, removes it when the swap throws, and restricts pipeline_queue.json after the swap (a failed restrict is logged and swallowed).
+
+Acceptance evidence:
+- Byte-identical built-in prompt: ProtocolTemplateSystemPromptTests.testBuiltInTemplateWithoutBackgroundSendsThePreTemplatePrompt, green before (02c309ae) and after the refactor with unchanged expected strings.
+- Background block text, position, verbatim placeholders, blank = none: testBackgroundSitsVerbatimBetweenTheMeetingContextAndTheTemplate, testBlankBackgroundAddsNoBlock.
+- R7 queue behaviour: PipelineQueueProtocolTemplateTests (template B + background reach the generator, default frozen at enqueue, retry keeps both, missing and blank template fall back with the exact warning, old-snapshot job uses the current default, recovered orphan stamped, protocol-only resume uses the job's template).
+- Providers: OpenAIProtocolGeneratorTests.testGenerateSendsTheTemplateAndBackgroundInTheSystemMessage, ProtocolTemplateDeliveryTests.testClaudeCLIReceivesTheTemplateAndBackgroundOnStdin (exact stdin). CommandProtocolGeneratorTests now pass the pinned prompt as instructions.
+- R2 migration: ProtocolTemplateMigrationTests (8 cases, including the read-only-folder failure followed by a successful retry, the other build adopting the marker's default, a chosen default left alone, legacy file byte-identical).
+- Store and name rules: ProtocolTemplateStoreTests (listing filter and Finder order, blank file, resolve and warning, effectiveDefault, create, refusal, trash via injected closure, every refusal case, path-escape guard).
+- R9: PipelineSnapshotTests (old JSON without the new keys decodes, staging 0600 at swap time over a leftover 0644 file, staging removed on a failed swap, pipeline_queue.json 0600 over an old 0644 file, failed restrict does not throw), ProtocolTemplateBackgroundLoggingTests (source scan of every log/print call in Sources, with a self-test that the scan catches a leak), and the fallback warning test asserts the exact warning text, which carries no background.
+- Mutation checks (each reverted): removing the stamp, ignoring the job's template, writing the staging file with Data.write without the restrict, and writing the default after a failed copy each turned the matching tests red.
+
+Gates on the committed tree: acceptance filter 568 tests rc=0; ./scripts/lint.sh with pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1 rc=0 (0 violations); swift build -c release -Xswiftc -DAPPSTORE rc=0; swift build -c release rc=0. Not run: CI's swiftlint analyze (unused_declaration), which needs a clean xcodebuild build-for-testing; the conductor should run it before the PR (every new declaration is referenced from Sources or Tests by reading).
+
+DECIDED:
+- ProtocolTemplateID is stored as one string ("" = built-in) in the settings and the snapshot through a custom Codable. The synthesized enum encoding would make an unknown case throw and drop the whole restored queue.
+- Migration step 2 runs only when the marker exists. After a failed copy the default key stays absent (it reads as the built-in), so the retry's copy still becomes the default. The spec's literal wording would write "" on the failed launch, and the later copy would then never become the default, which contradicts R2's "tries again".
+- A legacy prompt that exists but is not UTF-8 counts as nothing to copy, as the pre-template code ignored it. One that exists but cannot be read is a failure (no marker, retried next launch). The migration writes the copy with .atomic so no partial template appears, while store.create uses .withoutOverwriting so it never clobbers a file.
+- Template names read from the settings or the snapshot resolve only as one visible path component (no "/", no leading "."), so a stored name cannot read a file outside the folder. ":" is allowed for lookup (Finder stores "/" as ":") and refused only for new names.
+- ProtocolTemplates.swift carries "swiftlint:disable:this file_name" with a reason. The task fixes that file name for four types, and renaming the file or editing .swiftlint.yml would leave the declared Touches.
+- The old ProtocolGenerating call shape (built-in template, no background) moved from TestHelpers.swift to ProtocolGeneratorTests.swift, and the Claude CLI delivery test went to a new ProtocolTemplateDeliveryTests.swift. TestHelpers.swift and ClaudeCLIProtocolGeneratorTests.swift both sit at the 600-line file_length cap. The four loadPrompt tests are replaced by store tests covering the same blank-file fallback.
+- PipelineQueue's inits take defaultProtocolTemplateProvider before protocolTemplateStore, so the closure is never the last argument (SwiftLint --fix had rewritten it into a broken trailing closure).
+- generateProtocol logs one info line with the template name at .private, a fallback flag and background=present|absent, never the text.
+- The review ran as the conductor's single-reviewer form (flowctl codex impl-review --spec codex:gpt-5.6-sol:xhigh --sandbox workspace-write). review-route had asked for a first-round three-lens fan-out.
+
+ASSUMED: refusal wording for new template names ("Enter a name for the template.", "Use at most 80 characters.", "A template name cannot contain “/” or “:”.", "A template name cannot start with a dot.", "A template with this name already exists.") · flip at: app/MeetingTranscriber/Sources/ProtocolTemplates.swift:ProtocolTemplateName.Refusal.errorDescription · test: ProtocolTemplateStoreTests.testValidateTrimsAndRefusesUnusableNames (pins the refusal case per input, not the wording; task 2 shows the text)
+
+BLOCKED: none.
+
+Open for later tasks:
+- Settings -> Output still edits protocol_prompt.md, which no generator reads any more, until task 2 replaces those controls. Between this commit and task 2, edits made there have no effect.
+- README.md, docs/architecture-macos.md and docs/automation-api.md are not updated here (outside this task's Touches); the spec lists them.
+- No user route to a mapped feature changed (no UI in this task).
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 02c309ae50df3858c9add02e693ad67e4485e162, f26f15a2c57f6d57073a2e7c4133f65b5ee955c7, ce4cc2142103ad878fa4c0e4d670f3150b6c055f
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh2-home swift test --parallel --filter "ProtocolGenerator|ProtocolTemplate|MeetingPromptMetadata|OpenAIProtocolGenerator|ClaudeCLIProtocolGenerator|CommandProtocolGenerator|PipelineQueue|PipelineSnapshot|PipelineJob|AppSettings|RPCSettingsState" (rc=0, 568 tests), PATH=<pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1>:$PATH ./scripts/lint.sh (rc=0, 0 violations), cd app/MeetingTranscriber && swift build -c release -Xswiftc -DAPPSTORE (rc=0), cd app/MeetingTranscriber && swift build -c release (rc=0)
 - PRs:

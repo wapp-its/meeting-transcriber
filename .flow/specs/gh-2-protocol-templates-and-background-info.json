@@ -10,7 +10,9 @@
     "gh-49-show-a-pending-recording-prompt-on-the"
   ],
   "id": "gh-2-protocol-templates-and-background-info",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-2-protocol-templates-and-background-info.1": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -285,15 +287,53 @@
       "task": null,
       "timestamp": "2026-10-06T20:53:36.044926Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "0d4dcda2df215280763a59437b29a2483422677f6bf1e226e149b6db385aef71",
+      "backend": "codex",
+      "base_sha": "060811cf805de50a72f7088ff2f19eb2c31fe088",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "ce4cc2142103ad878fa4c0e4d670f3150b6c055f",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1217394,
+      "output_sha256": "e054cf11852b0af2b72b95f8f42b6bc8711925d5cacd9e0a27843f873f5bc3d5",
+      "reservation_id": "ee9043395185451ab39d58f9c1363e56",
+      "round_consumed": true,
+      "scope": "impl:gh-2-protocol-templates-and-background-info.1",
+      "superseded_by": null,
+      "task": "gh-2-protocol-templates-and-background-info.1",
+      "timestamp": "2026-10-13T17:58:51.651290Z",
+      "tool_calls": 39,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-2-protocol-templates-and-background-info.1": 1,
     "plan": 1,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-2-protocol-templates-and-background-info.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-2-protocol-templates-and-background-info.md",
@@ -311,5 +351,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/2"
   },
-  "updated_at": "2026-10-06T20:54:52.860170Z"
+  "updated_at": "2026-10-13T17:58:51.690931Z"
 }
