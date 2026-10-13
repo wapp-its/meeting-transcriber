@@ -97,7 +97,13 @@ enum A11yID {
     /// The menu's answers to the open recording prompt. No app name, for the
     /// reason on `consentDeniedAppRemove`.
     static let consentPromptRecord = "consentPromptRecord"
+    static let consentPromptRecordWithOptions = "consentPromptRecordWithOptions"
     static let consentPromptIgnore = "consentPromptIgnore"
+
+    /// The Record Meeting window's buttons. The window shows background text
+    /// and stays off every RPC allowlist.
+    static let consentOptionsRecordButton = "consentOptionsRecordButton"
+    static let consentOptionsCancelButton = "consentOptionsCancelButton"
 
     static let recordOnlyBanner = "recordOnlyBanner"
     static let transcriptionSection = "transcriptionSection"

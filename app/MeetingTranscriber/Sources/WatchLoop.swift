@@ -122,6 +122,9 @@ class WatchLoop {
     /// Recordings start in the loop and nowhere else, so an answer arriving
     /// out of band parks here instead of starting one from the consent task.
     var approvedConsentMeeting: DetectedMeeting?
+    /// "Record with Options…" choices for the open question, then for the meeting it approved (`WatchLoop+Consent.swift`).
+    var pendingConsentProtocolOptions: MeetingProtocolOptions?
+    var approvedConsentProtocolOptions: MeetingProtocolOptions?
 
     /// The task awaiting the parked answer. Held so `stop()` can let go of it.
     var consentTask: Task<Void, Never>?
@@ -132,6 +135,8 @@ class WatchLoop {
         pendingConsentQuestion = nil
         appsWaitingForPrompt = []
         approvedConsentMeeting = nil
+        pendingConsentProtocolOptions = nil
+        approvedConsentProtocolOptions = nil
         consentTask = nil
     }
 
@@ -348,9 +353,9 @@ class WatchLoop {
             // arrives out of band, but recordings only ever start here.
             // Re-checked because up to a poll interval has passed since the
             // answer, and the call may have ended in it.
-            if let approved = takeApprovedConsentMeeting(), detector.isMeetingActive(approved),
-               !appsHeldFromDetection.contains(approved.pattern.appName) {
-                if await runMeeting(approved) { return }
+            if let approved = takeApprovedConsent(), detector.isMeetingActive(approved.meeting),
+               !appsHeldFromDetection.contains(approved.meeting.pattern.appName) {
+                if await runMeeting(approved.meeting, protocolOptions: approved.protocolOptions) { return }
             } else if let meeting = detector.checkOnce(excluding: appsExcludedFromDetection.union(appsHeldFromDetection)) {
                 // A detected meeting asks before recording unless its app
                 // records without asking. See WatchLoop+Consent.swift.
@@ -375,9 +380,9 @@ class WatchLoop {
 
     /// Record one meeting to completion and return to watching. True means the
     /// loop was cancelled mid-recording and must exit.
-    private func runMeeting(_ meeting: DetectedMeeting) async -> Bool {
+    private func runMeeting(_ meeting: DetectedMeeting, protocolOptions: MeetingProtocolOptions? = nil) async -> Bool {
         do {
-            try await handleMeeting(meeting)
+            try await handleMeeting(meeting, protocolOptions: protocolOptions)
         } catch {
             if error is CancellationError { return true }
             let msg = "Recording error: \(error.localizedDescription)"
@@ -403,7 +408,7 @@ class WatchLoop {
 
     // MARK: - Meeting Handling
 
-    func handleMeeting(_ meeting: DetectedMeeting) async throws {
+    func handleMeeting(_ meeting: DetectedMeeting, protocolOptions: MeetingProtocolOptions? = nil) async throws {
         defer { stopByHandRequestedAt = nil }
         let title = Self.cleanTitle(meeting.windowTitle)
 
@@ -461,6 +466,7 @@ class WatchLoop {
             recording: recording,
             trigger: .auto,
             participants: participants,
+            protocolOptions: protocolOptions,
         )
     }
 

@@ -43,6 +43,8 @@ struct MenuBarView: View {
     /// question rather than reading the open one, so a click on a menu that
     /// went stale answers nothing (`WatchLoop.answerParkedConsent`).
     var onAnswerConsent: ((ConsentQuestion, Bool) -> Void)?
+    /// Opens the Record Meeting window for the question the menu displayed.
+    var onRecordConsentWithOptions: ((ConsentQuestion) -> Void)?
     let onQuit: () -> Void
     /// Stores a chosen microphone's UID, empty for System Default.
     var onSelectMicrophone: (String) -> Void = { _ in }
@@ -126,6 +128,13 @@ struct MenuBarView: View {
                 Label("Record", systemImage: "record.circle")
             }
             .accessibilityIdentifier(A11yID.consentPromptRecord)
+
+            Button {
+                onRecordConsentWithOptions?(question)
+            } label: {
+                Label("Record with Options…", systemImage: "slider.horizontal.3")
+            }
+            .accessibilityIdentifier(A11yID.consentPromptRecordWithOptions)
 
             Button {
                 onAnswerConsent?(question, false)

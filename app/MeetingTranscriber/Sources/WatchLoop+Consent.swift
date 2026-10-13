@@ -87,12 +87,15 @@ extension WatchLoop {
         return appsWaitingForPrompt.union([pendingConsentApp])
     }
 
-    /// Take the approved meeting, if any, clearing it. The poll loop is the
-    /// only caller: recordings start there and nowhere else, so two of them
-    /// cannot overlap.
-    func takeApprovedConsentMeeting() -> DetectedMeeting? {
-        defer { approvedConsentMeeting = nil }
-        return approvedConsentMeeting
+    /// Take the approved meeting, if any, with the options it was approved
+    /// with, clearing both. The poll loop is the only caller: recordings start
+    /// there and nowhere else, so two of them cannot overlap.
+    func takeApprovedConsent() -> (meeting: DetectedMeeting, protocolOptions: MeetingProtocolOptions?)? {
+        defer {
+            approvedConsentMeeting = nil
+            approvedConsentProtocolOptions = nil
+        }
+        return approvedConsentMeeting.map { ($0, approvedConsentProtocolOptions) }
     }
 
     /// Answer a parked prompt as a decline, for `stop()`. Routed through the
@@ -113,9 +116,20 @@ extension WatchLoop {
     /// False when `question` is not the open one (expired, answered elsewhere,
     /// declined by Stop Watching or a manual start, or replaced, also by a new
     /// prompt about the same app) or its prompt has not registered yet.
-    func answerParkedConsent(_ question: ConsentQuestion, granted: Bool) -> Bool {
-        guard pendingConsentQuestion == question else { return false }
-        return notifier.answerConsentPrompt(id: question.id, granted: granted)
+    ///
+    /// `protocolOptions` comes from "Record with Options…" only, and is kept
+    /// for `finishConsent` once this answer is the one that resolved the
+    /// prompt. Kept after the resolution, not before: a second answer to an
+    /// already resolved prompt (a plain Record from a menu that has not caught
+    /// up) returns false here and must not overwrite the first answer's
+    /// options. The resolution never lands synchronously, so nothing reads
+    /// them before this line.
+    func answerParkedConsent(_ question: ConsentQuestion, granted: Bool, protocolOptions: MeetingProtocolOptions? = nil) -> Bool {
+        guard pendingConsentQuestion == question,
+              notifier.answerConsentPrompt(id: question.id, granted: granted)
+        else { return false }
+        pendingConsentProtocolOptions = protocolOptions
+        return true
     }
 
     /// Land the user's answer. Main-actor isolated like the rest of
@@ -126,8 +140,13 @@ extension WatchLoop {
         // clears at once and the declined prompt's completion lands here
         // later, and a prompt can even register after Stop Watching, since
         // registration runs off the main actor. A newer question may be open
-        // by then, and none of these may wipe it.
+        // by then, and none of these may wipe it. The options are taken first,
+        // and only from this question: a question that is no longer the open
+        // one lost its options when it was cleared, and the ones held now
+        // belong to the newer question.
+        var protocolOptions: MeetingProtocolOptions?
         if pendingConsentQuestion == question {
+            protocolOptions = pendingConsentProtocolOptions
             clearConsentState()
         }
 
@@ -177,5 +196,6 @@ extension WatchLoop {
             return
         }
         approvedConsentMeeting = meeting
+        approvedConsentProtocolOptions = protocolOptions
     }
 }

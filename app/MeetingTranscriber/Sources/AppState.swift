@@ -28,6 +28,8 @@ final class AppState {
 
     var updateChecker: UpdateChecker
     var selectedNamingJobID: UUID?
+    /// The recording prompt the Record Meeting window was last opened for (`AppState+ConsentPrompt.swift`).
+    var consentOptionsQuestion: ConsentQuestion?
 
     /// Transcription-engine concern (the three engine instances, active-engine
     /// selection, and settings → engine language/vocabulary sync), extracted

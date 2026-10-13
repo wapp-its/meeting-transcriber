@@ -97,21 +97,28 @@ final class AppStateConsentPromptTests: XCTestCase {
         XCTAssertFalse(state.awaitingUserAnswer, "loop replaced by one without a question")
     }
 
+    /// The Record Meeting window's Record carries its options to the loop, and
+    /// the window reads back whether the question was still open.
     func testAnsweringTheOpenQuestionAnswersItsPromptById() {
         let (state, loop, notifier) = makeStateWithLoop()
         let question = makeQuestion()
         loop.pendingConsentQuestion = question
+        let options = MeetingProtocolOptions(template: .file(name: "Board"), rawBackground: "Agenda")
 
-        state.answerConsentQuestion(question, granted: true)
+        XCTAssertTrue(state.answerConsentQuestion(question, granted: true, protocolOptions: options))
         XCTAssertEqual(notifier.answers.map(\.id), [question.id])
         XCTAssertEqual(notifier.answers.map(\.granted), [true])
+        XCTAssertEqual(loop.pendingConsentProtocolOptions, options)
     }
 
     func testAnsweringAnotherQuestionAnswersNothing() {
         let (state, loop, notifier) = makeStateWithLoop()
         loop.pendingConsentQuestion = makeQuestion()
+        let options = MeetingProtocolOptions(template: .file(name: "Board"), rawBackground: "Agenda")
 
-        state.answerConsentQuestion(makeQuestion(), granted: true)
+        XCTAssertFalse(state.answerConsentQuestion(makeQuestion(), granted: true, protocolOptions: options))
         XCTAssertTrue(notifier.answers.isEmpty)
+        XCTAssertNil(loop.pendingConsentProtocolOptions)
+        XCTAssertFalse(makeState().answerConsentQuestion(makeQuestion(), granted: true), "nothing is watching")
     }
 }

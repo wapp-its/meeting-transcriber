@@ -137,6 +137,7 @@ struct MeetingTranscriberApp: App {
         recordAppWindow
         transcriptionsWindow
         regenerateProtocolWindow
+        consentOptionsWindow
     }
 
     // MARK: - Menu Bar
@@ -174,6 +175,7 @@ struct MeetingTranscriberApp: App {
             onAnswerConsent: { question, granted in
                 appState.answerConsentQuestion(question, granted: granted)
             },
+            onRecordConsentWithOptions: openConsentOptions,
             onQuit: quit,
             onSelectMicrophone: { appState.settings.micDeviceUID = $0 },
             microphoneMenu: appState.microphoneMenuState,
@@ -360,6 +362,26 @@ struct MeetingTranscriberApp: App {
             .onAppear { appState.protocolRegenerator.clearResult() }
         }
         .windowResizability(.contentSize)
+    }
+
+    private var consentOptionsWindow: some Scene {
+        Window("Record Meeting", id: ConsentOptionsView.windowID) {
+            ConsentOptionsView(
+                question: appState.consentOptionsQuestion,
+                optionsContext: { appState.protocolOptionsContext() },
+                onRecord: { question, options in
+                    appState.answerConsentQuestion(question, granted: true, protocolOptions: options)
+                },
+                onClose: { closeWindow(id: ConsentOptionsView.windowID) },
+            )
+        }
+        .windowResizability(.contentSize)
+    }
+
+    /// "Record with Options…" on the menu's recording prompt.
+    private func openConsentOptions(_ question: ConsentQuestion) {
+        appState.consentOptionsQuestion = question
+        bringWindowToFront(id: ConsentOptionsView.windowID)
     }
 
     // MARK: - Speaker Naming Window
