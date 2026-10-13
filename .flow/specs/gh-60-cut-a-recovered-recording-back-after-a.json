@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-60-recovered-cut",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-10-09T02:48:29.610761Z",
+  "completion_reviewed_at": "2026-10-13T14:46:14.362830Z",
   "created_at": "2026-10-06T22:37:30.592359Z",
   "default_impl": null,
   "default_review": null,
@@ -838,6 +838,50 @@
       "task": "gh-60-cut-a-recovered-recording-back-after-a.4",
       "timestamp": "2026-10-13T14:42:21.277885Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "f5288088260f866aa8344f00404ee3985fe649571544b833adfa2d0edf5a73d5",
+      "backend": "codex",
+      "base_sha": "47c550ada129a452cc2922d9f24653bb3212b497",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-86f1d1bfc73675cb46ad95bcff785a6f",
+            "classification": "introduced",
+            "findingId": "finding-86f1d1bfc73675cb46ad95bcff785a6f",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "06ced36f996eaf163fa5ddda21a1e9acd3707d29",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 6266,
+      "output_sha256": "3c97500391bc379c08d86f3d4d5056f8c019fc3b9354bc95b1067c2d1e056a69",
+      "reservation_id": "ac41f678ec564b588aa7ba1fe6338303",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-13T14:46:14.339858Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -846,7 +890,7 @@
     "impl:gh-60-cut-a-recovered-recording-back-after-a.3": 1,
     "impl:gh-60-cut-a-recovered-recording-back-after-a.4": 2,
     "plan": 1,
-    "plan#completion": 1
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -874,5 +918,5 @@
     "mergeBaseTracker": "Folgearbeit zu #54.\n\n## Problem\nSt\u00fcrzt die App ab oder wird sie beendet, w\u00e4hrend der 2-Minuten-Countdown aus #54 l\u00e4uft, holt die Wiederherstellung beim n\u00e4chsten Start die Aufnahme **ungeschnitten** zur\u00fcck. Damit landen die Countdown-Minuten (Raumaudio nach dem Meeting) doch im Transkript und Protokoll, entgegen der Entscheidung in #54 (ohne Antwort wird auf Signalverlust + Nachlaufzeit zur\u00fcckgeschnitten).\n\nHeute (vor #54) war das Fenster nur die Nachlaufzeit von 15 s, jetzt bis zu gut 2 Minuten.\n\n## Wunsch\nDen ausstehenden Schnittpunkt neben der Markierung der laufenden Aufnahme speichern, sobald der Countdown beginnt, und bei der Wiederherstellung anwenden; nach \u201eWeiter aufnehmen\u201c oder zur\u00fcckkehrendem Signal wieder entfernen.\n\n## Abnahme\nCountdown l\u00e4uft, App wird hart beendet \u2192 nach Neustart wird die Aufnahme verarbeitet und endet am selben Punkt wie bei abgelaufenem Countdown.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/60"
   },
-  "updated_at": "2026-10-13T14:42:21.302485Z"
+  "updated_at": "2026-10-13T14:46:14.364092Z"
 }
