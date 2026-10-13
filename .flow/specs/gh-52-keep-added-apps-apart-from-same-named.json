@@ -1,7 +1,7 @@
 {
   "branch_name": "fix/gh-52-added-app-identity",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-13T15:52:53.735007Z",
   "created_at": "2026-10-06T20:20:31.727861Z",
   "default_impl": null,
   "default_review": null,
@@ -289,6 +289,42 @@
       "task": "gh-52-keep-added-apps-apart-from-same-named.2",
       "timestamp": "2026-10-13T15:44:39.467047Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "a319fb4efd21640e860f96acd18c7a22fff0548ce6fe5f7567c4e4d380860aea",
+      "backend": "codex",
+      "base_sha": "47c550ada129a452cc2922d9f24653bb3212b497",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "9b2d768ad6abdcbbc90e09644678d27d60bd115b",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 523342,
+      "output_sha256": "1335b0e11ebeab8d791effab782882ad2cda9f0045c335908f1597c5af59df0c",
+      "reservation_id": "82335119e70e4009bb90f7d2057870af",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-13T15:52:53.701479Z",
+      "tool_calls": 34,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -296,11 +332,12 @@
     "impl:gh-52-keep-added-apps-apart-from-same-named.2": 1,
     "impl:gh-52-keep-added-apps-apart-from-same-named.3": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-52-keep-added-apps-apart-from-same-named.1": 0,
     "impl:gh-52-keep-added-apps-apart-from-same-named.3": 0,
     "plan": 0
@@ -320,5 +357,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/52"
   },
-  "updated_at": "2026-10-13T15:39:20.574661Z"
+  "updated_at": "2026-10-13T15:52:53.737984Z"
 }
