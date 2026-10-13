@@ -13,6 +13,8 @@ struct TranscriptionSettingsView: View {
     var modelChoice = WhisperKitModelChoice()
     /// Whether a complete copy of a model is on this Mac; tests replace the lookup.
     var isModelOnDisk: (WhisperKitModelSelection) -> Bool = WhisperKitModelChoice.isOnDiskInProduction
+    /// Makes the catalog the Hugging Face browser searches; tests replace it.
+    var makeHubCatalog: () -> any HuggingFaceModelCataloging = { HuggingFaceModelCatalog() }
 
     /// Set when the user flips live captions on while a first-use Nemotron model
     /// download is pending — defers the actual enable to the consent alert.
@@ -78,9 +80,11 @@ struct TranscriptionSettingsView: View {
                 Text(model.label).tag(model.variant)
             }
             Text("Custom model\u{2026}").tag(Self.customModelTag)
+            Text("From Hugging Face\u{2026}").tag(Self.huggingFaceTag)
         }
         .accessibilityIdentifier(A11yID.whisperKitModelPicker)
         .whisperKitLoadOfferAlert(modelChoice, engine: whisperKitEngine)
+        .huggingFaceBrowserSheet(modelChoice, onUse: useHubVariant)
 
         if settings.whisperKitCustomModelEnabled {
             customWhisperKitModelFields
@@ -180,6 +184,7 @@ struct TranscriptionSettingsView: View {
         Binding(
             get: { settings.whisperKitCustomModelEnabled ? Self.customModelTag : settings.whisperKitModel },
             set: { tag in
+                guard tag != Self.huggingFaceTag else { return openHuggingFaceBrowser() }
                 settings.whisperKitCustomModelEnabled = tag == Self.customModelTag
                 guard tag != Self.customModelTag else { return }
                 settings.whisperKitModel = tag

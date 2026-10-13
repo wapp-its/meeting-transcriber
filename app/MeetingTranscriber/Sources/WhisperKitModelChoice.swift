@@ -24,7 +24,8 @@ struct WhisperKitModelLoadOffer: Equatable {
     }
 }
 
-/// State of the WhisperKit model choice in Settings: the pending load offer.
+/// State of the WhisperKit model choice in Settings: the open Hugging Face browser and
+/// the pending load offer.
 ///
 /// A reference type owned by `SettingsView`, so the offer survives the body
 /// re-evaluations that a settings write causes, and so a test holds the same object
@@ -33,6 +34,14 @@ struct WhisperKitModelLoadOffer: Equatable {
 @MainActor
 final class WhisperKitModelChoice {
     private(set) var loadOffer: WhisperKitModelLoadOffer?
+
+    /// The Hugging Face browser the picker presents as a sheet; nil while none is open.
+    /// "From Hugging Face…" opens it, "Use" and "Cancel" close it.
+    var hubBrowser: HuggingFaceModelSearch?
+
+    /// The offer a "Use" made, held back until the browser has closed: an alert
+    /// presented while a sheet is still being dismissed can be dropped on macOS.
+    private(set) var pendingLoadOffer: WhisperKitModelLoadOffer?
 
     /// Offer to load `selection`, unless the engine already loads or holds exactly it.
     /// `isOnDisk` is asked only when an offer is made. An offered model is deferred on
@@ -44,14 +53,54 @@ final class WhisperKitModelChoice {
         engine: WhisperKitEngine,
         isOnDisk: (WhisperKitModelSelection) -> Bool,
     ) {
+        if let offer = makeOffer(for: selection, sizeBytes: sizeBytes, engine: engine, isOnDisk: isOnDisk) {
+            loadOffer = offer
+        }
+    }
+
+    /// "Use" in the Hugging Face browser: writes `variant` of `listing` to `settings`,
+    /// closes the browser and holds the offer for the resulting model back until
+    /// `browserDidDismiss()`. The offer names the listed variant's size.
+    func use(
+        _ variant: HuggingFaceModelVariant,
+        in listing: HuggingFaceRepositoryListing,
+        settings: AppSettings,
+        engine: WhisperKitEngine,
+        isOnDisk: (WhisperKitModelSelection) -> Bool,
+    ) {
+        settings.useHubModel(repoID: listing.id, variant: variant.name)
+        pendingLoadOffer = makeOffer(
+            for: settings.whisperKitModelSelection,
+            sizeBytes: variant.sizeBytes,
+            engine: engine,
+            isOnDisk: isOnDisk,
+        )
+        hubBrowser = nil
+    }
+
+    /// The browser sheet has closed: asks the question a "Use" held back, if any.
+    func browserDidDismiss() {
+        guard let offer = pendingLoadOffer else { return }
+        pendingLoadOffer = nil
+        loadOffer = offer
+    }
+
+    /// The offer for `selection`, deferring it on the engine, or nil when `shouldOffer`
+    /// says no.
+    private func makeOffer(
+        for selection: WhisperKitModelSelection,
+        sizeBytes: Int64?,
+        engine: WhisperKitEngine,
+        isOnDisk: (WhisperKitModelSelection) -> Bool,
+    ) -> WhisperKitModelLoadOffer? {
         guard Self.shouldOffer(
             chosen: selection,
             engineVariant: engine.modelVariant,
             engineOrigin: engine.modelOrigin,
             engineState: engine.modelState,
-        ) else { return }
+        ) else { return nil }
         engine.deferredSelection = selection
-        loadOffer = WhisperKitModelLoadOffer(selection: selection, sizeBytes: sizeBytes, isOnDisk: isOnDisk(selection))
+        return WhisperKitModelLoadOffer(selection: selection, sizeBytes: sizeBytes, isOnDisk: isOnDisk(selection))
     }
 
     /// False only when the engine already requests exactly `chosen` and has it loaded
