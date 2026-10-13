@@ -163,17 +163,21 @@ final class MicEngineSessionSeamTests: XCTestCase {
         )
     }
 
-    /// The read costs a CoreAudio round trip on the real session, and the
-    /// toggle exists so nothing is spent when it is off.
-    func testNoDeviceIsReadWhenDebugLoggingIsOff() throws {
+    /// The read costs CoreAudio round trips on the real session. It used to be
+    /// skipped with the toggle off; it now also feeds `activeInputDevice`, the
+    /// microphone the app names during a recording, so it is taken on every
+    /// start, and still once: the debug line reuses it.
+    func testTheDeviceIsReadOncePerStartWithDebugLoggingOff() throws {
         let session = FakeSession()
+        session.reportedInputDevice = MicInputDevice(uid: "BuiltInMicrophoneDevice", name: "MacBook Pro Microphone")
         let (handler, url) = makeHandler(session)
         defer { try? FileManager.default.removeItem(at: url) }
 
         try handler.start()
+        XCTAssertEqual(handler.activeInputDevice, session.reportedInputDevice)
         handler.stop()
 
-        XCTAssertEqual(session.boundInputDeviceReads, 0)
+        XCTAssertEqual(session.boundInputDeviceReads, 1)
     }
 
     // MARK: - Converter ownership (issue #589)

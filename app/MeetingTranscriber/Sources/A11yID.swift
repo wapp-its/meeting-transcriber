@@ -59,6 +59,10 @@ enum A11yID {
         "jobRetryButton.\(index)"
     }
 
+    /// The device picker in the menu bar's Microphone submenu. One fixed
+    /// value: no device UID or name in it, for the reason the job rows give.
+    static let menuMicrophonePicker = "menuMicrophonePicker"
+
     /// Menu bar job row's Remove button on a failed job, addressed by ROW
     /// INDEX for the same reason as `jobRetryButton`.
     static func jobRemoveButton(_ index: Int) -> String {

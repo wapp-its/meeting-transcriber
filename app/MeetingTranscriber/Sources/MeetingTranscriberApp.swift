@@ -173,6 +173,8 @@ struct MeetingTranscriberApp: App {
                 appState.answerConsentQuestion(question, granted: granted)
             },
             onQuit: quit,
+            onSelectMicrophone: { appState.settings.micDeviceUID = $0 },
+            microphoneMenu: appState.microphoneMenuState,
         )
     }
 

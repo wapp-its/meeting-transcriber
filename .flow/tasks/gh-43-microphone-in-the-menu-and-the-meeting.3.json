@@ -11,7 +11,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-43-microphone-in-the-menu-and-the-meeting",
   "spec_path": ".flow/tasks/gh-43-microphone-in-the-menu-and-the-meeting.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "MicrophoneController applies a changed choice to the running recording and tracks the recorded device",
   "updated_at": "2026-10-06T20:38:11.394343Z"
 }
