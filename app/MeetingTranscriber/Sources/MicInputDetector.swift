@@ -44,10 +44,12 @@ class MicInputDetector: MeetingDetecting {
         /// An app added through "Add App…" always asks before recording: it
         /// has no "record without asking" switch, and its display name can
         /// equal a built-in app's, whose switch must not carry over to it.
+        /// For the same reason it is keyed by its bundle ID, not its name.
         var meetingPattern: AppMeetingPattern {
             guard usesBuiltInMeetingPattern else {
                 return AppMeetingPattern(
                     appName: appName, ownerNames: [appName], meetingPatterns: [], requiresRecordingConsent: true,
+                    identityKey: AddedAppIdentity.key(bundleID: bundleIDs.first ?? appName),
                 )
             }
             return AppMeetingPattern.forAppName(appName)
