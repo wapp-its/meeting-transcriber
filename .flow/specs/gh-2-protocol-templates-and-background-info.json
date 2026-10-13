@@ -879,7 +879,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-2-protocol-templates-and-background-info.md",
-  "status": "open",
+  "status": "done",
   "title": "Protocol templates and background info per meeting",
   "tracker": {
     "baseHashFlow": null,
@@ -893,5 +893,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/2"
   },
-  "updated_at": "2026-10-13T21:11:15.754049Z"
+  "updated_at": "2026-10-13T21:19:41.918816Z"
 }
