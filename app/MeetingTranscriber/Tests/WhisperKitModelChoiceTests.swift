@@ -20,9 +20,10 @@ final class WhisperKitModelChoiceTests: XCTestCase {
         var loads: [WhisperKitModelSelection] = []
     }
 
-    /// What the engine reported while a load was in flight.
+    /// What the engine reported, and the offer made, while a load was in flight.
     private final class InFlightProbe {
         var engineState: EngineModelState?
+        var offer: WhisperKitModelLoadOffer?
     }
 
     /// Install a source that loads every model from a temporary folder into a
@@ -53,13 +54,13 @@ final class WhisperKitModelChoiceTests: XCTestCase {
 
     // MARK: - When to offer
 
-    func testShouldOfferOnlyWhenTheAnswerDecidesWhatLoads() {
+    func testShouldOfferOnlyWhenTheChosenModelIsNotAlreadyLoadedOrLoading() {
         let smallFromAnotherRepository = WhisperKitModelSelection(variant: small.variant, origin: swissGerman.origin)
         let cases: [(engine: WhisperKitModelSelection, state: EngineModelState, expected: Bool, why: String)] = [
             (turbo, .loaded, true, "another variant is loaded"),
             (turbo, .unloaded, true, "another variant is requested but not loaded"),
-            (turbo, .downloading, false, "a load in flight goes on to the chosen model whatever the answer"),
-            (turbo, .loading, false, "a load in flight goes on to the chosen model whatever the answer"),
+            (turbo, .downloading, true, "another variant is downloading"),
+            (turbo, .loading, true, "another variant is loading"),
             (smallFromAnotherRepository, .loaded, true, "the same folder name from another repository is another model"),
             (small, .unloaded, true, "the chosen model is requested but not loaded"),
             (small, .loaded, false, "the chosen model is loaded"),
@@ -105,30 +106,6 @@ final class WhisperKitModelChoiceTests: XCTestCase {
         XCTAssertNil(choice.loadOffer)
     }
 
-    /// A load already running when the pick lands (the launch preload, say) goes on
-    /// to the picked model once it finishes, so "Later" could not hold. The picker's
-    /// order is kept: the offer is decided first, and the settings observer applies
-    /// the pick to the engine a main-actor turn later.
-    func testAPickDuringALoadOffersNothingAndTheLoadGoesOnToIt() async throws {
-        let engine = WhisperKitEngine()
-        let choice = WhisperKitModelChoice()
-        let probe = InFlightProbe()
-        let small = small
-        let recorder = try await installRecordingSource(on: engine) { [turbo] loading in
-            guard loading == turbo else { return }
-            probe.engineState = engine.modelState
-            choice.offerLoad(for: small, sizeBytes: 486_487_465, engine: engine) { _ in false }
-            engine.applyModelVariant(small.variant, origin: small.origin)
-        }
-
-        await engine.loadModel(for: turbo)
-
-        XCTAssertEqual(probe.engineState, .loading, "Precondition: the pick landed while a load was in flight")
-        XCTAssertNil(choice.loadOffer)
-        XCTAssertEqual(recorder.loads, [turbo, small], "The load in flight went on to the picked model")
-        XCTAssertEqual(engine.modelState, .loaded)
-    }
-
     // MARK: - Load now / Later
 
     /// The settings observer applies a pick a main-actor turn later, so the engine
@@ -148,6 +125,68 @@ final class WhisperKitModelChoiceTests: XCTestCase {
         XCTAssertEqual(recorder.loads, [turbo, swissGerman])
         XCTAssertEqual(engine.modelState, .loaded)
         XCTAssertEqual(WhisperKitModelSelection(variant: engine.modelVariant, origin: engine.modelOrigin), swissGerman)
+    }
+
+    /// A load already running when the pick lands (the launch preload, say) would go
+    /// on to the picked model once it finishes. "Later" stops it there. The picker's
+    /// order is kept: the offer is made first, the settings observer applies the pick
+    /// to the engine a main-actor turn later, and the user answers after that.
+    func testLaterDuringALoadStopsItBeforeThePickedModel() async throws {
+        let engine = WhisperKitEngine()
+        let choice = WhisperKitModelChoice()
+        let probe = InFlightProbe()
+        let small = small
+        let recorder = try await installRecordingSource(on: engine) { [turbo] loading in
+            guard loading == turbo else { return }
+            probe.engineState = engine.modelState
+            choice.offerLoad(for: small, sizeBytes: 486_487_465, engine: engine) { _ in false }
+            engine.applyModelVariant(small.variant, origin: small.origin)
+            probe.offer = choice.loadOffer
+            if let offer = choice.loadOffer { choice.loadLater(offer, engine: engine) }
+        }
+
+        await engine.loadModel(for: turbo)
+
+        XCTAssertEqual(probe.engineState, .loading, "Precondition: the pick landed while a load was in flight")
+        XCTAssertEqual(probe.offer?.selection, small, "A pick during a load still asks")
+        XCTAssertNil(choice.loadOffer)
+        XCTAssertEqual(recorder.loads, [turbo], "The picked model must wait for its first use")
+        XCTAssertEqual(engine.modelState, .unloaded)
+        XCTAssertEqual(WhisperKitModelSelection(variant: engine.modelVariant, origin: engine.modelOrigin), small)
+    }
+
+    /// "Later" never holds up a transcription: the first use loads the deferred model.
+    /// The audio does not exist, so the decode fails after the load; only the load is
+    /// under test.
+    func testATranscriptionLoadsADeferredModel() async throws {
+        let engine = WhisperKitEngine()
+        let recorder = try await installRecordingSource(on: engine)
+        engine.applyModelVariant(small.variant, origin: small.origin)
+        engine.deferredSelection = small
+
+        _ = try? await engine.transcribeSegments(audioPath: URL(fileURLWithPath: "/nonexistent/wk-choice-audio.wav"))
+
+        XCTAssertEqual(recorder.loads, [small])
+        XCTAssertEqual(engine.modelState, .loaded)
+    }
+
+    /// "Load Model" after "Later" loads the model the user just deferred.
+    func testAnExplicitLoadOverrulesLater() async throws {
+        let engine = WhisperKitEngine()
+        let recorder = try await installRecordingSource(on: engine)
+        let choice = WhisperKitModelChoice()
+        choice.offerLoad(for: small, sizeBytes: 486_487_465, engine: engine) { _ in false }
+        engine.applyModelVariant(small.variant, origin: small.origin)
+        let offer = try XCTUnwrap(choice.loadOffer)
+        choice.loadLater(offer, engine: engine)
+        await engine.loadModel()
+        XCTAssertEqual(recorder.loads, [], "Precondition: a preload leaves the deferred model alone")
+
+        await engine.loadModel(for: small)
+
+        XCTAssertEqual(recorder.loads, [small])
+        XCTAssertEqual(engine.modelState, .loaded)
+        XCTAssertNil(engine.deferredSelection)
     }
 
     func testDeclineClearsTheOfferAndLoadsNothing() async throws {

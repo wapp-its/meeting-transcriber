@@ -34,9 +34,8 @@ struct WhisperKitModelLoadOffer: Equatable {
 final class WhisperKitModelChoice {
     private(set) var loadOffer: WhisperKitModelLoadOffer?
 
-    /// Offer to load `selection`, unless the answer would decide nothing: the engine
-    /// already holds exactly it, or a load is in flight. `isOnDisk` is asked only when
-    /// an offer is made.
+    /// Offer to load `selection`, unless the engine already loads or holds exactly it.
+    /// `isOnDisk` is asked only when an offer is made.
     func offerLoad(
         for selection: WhisperKitModelSelection,
         sizeBytes: Int64?,
@@ -52,28 +51,18 @@ final class WhisperKitModelChoice {
         loadOffer = WhisperKitModelLoadOffer(selection: selection, sizeBytes: sizeBytes, isOnDisk: isOnDisk(selection))
     }
 
-    /// False when the engine already holds exactly `chosen`, and whenever a load is in
-    /// flight, whichever model it is for: `WhisperKitEngine.loadModel` goes on to the
-    /// model requested when it finishes, so the chosen model loads next whatever the
-    /// answer, and "Later" could not hold. The engine's request may still be the
-    /// previous model when this runs, because the settings observer applies a change a
-    /// main-actor turn later, so a different model always reads as a change.
+    /// False only when the engine already requests exactly `chosen` and has it loaded
+    /// or is loading it. The engine's request may still be the previous model when
+    /// this runs, because the settings observer applies a change a main-actor turn
+    /// later, so a different model always reads as a change.
     static func shouldOffer(
         chosen: WhisperKitModelSelection,
         engineVariant: String,
         engineOrigin: WhisperKitModelOrigin,
         engineState: EngineModelState,
     ) -> Bool {
-        switch engineState {
-        case .downloading, .loading:
-            false
-
-        case .loaded:
-            chosen.variant != engineVariant || chosen.origin != engineOrigin
-
-        case .unloaded:
-            true
-        }
+        let engineRequestsChosen = chosen.variant == engineVariant && chosen.origin == engineOrigin
+        return !engineRequestsChosen || engineState == .unloaded
     }
 
     /// "Load now". Loads the offer it is given, not whatever `loadOffer` holds by the
@@ -84,7 +73,15 @@ final class WhisperKitModelChoice {
         return Task { await engine.loadModel(for: offer.selection) }
     }
 
-    /// "Later": the model loads on first use, as without the offer.
+    /// "Later": the model loads on first use, as without the offer. A load still
+    /// running for the previous model stops when it finishes instead of going on to
+    /// this one; one already loading this model cannot be stopped and completes.
+    func loadLater(_ offer: WhisperKitModelLoadOffer, engine: WhisperKitEngine) {
+        loadOffer = nil
+        engine.deferredSelection = offer.selection
+    }
+
+    /// The alert was dismissed, which SwiftUI also does around either button's action.
     func decline() {
         loadOffer = nil
     }
@@ -109,8 +106,9 @@ extension WhisperKitEngine {
     /// Load `selection`, applying it to the engine first. The settings observer
     /// reaches the engine a main-actor turn after a settings write, so a load started
     /// right after one would otherwise load the previous model. Shared by "Load now"
-    /// and the "Load Model" button.
+    /// and the "Load Model" button, which also overrule an earlier "Later".
     func loadModel(for selection: WhisperKitModelSelection) async {
+        deferredSelection = nil
         applyModelVariant(selection.variant, origin: selection.origin)
         await loadModel()
     }

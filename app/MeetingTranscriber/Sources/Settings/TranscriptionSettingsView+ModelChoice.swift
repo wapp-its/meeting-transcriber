@@ -43,7 +43,7 @@ extension View {
             presenting: choice.loadOffer,
         ) { offer in
             Button("Load now") { choice.accept(offer, engine: engine) }
-            Button("Later", role: .cancel) {}
+            Button("Later", role: .cancel) { choice.loadLater(offer, engine: engine) }
         } message: { offer in
             Text(offer.message)
         }

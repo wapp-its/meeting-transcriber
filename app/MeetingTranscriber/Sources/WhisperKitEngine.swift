@@ -84,6 +84,11 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
     /// Test-only loader override used to count content reads on cache hits.
     private var vocabularyTermsLoaderOverride: ((String, WhisperVocabularyPrompt.FileRevision) -> WhisperVocabularyPrompt.VocabularyTermsLoadResult)?
     private let modelLoad = SingleFlight<LoadAttempt>()
+    /// A model the user chose to load on first use ("Later" in Settings). A load that
+    /// would start it stops instead, also one still running for the previous model;
+    /// a transcription's load does not, it needs the model now. Cleared by an explicit
+    /// load (`loadModel(for:)`).
+    var deferredSelection: WhisperKitModelSelection?
     /// The Hugging Face token every Hub request of a load carries, `""` for none. Read
     /// by the production source when it downloads or builds a pipe, never by a test
     /// source. Anonymous by default, so an engine built in a test never reads the Keychain.
@@ -150,6 +155,10 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
     }
 
     func loadModel() async {
+        await loadModel(stoppingAtDeferred: true)
+    }
+
+    private func loadModel(stoppingAtDeferred: Bool) async {
         // Two decisions recorded here so they are not re-derived. The general form
         // would be a named `loadedVariant`, with readiness defined as
         // `loadedVariant == modelVariant`, which states the invariant directly and
@@ -174,6 +183,10 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
             // to stop it. Nothing below checks cancellation: the CoreML init is not
             // interruptible, so this is the only point where it can take effect.
             if Task.isCancelled { return }
+            // Same point for a deferred model: nothing loads until a pass would start it.
+            if stoppingAtDeferred, deferredSelection == WhisperKitModelSelection(variant: modelVariant, origin: modelOrigin) {
+                return
+            }
 
             let attempt = await modelLoad.run { [self] in await performLoad() }
 
@@ -312,7 +325,7 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
         // make automation report a real model as loaded.
         if pipe != nil || decodingClientOverride != nil { return }
         logger.info("WhisperKit: model not loaded, loading \(self.modelVariant, privacy: .public)...")
-        await loadModel()
+        await loadModel(stoppingAtDeferred: false)
         guard pipe != nil else {
             logger.error("WhisperKit: model load FAILED, state=\(String(describing: self.modelState), privacy: .public)")
             throw lastLoadFailure ?? TranscriptionError.modelNotLoaded
