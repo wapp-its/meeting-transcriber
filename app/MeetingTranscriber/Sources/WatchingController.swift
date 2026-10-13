@@ -12,8 +12,9 @@ import Observation
 /// god-class split). Unlike the earlier leaf controllers, watching is a hub: it
 /// reaches across the already-extracted siblings — `pipeline` (to rebuild/ensure
 /// the queue and pass it to the loop), `channelHealth` (start/stop on state
-/// transitions), `permissions` (seed the loop's permission checker), and
-/// `liveTranscription` (attach live sinks to each recorder). It holds those
+/// transitions), `permissions` (seed the loop's permission checker),
+/// `liveTranscription` (attach live sinks to each recorder) and `microphone`
+/// (attach/detach on the same transitions as `channelHealth`). It holds those
 /// siblings as direct references (not an `AppState` back-reference) since they
 /// are all constructed before this controller in `AppState.init`.
 ///
@@ -50,6 +51,8 @@ final class WatchingController {
     private let channelHealth: ChannelHealthController
     private let permissions: PermissionsController
     let liveTranscription: LiveTranscriptionCoordinator
+    /// Nil where the caller supplies none, as most tests do.
+    private let microphone: MicrophoneController?
 
     /// Microphone-access gate. Injectable so tests skip the real TCC prompt; the
     /// return value is intentionally ignored (the loop is created regardless, and
@@ -128,6 +131,7 @@ final class WatchingController {
         channelHealth: ChannelHealthController,
         permissions: PermissionsController,
         liveTranscription: LiveTranscriptionCoordinator,
+        microphone: MicrophoneController? = nil,
         ensureMicAccess: @escaping () async -> Bool = { await Permissions.ensureMicrophoneAccess() },
         requestScreenRecording: @escaping () -> Void = { Permissions.ensureScreenRecordingAccess() },
         requestAccessibility: @escaping () -> Void = {
@@ -145,6 +149,7 @@ final class WatchingController {
         self.channelHealth = channelHealth
         self.permissions = permissions
         self.liveTranscription = liveTranscription
+        self.microphone = microphone
         self.ensureMicAccess = ensureMicAccess
         self.requestScreenRecording = requestScreenRecording
         self.requestAccessibility = requestAccessibility
@@ -244,7 +249,7 @@ final class WatchingController {
                     pollInterval: settings.pollInterval,
                     endGracePeriod: settings.endGrace,
                     noMic: settings.noMic,
-                    micDeviceUID: settings.micDeviceUID.isEmpty ? nil : settings.micDeviceUID,
+                    micDeviceUID: { [settings] in settings.micDeviceUID.isEmpty ? nil : settings.micDeviceUID },
                     verboseDiagnostics: { [settings] in settings.verboseDiagnostics },
                     recordOnly: { [settings] in settings.recordOnly },
                     // Decided per write, not per poll: the loop calls this once
@@ -471,7 +476,7 @@ final class WatchingController {
             pipelineQueue: pipeline.queue,
             pollInterval: settings.pollInterval,
             noMic: settings.noMic,
-            micDeviceUID: settings.micDeviceUID.isEmpty ? nil : settings.micDeviceUID,
+            micDeviceUID: { [settings] in settings.micDeviceUID.isEmpty ? nil : settings.micDeviceUID },
             verboseDiagnostics: { [settings] in settings.verboseDiagnostics },
             recordOnly: { [settings] in settings.recordOnly },
             // Same seam as the auto-watch loop above: per write, through the
@@ -532,8 +537,8 @@ final class WatchingController {
 
     // MARK: - State-change handler
 
-    /// Attaches the state-change callback that drives channel-health monitoring
-    /// and post-`.error` notifications. Shared between the auto-detect path
+    /// Attaches the state-change callback that drives channel-health monitoring,
+    /// the microphone controller and post-`.error` notifications. Shared between the auto-detect path
     /// (`toggleWatching`) and the manual-recording path (`startManualRecording`)
     /// so the red-tint indicator + asymmetric-silence notification fire in both.
     /// `notifyOnRecording` only fires "Meeting Detected" notifications for the
@@ -565,6 +570,10 @@ final class WatchingController {
                     self?.channelHealth.start(source: source) { [weak self] in
                         self?.watchLoop?.activeRecorder
                     }
+                    let appName = loop?.manualRecordingInfo?.appName ?? loop?.currentMeeting?.pattern.appName
+                    self?.microphone?.recordingStarted(source: source, meetingAppName: appName) { [weak self] in
+                        self?.watchLoop?.activeRecorder
+                    }
                 }
 
             case .error:
@@ -572,9 +581,11 @@ final class WatchingController {
                     notifier.notify(title: "Error", body: err)
                 }
                 self?.channelHealth.stop()
+                self?.microphone?.recordingStopped()
 
             default:
                 self?.channelHealth.stop()
+                self?.microphone?.recordingStopped()
             }
         }
     }

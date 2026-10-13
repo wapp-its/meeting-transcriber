@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import AVFoundation
 @testable import MeetingTranscriber
 import XCTest
@@ -111,8 +112,8 @@ final class WatchLoopMeetingEndTests: XCTestCase { // swiftlint:disable:this bal
 
     /// Three 16 kHz tracks shaped like a dual-source recording, 30 s unless
     /// a test needs them to outlast the virtual clock.
-    private func makeRecorderWithTracks(seconds: Int = 30) throws -> MockRecorder {
-        let recorder = MockRecorder()
+    private func makeRecorderWithTracks(seconds: Int = 30) throws -> StoreOrderRecorder {
+        let recorder = StoreOrderRecorder()
         let samples = (0 ..< seconds * 16000).map { Float($0 % 1000) / 2000 }
         var urls: [URL] = []
         for suffix in [RecordingFileSuffix.mix, RecordingFileSuffix.app, RecordingFileSuffix.mic] {
@@ -134,6 +135,18 @@ final class WatchLoopMeetingEndTests: XCTestCase { // swiftlint:disable:this bal
 
     private func seconds(_ date: Date?) -> TimeInterval? {
         date?.timeIntervalSince(Harness.start)
+    }
+
+    /// Notes how many questions had gone out at each store of a cut, which
+    /// says whether the cut was stored before its question was posted.
+    private final class StoreOrderRecorder: MockRecorder {
+        var questionsPosted: () -> Int = { 0 }
+        private(set) var postedAtStore: [Int] = []
+
+        override func storePendingCut(cutAt: Date, deadline: Date, startedAt: Date) throws {
+            postedAtStore.append(questionsPosted())
+            try super.storePendingCut(cutAt: cutAt, deadline: deadline, startedAt: startedAt)
+        }
     }
 
     /// Reports how its mix was made, as `buildRecording` does.
@@ -242,6 +255,7 @@ final class WatchLoopMeetingEndTests: XCTestCase { // swiftlint:disable:this bal
         XCTAssertEqual(try paths.map { try Data(contentsOf: XCTUnwrap($0)) }, originals, "every track as recorded")
         XCTAssertEqual(queue.jobs.count, 1, "never discarded")
         XCTAssertEqual(harness.diagnostics.lines(.warning, startingWith: "recording_cut_failed").count, 1)
+        XCTAssertEqual(recorder.calls.suffix(2), [resolved(keeping: 10, endedAt: 130), .clearPendingCut], "cleared all the same")
     }
 
     // MARK: - R2: Stop now
@@ -369,6 +383,8 @@ final class WatchLoopMeetingEndTests: XCTestCase { // swiftlint:disable:this bal
         XCTAssertEqual(try trackFrames(recorder), [240_000, 240_000, 240_000], "every track ends at the cut point")
         XCTAssertEqual(harness.notifier.withdrawnMeetingEndQuestions, harness.askedIDs, "the question is taken back")
         XCTAssertTrue(harness.autoStopLines.isEmpty, "stopping by hand is not an automatic stop")
+        // Settled although Stop Watching let go of the active recorder first.
+        XCTAssertEqual(recorder.calls, [.start, stored(cutAt: 15), .stop, resolved(keeping: 15, endedAt: 30), .clearPendingCut])
     }
 
     /// R4: a Keep recording that arrived in time stands even when watching
@@ -397,6 +413,7 @@ final class WatchLoopMeetingEndTests: XCTestCase { // swiftlint:disable:this bal
         XCTAssertEqual(queue.jobs.count, 1)
         XCTAssertEqual(try trackFrames(recorder), [480_000, 480_000, 480_000], "kept whole, as the person chose")
         XCTAssertTrue(harness.diagnostics.lines(.notice, startingWith: "recording_cut").isEmpty, "nothing was cut")
+        XCTAssertEqual(recorder.calls, [.start, stored(cutAt: 15), .clearPendingCut, .stop], "cleared before the stop")
     }
 
     // MARK: - The cap during the question
@@ -450,5 +467,196 @@ final class WatchLoopMeetingEndTests: XCTestCase { // swiftlint:disable:this bal
                 "balanced \(balanced), app track \(withApp)",
             )
         }
+    }
+}
+
+// MARK: - The stored cut
+
+/// While the question is open its cut is stored with the recording, so a crash
+/// while asking still ends the recording there, and every end settles it. Read
+/// from the recorder's call log.
+extension WatchLoopMeetingEndTests {
+    private typealias Tick = @MainActor (Harness, WatchLoop?, TimeInterval) -> Void
+
+    private static let ioError = NSError(domain: NSPOSIXErrorDomain, code: 5)
+
+    private func at(_ seconds: TimeInterval) -> Date {
+        Harness.start.addingTimeInterval(seconds)
+    }
+
+    /// The cut stored by a question asked at `cutAt`, which is the loss plus
+    /// grace, in a recording started at 0 s.
+    private func stored(cutAt: TimeInterval = 10) -> MockRecorder.Call {
+        .storePendingCut(cutAt: at(cutAt), deadline: at(cutAt + 120), startedAt: Harness.start)
+    }
+
+    private func resolved(keeping seconds: TimeInterval, endedAt: TimeInterval) -> MockRecorder.Call {
+        .recordPendingCutResolution(keptSeconds: seconds, captureEndedAt: at(endedAt))
+    }
+
+    /// One meeting through `handleMeeting`, its signal gone from the first
+    /// poll. Returns whether it threw: a failing stop is under test here.
+    @discardableResult
+    private func record(
+        _ recorder: MockRecorder,
+        on harness: Harness = Harness(),
+        maxDuration: TimeInterval = 3600,
+        onTick: @escaping Tick = { _, _, _ in },
+    ) async -> Bool {
+        let loop = harness.makeLoop(recorder: recorder, maxDuration: maxDuration)
+        harness.onTick = { [weak loop] h, t in onTick(h, loop, t) }
+        do {
+            try await loop.handleMeeting(meeting)
+            return false
+        } catch {
+            return true
+        }
+    }
+
+    /// The cut is stored before the question goes out; after the stop, with
+    /// every track still whole, the stored cut learns where the cut lands and
+    /// when capture ended; after the cut it is cleared once. Stop now keeps
+    /// 25 s, not 10: the 30 s tracks outlast the clock's 15 s.
+    func testAnEndOutOfTheQuestionResolvesTheStoredCutBeforeCuttingAndClearsItAfter() async throws {
+        let ends: [(name: String, maxDuration: TimeInterval, kept: TimeInterval, act: Tick)] = [
+            ("countdown expiry", 3600, 10, { _, _, _ in }),
+            ("Stop now", 3600, 25, { h, _, t in if t == 15 { h.answerFirstQuestion(.stopNow) } }),
+            ("the cap", 50, 10, { _, _, _ in }),
+            ("a stop by hand", 3600, 10, { _, loop, t in if t == 30 { loop?.stopDetectedRecording() } }),
+        ]
+        for (name, maxDuration, kept, act) in ends {
+            tmpDir = try makeTempDirectory(prefix: "meeting-end-stored")
+            let harness = Harness()
+            let recorder = try makeRecorderWithTracks()
+            recorder.questionsPosted = { harness.askedIDs.count }
+            var framesAtResolution: [AVAudioFramePosition] = []
+            recorder.duringPendingCutResolution = { [weak recorder] in
+                framesAtResolution = recorder.flatMap { try? self.trackFrames($0) } ?? []
+            }
+
+            await record(recorder, on: harness, maxDuration: maxDuration, onTick: act)
+
+            let stoppedAt = harness.elapsed
+            XCTAssertEqual(recorder.postedAtStore, [0], "\(name): stored before the question is posted")
+            XCTAssertEqual(recorder.calls, [.start, stored(), .stop, resolved(keeping: kept, endedAt: stoppedAt), .clearPendingCut], name)
+            XCTAssertEqual(framesAtResolution, [480_000, 480_000, 480_000], "\(name): resolved before any track is cut")
+            let frames = AVAudioFramePosition(kept * 16000)
+            XCTAssertEqual(try trackFrames(recorder), [frames, frames, frames], "\(name): cut to the resolved seconds")
+        }
+    }
+
+    /// Each failure of the stored cut is logged with domain and code and no
+    /// path, and the countdown still ends the recording cut back as before.
+    func testAFailedWriteOrRemovalOfTheStoredCutIsLoggedAndTheRecordingStillCut() async throws {
+        let unlink = NSError(domain: NSCocoaErrorDomain, code: 513)
+        let write = { (published: Bool) in PendingCutWriteError(published: published, underlying: Self.ioError) }
+        let (io, denied) = ("domain=NSPOSIXErrorDomain code=5", "domain=NSCocoaErrorDomain code=513")
+        let failures: [(fail: @MainActor (MockRecorder) -> Void, line: String)] = [
+            ({ $0.storePendingCutError = write(false) }, "pending_cut_write_failed \(io) published=false"),
+            ({ $0.recordPendingCutResolutionError = write(true) }, "pending_cut_write_failed \(io) published=true"),
+            ({ $0.clearPendingCutOutcome = .removedNotSynced(Self.ioError) }, "pending_cut_remove_failed \(io) emptied=false"),
+            ({ $0.clearPendingCutOutcome = .emptied(unlinkError: unlink) }, "pending_cut_remove_failed \(denied) emptied=true"),
+            ({ $0.clearPendingCutOutcome = .failed(unlinkError: unlink, emptyError: Self.ioError) }, "pending_cut_remove_failed \(denied) emptied=false"),
+        ]
+        for (fail, line) in failures {
+            tmpDir = try makeTempDirectory(prefix: "meeting-end-stored-failure")
+            let harness = Harness()
+            let recorder = try makeRecorderWithTracks()
+            fail(recorder)
+
+            await record(recorder, on: harness)
+
+            XCTAssertEqual(harness.diagnostics.lines(.warning, startingWith: "pending_cut"), [line])
+            XCTAssertEqual(harness.elapsed, 130, line)
+            XCTAssertEqual(try trackFrames(recorder), [160_000, 160_000, 160_000], "\(line): cut back as before")
+            XCTAssertEqual(recorder.calls.last, .clearPendingCut, line)
+        }
+    }
+
+    /// Keep recording and a returning signal clear the stored cut at once,
+    /// also after a store that failed with its record published. The cap then
+    /// ends the recording uncut and clears again, before the stop.
+    func testASettledQuestionClearsItsStoredCutAtOnceEvenAfterAFailedStore() async {
+        let settles: [(name: String, act: Tick)] = [
+            ("Keep recording", { h, _, t in if t == 15 { h.answerFirstQuestion(.keepRecording) } }),
+            ("a returning signal", { h, _, t in if t == 20 { h.signal.active = true } }),
+        ]
+        for (name, act) in settles {
+            for storeFails in [false, true] {
+                let recorder = makeMockRecorder()
+                if storeFails { recorder.storePendingCutError = PendingCutWriteError(published: true, underlying: Self.ioError) }
+
+                await record(recorder, maxDuration: 30, onTick: act)
+
+                XCTAssertEqual(recorder.calls, [.start, stored(), .clearPendingCut, .clearPendingCut, .stop], "\(name), store failed: \(storeFails)")
+            }
+        }
+    }
+
+    /// The signal returns at 20 s and the stored cut goes with the question;
+    /// lost again at 30 s, the fresh question stores the new cut point.
+    func testALaterLossStoresAFreshCutAfterAReturningSignalClearedTheFirst() async throws {
+        let recorder = try makeRecorderWithTracks()
+
+        await record(recorder) { h, _, t in
+            if t == 20 { h.signal.active = true }
+            if t == 30 { h.signal.active = false }
+        }
+
+        XCTAssertEqual(recorder.calls, [
+            .start, stored(), .clearPendingCut, stored(cutAt: 40), .stop, resolved(keeping: 40, endedAt: 160), .clearPendingCut,
+        ])
+    }
+
+    /// A stop that carries no cut clears the stored cut before the recorder
+    /// stops, so it is cleared even when the stop throws.
+    func testAStopWithoutACutClearsTheStoredCutBeforeTheRecorderStops() async {
+        let stops: [(name: String, maxDuration: TimeInterval, act: Tick, calls: [MockRecorder.Call])] = [
+            (
+                "the cap on the poll that sees a Keep",
+                50,
+                { h, _, t in if t == 51 { h.answerFirstQuestion(.keepRecording) } },
+                [.start, stored(), .clearPendingCut, .stop],
+            ),
+            (
+                "a stop by hand before any question",
+                3600,
+                { _, loop, t in if t == 5 { loop?.stopDetectedRecording() } },
+                [.start, .clearPendingCut, .stop],
+            ),
+        ]
+        for (name, maxDuration, act, calls) in stops {
+            for stopThrows in [false, true] {
+                let recorder = makeMockRecorder()
+                if stopThrows { recorder.mixPath = nil }
+
+                let threw = await record(recorder, maxDuration: maxDuration, onTick: act)
+
+                XCTAssertEqual(threw, stopThrows, name)
+                XCTAssertEqual(recorder.calls, calls, "\(name), stop throws: \(stopThrows)")
+            }
+        }
+    }
+
+    /// A stop that carries a cut and throws clears nothing: the stored cut
+    /// goes to recovery with the recording.
+    func testACutCarryingStopThatThrowsClearsNothing() async {
+        let recorder = makeMockRecorder()
+        recorder.mixPath = nil
+
+        let threw = await record(recorder)
+
+        XCTAssertTrue(threw)
+        XCTAssertEqual(recorder.calls, [.start, stored(), .stop])
+    }
+
+    func testAManualRecordingStoresNoCut() async throws {
+        let recorder = makeMockRecorder()
+        let loop = Harness().makeLoop(recorder: recorder)
+
+        try await loop.startMicrophoneRecording()
+        loop.stopManualRecording()
+
+        XCTAssertEqual(recorder.calls, [.start, .stop])
     }
 }

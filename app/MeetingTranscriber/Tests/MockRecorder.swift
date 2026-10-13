@@ -57,18 +57,73 @@ class MockRecorder: RecordingProvider {
     var micSignalAges: ChannelSignalAges = .deliveringSignalNow
     var appSignalAges: ChannelSignalAges = .deliveringSignalNow
 
+    /// The microphone and the tapped processes a test wants the recording to
+    /// report. Defaults match the protocol's: no device, no microphone track,
+    /// no tapped process.
+    var micInputDevice: MicInputDevice?
+    var microphoneTrackActive = false
+    var tappedPIDs: [pid_t] = []
+    /// Every `selectMicrophone(deviceUID:)` call in order, so a test can tell
+    /// how many switches reached the recording and which device each asked for.
+    private(set) var selectMicrophoneCalls: [String?] = []
+
     /// Overrides the `recordingStartDate` `stop()` reports. `nil` (default)
     /// yields `Date()` at stop time, matching a real recorder; set it to pin a
     /// specific meeting-start time (e.g. filename-anchoring tests).
     var recordingStartDate: Date?
 
+    /// One recorder call, with the arguments the stored-cut calls took.
+    enum Call: Equatable {
+        case start
+        case storePendingCut(cutAt: Date, deadline: Date, startedAt: Date)
+        case recordPendingCutResolution(keptSeconds: TimeInterval, captureEndedAt: Date)
+        case clearPendingCut
+        case stop
+    }
+
+    /// Every call in the order it was made, so a test can pin, say, that a
+    /// stored cut is cleared before the recorder stops. A call that fails is
+    /// logged as well.
+    private(set) var calls: [Call] = []
+
+    /// What a stored-cut call fails with. A failing `stop()` is `mixPath` nil.
+    var storePendingCutError: (any Error)?
+    var recordPendingCutResolutionError: (any Error)?
+    var clearPendingCutOutcome: PendingRecordingCut.RemoveOutcome = .removed
+
+    /// Runs inside `recordPendingCutResolution`, before it returns or throws,
+    /// so a test can look at the tracks at the moment the resolution is stored.
+    var duringPendingCutResolution: (() -> Void)?
+
     func start(source: RecordingSource, micDeviceUID: String?, debugLogging _: Bool) {
+        calls.append(.start)
         startCalled = true
         capturedSource = source
         capturedMicDeviceUID = micDeviceUID
     }
 
+    func selectMicrophone(deviceUID: String?) {
+        selectMicrophoneCalls.append(deviceUID)
+    }
+
+    func storePendingCut(cutAt: Date, deadline: Date, startedAt: Date) throws {
+        calls.append(.storePendingCut(cutAt: cutAt, deadline: deadline, startedAt: startedAt))
+        if let storePendingCutError { throw storePendingCutError }
+    }
+
+    func recordPendingCutResolution(keptSeconds: TimeInterval, captureEndedAt: Date) throws {
+        calls.append(.recordPendingCutResolution(keptSeconds: keptSeconds, captureEndedAt: captureEndedAt))
+        duringPendingCutResolution?()
+        if let recordPendingCutResolutionError { throw recordPendingCutResolutionError }
+    }
+
+    func clearPendingCut() -> PendingRecordingCut.RemoveOutcome {
+        calls.append(.clearPendingCut)
+        return clearPendingCutOutcome
+    }
+
     func stop() throws -> RecordingResult {
+        calls.append(.stop)
         stopCalled = true
         guard let mix = mixPath else {
             throw RecorderError.noAudioData

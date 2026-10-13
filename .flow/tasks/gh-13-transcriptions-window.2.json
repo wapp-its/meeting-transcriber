@@ -11,7 +11,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-13-transcriptions-window",
   "spec_path": ".flow/tasks/gh-13-transcriptions-window.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Transcription list logic and controller actions",
   "updated_at": "2026-10-06T20:35:05.193835Z"
 }

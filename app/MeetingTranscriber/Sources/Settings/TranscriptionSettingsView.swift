@@ -6,6 +6,8 @@ struct TranscriptionSettingsView: View {
     @Bindable var settings: AppSettings
     var whisperKitEngine: WhisperKitEngine
     var parakeetEngine: ParakeetEngine
+    /// Forwarded to `VocabularySourceSettingsView`; nil hides its status line.
+    var remoteVocabulary: RemoteVocabularyController?
 
     /// Set when the user flips live captions on while a first-use Nemotron model
     /// download is pending — defers the actual enable to the consent alert.
@@ -32,14 +34,14 @@ struct TranscriptionSettingsView: View {
     /// `body`: inline, this section made `body` the slowest body in the app
     /// to type-check, close enough to the 300 ms limit CI enforces that a
     /// slow runner pushed it over. Each property stands for exactly one of the
-    /// section's former direct children, in the same order: view tests reach
-    /// some controls by their position in the section, so merging two of them
-    /// into one property would move every control after it.
+    /// section's direct children, in order; the vocabulary-source controls are
+    /// a view of their own (`VocabularySourceSettingsView`) for the same reason.
     private var transcriptionSection: some View {
         Section("Transcription") {
             enginePicker
             whisperKitPickers
             parakeetLanguagePicker
+            VocabularySourceSettingsView(settings: settings, remoteVocabulary: remoteVocabulary)
             customVocabularyRow
             customVocabularyValidation
             whisperKitVocabularyPromptControls
@@ -101,34 +103,41 @@ struct TranscriptionSettingsView: View {
         }
     }
 
-    private var customVocabularyRow: some View {
-        HStack {
-            TextField("Custom vocabulary file", text: Binding(
-                get: { settings.customVocabularyPath },
-                set: { settings.setCustomVocabularyPath($0) },
-            ))
-            .textFieldStyle(.roundedBorder)
-            .accessibilityIdentifier(A11yID.customVocabularyPathField)
-            Button("Choose\u{2026}") {
-                let panel = NSOpenPanel()
-                panel.allowedContentTypes = [.plainText]
-                panel.allowsMultipleSelection = false
-                if panel.runModal() == .OK, let url = panel.url {
-                    settings.setCustomVocabularyFile(url)
+    /// Shown only for the local-file source; the selection is kept while the
+    /// URL source is active, for switching back.
+    @ViewBuilder private var customVocabularyRow: some View {
+        if settings.vocabularySource == .file {
+            HStack {
+                TextField("Custom vocabulary file", text: Binding(
+                    get: { settings.customVocabularyPath },
+                    set: { settings.setCustomVocabularyPath($0) },
+                ))
+                .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier(A11yID.customVocabularyPathField)
+                Button("Choose\u{2026}") {
+                    let panel = NSOpenPanel()
+                    panel.allowedContentTypes = [.plainText]
+                    panel.allowsMultipleSelection = false
+                    if panel.runModal() == .OK, let url = panel.url {
+                        settings.setCustomVocabularyFile(url)
+                    }
                 }
             }
+            .help(Self.vocabularyHelpText(for: settings.transcriptionEngine))
+            .accessibilityIdentifier(A11yID.customVocabularyFileRow)
         }
-        .help(Self.vocabularyHelpText(for: settings.transcriptionEngine))
     }
 
-    private var customVocabularyValidation: some View {
-        Text(settings.customVocabularyValidation.message)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .onAppear { settings.refreshCustomVocabularyValidation() }
-            .onChange(of: settings.customVocabularyPath) { _, _ in
-                settings.refreshCustomVocabularyValidation()
-            }
+    @ViewBuilder private var customVocabularyValidation: some View {
+        if settings.vocabularySource == .file {
+            Text(settings.customVocabularyValidation.message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .onAppear { settings.refreshCustomVocabularyValidation() }
+                .onChange(of: settings.customVocabularyPath) { _, _ in
+                    settings.refreshCustomVocabularyValidation()
+                }
+        }
     }
 
     @ViewBuilder

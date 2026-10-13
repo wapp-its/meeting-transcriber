@@ -2,122 +2,15 @@ import AppKit
 import Foundation
 import Observation
 import os.log
-import UserNotifications
-
-// MARK: - AppNotifying
-
-/// Notification abstraction that keeps AppKit out of AppState.
-///
-/// Real implementation: `NotificationManager` (AppKit, used in menu bar app).
-/// Test implementation: `RecordingNotifier` (records calls, no side effects).
-protocol AppNotifying {
-    /// The urgency is part of the requirement, not a defaulted convenience, so
-    /// that a conformer which ignores it has to say so. The reverse shape (a
-    /// 2-arg requirement plus a defaulted 3-arg extension) compiles just as
-    /// well and silently downgrades every time-sensitive notification a
-    /// forgetful conformer receives, which is the exact failure this urgency
-    /// exists to prevent. `notify(title:body:)` lives in the extension below.
-    func notify(title: String, body: String, urgency: NotificationUrgency)
-
-    /// Ask the user whether to record a just-detected meeting (issue #503);
-    /// true = record. `@MainActor` — the real prompt is UI. Defaults to
-    /// false so a notifier without a prompt never records silently.
-    @MainActor
-    func askToRecord(title: String, body: String) async -> ConsentAnswer
-
-    /// Resolve a parked `askToRecord` prompt programmatically (the debug-RPC
-    /// consent hook, issue #503); returns whether one was waiting. Lives on the
-    /// same seam as `askToRecord` so park + resolve share it. Defaults to false
-    /// (no prompt) for notifiers without a real coordinator.
-    func resolveBrowserConsent(granted: Bool) -> Bool
-
-    /// Ask whether a detected meeting whose signal is gone has ended ("Keep
-    /// recording" / "Stop now"), returning at once. `onAnswer` runs when an
-    /// action is tapped, never after the question is withdrawn. Defaults (and
-    /// rationale) in `MeetingEndQuestions.swift`.
-    @MainActor
-    func askBeforeEndingRecording(id: String, title: String, body: String, onAnswer: @escaping MeetingEndQuestionHandler)
-
-    /// Take the question back: out of Notification Center, and no answer to
-    /// it is delivered afterwards.
-    func withdrawMeetingEndQuestion(id: String)
-
-    /// How a posted notification would be presented. On the same seam as
-    /// `askToRecord` because it answers whether that prompt could be SEEN, which
-    /// decides whether a meeting that asks can be recorded at all (see
-    /// `BrowserConsentReadiness`).
-    ///
-    /// Here rather than as a probe closure on `PermissionsController` because
-    /// `NotificationManager` already owns both the scheduler port and the
-    /// `canDeliver` bundle guard this read needs; a separate closure would
-    /// re-derive that guard and add a second injection point to every test that
-    /// already injects a notifier.
-    ///
-    /// `@MainActor` for the same reason as `askToRecord`: `AppNotifying` is not
-    /// Sendable, so a non-isolated async requirement would force callers to send
-    /// the notifier across an actor boundary.
-    @MainActor
-    func notificationVisibility() async -> NotificationVisibility
-
-    #if !APPSTORE
-        /// Recently posted notifications, oldest first, for the debug RPC
-        /// `/state.notifications` snapshot. Defaults to empty — only the
-        /// production `NotificationManager` keeps a log.
-        var recentNotifications: [NotificationRingBuffer.Entry] {
-            get
-        }
-    #endif
-}
-
-#if !APPSTORE
-    extension AppNotifying {
-        var recentNotifications: [NotificationRingBuffer.Entry] {
-            []
-        }
-    }
-#endif
-
-extension AppNotifying {
-    /// Convenience for the majority of notifications, which have no deadline.
-    /// Static dispatch on purpose: it cannot be witnessed, so it can never
-    /// become a lossy override of the requirement above.
-    func notify(title: String, body: String) {
-        notify(title: title, body: body, urgency: .standard)
-    }
-
-    // swiftlint:disable async_without_await
-    /// Deny by default — only `NotificationManager` shows a real prompt, and
-    /// "we could not ask" must never record.
-    @MainActor
-    func askToRecord(title _: String, body _: String) async -> ConsentAnswer {
-        .declined
-    }
-
-    /// Nothing to report by default. Notably this keeps
-    /// `UNUserNotificationCenter.current()` out of every headless context: it
-    /// raises NSInternalInconsistencyException without a real app bundle, so a
-    /// default that reached for it would abort any test touching the notifier.
-    @MainActor
-    func notificationVisibility() async -> NotificationVisibility {
-        .unread
-    }
-
-    // swiftlint:enable async_without_await
-
-    /// No prompt to resolve by default — only `NotificationManager` parks one.
-    func resolveBrowserConsent(granted _: Bool) -> Bool {
-        false
-    }
-}
 
 // MARK: - AppState
 
 /// Observable ViewModel that composes the app's concern-specific controllers
 /// (`engines`, `watching`, `pipeline`, `permissions`, `channelHealth`,
-/// `liveTranscription`, `rpcController`) and exposes the derived UI properties
-/// (badge, status label) the menu-bar scene binds to. It wires the controllers
-/// together rather than owning their state — new concern state belongs in a
-/// controller, not here.
+/// `microphone`, `liveTranscription`, `rpcController`) and exposes the derived
+/// UI properties (badge, status label) the menu-bar scene binds to. It wires the
+/// controllers together rather than owning their state — new concern state
+/// belongs in a controller, not here.
 ///
 /// Extracted from `MeetingTranscriberApp` so badge/watching logic and
 /// `BadgeKind.compute(...)` are testable without the `@main` App struct.
@@ -143,6 +36,11 @@ final class AppState {
     /// etc. by the Settings UI + RPC snapshot.
     let engines: EngineController
 
+    /// Downloads and refreshes the vocabulary of the URL source and publishes
+    /// its status for Settings. Inert until the menu-bar `.task` calls
+    /// `start()`, so constructing an `AppState` touches no cache file.
+    let remoteVocabulary: RemoteVocabularyController
+
     /// Watching / recording lifecycle concern (the active `WatchLoop`, the
     /// auto-detect toggle, manual recording start/stop, the recorder factory,
     /// and the state-change handler), extracted into its own controller. It
@@ -166,6 +64,11 @@ final class AppState {
     /// `WatchingController` wires its `start()` / `stop()` to `WatchLoop` state
     /// transitions, and the menu-bar icon + RPC snapshot read its flags.
     let channelHealth: ChannelHealthController
+
+    /// Which microphone the app records from: hands a changed choice to the
+    /// running recording and publishes the device it records from.
+    /// `WatchingController` attaches it on the same transitions as `channelHealth`.
+    let microphone: MicrophoneController
 
     /// Observable state for the live caption overlay. Always present (the
     /// `LiveCaptionsOverlay` window observes this); content is only populated
@@ -219,6 +122,10 @@ final class AppState {
         UpdateChecker()
     }
 
+    private static func makeRemoteVocabulary(settings: AppSettings) -> RemoteVocabularyController {
+        RemoteVocabularyController(settings: settings)
+    }
+
     // MARK: - Init
 
     init(
@@ -243,11 +150,10 @@ final class AppState {
         // simultaneous ANE / compiler peak that starves the system on a join).
         let warmupQueue = ModelWarmupQueue()
         self.engines = EngineController(settings: settings, warmupQueue: warmupQueue)
+        self.remoteVocabulary = Self.makeRemoteVocabulary(settings: settings)
         self.permissions = PermissionsController(notifier: notifier)
         self.updateChecker = updateChecker ?? Self.makeUpdateChecker()
-        self.pipeline = PipelineController(
-            settings: settings, notifier: notifier, queueEnvironment: pipelineEnvironment,
-        )
+        self.pipeline = PipelineController(settings: settings, notifier: notifier, queueEnvironment: pipelineEnvironment)
         self.channelHealth = ChannelHealthController(
             notifier: notifier,
             debounceSeconds: { [settings] in settings.asymmetricSilenceWarningSeconds },
@@ -261,13 +167,11 @@ final class AppState {
             verboseDiagnostics: { [settings] in settings.verboseDiagnostics },
             warmupQueue: warmupQueue,
         )
+        self.microphone = MicrophoneController(settings: settings, notifier: notifier)
         self.watching = WatchingController(
-            settings: settings,
-            notifier: notifier,
-            pipeline: pipeline,
-            channelHealth: channelHealth,
-            permissions: permissions,
-            liveTranscription: liveTranscription,
+            settings: settings, notifier: notifier, pipeline: pipeline,
+            channelHealth: channelHealth, permissions: permissions,
+            liveTranscription: liveTranscription, microphone: microphone,
         )
 
         #if !APPSTORE
@@ -537,21 +441,6 @@ final class AppState {
     /// the recording would begin a moment later regardless.
     var canStopRecording: Bool {
         watching.isRecording
-    }
-
-    /// Menu-bar **top-half** red tint: mic channel silent, OR both channels
-    /// silent (`recordingSilentActive` paints both halves). Hoisted out of the
-    /// menu-bar body for the same type-check-budget reason as
-    /// `hasPermissionProblem` — reading two `channelHealth.*` flags through the
-    /// sub-controller inline is more than the body can afford on slow CI.
-    var micSilentOverlay: Bool {
-        channelHealth.micSilentOverlay
-    }
-
-    /// Menu-bar **bottom-half** red tint: app-audio channel silent, OR both
-    /// channels silent. See `micSilentOverlay`.
-    var appSilentOverlay: Bool {
-        channelHealth.appSilentOverlay
     }
 
     // Internal (not private): also formats `postedAt` in the RPC snapshot

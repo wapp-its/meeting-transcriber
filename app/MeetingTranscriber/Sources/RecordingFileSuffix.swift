@@ -21,6 +21,18 @@ enum RecordingFileSuffix {
     /// from that once re-processed 40 recordings on a live archive.
     static let inProgress = "_recording.marker"
 
+    /// The stored meeting-end cut of a recording (`PendingRecordingCut`),
+    /// kept beside its marker from the moment the "meeting seems to have
+    /// ended" question opens until the stop has settled it.
+    ///
+    /// Neither a crash signal nor a track. Crash detection stays on the marker
+    /// above and the raw app temp below: a stored cut outlives the marker on
+    /// purpose (the recorder removes the marker as soon as the mix exists,
+    /// before the live cut runs), so its presence says nothing about whether
+    /// the process died. Its name ends in neither `.wav` nor any track suffix,
+    /// so no scan of the staging folder takes it for audio.
+    static let pendingCut = "_pending_cut.json"
+
     /// Raw float32 app-audio temp file written live during capture (16 kHz
     /// mono, in-IOProc resampled) and consumed by `buildRecording` at `stop()`.
     /// A leftover one means the writer was killed mid-recording (crash) — see

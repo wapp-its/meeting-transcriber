@@ -59,6 +59,46 @@ enum A11yID {
         "jobRetryButton.\(index)"
     }
 
+    /// The device picker in the menu bar's Microphone submenu. One fixed
+    /// value: no device UID or name in it, for the reason the job rows give.
+    static let menuMicrophonePicker = "menuMicrophonePicker"
+
+    /// Menu bar job row's Remove button on a failed job, addressed by ROW
+    /// INDEX for the same reason as `jobRetryButton`.
+    static func jobRemoveButton(_ index: Int) -> String {
+        "jobRemoveButton.\(index)"
+    }
+
+    /// Menu bar item that opens the Transcriptions window.
+    static let allTranscriptionsMenuItem = "allTranscriptionsMenuItem"
+
+    // Transcriptions window. Its rows show meeting titles and participants,
+    // so the per-row buttons are addressed by ROW INDEX in the filtered list,
+    // like `jobRetryButton`, and no identifier carries a title, participant or
+    // path.
+    static let transcriptionsSearchField = "transcriptionsSearchField"
+
+    static func transcriptionOpenButton(_ index: Int) -> String {
+        "transcriptionOpenButton.\(index)"
+    }
+
+    static func transcriptionRevealButton(_ index: Int) -> String {
+        "transcriptionRevealButton.\(index)"
+    }
+
+    static func transcriptionRetryButton(_ index: Int) -> String {
+        "transcriptionRetryButton.\(index)"
+    }
+
+    static func transcriptionRemoveButton(_ index: Int) -> String {
+        "transcriptionRemoveButton.\(index)"
+    }
+
+    /// The menu's answers to the open recording prompt. No app name, for the
+    /// reason on `consentDeniedAppRemove`.
+    static let consentPromptRecord = "consentPromptRecord"
+    static let consentPromptIgnore = "consentPromptIgnore"
+
     static let recordOnlyBanner = "recordOnlyBanner"
     static let transcriptionSection = "transcriptionSection"
     static let protocolSection = "protocolSection"
@@ -95,6 +135,12 @@ enum A11yID {
     /// `/state`, which is what makes it a usable text-entry probe.
     static let micNameField = "micNameField"
     static let customVocabularyPathField = "customVocabularyPathField"
+    static let customVocabularyFileRow = "customVocabularyFileRow"
+    static let vocabularySourcePicker = "vocabularySourcePicker"
+    static let remoteVocabularyURLField = "remoteVocabularyURLField"
+    static let remoteVocabularyTokenField = "remoteVocabularyTokenField"
+    static let remoteVocabularyUpdateButton = "remoteVocabularyUpdateButton"
+    static let remoteVocabularyStatus = "remoteVocabularyStatus"
     static let whisperKitVocabularyPromptToggle = "whisperKitVocabularyPromptToggle"
     static let whisperKitModelPicker = "whisperKitModelPicker"
     static let whisperKitCustomRepoField = "whisperKitCustomRepoField"

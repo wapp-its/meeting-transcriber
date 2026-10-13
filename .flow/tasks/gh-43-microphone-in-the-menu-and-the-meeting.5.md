@@ -49,9 +49,69 @@ App target. The measurement probe (R5) and the mismatch warning (R6): every 5 s 
 - [ ] `./scripts/lint.sh` and `./scripts/pre-push.sh --with-appstore` pass; the focused suites are green (log read from a file).
 - [ ] `docs/architecture-macos.md` has rows for the four new files.
 ## Done summary
-TBD
+During a recording that taps a meeting app and captures the microphone, the app now checks every five seconds which input devices the meeting app uses and writes what it finds to the log. When two probes in a row show the meeting app only on identifiable physical devices, none of them the recorded microphone, the app posts one time-sensitive notification per recording, `Microphone differs from <App>`. The menu's Microphone entry shows `<App> uses <device>` while the latest probe is a mismatch.
 
+The work is split so every decision is tested without Core Audio.
+- `MeetingMicrophoneProbe` only reads. It translates each pid to a process object, reads `isRunningInput` and the device list on the input scope, then reads UID, name and transport per device. Every read keeps its OSStatus, the name included. The four raw reads are injectable through `RawReads`.
+- `MeetingMicrophoneVerdict.evaluate` returns match, mismatch or undetermined with a reason. It classifies transports by an allow-list of 13 physical kinds and never names the deprecated auto-aggregate constant.
+- `MeetingMicrophoneWarningPolicy` holds `Limits.production` (5 ticks, 2 mismatches, 20 change entries) and builds every log line, the notification and the hint.
+- `MicrophoneController+MeetingProbe.swift` runs one read at a time on the controller's own serial queue, never on the main thread. A probe that falls due while a read is still out is skipped and counted. The result comes back by a main-actor hop. It is dropped unless its recording is still attached and its microphone track is still running.
+- `AppState` passes the notifier, and `AppState+Microphone` passes `microphone.meetingAppHint` into the menu state.
+- `docs/architecture-macos.md` has rows for the four new files.
+
+Tests (29 new; the pure-type and controller suites were each seen red against stubs first):
+- `MeetingMicrophoneVerdictTests` (7) has one test for match, mismatch and each undetermined reason. `unidentifiableDevice` covers aggregate, auto-aggregate as `0x66677270`, virtual, unknown, unlisted `rscr`, and a capturing process that lists no device. `unreadableProperty` covers a failed isRunningInput, device list, UID and transport read. `testEveryPhysicalTransportIsIdentifiable` pins the allow-list.
+- `MeetingMicrophoneWarningPolicyTests` (10) cover these cases: one notification after two consecutive mismatches per recording; a reset by a match or undetermined verdict; the hint only while the latest verdict is a mismatch; exact R5 wording for the first entry, an unchanged probe and a change entry. `testAFailedReadIsShownAsItsStatus` checks `?(<status>)` for isRunningInput, the device list, transport, UID (as the device's role) and the `[debug]` name. They also cover transport labels, the 21st change giving one cap line and then nothing, and the stop line. `testNoLineCarriesAUIDAndOnlyTheDebugLineNamesDevices` uses distinctive UIDs and names.
+- `MeetingMicrophoneProbeTests` (1) feeds fake raw reads. It checks that a pid without a process object is skipped, that each failed read keeps its status, and that the device list is read on the input scope.
+- `MicrophoneControllerMeetingProbeTests` (11) cover these cases:
+  - the reader runs on tick 5, not on ticks 1 to 4, off the main thread, with the recorder's `tappedPIDs`;
+  - no read with empty `tappedPIDs` or after a failed mic start, and probing stops at a give-up;
+  - a result still out at a give-up is dropped and the hint clears (seen red without the guard);
+  - a probe due during a blocked read becomes `skippedProbes=1`;
+  - a result arriving after its recording stopped, with the next recording already attached, changes nothing;
+  - two mismatches give exactly one `.timeSensitive` notification with the exact title and body;
+  - the hint clears at a match and at stop;
+  - a microphone without a UID gives `recordedMicrophoneUnknown`;
+  - the `[debug]` line appears only with verbose on;
+  - a failed name read through `RawReads` reaches the `[debug]` line as `name=?(2003332927)`.
+
+Not covered by a unit test:
+- The real Core Audio reads. CI has no meeting app or audio hardware, and the Teams and Zoom calls are the owner's check after merge.
+- The `?(0)` branch of the CFString read, which answers noErr with no string.
+- The one-line hint pass-through in `AppState+Microphone`. `MicrophoneMenuStateTests.testTheMeetingAppHintPassesThroughUnchanged` covers `resolve`.
+
+Baseline: green. The focused filter `MeetingMicrophone|MicrophoneController|MicrophoneMenuState|MenuBar` passed 148 tests (rc 0) at d87e045e before any edit.
+Gates at 7aafa409:
+- The task filter passed 177 tests (rc 0).
+- The spec's app Quick filter plus the suites that build `AppState` (`Microphone|MeetingMicrophone|WatchLoopTests|MenuBar|AppState|WatchingController`) passed 409 tests (rc 0).
+- `./scripts/lint.sh` found 0 violations in 729 files.
+- `./scripts/pre-push.sh` gave rc 0 with 0 warnings.
+- `swift build -c release -Xswiftc -DAPPSTORE` gave rc 0 with 0 warnings.
+- A clean `xcodebuild build-for-testing` plus `swiftlint analyze --strict` found 0 violations in 656 files. It ran on 35cac967, before the review fix. The fix adds one declaration, `recordProbeStarted()`, which the controller calls.
+- Line counts: `AppState.swift` 587 and unchanged, with `AppState.init` at its previous length. `MicrophoneController.swift` 196.
+
+Decision: the verbose flag is read from the controller's own `settings.verboseDiagnostics`, with no injected `verboseDiagnostics` closure · rule 6 · the controller already holds `settings`, so the `AppState` call stays one line inside the 60-line init body. Flip at `MicrophoneController+MeetingProbe.swift:adoptMeetingProbe`; test `testTheDebugLineIsWrittenOnlyWithVerboseAudioLogging`.
+Assumption: the menu hint shows from the first mismatching probe, while the notification waits for the second · alternatives: show the hint only after the second consecutive mismatch, together with the notification · flip at: `MeetingMicrophoneWarningPolicy.swift:record` (`outcome.hintDevices`) · test: `testTheHintShowsOnlyWhileTheLatestVerdictIsAMismatch`, `testTwoMismatchingProbesPostOneTimeSensitiveNotificationAndShowTheHint` · rule 4
+Assumption: several device names are joined with `, `. An unreadable device name reads `an unnamed device`, a recorded microphone without a name reads `an unnamed microphone`, and a missing app name reads `the meeting app` · alternatives: `A and B`; leave unnamed devices out · flip at: `MeetingMicrophoneWarningPolicy.swift:deviceNames` and `notification(appName:recordedName:devices:)`, `MicrophoneController+MeetingProbe.swift:adoptMeetingProbe` · test: `testTheNotificationAndHintWording` · rule 4
+Decision: verdict precedence is match first, then `unreadableProperty`, `noProcessCapturingInput` and `unidentifiableDevice`. `recordedMicrophoneUnknown` comes last, reported only when the meeting app's side was identifiable · rule 6 · the verdict line then says what the meeting app's side showed. Tests are in `MeetingMicrophoneVerdictTests`.
+Decision: a process that captures input but lists no device makes the verdict `unidentifiableDevice`, so nothing warns · rule 1 · D3 says warn only where the probe can tell. Test `testUnidentifiableDevice`.
+Decision: transports are logged by name for the allow-listed kinds plus Aggregate, Virtual and Unknown, and as their four-char code otherwise (`fgrp`) · rule 6 · test `testTransportsWithoutAPhysicalKindAreNamedOrGivenAsTheirCode`.
+Decision: a process line is left out only when the process reads `isRunningInput=false` and lists no device, so a failed read never hides a line · rule 1 · R5 says an unreadable property appears as `?(<status>)`. Tests `testTheFirstProbeLogsAnUnchangedProbeLogsNothingAndAChangeLogs`, `testAFailedReadIsShownAsItsStatus`.
+Decision: one `[debug]` line per entry lists each device once across the logged processes, after the entry lines, and only when a device is listed · rule 6.
+Decision: the cap line reads `Meeting app microphone: 20 changes logged in this recording, further changes not logged` · rule 6 · test `testThe21stChangeLogsOneCapLineAndThenNothing`.
+Decision: `probes` counts reads started. The stop line is written when a read started or was skipped, and `lastVerdict=none` covers a read that never came back · rule 1 (review finding, R5 stop summary) · tests `testTheStopLineCarriesLastVerdictProbesSkippedProbesAndWarned`, `testAResultArrivingAfterItsRecordingStoppedChangesNothing`.
+Decision: `MicrophoneController.init` defaults `notifier` to `SilentNotifier()`, `log` to `OSLogDiagnostics(category: "MeetingMicrophone")` and `probeReader` to the Core Audio read · rule 6 · the existing `MicrophoneControllerTests`, outside this task's Touches, compile unchanged. `AppState` passes the real notifier.
+Decision: the new code comments cite no issue number, because the fork's #43 would point at a different issue in the original · rule 6.
+
+Follow-ups: none filed by this task.
+Feature map: the repo has no `.flow/features/`. There is no new user route; the hint is a line in the existing menu bar → Microphone entry.
+
+Tier: session (jev-unavailable(no_key)) — explicit routing block: implementer opus at xhigh
+
+stage: impl-review - ran [2026-10-09T08:44:41Z..2026-10-09T08:59:55Z] codex gpt-5.6-sol at xhigh (receipt model gpt-5.6-sol, effort xhigh). The first round ran three draws (correctness, contracts, integration), all NEEDS_WORK. They found three defects. A read still out at stop left no stop summary. A result that came back after the mic track gave up could still warn and leave the hint. A failed UID read was logged as `?` without its status. The validator kept all three. One fix commit, 7aafa409, closed all three, with no finding declined. The single re-review returned SHIP with all three marked fixed. The fan-out and re-review ran under `CODEX_SANDBOX=workspace-write` and `FLOW_VALIDATE_REVIEW=1`, the owner's standing override. After each round `git status` showed only flowctl's `.flow/specs` ledger change. The lesson was captured as memory `bug/runtime-errors/async-probe-result-adopted-after-its-2026-10-09`.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 35cac967feb20613a4187903ae25b840ac87fe12, 7aafa4095ecf8216e61a8946cd9dea008754174a
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh43-home swift test --parallel --filter 'MeetingMicrophone|MicrophoneController|MicrophoneMenuState|MenuBar' (177 tests, rc 0), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh43-home swift test --parallel --filter 'Microphone|MeetingMicrophone|WatchLoopTests|MenuBar|AppState|WatchingController' (409 tests, rc 0), ./scripts/lint.sh (0 violations, 729 files), ./scripts/pre-push.sh (rc 0, 0 warnings), cd app/MeetingTranscriber && swift build -c release -Xswiftc -DAPPSTORE (rc 0, 0 warnings), xcodebuild build-for-testing + swiftlint analyze --strict (0 violations, 656 files, at 35cac967)
 - PRs:

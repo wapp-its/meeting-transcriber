@@ -9,8 +9,8 @@ final class TerminalJobStoreTests: XCTestCase {
         title: String = "Meeting",
         transcript: String? = nil,
         proto: String? = nil,
-    ) -> JobStatusDTO {
-        JobStatusDTO(
+    ) -> TerminalJobRecord {
+        TerminalJobRecord(status: JobStatusDTO(
             jobID: id.uuidString,
             state: state,
             meetingTitle: title,
@@ -18,7 +18,7 @@ final class TerminalJobStoreTests: XCTestCase {
             protocolPath: proto,
             error: nil,
             warnings: [],
-        )
+        ))
     }
 
     // MARK: - Pure upsert/cap logic
@@ -38,13 +38,31 @@ final class TerminalJobStoreTests: XCTestCase {
     }
 
     func testUpsertCapsToMostRecent() {
-        var records: [JobStatusDTO] = []
+        var records: [TerminalJobRecord] = []
         let kept = (0 ..< 5).map { record(title: "job-\($0)") }
         for r in kept {
             records = TerminalJobStore.upserting(records, with: r, cap: 3)
         }
         XCTAssertEqual(records.count, 3)
-        XCTAssertEqual(records.map(\.meetingTitle), ["job-2", "job-3", "job-4"])
+        XCTAssertEqual(records.map(\.status.meetingTitle), ["job-2", "job-3", "job-4"])
+    }
+
+    func testDefaultCapKeepsTheNewestThousand() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tjs-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        // A full history on disk, then one more finished job: 1001 in all.
+        let path = dir.appendingPathComponent("terminal_jobs.json")
+        try JSONEncoder().encode((0 ..< 1000).map { record(title: "job-\($0)") }).write(to: path)
+        let store = TerminalJobStore(path: path)
+        let newest = record(title: "job-1000")
+        store.record(newest)
+
+        XCTAssertEqual(store.records.count, 1000)
+        XCTAssertEqual(store.records.first?.status.meetingTitle, "job-1", "the oldest record should have dropped out")
+        XCTAssertEqual(store.records.last, newest)
     }
 
     // MARK: - File roundtrip + durability
