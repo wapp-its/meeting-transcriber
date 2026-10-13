@@ -43,15 +43,26 @@ final class ProtocolTemplatesModel {
         self.trashItem = trashItem
     }
 
-    /// The effective default, so a setting naming a missing file shows the
-    /// built-in instead of a blank picker. Setting it writes the setting.
+    /// The effective default as the folder lists it, so a setting naming a
+    /// missing file shows the built-in instead of a blank picker. Setting it
+    /// writes the setting.
     var defaultSelection: ProtocolTemplateID {
-        get { store.effectiveDefault(settings.defaultProtocolTemplate) }
+        get { listed(store.effectiveDefault(settings.defaultProtocolTemplate)) }
         set { settings.defaultProtocolTemplate = newValue }
     }
 
     func reload() {
         names = store.names()
+    }
+
+    /// `id` spelt as the folder lists it. A Finder rename that changes only
+    /// the case leaves the stored name resolving on a case-insensitive volume
+    /// while matching no listed name, which would blank the picker.
+    private func listed(_ id: ProtocolTemplateID) -> ProtocolTemplateID {
+        guard case let .file(name) = id, !names.contains(name),
+              let listedName = names.first(where: { $0.caseInsensitiveCompare(name) == .orderedSame })
+        else { return id }
+        return .file(name: listedName)
     }
 
     /// Creates a template from the built-in text under the typed name and
@@ -80,9 +91,11 @@ final class ProtocolTemplatesModel {
     /// built-in the default.
     func confirmDelete(_ name: String) {
         pendingDeletion = nil
+        // Read before the file goes: afterwards the default no longer resolves.
+        let deletesTheDefault = defaultSelection == .file(name: name)
         do {
             try store.trash(name: name, trashItem: trashItem)
-            if settings.defaultProtocolTemplate == .file(name: name) {
+            if deletesTheDefault {
                 settings.defaultProtocolTemplate = .builtIn
             }
             message = nil

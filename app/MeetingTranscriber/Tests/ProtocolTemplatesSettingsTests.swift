@@ -156,6 +156,31 @@ final class ProtocolTemplatesSettingsTests: XCTestCase {
         XCTAssertEqual(model.defaultSelection, .file(name: "Board"))
     }
 
+    /// Finder renames the default `Board.md` to `board.md`. On the default
+    /// case-insensitive volume the stored "Board" still resolves, so the
+    /// picker must select the listed "board", and deleting it resets the default.
+    func testACaseOnlyRenameOfTheDefaultStaysSelectedAndDeletable() throws {
+        let store = try makeStore()
+        let caseSensitive = try store.directory.resourceValues(forKeys: [.volumeSupportsCaseSensitiveNamesKey])
+            .volumeSupportsCaseSensitiveNames
+        try XCTSkipIf(caseSensitive == true, "a case-only rename only keeps the old name resolving on a case-insensitive volume")
+        try write(["Board"], in: store)
+        let settings = try makeSettings()
+        settings.defaultProtocolTemplate = .file(name: "Board")
+        let fm = FileManager.default
+        try fm.moveItem(at: store.fileURL(named: "Board"), to: store.fileURL(named: "board"))
+        let trash: (URL) throws -> Void = { try fm.removeItem(at: $0) }
+        let model = ProtocolTemplatesModel(store: store, settings: settings, trashItem: trash)
+        model.reload()
+
+        XCTAssertEqual(model.names, ["board"])
+        XCTAssertEqual(model.defaultSelection, .file(name: "board"))
+
+        model.confirmDelete("board")
+
+        XCTAssertEqual(settings.defaultProtocolTemplate, .builtIn)
+    }
+
     func testOpenFolderCreatesAMissingFolderWithoutTheMigrationMarker() throws {
         let root = try makeTempDirectory(prefix: "protocol-templates-settings")
         let store = ProtocolTemplateStore(directory: root.appendingPathComponent("Protocol Templates"))
