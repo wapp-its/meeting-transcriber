@@ -118,4 +118,62 @@ final class PipelineSnapshotTests: XCTestCase {
         XCTAssertNil(loaded.protocolTemplate)
         XCTAssertNil(loaded.protocolBackground)
     }
+
+    // MARK: - Owner-only files
+
+    private func mode(of url: URL) throws -> Int {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        return try XCTUnwrap(attributes[.posixPermissions] as? Int) & 0o777
+    }
+
+    /// The staging copy holds the same background text as the snapshot, so it
+    /// is owner-only by the time it holds anything, even over a leftover
+    /// world-readable one; and a failed swap does not leave it behind.
+    func testTheStagingFileIsOwnerOnlyAndAFailedSwapRemovesIt() throws {
+        let dir = try makeTempDirectory(prefix: "pipeline-snapshot")
+        let staging = dir.appendingPathComponent(PipelineSnapshot.stagingFilename)
+        try Data("leftover".utf8).write(to: staging)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: staging.path)
+        let job = PipelineJob(
+            meetingTitle: "Board", appName: "Teams", mixPath: nil, appPath: nil, micPath: nil, micDelay: 0,
+            protocolBackground: "Alice chairs",
+        )
+        var modeAtSwap: Int?
+        var bytesAtSwap: Data?
+
+        XCTAssertThrowsError(try PipelineSnapshot.save([job], to: dir) { _, stagingFile in
+            modeAtSwap = try self.mode(of: stagingFile)
+            bytesAtSwap = try Data(contentsOf: stagingFile)
+            throw CocoaError(.fileWriteUnknown)
+        })
+
+        XCTAssertEqual(modeAtSwap, 0o600)
+        XCTAssertEqual(bytesAtSwap, try JSONEncoder().encode([job]))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: staging.path), "the failed swap left the staging copy")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dir.appendingPathComponent(PipelineSnapshot.snapshotFilename).path))
+    }
+
+    /// `replaceItemAt` keeps the permissions of the file it replaces, so a
+    /// snapshot written world-readable by an earlier build must be restricted.
+    func testTheSnapshotIsOwnerOnlyAfterASave() throws {
+        let dir = try makeTempDirectory(prefix: "pipeline-snapshot")
+        let snapshot = dir.appendingPathComponent(PipelineSnapshot.snapshotFilename)
+        try Data("[]".utf8).write(to: snapshot)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: snapshot.path)
+
+        try PipelineSnapshot.save([], to: dir)
+
+        XCTAssertEqual(try mode(of: snapshot), 0o600)
+    }
+
+    /// Restricting the final file is best effort: its failure is logged and the
+    /// save, and with it the pipeline, carries on.
+    func testAFailedRestrictDoesNotFailTheSave() throws {
+        let dir = try makeTempDirectory(prefix: "pipeline-snapshot")
+
+        // A swap that leaves no snapshot behind, so there is nothing to restrict.
+        XCTAssertNoThrow(try PipelineSnapshot.save([], to: dir) { _, staging in
+            try FileManager.default.removeItem(at: staging)
+        })
+    }
 }
