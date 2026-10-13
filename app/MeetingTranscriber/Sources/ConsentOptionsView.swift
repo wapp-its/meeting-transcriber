@@ -37,31 +37,35 @@ struct ConsentOptionsView: View {
     /// the window at launch, before any prompt.
     let question: ConsentQuestion?
     /// Read when the window opens, so templates added in Finder since are listed.
-    let optionsContext: () -> ProtocolOptionsContext
+    let templateChoices: () -> ProtocolTemplateChoices
+    /// Read on every redraw, so the form follows a change in Settings.
+    let optionsUse: () -> ProtocolOptionsUse
     /// Answers `question` as Record with the options; false when it is no
     /// longer the open prompt.
     let onRecord: (ConsentQuestion, MeetingProtocolOptions) -> Bool
     let onClose: () -> Void
 
-    @State private var openedContext: ProtocolOptionsContext?
+    @State private var openedChoices: ProtocolTemplateChoices?
     @State private var draft: ConsentOptionsDraft
 
     init(
         question: ConsentQuestion?,
-        optionsContext: @escaping () -> ProtocolOptionsContext,
+        templateChoices: @escaping () -> ProtocolTemplateChoices,
+        optionsUse: @escaping () -> ProtocolOptionsUse,
         draft: ConsentOptionsDraft = ConsentOptionsDraft(),
         onRecord: @escaping (ConsentQuestion, MeetingProtocolOptions) -> Bool,
         onClose: @escaping () -> Void,
     ) {
         self.question = question
-        self.optionsContext = optionsContext
+        self.templateChoices = templateChoices
+        self.optionsUse = optionsUse
         _draft = State(initialValue: draft)
         self.onRecord = onRecord
         self.onClose = onClose
     }
 
     private var context: ProtocolOptionsContext {
-        openedContext ?? optionsContext()
+        ProtocolOptionsContext(choices: openedChoices ?? templateChoices(), use: optionsUse())
     }
 
     var body: some View {
@@ -124,8 +128,8 @@ struct ConsentOptionsView: View {
     }
 
     private func startOver() {
-        let opened = optionsContext()
-        openedContext = opened
+        let opened = templateChoices()
+        openedChoices = opened
         draft.reset(to: opened.defaultTemplate)
     }
 }

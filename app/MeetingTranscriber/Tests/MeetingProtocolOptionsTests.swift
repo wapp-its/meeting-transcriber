@@ -53,7 +53,10 @@ final class MeetingProtocolOptionsTests: XCTestCase {
         settings.protocolProvider = .none
         settings.recordOnly = true
 
-        let context = ProtocolOptionsContext(settings: settings, store: store)
+        let context = ProtocolOptionsContext(
+            choices: ProtocolTemplateChoices(settings: settings, store: store),
+            use: ProtocolOptionsUse(settings: settings),
+        )
 
         XCTAssertEqual(
             context,
@@ -66,6 +69,23 @@ final class MeetingProtocolOptionsTests: XCTestCase {
         )
     }
 
+    /// What an open window reads on every redraw follows the settings at the
+    /// call, not when the value type was first made.
+    func testUseReadsTheSettingsAtTheCall() throws {
+        let settings = try makeSettings()
+        settings.protocolProvider = .openAICompatible
+        settings.openAIEndpoint = "http://localhost:11434/v1"
+        settings.recordOnly = false
+        XCTAssertEqual(ProtocolOptionsUse(settings: settings), ProtocolOptionsUse(destination: .local(host: "localhost"), recordOnly: false))
+
+        settings.openAIEndpoint = "https://api.example.com/v1"
+        settings.recordOnly = true
+        XCTAssertEqual(
+            ProtocolOptionsUse(settings: settings),
+            ProtocolOptionsUse(destination: .remote(name: "api.example.com"), recordOnly: true),
+        )
+    }
+
     /// A default naming a missing file preselects the built-in, as new jobs
     /// get it; one renamed in Finder only in case preselects the listed name,
     /// since the stored spelling matches no picker row.
@@ -74,11 +94,11 @@ final class MeetingProtocolOptionsTests: XCTestCase {
         let settings = try makeSettings()
 
         settings.defaultProtocolTemplate = .file(name: "Gone")
-        XCTAssertEqual(ProtocolOptionsContext(settings: settings, store: store).defaultTemplate, .builtIn)
+        XCTAssertEqual(ProtocolTemplateChoices(settings: settings, store: store).defaultTemplate, .builtIn)
 
         settings.defaultProtocolTemplate = .file(name: "Board")
         let caseSensitiveVolume = FileManager.default.fileExists(atPath: store.fileURL(named: "Board").path) == false
         try XCTSkipIf(caseSensitiveVolume, "needs the case-insensitive default volume")
-        XCTAssertEqual(ProtocolOptionsContext(settings: settings, store: store).defaultTemplate, .file(name: "board"))
+        XCTAssertEqual(ProtocolTemplateChoices(settings: settings, store: store).defaultTemplate, .file(name: "board"))
     }
 }

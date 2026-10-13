@@ -97,13 +97,15 @@ struct AppPickerView: View {
     /// out, and "Microphone only" cannot start.
     let noMic: Bool
     /// Read when the window opens, so templates added in Finder since are listed.
-    let optionsContext: () -> ProtocolOptionsContext
+    let templateChoices: () -> ProtocolTemplateChoices
+    /// Read on every redraw, so the form follows a change in Settings.
+    let optionsUse: () -> ProtocolOptionsUse
     let onStartRecording: (ManualRecordingRequest, MeetingProtocolOptions) -> Void
     let onCancel: () -> Void
 
     @State private var apps: [RunningApp] = []
-    /// The context as read when the window opened, nil before that.
-    @State private var openedContext: ProtocolOptionsContext?
+    /// The templates as read when the window opened, nil before that.
+    @State private var openedChoices: ProtocolTemplateChoices?
     /// SwiftUI keeps the first object it is handed for the view's lifetime, so
     /// a test holds the object every control of the dialog writes to.
     @State private var draft: StartRecordingDraft
@@ -112,7 +114,8 @@ struct AppPickerView: View {
         appsProvider: any RunningAppsProvider,
         startWouldBeRefused: Bool,
         noMic: Bool,
-        optionsContext: @escaping () -> ProtocolOptionsContext,
+        templateChoices: @escaping () -> ProtocolTemplateChoices,
+        optionsUse: @escaping () -> ProtocolOptionsUse,
         draft: StartRecordingDraft = StartRecordingDraft(),
         onStartRecording: @escaping (ManualRecordingRequest, MeetingProtocolOptions) -> Void,
         onCancel: @escaping () -> Void,
@@ -120,7 +123,8 @@ struct AppPickerView: View {
         self.appsProvider = appsProvider
         self.startWouldBeRefused = startWouldBeRefused
         self.noMic = noMic
-        self.optionsContext = optionsContext
+        self.templateChoices = templateChoices
+        self.optionsUse = optionsUse
         _draft = State(initialValue: draft)
         self.onStartRecording = onStartRecording
         self.onCancel = onCancel
@@ -133,7 +137,7 @@ struct AppPickerView: View {
     }
 
     private var context: ProtocolOptionsContext {
-        openedContext ?? optionsContext()
+        ProtocolOptionsContext(choices: openedChoices ?? templateChoices(), use: optionsUse())
     }
 
     /// Whether an app recording also takes the microphone.
@@ -162,8 +166,8 @@ struct AppPickerView: View {
         .frame(width: 440, height: 620)
         .onAppear {
             apps = appsProvider.runningApps()
-            let opened = optionsContext()
-            openedContext = opened
+            let opened = templateChoices()
+            openedChoices = opened
             draft.reset(defaultTemplate: opened.defaultTemplate)
         }
     }

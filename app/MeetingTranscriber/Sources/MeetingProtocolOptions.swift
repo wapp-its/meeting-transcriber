@@ -102,8 +102,7 @@ enum ProtocolDestination: Equatable {
     }
 }
 
-/// Everything an options form shows besides the draft, read in one go from the
-/// settings and the templates folder.
+/// Everything an options form shows besides the draft.
 struct ProtocolOptionsContext: Equatable {
     /// The built-in first, then the folder's templates in Finder's order.
     let templates: [ProtocolTemplateID]
@@ -114,12 +113,45 @@ struct ProtocolOptionsContext: Equatable {
 }
 
 extension ProtocolOptionsContext {
+    init(choices: ProtocolTemplateChoices, use: ProtocolOptionsUse) {
+        self.init(
+            templates: choices.templates,
+            defaultTemplate: choices.defaultTemplate,
+            destination: use.destination,
+            recordOnly: use.recordOnly,
+        )
+    }
+}
+
+/// The part of the context a window reads once, when it opens: every opening
+/// starts from the effective default, and the folder is not listed again on
+/// every redraw.
+struct ProtocolTemplateChoices: Equatable {
+    let templates: [ProtocolTemplateID]
+    let defaultTemplate: ProtocolTemplateID
+}
+
+/// The part of the context a window reads on every redraw, so one left open
+/// while Settings changes the provider or record-only mode says where the
+/// background info goes now, and whether it is used at all. A read of the
+/// observable settings during `body` is what makes the window redraw.
+struct ProtocolOptionsUse: Equatable {
+    let destination: ProtocolDestination
+    let recordOnly: Bool
+}
+
+extension ProtocolOptionsUse {
+    init(settings: AppSettings) {
+        destination = .resolve(provider: settings.protocolProvider, openAIEndpoint: settings.openAIEndpoint)
+        recordOnly = settings.recordOnly
+    }
+}
+
+extension ProtocolTemplateChoices {
     init(settings: AppSettings, store: ProtocolTemplateStore) {
         let names = store.names()
         templates = [.builtIn] + names.map { .file(name: $0) }
         defaultTemplate = Self.listed(store.effectiveDefault(settings.defaultProtocolTemplate), in: names)
-        destination = .resolve(provider: settings.protocolProvider, openAIEndpoint: settings.openAIEndpoint)
-        recordOnly = settings.recordOnly
     }
 
     /// `id` spelt as the folder lists it. After a Finder rename that changed

@@ -7,12 +7,8 @@ import XCTest
 /// `WatchLoopConsentOptionsTests`.
 @MainActor
 final class ConsentOptionsViewTests: XCTestCase {
-    private static let context = ProtocolOptionsContext(
-        templates: [.builtIn, .file(name: "Board")],
-        defaultTemplate: .builtIn,
-        destination: .remote(name: "Anthropic (Claude)"),
-        recordOnly: false,
-    )
+    private static let choices = ProtocolTemplateChoices(templates: [.builtIn, .file(name: "Board")], defaultTemplate: .builtIn)
+    private static let use = ProtocolOptionsUse(destination: .remote(name: "Anthropic (Claude)"), recordOnly: false)
 
     private let question = ConsentQuestion(
         app: "Zoom",
@@ -28,6 +24,7 @@ final class ConsentOptionsViewTests: XCTestCase {
 
     private func makeView(
         question: ConsentQuestion?,
+        optionsUse: @escaping () -> ProtocolOptionsUse = { use },
         draft: ConsentOptionsDraft = ConsentOptionsDraft(),
         answerResult: Bool = true,
         calls: Calls = Calls(),
@@ -41,7 +38,8 @@ final class ConsentOptionsViewTests: XCTestCase {
         let onClose: () -> Void = { calls.closes += 1 }
         return ConsentOptionsView(
             question: question,
-            optionsContext: { Self.context },
+            templateChoices: { Self.choices },
+            optionsUse: optionsUse,
             draft: draft,
             onRecord: onRecord,
             onClose: onClose,
@@ -59,6 +57,23 @@ final class ConsentOptionsViewTests: XCTestCase {
         XCTAssertNoThrow(try sut.find(text: question.body))
         XCTAssertNoThrow(try sut.find(viewWithAccessibilityIdentifier: A11yID.protocolOptionsTemplatePicker))
         XCTAssertThrowsError(try sut.find(text: ConsentOptionsView.noLongerOpen))
+    }
+
+    /// A window left open while Settings switches from a local to a remote
+    /// provider names where the background info goes now.
+    func testTheNoticeFollowsTheSettingsWhileTheWindowIsOpen() throws {
+        var use = ProtocolOptionsUse(destination: .local(host: "127.0.0.1"), recordOnly: false)
+        let currentUse: () -> ProtocolOptionsUse = { use }
+        let sut = makeView(question: question, optionsUse: currentUse)
+        try sut.inspect().vStack().callOnAppear()
+        let notice = {
+            try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.protocolOptionsDestinationNotice).text().string()
+        }
+        XCTAssertEqual(try notice(), ProtocolDestination.local(host: "127.0.0.1").notice)
+
+        use = ProtocolOptionsUse(destination: .remote(name: "OpenAI (Codex)"), recordOnly: false)
+
+        XCTAssertEqual(try notice(), ProtocolDestination.remote(name: "OpenAI (Codex)").notice)
     }
 
     func testRecordAnswersTheDisplayedQuestionWithTheDraftsOptionsAndCloses() throws {

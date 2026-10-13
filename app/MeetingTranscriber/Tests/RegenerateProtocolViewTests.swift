@@ -6,12 +6,8 @@ import XCTest
 /// pinned in `ProtocolRegeneratorTests` and `ProtocolRegenerationTargetTests`.
 @MainActor
 final class RegenerateProtocolViewTests: XCTestCase {
-    private static let context = ProtocolOptionsContext(
-        templates: [.builtIn, .file(name: "Board")],
-        defaultTemplate: .builtIn,
-        destination: .remote(name: "Anthropic (Claude)"),
-        recordOnly: false,
-    )
+    private static let choices = ProtocolTemplateChoices(templates: [.builtIn, .file(name: "Board")], defaultTemplate: .builtIn)
+    private static let use = ProtocolOptionsUse(destination: .remote(name: "Anthropic (Claude)"), recordOnly: false)
 
     private static func target(start: Date? = nil, hasProtocol: Bool = true) -> ProtocolRegenerationTarget {
         ProtocolRegenerationTarget(
@@ -28,7 +24,7 @@ final class RegenerateProtocolViewTests: XCTestCase {
 
     private func makeView(
         phase: ProtocolRegenerator.Phase = .idle,
-        context: ProtocolOptionsContext = context,
+        optionsUse: @escaping () -> ProtocolOptionsUse = { use },
         draft: RegenerateProtocolDraft = RegenerateProtocolDraft(target: target()),
         chooseFile: @escaping () -> URL? = { nil },
         resolveFile: @escaping (URL) throws -> ProtocolRegenerationTarget = { _ in target() },
@@ -37,7 +33,8 @@ final class RegenerateProtocolViewTests: XCTestCase {
         let onClose: () -> Void = {}
         return RegenerateProtocolView(
             phase: phase,
-            optionsContext: { context },
+            templateChoices: { Self.choices },
+            optionsUse: optionsUse,
             latestTarget: { nil },
             chooseFile: chooseFile,
             resolveFile: resolveFile,
@@ -52,21 +49,50 @@ final class RegenerateProtocolViewTests: XCTestCase {
     }
 
     func testGenerateIsDisabledWithoutATargetWhileRunningWithProviderOffAndInRecordOnlyMode() throws {
-        let off = ProtocolOptionsContext(templates: [.builtIn], defaultTemplate: .builtIn, destination: .off, recordOnly: false)
-        let recordOnly = ProtocolOptionsContext(
-            templates: [.builtIn], defaultTemplate: .builtIn, destination: .remote(name: "x"), recordOnly: true,
-        )
+        // Locals, not closure literals: as the only argument one would be
+        // rewritten into a trailing closure.
+        let off: () -> ProtocolOptionsUse = { ProtocolOptionsUse(destination: .off, recordOnly: false) }
+        let recordOnly: () -> ProtocolOptionsUse = { ProtocolOptionsUse(destination: .remote(name: "x"), recordOnly: true) }
         let cases: [(String, RegenerateProtocolView)] = [
             ("no target", makeView(draft: RegenerateProtocolDraft())),
             ("running", makeView(phase: .running)),
-            ("provider None", makeView(context: off)),
-            ("record-only", makeView(context: recordOnly)),
+            ("provider None", makeView(optionsUse: off)),
+            ("record-only", makeView(optionsUse: recordOnly)),
         ]
 
         XCTAssertFalse(try generateButton(makeView()).isDisabled(), "a target with a provider must be generatable")
         for (name, view) in cases {
             XCTAssertTrue(try generateButton(view).isDisabled(), name)
         }
+    }
+
+    /// Settings changed while the window is open: Generate and the notice
+    /// explaining it follow the current provider and record-only mode, as the
+    /// regeneration itself does, instead of what was true when the window opened.
+    func testGenerateAndItsExplanationFollowTheSettingsWhileTheWindowIsOpen() throws {
+        var use = Self.use
+        let currentUse: () -> ProtocolOptionsUse = { use }
+        let draft = RegenerateProtocolDraft()
+        let sut = makeView(optionsUse: currentUse, draft: draft)
+        try sut.inspect().vStack().callOnAppear()
+        // Opening found no recent meeting here; one is chosen, as with Choose File.
+        draft.target = Self.target()
+        let notice = {
+            try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.protocolOptionsDestinationNotice).text().string()
+        }
+        XCTAssertFalse(try generateButton(sut).isDisabled())
+
+        use = ProtocolOptionsUse(destination: .off, recordOnly: false)
+        XCTAssertTrue(try generateButton(sut).isDisabled(), "provider switched off")
+        XCTAssertEqual(try notice(), ProtocolDestination.off.notice)
+
+        use = ProtocolOptionsUse(destination: .local(host: "localhost"), recordOnly: true)
+        XCTAssertTrue(try generateButton(sut).isDisabled(), "record-only switched on")
+        XCTAssertNoThrow(try sut.inspect().find(text: ProtocolOptionsForm.recordOnlyNote))
+
+        use = ProtocolOptionsUse(destination: .local(host: "localhost"), recordOnly: false)
+        XCTAssertFalse(try generateButton(sut).isDisabled(), "a local provider again")
+        XCTAssertEqual(try notice(), ProtocolDestination.local(host: "localhost").notice)
     }
 
     func testGenerateHandsTheTargetAndTheDraftsOptionsToTheRegenerator() throws {

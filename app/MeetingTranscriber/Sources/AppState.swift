@@ -469,11 +469,16 @@ final class AppState {
         watching.isRecording
     }
 
-    /// What a protocol options form shows, read from the settings and the
-    /// templates folder at the call, so a window that asks when it opens lists
-    /// templates added in Finder since.
-    func protocolOptionsContext() -> ProtocolOptionsContext {
-        ProtocolOptionsContext(settings: settings, store: .production)
+    /// The templates a protocol options window offers, read from the folder at
+    /// the call, so a window that asks when it opens lists templates added in
+    /// Finder since.
+    func protocolTemplateChoices() -> ProtocolTemplateChoices {
+        ProtocolTemplateChoices(settings: settings, store: .production)
+    }
+
+    /// Where an options window's background info goes, from the current settings.
+    func protocolOptionsUse() -> ProtocolOptionsUse {
+        ProtocolOptionsUse(settings: settings)
     }
 
     // Internal (not private): also formats `postedAt` in the RPC snapshot

@@ -17,27 +17,24 @@ final class AppPickerViewTests: XCTestCase {
         RunningApp(id: 200, name: "Safari", bundleIdentifier: "com.apple.Safari", icon: nil),
     ]
 
-    private let context = ProtocolOptionsContext(
-        templates: [.builtIn, .file(name: "Board")],
-        defaultTemplate: .builtIn,
-        destination: .remote(name: "Anthropic (Claude)"),
-        recordOnly: false,
-    )
+    private static let choices = ProtocolTemplateChoices(templates: [.builtIn, .file(name: "Board")], defaultTemplate: .builtIn)
+    private static let use = ProtocolOptionsUse(destination: .remote(name: "Anthropic (Claude)"), recordOnly: false)
 
     private func makeView(
         apps: [RunningApp] = testApps,
         startWouldBeRefused: Bool = false,
         noMic: Bool = false,
+        optionsUse: @escaping () -> ProtocolOptionsUse = { use },
         draft: StartRecordingDraft = StartRecordingDraft(),
         onStartRecording: @escaping (ManualRecordingRequest, MeetingProtocolOptions) -> Void = { _, _ in },
         onCancel: @escaping () -> Void = {},
     ) -> AppPickerView {
-        let context = context
-        return AppPickerView(
+        AppPickerView(
             appsProvider: MockAppsProvider(apps: apps),
             startWouldBeRefused: startWouldBeRefused,
             noMic: noMic,
-            optionsContext: { context },
+            templateChoices: { Self.choices },
+            optionsUse: optionsUse,
             draft: draft,
             onStartRecording: onStartRecording,
             onCancel: onCancel,
@@ -132,12 +129,33 @@ final class AppPickerViewTests: XCTestCase {
         )
     }
 
-    func testTheOptionsFormShowsTheContextsNotice() throws {
-        let notice = try makeView().inspect()
+    private func notice(_ view: AppPickerView) throws -> String {
+        try view.inspect()
             .find(viewWithAccessibilityIdentifier: A11yID.protocolOptionsDestinationNotice)
             .text()
             .string()
-        XCTAssertEqual(notice, context.destination.notice)
+    }
+
+    func testTheOptionsFormShowsTheContextsNotice() throws {
+        XCTAssertEqual(try notice(makeView()), Self.use.destination.notice)
+    }
+
+    /// A window left open while Settings switches to a remote provider and
+    /// record-only mode says so, instead of what was true when it opened.
+    func testTheOptionsFormFollowsTheSettingsWhileTheWindowIsOpen() throws {
+        var use = ProtocolOptionsUse(destination: .local(host: "localhost"), recordOnly: false)
+        // A local, not a closure literal: as the only argument one would be
+        // rewritten into a trailing closure.
+        let currentUse: () -> ProtocolOptionsUse = { use }
+        let sut = makeView(optionsUse: currentUse)
+        try sut.inspect().vStack().callOnAppear()
+        XCTAssertEqual(try notice(sut), ProtocolDestination.local(host: "localhost").notice)
+        XCTAssertThrowsError(try sut.inspect().find(text: ProtocolOptionsForm.recordOnlyNote))
+
+        use = ProtocolOptionsUse(destination: .remote(name: "api.example.com"), recordOnly: true)
+
+        XCTAssertEqual(try notice(sut), ProtocolDestination.remote(name: "api.example.com").notice)
+        XCTAssertNoThrow(try sut.inspect().find(text: ProtocolOptionsForm.recordOnlyNote))
     }
 
     // MARK: - Cancel

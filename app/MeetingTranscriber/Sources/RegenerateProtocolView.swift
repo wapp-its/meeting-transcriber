@@ -40,7 +40,9 @@ struct RegenerateProtocolView: View {
 
     let phase: ProtocolRegenerator.Phase
     /// Read when the window opens, so templates added in Finder since are listed.
-    let optionsContext: () -> ProtocolOptionsContext
+    let templateChoices: () -> ProtocolTemplateChoices
+    /// Read on every redraw, so the notice and Generate follow a change in Settings.
+    let optionsUse: () -> ProtocolOptionsUse
     let latestTarget: () -> ProtocolRegenerationTarget?
     /// Runs the open panel; a test hands in a URL instead.
     let chooseFile: () -> URL?
@@ -48,12 +50,13 @@ struct RegenerateProtocolView: View {
     let onGenerate: (ProtocolRegenerationTarget, MeetingProtocolOptions) -> Void
     let onClose: () -> Void
 
-    @State private var openedContext: ProtocolOptionsContext?
+    @State private var openedChoices: ProtocolTemplateChoices?
     @State private var draft: RegenerateProtocolDraft
 
     init(
         phase: ProtocolRegenerator.Phase,
-        optionsContext: @escaping () -> ProtocolOptionsContext,
+        templateChoices: @escaping () -> ProtocolTemplateChoices,
+        optionsUse: @escaping () -> ProtocolOptionsUse,
         latestTarget: @escaping () -> ProtocolRegenerationTarget?,
         chooseFile: @escaping () -> URL?,
         resolveFile: @escaping (URL) throws -> ProtocolRegenerationTarget,
@@ -62,7 +65,8 @@ struct RegenerateProtocolView: View {
         onClose: @escaping () -> Void,
     ) {
         self.phase = phase
-        self.optionsContext = optionsContext
+        self.templateChoices = templateChoices
+        self.optionsUse = optionsUse
         self.latestTarget = latestTarget
         self.chooseFile = chooseFile
         self.resolveFile = resolveFile
@@ -72,12 +76,13 @@ struct RegenerateProtocolView: View {
     }
 
     private var context: ProtocolOptionsContext {
-        openedContext ?? optionsContext()
+        ProtocolOptionsContext(choices: openedChoices ?? templateChoices(), use: optionsUse())
     }
 
-    /// The form's notice and record-only note say why when the context is the reason.
+    /// The form's notice and record-only note say why when the settings are the reason.
     private var generateDisabled: Bool {
-        draft.target == nil || phase == .running || context.destination == .off || context.recordOnly
+        let use = optionsUse()
+        return draft.target == nil || phase == .running || use.destination == .off || use.recordOnly
     }
 
     var body: some View {
@@ -94,8 +99,8 @@ struct RegenerateProtocolView: View {
         .padding()
         .frame(width: 440)
         .onAppear {
-            let opened = optionsContext()
-            openedContext = opened
+            let opened = templateChoices()
+            openedChoices = opened
             draft.reset(latest: latestTarget(), defaultTemplate: opened.defaultTemplate)
         }
     }

@@ -316,7 +316,8 @@ struct MeetingTranscriberApp: App {
                 // Cancel — so it has to stay truthful across both halves.
                 startWouldBeRefused: appState.watching.isManualRecording,
                 noMic: appState.settings.noMic,
-                optionsContext: { appState.protocolOptionsContext() },
+                templateChoices: { appState.protocolTemplateChoices() },
+                optionsUse: { appState.protocolOptionsUse() },
                 onStartRecording: { request, options in
                     appState.watching.startRecording(request, protocolOptions: options)
                     closeWindow(id: "record-app")
@@ -350,7 +351,8 @@ struct MeetingTranscriberApp: App {
         Window("Regenerate Protocol", id: RegenerateProtocolView.windowID) {
             RegenerateProtocolView(
                 phase: appState.protocolRegenerator.phase,
-                optionsContext: { appState.protocolOptionsContext() },
+                templateChoices: { appState.protocolTemplateChoices() },
+                optionsUse: { appState.protocolOptionsUse() },
                 latestTarget: { appState.protocolRegenerator.latestTarget() },
                 chooseFile: { RegenerateProtocolView.chooseFile(startingIn: appState.settings.effectiveOutputDir) },
                 resolveFile: { try appState.protocolRegenerator.target(for: $0) },
@@ -368,7 +370,8 @@ struct MeetingTranscriberApp: App {
         Window("Record Meeting", id: ConsentOptionsView.windowID) {
             ConsentOptionsView(
                 question: appState.consentOptionsQuestion,
-                optionsContext: { appState.protocolOptionsContext() },
+                templateChoices: { appState.protocolTemplateChoices() },
+                optionsUse: { appState.protocolOptionsUse() },
                 onRecord: { question, options in
                     appState.answerConsentQuestion(question, granted: true, protocolOptions: options)
                 },
