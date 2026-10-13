@@ -79,8 +79,13 @@ struct PendingRecordingCut: Codable, Equatable, Sendable {
     }
 
     enum InvalidReason: Equatable, Sendable {
-        /// The file could not be read, or its bytes are not a record.
+        /// Its bytes are not a record.
         case unreadable
+        /// Something is there, but reading it failed: an I/O or permission
+        /// error, or a path that is not a file. Never applied, like every
+        /// other reason, but not known to hold no record: the orphan scan
+        /// tells the two apart (`RecoveredCut.keepsFromOrphanScan`).
+        case readFailed
         /// Zero bytes: what a removal that could not unlink the file leaves.
         case empty
         case unknownVersion
@@ -170,7 +175,7 @@ struct PendingRecordingCut: Codable, Equatable, Sendable {
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
             return .absent
         } catch {
-            return .invalid(.unreadable)
+            return .invalid(.readFailed)
         }
         guard !data.isEmpty else { return .invalid(.empty) }
         let decoder = JSONDecoder()

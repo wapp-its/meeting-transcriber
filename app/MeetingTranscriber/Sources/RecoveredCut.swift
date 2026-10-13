@@ -149,19 +149,35 @@ enum RecoveredCut {
     /// stop queues it once it is cut. A stop whose stored cut was never
     /// written is held all the same.
     ///
-    /// A stored cut beside it: one the recovery pass before the scan did not
-    /// settle, because a cut-carrying stop failed after that pass collected
-    /// (the stop hands its cut to recovery) or a restore failed. The next
-    /// pass cuts it first. An emptied stored cut is a settled one: it never
-    /// decodes, so it is never applied.
+    /// A valid stored cut beside it: one the recovery pass before the scan
+    /// did not settle, because a cut-carrying stop failed after that pass
+    /// collected (the stop hands its cut to recovery) or a restore failed.
+    /// The next pass cuts it first.
+    ///
+    /// A stored cut that reads as no record (emptied, bytes that are not a
+    /// record, another recording's) is never applied, so its recording is
+    /// recovered uncut; holding it back would keep the recording out of the
+    /// queue for as long as that file cannot be removed. One that is there
+    /// but cannot be read now is not known to be invalid and is held back,
+    /// for the next pass to read again, unless the path is not a regular
+    /// file, which no write of the app leaves and no pass could read.
     ///
     /// The scan asks after listing the folder, so a mix it listed during a
     /// live stop is either still held at that point or already cut.
     static func keepsFromOrphanScan(stem: String, in dir: URL) -> Bool {
         if PendingRecordingCut.isHeld(stem) { return true }
-        let stored = PendingRecordingCut.url(stem: stem, in: dir)
-        let size = (try? FileManager.default.attributesOfItem(atPath: stored.path)[.size] as? Int) ?? 0
-        return size > 0
+        switch PendingRecordingCut.read(stem: stem, in: dir) {
+        case .valid:
+            return true
+
+        case .invalid(.readFailed):
+            let path = PendingRecordingCut.url(stem: stem, in: dir).path
+            let type = (try? FileManager.default.attributesOfItem(atPath: path))?[.type] as? FileAttributeType
+            return type.map { $0 == .typeRegular } ?? true
+
+        case .absent, .invalid:
+            return false
+        }
     }
 
     // MARK: - Apply

@@ -184,6 +184,45 @@ final class StagedRecoveryFolderTests: XCTestCase {
         XCTAssertEqual(queue.jobs.map(\.meetingTitle), ["Recovered Recording (20260313_110000)"])
     }
 
+    /// Only a stored cut recovery could still apply holds a recording back. One
+    /// that reads as no record at all (bytes that are not a record, another
+    /// recording's, a folder in its place) is never applied: its recording is
+    /// recovered uncut, and holding it back would keep it from the queue for
+    /// as long as that file cannot be removed. One that is there but cannot be
+    /// read right now is not known to be invalid, and is held back for the
+    /// next pass to read again.
+    func testTheOrphanScanHoldsBackOnlyAStoredCutRecoveryCouldStillApply() async throws {
+        let dir = try makeTempDirectory(prefix: "StagedRecoveryInvalidCut")
+        let garbage = StagedRecordingFixture(dir: dir, stem: "20260314_100000")
+        let other = StagedRecordingFixture(dir: dir, stem: "20260314_110000")
+        let folder = StagedRecordingFixture(dir: dir, stem: "20260314_120000")
+        let unreadable = StagedRecordingFixture(dir: dir, stem: "20260314_130000")
+        for fixture in [garbage, other, folder, unreadable] {
+            try fixture.stoppedRecording(seconds: 25)
+        }
+        try Data("not a record".utf8).write(to: PendingRecordingCut.url(stem: garbage.stem, in: dir))
+        let now = Date()
+        try JSONEncoder().encode(PendingRecordingCut(stem: "another", cutAt: now, startedAt: now, deadline: now))
+            .write(to: PendingRecordingCut.url(stem: other.stem, in: dir))
+        try FileManager.default.createDirectory(at: PendingRecordingCut.url(stem: folder.stem, in: dir), withIntermediateDirectories: false)
+        try unreadable.storeCut(startedAt: -22, cutAt: -12.000_031_25)
+        let locked = PendingRecordingCut.url(stem: unreadable.stem, in: dir)
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: locked.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: locked.path) }
+        let queue = try makeQueue(staging: dir)
+
+        await queue.recoverOrphanedRecordings(recordingsDir: dir)
+
+        XCTAssertEqual(
+            Set(queue.jobs.map(\.meetingTitle)),
+            [
+                "Recovered Recording (20260314_100000)",
+                "Recovered Recording (20260314_110000)",
+                "Recovered Recording (20260314_120000)",
+            ],
+        )
+    }
+
     /// A recording recovered more than a day after it was made is still cut
     /// (its countdown minutes are not kept) but, as before this spec, no
     /// longer queued: the cut keeps the recording's age, so the orphan scan's
