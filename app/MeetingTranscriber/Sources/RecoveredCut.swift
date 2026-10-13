@@ -138,6 +138,32 @@ enum RecoveredCut {
         return (try? FileManager.default.attributesOfItem(atPath: app.path)[.modificationDate]) as? Date
     }
 
+    // MARK: - The orphan scan
+
+    /// Whether the orphan scan has to pass over the recording `stem` in `dir`
+    /// because its meeting-end cut is not settled, so that queuing it now
+    /// would transcribe the room audio the cut removes.
+    ///
+    /// Held: a stop of this process has not cut it yet. Its mix is on its
+    /// path from the recorder's stop on, before the live cut runs, and the
+    /// stop queues it once it is cut. A stop whose stored cut was never
+    /// written is held all the same.
+    ///
+    /// A stored cut beside it: one the recovery pass before the scan did not
+    /// settle, because a cut-carrying stop failed after that pass collected
+    /// (the stop hands its cut to recovery) or a restore failed. The next
+    /// pass cuts it first. An emptied stored cut is a settled one: it never
+    /// decodes, so it is never applied.
+    ///
+    /// The scan asks after listing the folder, so a mix it listed during a
+    /// live stop is either still held at that point or already cut.
+    static func keepsFromOrphanScan(stem: String, in dir: URL) -> Bool {
+        if PendingRecordingCut.isHeld(stem) { return true }
+        let stored = PendingRecordingCut.url(stem: stem, in: dir)
+        let size = (try? FileManager.default.attributesOfItem(atPath: stored.path)[.size] as? Int) ?? 0
+        return size > 0
+    }
+
     // MARK: - Apply
 
     /// Settle each collected stored cut, after the crashed recordings were

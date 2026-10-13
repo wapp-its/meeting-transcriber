@@ -108,6 +108,82 @@ final class StagedRecoveryFolderTests: XCTestCase {
         XCTAssertTrue(registry.claimedAudioPaths.isEmpty, "the hold ends with the scan")
     }
 
+    // MARK: - A cut that is not settled yet
+
+    /// One staged recovery pass on `dir`, the steps the production pass runs,
+    /// with the orphan scan reading `dir`.
+    private func runPass(on dir: URL, into queue: PipelineQueue) async {
+        let unsettled = PipelineController.recoverStagingFolder(dir, levelBalance: false, diagnostics: RecordingDiagnostics())
+        await PipelineController.recoverOrphans(
+            into: queue, holdingBack: unsettled.map { dir.appendingPathComponent($0 + RecordingFileSuffix.mix) }, recordingsDir: dir,
+        )
+    }
+
+    /// Between a detected meeting's live stop and its live cut, its mix is on
+    /// its path and its stem is held: the state a pass running at that moment
+    /// meets (a queue rebuilt while a meeting ends). The pass leaves the held
+    /// stored cut to the stop, so its orphan scan must leave the recording to
+    /// the stop too; queued now, it would be transcribed with the room audio
+    /// the cut is about to remove. A stop whose stored cut was never written
+    /// is held all the same and passed over the same way. Once the stop has
+    /// cut it and settled its stored cut, the scan takes it as before, which
+    /// shows the hold did the excluding.
+    func testTheOrphanScanPassesOverARecordingBetweenItsLiveStopAndItsLiveCut() async throws {
+        let dir = try makeTempDirectory(prefix: "StagedRecoveryHeld")
+        let stored = StagedRecordingFixture(dir: dir, stem: "20260312_100000")
+        let unstored = StagedRecordingFixture(dir: dir, stem: "20260312_110000")
+        for fixture in [stored, unstored] {
+            try fixture.stoppedRecording(seconds: 25)
+            PendingRecordingCut.hold(fixture.stem)
+        }
+        defer { [stored, unstored].forEach { PendingRecordingCut.release($0.stem) } }
+        try stored.storeCut(startedAt: -22, cutAt: -12.000_031_25)
+
+        let queue = try makeQueue(staging: dir)
+        await runPass(on: dir, into: queue)
+
+        XCTAssertEqual(queue.jobs.map(\.meetingTitle), [], "a recording whose live cut is still to come was queued")
+        for fixture in [stored, unstored] {
+            for suffix in RecordingFileSuffix.all {
+                XCTAssertEqual(try fixture.frames(suffix), 400_000, "\(fixture.stem)\(suffix)")
+            }
+        }
+        XCTAssertTrue(stored.storedCutExists)
+
+        // The live cut done: its stored cut removed and the hold released.
+        _ = PendingRecordingCut.remove(stem: stored.stem, in: dir)
+        [stored, unstored].forEach { PendingRecordingCut.release($0.stem) }
+        let next = try makeQueue(staging: dir)
+        await runPass(on: dir, into: next)
+
+        XCTAssertEqual(
+            Set(next.jobs.map(\.meetingTitle)),
+            ["Recovered Recording (20260312_100000)", "Recovered Recording (20260312_110000)"],
+        )
+    }
+
+    /// A stored cut still beside a mix when the scan runs is one the pass did
+    /// not settle: a cut-carrying stop that failed after the pass collected,
+    /// which hands its cut to the next pass, or an unsettled restore. The
+    /// scan passes over that recording, so it is cut before it is queued. An
+    /// emptied stored cut is a settled one (it never decodes, so it is never
+    /// applied) and holds nothing back.
+    func testTheOrphanScanPassesOverARecordingWhoseStoredCutIsStillBesideIt() async throws {
+        let dir = try makeTempDirectory(prefix: "StagedRecoveryStoredCut")
+        let pending = StagedRecordingFixture(dir: dir, stem: "20260313_100000")
+        let emptied = StagedRecordingFixture(dir: dir, stem: "20260313_110000")
+        for fixture in [pending, emptied] {
+            try fixture.stoppedRecording(seconds: 25)
+            try fixture.storeCut(startedAt: -22, cutAt: -12.000_031_25)
+        }
+        try Data().write(to: PendingRecordingCut.url(stem: emptied.stem, in: dir))
+        let queue = try makeQueue(staging: dir)
+
+        await queue.recoverOrphanedRecordings(recordingsDir: dir)
+
+        XCTAssertEqual(queue.jobs.map(\.meetingTitle), ["Recovered Recording (20260313_110000)"])
+    }
+
     /// A recording recovered more than a day after it was made is still cut
     /// (its countdown minutes are not kept) but, as before this spec, no
     /// longer queued: the cut keeps the recording's age, so the orphan scan's
