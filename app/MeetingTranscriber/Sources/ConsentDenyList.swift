@@ -44,6 +44,19 @@ struct ConsentDenyList: Equatable {
     func reverting(_ app: String) -> Self {
         Self(denied: denied.filter { $0 != app })
     }
+
+    /// The text a person reads for a stored entry. An added app's key reads as
+    /// its display name marked "(added app)", which tells it apart from a
+    /// built-in or another added app of the same name; an app that is not
+    /// installed resolves to its bundle ID. Every other entry already is a name
+    /// and reads as stored.
+    static func displayName(
+        for entry: String,
+        resolveAppName: (String) -> String = MicInputDetector.appDisplayName(bundleID:),
+    ) -> String {
+        guard let bundleID = AddedAppIdentity.bundleID(fromKey: entry) else { return entry }
+        return "\(resolveAppName(bundleID)) (added app)"
+    }
 }
 
 /// Read/write access to the deny list, injected into `WatchLoop` so its tests

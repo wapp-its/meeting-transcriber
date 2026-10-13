@@ -60,4 +60,24 @@ final class ConsentDenyListTests: XCTestCase {
         }
         XCTAssertEqual(list.denied, ["Slack", "Discord", "Aside"])
     }
+
+    func testAnAddedAppsKeyReadsAsItsNameMarkedAsAdded() {
+        let resolve = { (bundleID: String) in ["com.example.zoom": "Zoom"][bundleID] ?? "unresolved \(bundleID)" }
+        XCTAssertEqual(
+            ConsentDenyList.displayName(for: AddedAppIdentity.key(bundleID: "com.example.zoom"), resolveAppName: resolve),
+            "Zoom (added app)",
+        )
+        // The production resolver falls back to the bundle ID for an app that
+        // is not installed.
+        XCTAssertEqual(
+            ConsentDenyList.displayName(for: AddedAppIdentity.key(bundleID: "com.example.not-installed")),
+            "com.example.not-installed (added app)",
+        )
+    }
+
+    func testABuiltInOrBrowserEntryReadsAsStored() {
+        for entry in ["Zoom", "Microsoft Teams", "Google Chrome"] {
+            XCTAssertEqual(ConsentDenyList.displayName(for: entry) { _ in "resolved" }, entry)
+        }
+    }
 }
