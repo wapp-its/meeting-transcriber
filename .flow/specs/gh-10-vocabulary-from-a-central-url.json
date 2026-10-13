@@ -458,11 +458,46 @@
       "timestamp": "2026-10-09T12:01:30.830890Z",
       "tool_calls": 36,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "24e48a5e4c4a4607ef65432319ee2c4d259b11098e8615dc4c89314f99f47f3e",
+      "backend": "codex",
+      "base_sha": "a51b95c2ffb0a8297ca0e99767767a1942e0177b",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "8841f734b21b22e5580cc8d0bd515bcd32dd8771",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1322,
+      "output_sha256": "46b74c42b8830df474cb865701ded776b8b16f5f13f9505e05ed0c0b33ee9152",
+      "reservation_id": "898292d0d69d46bf83a71d94a0a81cee",
+      "round_consumed": true,
+      "scope": "impl:gh-10-vocabulary-from-a-central-url.2",
+      "superseded_by": null,
+      "task": "gh-10-vocabulary-from-a-central-url.2",
+      "timestamp": "2026-10-13T14:24:31.065371Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-10-vocabulary-from-a-central-url.1": 1,
-    "impl:gh-10-vocabulary-from-a-central-url.2": 1,
+    "impl:gh-10-vocabulary-from-a-central-url.2": 2,
     "impl:gh-10-vocabulary-from-a-central-url.3": 1,
     "plan": 1,
     "plan#completion": 1
@@ -492,5 +527,5 @@
     "mergeBaseTracker": "## Problem\n\nDas Vokabular f\u00fcr die Transkription (Namen, Fachbegriffe) kommt heute aus einer lokalen Datei (`AppSettings+Vocabulary.swift`). In einer Organisation pflegt aber idealerweise eine Stelle die Liste zentral (Namen der Gremiumsmitglieder, Organisationseinheiten, Abk\u00fcrzungen), und alle bekommen denselben Stand.\n\n## Wunsch\n\nAls Quelle neben der lokalen Datei eine **URL** zulassen, z. B. die Raw-Adresse einer Datei in einem Git-Repository (GitLab/GitHub):\n\n- beim Start und periodisch laden (mit ETag/Last-Modified, damit nur \u00c4nderungen \u00fcbertragen werden),\n- lokal zwischenspeichern und **offline** mit dem letzten Stand weiterarbeiten,\n- optional mit Zugangstoken (privates Repository), im Schl\u00fcsselbund gespeichert,\n- Stand und Zeitpunkt der letzten Aktualisierung in den Einstellungen anzeigen.\n\nGleiches Prinzip sp\u00e4ter f\u00fcr Terminologie-Regeln (`terminologyRules`) und Protokoll-Vorlagen (#2).\n\n## Abnahme\n\n- URL auf eine Vokabeldatei gesetzt \u2192 Begriffe werden verwendet; \u00c4nderung im Repository \u2192 nach dem n\u00e4chsten Abgleich \u00fcbernommen.\n- Ohne Netz \u2192 letzter Stand bleibt aktiv, Hinweis in den Einstellungen.\n\nPasst zur zentralen Vorkonfiguration (#11).",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/10"
   },
-  "updated_at": "2026-10-09T12:16:53.892219Z"
+  "updated_at": "2026-10-13T14:24:31.090067Z"
 }

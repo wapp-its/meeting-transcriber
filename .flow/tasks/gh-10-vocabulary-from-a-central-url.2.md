@@ -127,13 +127,13 @@ ASSUME: a refused redirect is logged as `HTTP 3xx`, every other check with its e
 ASSUME: while a check is due or running, a copy without a trusted check time reads "Checking the address…", and no copy reads "Not downloaded yet – no vocabulary in use" · alternatives: B — show the untrusted copy as current with its file date; C — "Checking the address…" also during the debounce when there is no copy · flip at: app/MeetingTranscriber/Sources/RemoteVocabularyController.swift:RemoteVocabularyController.idleStatus() · test: RemoteVocabularyControllerTests.testAnAddressChangeDeletesTheOldCopyAndDropsTheCheckInFlight, RemoteVocabularyControllerTests.testStartChecksOnceAndStoresAValidDownload
 
 Follow-ups (not part of this task):
-- Exact redirect code in the log (A11 alternative B). It needs `RemoteVocabularyFetcher` and `RemoteVocabularyFailure` to carry the 3xx status.
+- Exact redirect code in the log (A11 alternative B): done on 2026-10-13 after the owner answered "Fix it" (spec D5, A11 superseded). Both redirect refusals carry the refused answer's status and the log line prints it (0eb680d7, test `RemoteVocabularyFetcherTests.testARefusedRedirectCarriesItsExactStatus`). Re-review: Codex `gpt-5.6-sol` at `xhigh`, three draws on base a51b95c2, all SHIP with no findings, each stating finding-ba86a2134f98801907afeb3fb21d3f46 fixed. The new round could not chain to that finding id, because the earlier round's receipt in /tmp no longer existed.
 - Split AppState.swift by moving `AppNotifying` and `SilentNotifier` into their own file, then drop its `file_length` suppression.
 - Instruction conflicts, as in task .1: the impl-review skill says never to set `CODEX_SANDBOX`, and the fork rule forbids `gh-N` ids in commit messages while the worker template adds `Task:` trailers.
 - No user route changed (there is no UI yet; task .3 adds it), so the feature map needs no update.
 
 stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits: 88837cd0c5dce24ef7bac9e10ac0c7a42b498076, 0a7d619ea35b5fa32ba52f1ecfbdf9e3ade66f31, a28bb374be31661da92c9b3b146673319dc12665, cab16bd6883c3a0d5125f5df7c85cd7dcd6e825f, 30a20cdbcf9bf60eb388b8c4016e629f0fd9c887
+- Commits: 88837cd0c5dce24ef7bac9e10ac0c7a42b498076, 0a7d619ea35b5fa32ba52f1ecfbdf9e3ade66f31, a28bb374be31661da92c9b3b146673319dc12665, cab16bd6883c3a0d5125f5df7c85cd7dcd6e825f, 30a20cdbcf9bf60eb388b8c4016e629f0fd9c887, 0eb680d7a0dd88bf5d09765e503a2fbaeace860a
 - Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh10-home swift test --parallel --filter "RemoteVocabulary|AppSettingsRemoteVocabulary|EngineSettingsRuntimeSync|AppSettingsTests|AppStateTests|ParakeetVocabularyPreparation|WhisperKitVocabularyFlow" (suite_rc=0, 198 tests), PATH=<pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1> ./scripts/lint.sh (0 violations, 721 files), ./scripts/pre-push.sh --with-appstore (Homebrew + App Store release builds passed)
 - PRs:
