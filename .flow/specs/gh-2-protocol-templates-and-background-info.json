@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-2-protocol-templates",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "needs_work",
+  "completion_reviewed_at": "2026-10-13T20:30:20.618502Z",
   "created_at": "2026-10-06T20:32:22.750230Z",
   "default_impl": null,
   "default_review": null,
@@ -18,7 +18,7 @@
     "gh-2-protocol-templates-and-background-info.5": 0
   },
   "next_task": 1,
-  "plan_review_rounds": 0,
+  "plan_review_rounds": 1,
   "plan_review_status": "ship",
   "plan_reviewed_at": "2026-10-06T20:53:36.062715Z",
   "ready": true,
@@ -653,6 +653,67 @@
       "timestamp": "2026-10-13T20:20:49.701873Z",
       "tool_calls": 27,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "c4c14b7a713e6bb0f158b502b921978740650f993745dcdf51c8512a266836cf",
+      "backend": "codex",
+      "base_sha": "557170da4da7da15941c5d62abf80fe43ead6af4",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-c5e26f39f5f47068ccac644902108e07",
+            "classification": "introduced",
+            "findingId": "finding-c5e26f39f5f47068ccac644902108e07",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-18c29ba74eb25d54a285a66b985b60a9",
+            "classification": "introduced",
+            "findingId": "finding-18c29ba74eb25d54a285a66b985b60a9",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-89e952e5524fe3a7613c797dad2260fa",
+            "classification": "introduced",
+            "findingId": "finding-89e952e5524fe3a7613c797dad2260fa",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "37ca207698abfecba0c17bbc52cac0374df14864",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 943233,
+      "output_sha256": "96cf8006c86bf71538c8da71b4c5f1d00b01b4867a6170eb04a4a56e649a5d5b",
+      "reservation_id": "effe17ce5274486797ccfe6846b4f4bf",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-13T20:30:20.595496Z",
+      "tool_calls": 45,
+      "verdict": "NEEDS_WORK"
     }
   ],
   "review_hash_epoch": {
@@ -667,6 +728,7 @@
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-2-protocol-templates-and-background-info.1": 0,
     "impl:gh-2-protocol-templates-and-background-info.2": 0,
     "impl:gh-2-protocol-templates-and-background-info.3": 0,
@@ -689,5 +751,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/2"
   },
-  "updated_at": "2026-10-13T20:20:49.732614Z"
+  "updated_at": "2026-10-13T20:30:20.622900Z"
 }

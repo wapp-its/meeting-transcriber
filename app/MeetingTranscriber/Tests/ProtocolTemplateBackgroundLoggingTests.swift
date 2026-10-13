@@ -1,3 +1,4 @@
+@testable import MeetingTranscriber
 import XCTest
 
 /// Background info is meeting content, so no log statement may carry it, not
@@ -23,6 +24,20 @@ final class ProtocolTemplateBackgroundLoggingTests: XCTestCase {
         }
 
         XCTAssertEqual(offenders, [], "Log statements that read the background info:\n" + offenders.joined(separator: "\n"))
+    }
+
+    /// A provider's failure text can echo the prompt it rejected, so the
+    /// summary the pipeline logs names the case and its code only.
+    func testProviderFailuresLogWithoutTheirText() {
+        let echoed = "invalid request: <background>\nAlice chairs\n</background>"
+        XCTAssertEqual(ProtocolError.httpError(400, echoed).logSummary, "HTTP 400")
+        XCTAssertEqual(ProtocolError.connectionFailed(echoed).logSummary, "Connection failed")
+        XCTAssertEqual(ProtocolError.emptyProtocol.logSummary, ProtocolError.emptyProtocol.errorDescription)
+        #if !APPSTORE
+            XCTAssertEqual(ProtocolError.cliFailed(2, echoed).logSummary, "Claude CLI exited with code 2")
+            XCTAssertEqual(ProtocolError.commandFailed(tool: "Codex CLI", exitCode: 1, reason: echoed).logSummary, "Codex CLI exited with code 1")
+        #endif
+        XCTAssertEqual(ProtocolError.httpError(400, echoed).errorDescription, "HTTP 400: \(echoed)", "the person still sees the text")
     }
 
     /// The scan finds what it is looking for, so an empty result means

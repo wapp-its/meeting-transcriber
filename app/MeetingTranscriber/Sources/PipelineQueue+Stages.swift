@@ -965,16 +965,14 @@ extension PipelineQueue {
                 instructions: instructions,
             )
         } catch {
-            // Every ProtocolGenerating error's message is now guaranteed
-            // content-free: ClaudeCLIProtocolGenerator sources cliFailed's
-            // text from the stream-json result event (never generated
-            // content, see ClaudeCLIProtocolGenerator.publicFailureMessage)
-            // or a fixed placeholder, never from the accumulated protocol
-            // text; every other case (cliNotFound, timeout, emptyProtocol,
-            // and OpenAIProtocolGenerator's connection/HTTP errors) already
-            // only ever carried diagnostic text. Safe to log at .public —
-            // restores the visibility traded away in PR #692's 4th commit.
-            logger.warning("[\(shortID, privacy: .public)] protocol_generation_failed error=\(error.localizedDescription, privacy: .public)")
+            // Logged content-free: a provider's error text can echo the prompt
+            // it rejected (an HTTP endpoint quoting the request, a command
+            // printing its input), and since the prompt carries the meeting's
+            // background info that text may not reach the exported
+            // diagnostics (R9 of the protocol-templates spec). The person
+            // still sees the full text where the result is shown.
+            let summary = (error as? ProtocolError)?.logSummary ?? String(describing: type(of: error))
+            logger.warning("[\(shortID, privacy: .public)] protocol_generation_failed error=\(summary, privacy: .public)")
             addWarning(id: jobID, "Protocol generation failed — transcript saved")
             return
         }

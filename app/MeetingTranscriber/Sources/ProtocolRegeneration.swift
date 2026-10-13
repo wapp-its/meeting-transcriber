@@ -296,8 +296,9 @@ final class ProtocolRegenerator {
         let scope = environment.outputDir()
         let accessing = scope.startAccessingSecurityScopedResource()
         defer { if accessing { scope.stopAccessingSecurityScopedResource() } }
+        let backgroundPresence = options.background == nil ? "absent" : "present"
         logger.info(
-            "protocol_regeneration_started job=\(target.jobID ?? "none", privacy: .public) background=\(options.background == nil ? "absent" : "present", privacy: .public)",
+            "protocol_regeneration_started job=\(target.jobID ?? "none", privacy: .public) background=\(backgroundPresence, privacy: .public)",
         )
         do {
             let warnings = try await run(target, options: options)

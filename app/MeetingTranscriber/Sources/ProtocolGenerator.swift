@@ -346,6 +346,28 @@ enum ProtocolError: LocalizedError {
     case generationTimedOut(Int)
     case protocolTruncated
 
+    /// What a log line may say about the failure: the case and its status or
+    /// exit code, never the text a provider sent back. An endpoint that echoes
+    /// a rejected request, or a command that prints its input, would put the
+    /// prompt (the meeting's background info included) into that text, and a
+    /// log line is exported with the diagnostics. `errorDescription` keeps the
+    /// text for the person reading the result.
+    var logSummary: String {
+        switch self {
+        #if !APPSTORE
+            case let .cliFailed(code, _): "Claude CLI exited with code \(code)"
+
+            case let .commandFailed(tool, exitCode, _): "\(tool) exited with code \(exitCode)"
+        #endif
+
+        case let .httpError(code, _): "HTTP \(code)"
+
+        case .connectionFailed: "Connection failed"
+
+        default: errorDescription ?? String(describing: self)
+        }
+    }
+
     var errorDescription: String? {
         switch self {
         #if !APPSTORE

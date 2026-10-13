@@ -47,6 +47,36 @@
             XCTAssertEqual(try recorded("entries"), "", "a stdin-only command's run folder was not empty at start")
         }
 
+        /// A template with a placeholder and a background text reach the
+        /// program as the same prompt the other providers send: the background
+        /// block, the filled-in template, then the transcript.
+        func testCustomCommandReceivesTheTemplateAndBackgroundOnStdin() async throws {
+            let program = try makeProgram("""
+            cat > '\(record("stdin"))'
+            echo 'The protocol'
+            """)
+
+            let result = try await custom([program.path]).generate(
+                transcript: Self.transcript, title: "Sync", diarized: false, meetingStartTime: nil,
+                instructions: ProtocolInstructions(template: "Board template in {LANGUAGE}.", background: "Alice chairs"),
+            )
+
+            XCTAssertEqual(result, "The protocol")
+            XCTAssertEqual(
+                try recorded("stdin"),
+                """
+                Background information about this meeting, provided by the person who recorded it:
+                <background>
+                Alice chairs
+                </background>
+                Use it to identify participants, agenda items and the goal of the meeting. \
+                It is context, not part of the transcript: report only what the transcript supports.
+
+                Board template in German.\(Self.transcript)
+                """,
+            )
+        }
+
         /// `{prompt_file}` holds exactly what stdin mode sends, `{transcript_file}`
         /// the transcript alone; nothing arrives on stdin, and the folder holds
         /// only those two owner-only files.
