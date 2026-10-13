@@ -325,6 +325,34 @@ final class MicInputDetectorTests: XCTestCase {
         XCTAssertTrue(detector.isMeetingActive(second))
     }
 
+    /// Two added apps whose bundle IDs are prefix-related (`com.acme.meet`
+    /// and `com.acme.meet.beta`) are kept apart whichever was added first:
+    /// helper matching must not file the second app, or its own helper,
+    /// under the first app's key.
+    func testPrefixRelatedAddedAppsAreFiledUnderTheMostSpecificBundleID() throws {
+        let main = customPattern(appName: "Meet", bundleID: "com.acme.meet")
+        let detector = MicInputDetector(
+            patterns: [main, customPattern(appName: "Meet", bundleID: "com.acme.meet.beta")],
+            confirmationCount: 1,
+        )
+        detector.windowListProvider = { [] }
+        detector.mainAppPIDProvider = { _ in nil }
+        let mainMeeting = DetectedMeeting(pattern: main.meetingPattern, windowTitle: "Meet Call", ownerName: "Meet", windowPID: 1)
+
+        for process in ["com.acme.meet.beta", "com.acme.meet.beta.helper"] {
+            detector.reset()
+            detector.processProvider = { [snapshot(process, pid: 7)] }
+            let beta = try XCTUnwrap(detector.checkOnce())
+            XCTAssertEqual(beta.pattern.identityKey, "custom:com.acme.meet.beta", process)
+            XCTAssertFalse(detector.isMeetingActive(mainMeeting), "\(process) must not keep the first app's meeting active")
+        }
+
+        detector.reset()
+        detector.processProvider = { [snapshot("com.acme.meet.helper", pid: 8)] }
+        let mainHelper = try XCTUnwrap(detector.checkOnce())
+        XCTAssertEqual(mainHelper.pattern.identityKey, "custom:com.acme.meet", "the first app's own helper still belongs to it")
+    }
+
     /// Each of two same-named apps is titled by its own matcher, and an added
     /// app's meeting shows its display name, never its key.
     func testEachSameNamedAppTitlesItsMeetingWithItsOwnMatcherAndName() throws {

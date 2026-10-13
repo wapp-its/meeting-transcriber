@@ -37,8 +37,18 @@ class MicInputDetector: MeetingDetecting {
         var matchesHelpers = false
         var usesBuiltInMeetingPattern = true
 
-        func matches(bundleID: String) -> Bool {
-            bundleIDs.contains { $0 == bundleID || (matchesHelpers && bundleID.hasPrefix($0 + ".")) }
+        /// The length of the longest of this pattern's bundle IDs that
+        /// `bundleID` is or is a helper of, nil when the process is not this
+        /// app's. The length ranks patterns that both match one process: an
+        /// added app's bundle ID can be a prefix of another added app's
+        /// (`com.acme.meet` and `com.acme.meet.beta`), and helper matching
+        /// would file the second app's microphone use under the first app's
+        /// key.
+        func matchLength(bundleID: String) -> Int? {
+            bundleIDs.lazy
+                .filter { $0 == bundleID || (matchesHelpers && bundleID.hasPrefix($0 + ".")) }
+                .map(\.count)
+                .max()
         }
 
         /// An app added through "Add App…" always asks before recording: it
@@ -178,7 +188,7 @@ class MicInputDetector: MeetingDetecting {
         var matchedPattern: [String: AppMeetingPattern] = [:]
 
         for process in processes where process.isRunningInput {
-            guard let pattern = patterns.first(where: { $0.matches(bundleID: process.bundleID) }) else {
+            guard let pattern = mostSpecificPattern(for: process.bundleID) else {
                 logUnmatchedRunningInput(bundleID: process.bundleID)
                 continue
             }
@@ -214,11 +224,23 @@ class MicInputDetector: MeetingDetecting {
     }
 
     func isMeetingActive(_ meeting: DetectedMeeting) -> Bool {
-        let candidates = patterns.filter { $0.meetingPattern.identityKey == meeting.pattern.identityKey }
-        guard !candidates.isEmpty else { return false }
-        return processProvider().contains { process in
-            process.isRunningInput && candidates.contains { $0.matches(bundleID: process.bundleID) }
+        processProvider().contains { process in
+            process.isRunningInput
+                && mostSpecificPattern(for: process.bundleID)?.meetingPattern.identityKey == meeting.pattern.identityKey
         }
+    }
+
+    /// The pattern a microphone-holding process belongs to: the one whose
+    /// matching bundle ID is longest, never the first one added. Two added
+    /// apps may have prefix-related bundle IDs (`com.acme.meet` and
+    /// `com.acme.meet.beta`), and helper matching would otherwise file the
+    /// second app's microphone use, and its liveness, under the first app's
+    /// key. Both detection and liveness go through this one rule.
+    private func mostSpecificPattern(for bundleID: String) -> MicPattern? {
+        patterns
+            .compactMap { pattern in pattern.matchLength(bundleID: bundleID).map { (pattern: pattern, length: $0) } }
+            .max { $0.length < $1.length }?
+            .pattern
     }
 
     /// A helper holding the mic is swapped for its main app, whose bundle the
