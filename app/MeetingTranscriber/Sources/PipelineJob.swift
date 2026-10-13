@@ -139,6 +139,16 @@ struct PipelineJob: Identifiable, Codable {
     // See `includeFullTranscriptInProtocol`.
     // swiftlint:disable:next discouraged_optional_boolean
     var saveRawTranscriptSeparately: Bool?
+    /// The template this job's protocol is made from, captured by name when the
+    /// job enters the queue; the file's text is read only when the protocol is
+    /// generated. Nil for a job from a snapshot written before templates, which
+    /// uses the current default. A retry keeps it: it is the person's choice,
+    /// not something the failed run concluded.
+    var protocolTemplate: ProtocolTemplateID?
+    /// Background info the person gave for this meeting, sent to the protocol
+    /// provider inside the prompt. Never logged, put in a warning or reported
+    /// over RPC; the snapshot that holds it is owner-only. A retry keeps it.
+    let protocolBackground: String?
     /// Diarizer mode that produced the *current* `speakerNamingDataByJob`
     /// entry. Set by `PipelineQueue` after diarisation completes (in the
     /// initial pipeline run and after `lateDiarization`). Used by the
@@ -274,6 +284,8 @@ struct PipelineJob: Identifiable, Codable {
         includeFullTranscriptInProtocol: Bool? = nil,
         // swiftlint:disable:next discouraged_optional_boolean
         saveRawTranscriptSeparately: Bool? = nil,
+        protocolTemplate: ProtocolTemplateID? = nil,
+        protocolBackground: String? = nil,
     ) {
         self.id = UUID()
         self.meetingTitle = meetingTitle
@@ -294,6 +306,8 @@ struct PipelineJob: Identifiable, Codable {
         self.namingSlug = nil
         self.includeFullTranscriptInProtocol = includeFullTranscriptInProtocol
         self.saveRawTranscriptSeparately = saveRawTranscriptSeparately
+        self.protocolTemplate = protocolTemplate
+        self.protocolBackground = protocolBackground
         self.usedDiarizerMode = nil
         self.autoSkipNaming = autoSkipNaming
     }
@@ -316,7 +330,8 @@ struct PipelineJob: Identifiable, Codable {
     /// again from its own run, and a leftover one would describe a recording
     /// the retry never saw that way. The paths stay: the audio is the input
     /// the retry needs, and the slug and transcript path name files the retry
-    /// overwrites under the same basename.
+    /// overwrites under the same basename. So do the protocol template and the
+    /// background, which the person chose rather than the run.
     mutating func prepareForRetry() {
         error = nil
         warnings = []

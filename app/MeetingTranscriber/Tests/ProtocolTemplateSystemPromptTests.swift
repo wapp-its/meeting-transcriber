@@ -93,18 +93,92 @@ final class ProtocolTemplateSystemPromptTests: XCTestCase {
             ("no start, plain", false, nil, withoutStart),
             ("no start, diarized", true, nil, withoutStart + Self.diarizationNote),
         ]
-        // Never created, so the pre-template code falls back to the built-in
-        // prompt instead of reading the developer's own custom prompt file.
-        let missingPrompt = makeTempFile(suffix: ".md")
         for testCase in cases {
             let prompt = ProtocolGenerator.buildSystemPrompt(
                 diarized: testCase.diarized,
                 language: "German",
                 meetingStartTime: testCase.start,
-                promptURL: missingPrompt,
+                instructions: ProtocolInstructions(template: ProtocolGenerator.protocolPrompt, background: nil),
                 timeZone: Self.zurich,
             )
             XCTAssertEqual(prompt, testCase.expected, testCase.name)
         }
+    }
+
+    // MARK: - Background block
+
+    func testBackgroundSitsVerbatimBetweenTheMeetingContextAndTheTemplate() {
+        // Placeholders in the background are the person's text, not the
+        // template's: they stay as typed.
+        let instructions = ProtocolInstructions(
+            template: "Template in {LANGUAGE} on {MEETING_DATE}.",
+            background: "  Alice (chair), Bob\nAgenda: budget {LANGUAGE}\n ",
+        )
+        let block = """
+        Background information about this meeting, provided by the person who recorded it:
+        <background>
+        Alice (chair), Bob
+        Agenda: budget {LANGUAGE}
+        </background>
+        Use it to identify participants, agenda items and the goal of the meeting. \
+        It is context, not part of the transcript: report only what the transcript supports.
+
+
+        """
+        let cases: [(name: String, start: Date?, expected: String)] = [
+            ("start", Self.meetingStart, Self.meetingContext + block + "Template in German on 2026-08-21."),
+            ("no start", nil, block + "Template in German on Unknown."),
+        ]
+        for testCase in cases {
+            let prompt = ProtocolGenerator.buildSystemPrompt(
+                diarized: false, language: "German", meetingStartTime: testCase.start,
+                instructions: instructions, timeZone: Self.zurich,
+            )
+            XCTAssertEqual(prompt, testCase.expected, testCase.name)
+        }
+    }
+
+    func testBlankBackgroundAddsNoBlock() {
+        let blank = ProtocolInstructions(template: ProtocolGenerator.protocolPrompt, background: " \n\t ")
+        XCTAssertNil(blank.background)
+
+        let prompt = ProtocolGenerator.buildSystemPrompt(
+            diarized: false, language: "German", meetingStartTime: Self.meetingStart,
+            instructions: blank, timeZone: Self.zurich,
+        )
+
+        XCTAssertEqual(prompt, Self.meetingContext + Self.builtInBody(date: "2026-08-21", time: "13:28"))
+    }
+
+    // MARK: - Protocol document
+
+    func testComposedDocumentGivesItsTranscriptBack() {
+        let transcript = "[00:00] Alice: Hello"
+        let withTranscript = ProtocolGenerator.composeDocument(
+            protocolMarkdown: "# Protocol", transcript: transcript, includeFullTranscript: true,
+        )
+        let without = ProtocolGenerator.composeDocument(
+            protocolMarkdown: "# Protocol", transcript: transcript, includeFullTranscript: false,
+        )
+
+        XCTAssertEqual(withTranscript, "# Protocol\n\n---\n\n## Full Transcript\n\n[00:00] Alice: Hello")
+        XCTAssertEqual(without, "# Protocol")
+        XCTAssertEqual(ProtocolGenerator.fullTranscript(in: withTranscript), transcript)
+        XCTAssertNil(ProtocolGenerator.fullTranscript(in: without))
+    }
+
+    /// The protocol before the separator is model output and may repeat the
+    /// heading; the transcript is what follows the last one.
+    func testFullTranscriptIsWhatFollowsTheLastSeparator() {
+        let separator = ProtocolGenerator.fullTranscriptSeparator
+        let document = "# Protocol" + separator + "quoted heading" + separator + "[00:00] Alice: Hello"
+
+        XCTAssertEqual(ProtocolGenerator.fullTranscript(in: document), "[00:00] Alice: Hello")
+        XCTAssertNil(ProtocolGenerator.fullTranscript(in: "# Protocol" + separator + " \n "))
+    }
+
+    func testLooksDiarizedWhenTheTranscriptCarriesSpeakerLabels() {
+        XCTAssertTrue(ProtocolGenerator.looksDiarized("[00:00] [Alice] Hello"))
+        XCTAssertFalse(ProtocolGenerator.looksDiarized("Hello, no labels here"))
     }
 }

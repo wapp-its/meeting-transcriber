@@ -941,19 +941,28 @@ extension PipelineQueue {
         let basename = job?.namingSlug
             ?? Self.namingSlug(title: title, jobID: jobID, startTime: Date())
         let meetingStartTime = job?.meetingStartTime
+        // A job from an older snapshot, or one no longer queued, takes the
+        // current default; only a queued job can carry background info.
+        let templateID = job?.protocolTemplate ?? defaultProtocolTemplateProvider()
+        let (instructions, templateWarning) = protocolTemplateStore.instructions(
+            for: templateID, background: job?.protocolBackground,
+        )
+        if let templateWarning { addWarning(id: jobID, templateWarning) }
+        let backgroundPresence = instructions.background == nil ? "absent" : "present"
+        logger.info(
+            "[\(shortID, privacy: .public)] protocol_template template=\(templateID.storedValue, privacy: .private) fallback=\(templateWarning != nil, privacy: .public) background=\(backgroundPresence, privacy: .public)",
+        )
         updateJobState(id: jobID, to: .generatingProtocol)
         startElapsedTimer()
         defer { stopElapsedTimer() }
         let protocolMD: String
         do {
-            let diarized = transcript.range(
-                of: #"\[\w[\w\s]*\]"#, options: .regularExpression,
-            ) != nil
             protocolMD = try await generator.generate(
                 transcript: transcript,
                 title: title,
-                diarized: diarized,
+                diarized: ProtocolGenerator.looksDiarized(transcript),
                 meetingStartTime: meetingStartTime,
+                instructions: instructions,
             )
         } catch {
             // Every ProtocolGenerating error's message is now guaranteed
@@ -969,9 +978,11 @@ extension PipelineQueue {
             addWarning(id: jobID, "Protocol generation failed — transcript saved")
             return
         }
-        let markdown = transcriptOutputOptions(forJobID: jobID).includeFullTranscriptInProtocol
-            ? protocolMD + "\n\n---\n\n## Full Transcript\n\n" + transcript
-            : protocolMD
+        let markdown = ProtocolGenerator.composeDocument(
+            protocolMarkdown: protocolMD,
+            transcript: transcript,
+            includeFullTranscript: transcriptOutputOptions(forJobID: jobID).includeFullTranscriptInProtocol,
+        )
         do {
             let mdPath = try ProtocolGenerator.saveProtocol(markdown, basename: basename, dir: protocolsDir)
             logger.info("[\(shortID, privacy: .public)] protocol_saved file=\(mdPath.lastPathComponent, privacy: .private)")

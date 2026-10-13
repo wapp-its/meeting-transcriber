@@ -109,6 +109,10 @@ final class AppState {
         // This is the only production construction of `AppSettings` — tests
         // inject their own, so none of them touch the real domains.
         LegacyDefaultsMigration.run(into: .standard)
+        // Before `AppSettings()` reads the default template this may set.
+        ProtocolTemplateMigration.run(
+            defaults: .standard, legacyPrompt: AppPaths.customPromptFile, store: .production,
+        )
         let settings = AppSettings()
         // Once, here, rather than from `customOutputDir` — that getter is read
         // during view updates, and repairing there would write observed state

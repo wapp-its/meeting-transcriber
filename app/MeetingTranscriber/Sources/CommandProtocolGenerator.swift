@@ -27,7 +27,6 @@
         var timeout = CLIProcessRunner.defaultTimeout
         /// The most protocol bytes a run may return, from stdout or the output file.
         var maxOutputBytes = CLIProcessRunner.defaultMaxStdoutBytes
-        var promptURL = AppPaths.customPromptFile
 
         static let codexUpdateHint = "This Codex CLI does not know an option the app needs (such as --ephemeral). Update Codex."
         private static let maxReasonLength = 300
@@ -62,12 +61,13 @@
             title _: String,
             diarized: Bool,
             meetingStartTime: Date?,
+            instructions: ProtocolInstructions,
         ) async throws -> String {
             let arguments = CommandTemplate.effectiveArguments(self.arguments)
             try CommandTemplate.validate(arguments, model: model)
             let prompt = ProtocolGenerator.fullPrompt(
                 transcript: transcript, diarized: diarized, language: language,
-                meetingStartTime: meetingStartTime, promptURL: promptURL,
+                meetingStartTime: meetingStartTime, instructions: instructions,
             )
             let environment = CLIProcessRunner.environment(base: ProcessInfo.processInfo.environment)
             let programName = URL(fileURLWithPath: arguments[0]).lastPathComponent

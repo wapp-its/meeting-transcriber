@@ -43,9 +43,11 @@
             title _: String,
             diarized: Bool,
             meetingStartTime: Date?,
+            instructions: ProtocolInstructions,
         ) async throws -> String {
             let prompt = ProtocolGenerator.fullPrompt(
                 transcript: transcript, diarized: diarized, language: language, meetingStartTime: meetingStartTime,
+                instructions: instructions,
             )
 
             let launch = await Self.launchConfiguration(claudeBin: claudeBin, anthropicAPIKey: anthropicAPIKey)

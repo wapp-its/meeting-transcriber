@@ -4,17 +4,19 @@
 
     /// The Codex CLI preset and the custom command, run against `#!/bin/sh`
     /// fake programs that report what they received or misbehave on purpose.
-    /// Every generator reads the pinned prompt below, never the developer's
-    /// own custom prompt.
+    /// Every generator gets the pinned prompt below as its template.
     final class CommandProtocolGeneratorTests: XCTestCase {
         private static let transcript = "Speaker 1: the quarterly numbers"
         private static let pinnedPrompt = "PINNED PROMPT\n"
+        /// The pinned prompt as a template with nothing to fill in, so the
+        /// prompt a command receives is exactly `pinnedPrompt`.
+        private static let pinned = ProtocolInstructions(template: pinnedPrompt, background: nil)
         private static let codexTemplate = [
             "codex", "exec", "--json", "--ephemeral", "--skip-git-repo-check",
             "--sandbox", "read-only", "--output-last-message", "{output_file}", "-",
         ]
 
-        /// Holds the fake programs, the pinned prompt and what fakes record.
+        /// Holds the fake programs and what fakes record.
         private var scratch = FileManager.default.temporaryDirectory
 
         override func setUpWithError() throws {
@@ -22,7 +24,6 @@
             scratch = FileManager.default.temporaryDirectory
                 .appendingPathComponent("command-generator-test-\(UUID().uuidString)", isDirectory: true)
             try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: false)
-            try Self.pinnedPrompt.write(to: promptURL, atomically: true, encoding: .utf8)
         }
 
         override func tearDownWithError() throws {
@@ -39,7 +40,7 @@
             echo 'The protocol'
             """)
 
-            let result = try await custom([program.path]).generate(transcript: Self.transcript, title: "Sync", diarized: false)
+            let result = try await generate(with: custom([program.path]))
 
             XCTAssertEqual(result, "The protocol")
             XCTAssertEqual(try recorded("stdin"), Self.pinnedPrompt + Self.transcript)
@@ -60,8 +61,7 @@
             echo 'The protocol'
             """)
 
-            let result = try await custom([program.path, "{prompt_file}", "--transcript={transcript_file}"])
-                .generate(transcript: Self.transcript, title: "Sync", diarized: false)
+            let result = try await generate(with: custom([program.path, "{prompt_file}", "--transcript={transcript_file}"]))
 
             XCTAssertEqual(result, "The protocol")
             XCTAssertEqual(try recorded("prompt"), Self.pinnedPrompt + Self.transcript)
@@ -80,8 +80,7 @@
             printf 'File protocol\\n' > "$1"
             """)
 
-            let result = try await custom([program.path, "{output_file}"])
-                .generate(transcript: Self.transcript, title: "Sync", diarized: false)
+            let result = try await generate(with: custom([program.path, "{output_file}"]))
 
             XCTAssertEqual(result, "File protocol")
         }
@@ -140,9 +139,9 @@
             let model = "  $(touch \(record("pwned2")))  "
             let program = try makeProgram(#"for arg in "$@"; do printf '%s\n' "$arg"; done"#)
 
-            let result = try await custom(
+            let result = try await generate(with: custom(
                 [program.path, "{transcript_file};touch \(record("pwned"))", "{model}", quoted], model: model,
-            ).generate(transcript: Self.transcript, title: "Sync", diarized: false)
+            ))
 
             let lines = result.components(separatedBy: "\n")
             XCTAssertEqual(lines.count, 3, "unexpected arguments: \(result)")
@@ -261,7 +260,7 @@
             for (name, ending) in [("success", "echo 'The protocol'"), ("failure", "exit 1")] {
                 let program = try makeProgram("cat > /dev/null\npwd -P > '\(record(name))'\n\(ending)")
 
-                _ = try? await custom([program.path]).generate(transcript: Self.transcript, title: "Sync", diarized: false)
+                _ = try? await generate(with: custom([program.path]))
 
                 let folder = try recorded(name).trimmingCharacters(in: .whitespacesAndNewlines)
                 XCTAssertTrue(folder.contains("MeetingTranscriber-cli-"), "\(name): unexpected run folder \(folder)")
@@ -291,7 +290,7 @@
             echo '{"type":"turn.completed"}'
             """)
 
-            let result = try await codex(program: program.path).generate(transcript: Self.transcript, title: "Sync", diarized: false)
+            let result = try await generate(with: codex(program: program.path))
 
             XCTAssertEqual(result, "Codex protocol")
             XCTAssertEqual(try recorded("stdin"), Self.pinnedPrompt + Self.transcript)
@@ -345,23 +344,21 @@
 
         // MARK: - Helpers
 
-        private var promptURL: URL {
-            scratch.appendingPathComponent("pinned-prompt.md")
+        /// `generator` run over the test transcript with the pinned prompt as its template.
+        private func generate(with generator: CommandProtocolGenerator) async throws -> String {
+            try await generator.generate(
+                transcript: Self.transcript, title: "Sync", diarized: false, meetingStartTime: nil, instructions: Self.pinned,
+            )
         }
 
-        /// The custom command over `arguments`, reading the pinned prompt.
+        /// The custom command over `arguments`.
         private func custom(_ arguments: [String], model: String = "") -> CommandProtocolGenerator {
-            var generator = CommandProtocolGenerator.custom(arguments: arguments, model: model, language: "German")
-            generator.promptURL = promptURL
-            return generator
+            CommandProtocolGenerator.custom(arguments: arguments, model: model, language: "German")
         }
 
-        /// The Codex preset with `program` in place of `codex`, reading the
-        /// pinned prompt.
+        /// The Codex preset with `program` in place of `codex`.
         private func codex(program: String) -> CommandProtocolGenerator {
-            var generator = CommandProtocolGenerator.codex(language: "German", program: program)
-            generator.promptURL = promptURL
-            return generator
+            CommandProtocolGenerator.codex(language: "German", program: program)
         }
 
         /// The error `generate()` throws; fails the test when it returns a
@@ -376,7 +373,9 @@
             let returned = XCTestExpectation(description: "generate() returned")
             let run = Task {
                 defer { returned.fulfill() }
-                return try await generator.generate(transcript: Self.transcript, title: "Sync", diarized: false)
+                return try await generator.generate(
+                    transcript: Self.transcript, title: "Sync", diarized: false, meetingStartTime: nil, instructions: Self.pinned,
+                )
             }
             guard await XCTWaiter.fulfillment(of: [returned], timeout: seconds) == .completed else {
                 XCTFail("generate() did not return within \(seconds) s", file: file, line: line)

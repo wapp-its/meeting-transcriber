@@ -297,6 +297,10 @@ final class PipelineController {
                     saveRawTranscriptSeparately: settings.saveRawTranscriptSeparately,
                 )
             },
+            defaultProtocolTemplateProvider: { [settings] in
+                ProtocolTemplateStore.production.effectiveDefault(settings.defaultProtocolTemplate)
+            },
+            protocolTemplateStore: .production,
             speakerMatcherFactory: { SpeakerMatcher() },
             vadConfig: settings.vadEnabled ? VADConfig(threshold: settings.vadThreshold) : nil,
             recognitionStatsLog: RecognitionStatsLog(),
