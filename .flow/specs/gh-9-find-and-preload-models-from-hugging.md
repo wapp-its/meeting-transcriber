@@ -122,6 +122,8 @@ Task gh-9-find-and-preload-models-from-hugging.1 validates the core approach (th
 
 FIT: GO · 2026-10-09 · base 47c550ad · engine flow-next 8.3.0 · no FIT receipt before; spec text unchanged since its plan commit; gh-12 (the token this spec reads) merged 2026-10-07 as AppSettings.huggingFaceToken over an injectable HuggingFaceTokenStore; every cited symbol is on the head, only line numbers drifted in TranscriptionSettingsView (binding :173, Load Model button :441); the 13 specs planned since claim none of this scope (gh-6 only consumes the model selection); open PR #111 (gh-10) also edits TranscriptionSettingsView, SettingsView and AppSettings, a merge-order fact; the live search and spert listing still answer as measured on 2026-10-06
 
+FIT: GO · 2026-10-13 · base 47c550ad · engine flow-next 8.6.0 · base unchanged since the 2026-10-09 GO; engine 8.3.0→8.6.0 changes no spec template, schema or flowctl command the spec relies on (diffed the cached plugin copies); the only design-source commit on any ref since then is upstream's unmerged docs refresh 3cff0ffb (docs/architecture-macos.md, CLAUDE.md on upstream/docs/auto-update), which describes existing code and claims none of this scope; spec text unchanged
+
 ## Quick commands
 
 ```bash
