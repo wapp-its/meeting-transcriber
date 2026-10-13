@@ -26,6 +26,12 @@ struct MenuBarView: View {
     let onNameSpeakers: (() -> Void)?
     let onProcessFiles: () -> Void
     let onDismissJob: (UUID) -> Void
+    /// The open "Record <App> meeting?" prompt, nil when none is open.
+    var consentQuestion: ConsentQuestion?
+    /// Answers the question the menu displayed, true for Record. Handed the
+    /// question rather than reading the open one, so a click on a menu that
+    /// went stale answers nothing (`WatchLoop.answerParkedConsent`).
+    var onAnswerConsent: ((ConsentQuestion, Bool) -> Void)?
     let onQuit: () -> Void
 
     private var state: TranscriberState {
@@ -55,6 +61,7 @@ struct MenuBarView: View {
     // -warnings-as-errors), failing the build on slower CI hardware. The view
     // order, dividers, and conditionals are unchanged.
     var body: some View {
+        consentPrompt
         statusHeader
         sessionControls
         meetingInfo
@@ -80,6 +87,39 @@ struct MenuBarView: View {
     }
 
     // MARK: - Body sections
+
+    /// The open recording prompt, worded exactly as its notification, for
+    /// whoever missed the banner or never got one. Its own section above the
+    /// status line, so the divider closing it leaves the status line and its
+    /// control together.
+    @ViewBuilder private var consentPrompt: some View {
+        if let question = consentQuestion {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(question.title)
+                    .font(.headline)
+                Text(question.body)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 4)
+
+            Button {
+                onAnswerConsent?(question, true)
+            } label: {
+                Label("Record", systemImage: "record.circle")
+            }
+            .accessibilityIdentifier(A11yID.consentPromptRecord)
+
+            Button {
+                onAnswerConsent?(question, false)
+            } label: {
+                Label("Ignore", systemImage: "xmark.circle")
+            }
+            .accessibilityIdentifier(A11yID.consentPromptIgnore)
+
+            Divider()
+        }
+    }
 
     private var statusHeader: some View {
         VStack(alignment: .leading, spacing: 2) {

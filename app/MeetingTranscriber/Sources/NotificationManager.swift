@@ -282,6 +282,19 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
     /// visible prompt, `.expired` when nobody answered in time.
     @MainActor
     func askToRecord(title: String, body: String) async -> ConsentAnswer {
+        await askToRecord(promptID: UUID().uuidString, title: title, body: body)
+    }
+
+    /// The consent gate's form: parked and posted under `question.id`, so
+    /// `answerConsentPrompt(id:granted:)` reaches exactly this prompt.
+    @MainActor
+    func askToRecord(_ question: ConsentQuestion) async -> ConsentAnswer {
+        await askToRecord(promptID: question.id.uuidString, title: question.title, body: question.body)
+    }
+
+    /// Both forms of `askToRecord`, under the prompt id the caller chose.
+    @MainActor
+    private func askToRecord(promptID id: String, title: String, body: String) async -> ConsentAnswer {
         let deliverable = deliverableOrLogDrop()
 
         #if !APPSTORE
@@ -295,7 +308,6 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
         #endif
 
         guard deliverable else { return .declined }
-        let id = UUID().uuidString
         let answer = await consentCoordinator.awaitDecision(id: id) { [self] in
             postConsentNotification(id: id, title: title, body: body)
         }
@@ -327,6 +339,14 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
     /// MainActor hop (unlike the scene actions).
     func resolveBrowserConsent(granted: Bool) -> Bool {
         consentCoordinator.resolvePending(granted: granted)
+    }
+
+    /// The menu's Record / Ignore for the prompt it shows: resolved by id
+    /// through the coordinator, the call a notification tap makes, so it can
+    /// never answer another prompt. Like `resolveBrowserConsent` it touches
+    /// only the lock-guarded coordinator and needs no MainActor hop.
+    func answerConsentPrompt(id: UUID, granted: Bool) -> Bool {
+        consentCoordinator.resolve(id: id.uuidString, granted: granted)
     }
 
     /// Post the actionable consent notification (the request-building is the pure
