@@ -35,7 +35,9 @@ final class WhisperKitModelChoice {
     private(set) var loadOffer: WhisperKitModelLoadOffer?
 
     /// Offer to load `selection`, unless the engine already loads or holds exactly it.
-    /// `isOnDisk` is asked only when an offer is made.
+    /// `isOnDisk` is asked only when an offer is made. An offered model is deferred on
+    /// the engine until the answer, so a load still running for the previous model
+    /// cannot go on to it while the question is open; "Load now" lifts that.
     func offerLoad(
         for selection: WhisperKitModelSelection,
         sizeBytes: Int64?,
@@ -48,6 +50,7 @@ final class WhisperKitModelChoice {
             engineOrigin: engine.modelOrigin,
             engineState: engine.modelState,
         ) else { return }
+        engine.deferredSelection = selection
         loadOffer = WhisperKitModelLoadOffer(selection: selection, sizeBytes: sizeBytes, isOnDisk: isOnDisk(selection))
     }
 
@@ -75,7 +78,7 @@ final class WhisperKitModelChoice {
 
     /// "Later": the model loads on first use, as without the offer. A load still
     /// running for the previous model stops when it finishes instead of going on to
-    /// this one; one already loading this model cannot be stopped and completes.
+    /// this one. The offer already deferred it; this keeps it deferred.
     func loadLater(_ offer: WhisperKitModelLoadOffer, engine: WhisperKitEngine) {
         loadOffer = nil
         engine.deferredSelection = offer.selection

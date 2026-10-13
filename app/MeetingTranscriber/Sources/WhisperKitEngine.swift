@@ -84,10 +84,10 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
     /// Test-only loader override used to count content reads on cache hits.
     private var vocabularyTermsLoaderOverride: ((String, WhisperVocabularyPrompt.FileRevision) -> WhisperVocabularyPrompt.VocabularyTermsLoadResult)?
     private let modelLoad = SingleFlight<LoadAttempt>()
-    /// A model the user chose to load on first use ("Later" in Settings). A load that
-    /// would start it stops instead, also one still running for the previous model;
-    /// a transcription's load does not, it needs the model now. Cleared by an explicit
-    /// load (`loadModel(for:)`).
+    /// A model Settings is asking about, or the user chose to load on first use
+    /// ("Later"). A load that would start it stops instead, also one still running for
+    /// the previous model; a transcription's load does not, it needs the model now.
+    /// Cleared by an explicit load (`loadModel(for:)`).
     var deferredSelection: WhisperKitModelSelection?
     /// The Hugging Face token every Hub request of a load carries, `""` for none. Read
     /// by the production source when it downloads or builds a pipe, never by a test

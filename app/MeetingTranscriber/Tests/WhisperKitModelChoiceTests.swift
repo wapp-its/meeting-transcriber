@@ -155,6 +155,35 @@ final class WhisperKitModelChoiceTests: XCTestCase {
         XCTAssertEqual(WhisperKitModelSelection(variant: engine.modelVariant, origin: engine.modelOrigin), small)
     }
 
+    /// The running load can finish while the question is still open, here the second
+    /// of two picks made during one long load. Until the user answers, the pick must
+    /// not start loading, or "Later" would come too late to stop it.
+    func testAPickStaysUnloadedWhileItsQuestionIsOpen() async throws {
+        let engine = WhisperKitEngine()
+        let choice = WhisperKitModelChoice()
+        let probe = InFlightProbe()
+        let small = small
+        let swissGerman = swissGerman
+        let recorder = try await installRecordingSource(on: engine) { [turbo] loading in
+            guard loading == turbo else { return }
+            choice.offerLoad(for: small, sizeBytes: 486_487_465, engine: engine) { _ in false }
+            engine.applyModelVariant(small.variant, origin: small.origin)
+            if let offer = choice.loadOffer { choice.loadLater(offer, engine: engine) }
+            choice.offerLoad(for: swissGerman, sizeBytes: nil, engine: engine) { _ in false }
+            engine.applyModelVariant(swissGerman.variant, origin: swissGerman.origin)
+            probe.offer = choice.loadOffer
+        }
+
+        await engine.loadModel(for: turbo)
+        XCTAssertEqual(recorder.loads, [turbo], "Nothing may load while the second question is open")
+        let offer = try XCTUnwrap(probe.offer)
+        XCTAssertEqual(offer.selection, swissGerman)
+        choice.loadLater(offer, engine: engine)
+
+        XCTAssertEqual(recorder.loads, [turbo])
+        XCTAssertEqual(engine.modelState, .unloaded)
+    }
+
     /// "Later" never holds up a transcription: the first use loads the deferred model.
     /// The audio does not exist, so the decode fails after the load; only the load is
     /// under test.
