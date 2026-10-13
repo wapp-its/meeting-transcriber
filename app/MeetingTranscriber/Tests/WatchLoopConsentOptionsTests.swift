@@ -27,7 +27,7 @@ final class WatchLoopConsentOptionsTests: XCTestCase {
         let queue: PipelineQueue
     }
 
-    private func makeHarness(recordWithoutAsking: [String] = []) throws -> Harness {
+    private func makeHarness(recordWithoutAsking: [String] = [], pollInterval: TimeInterval = 0.05) throws -> Harness {
         let output = try makeTempDirectory(prefix: "consent-options")
         let defaultTemplate: () -> ProtocolTemplateID = { Self.defaultTemplate }
         let queue = PipelineQueue(logDir: output, stagingDir: output, defaultProtocolTemplateProvider: defaultTemplate)
@@ -38,7 +38,7 @@ final class WatchLoopConsentOptionsTests: XCTestCase {
             detector: detector,
             recorderFactory: { recorders.make() },
             pipelineQueue: queue,
-            pollInterval: 0.05,
+            pollInterval: pollInterval,
             endGracePeriod: 0.05,
             meetingEndCountdown: 0.05,
             recordWithoutAskingApps: { recordWithoutAsking },
@@ -151,6 +151,22 @@ final class WatchLoopConsentOptionsTests: XCTestCase {
         harness.loop.stop()
         await severalPolls()
         XCTAssertEqual(harness.recorders.starts, 0, "an answer landing after Stop Watching records nothing")
+
+        harness.loop.start()
+        try await assertTheNextZoomRecordingHasNoOptions(harness)
+    }
+
+    /// The answer has landed and waits for the next poll when watching stops.
+    /// A slow poll keeps the approval parked long enough to stop in between;
+    /// the restarted loop must ask again rather than record on it.
+    func testAnApprovalWaitingForThePollLoopIsDroppedWithItsOptionsWhenWatchingStops() async throws {
+        let harness = try makeHarness(pollInterval: 0.3)
+        let question = try await openZoomPrompt(harness)
+
+        XCTAssertTrue(harness.loop.answerParkedConsent(question, granted: true, protocolOptions: options))
+        await waitFor(harness.loop.approvedConsentMeeting != nil)
+        XCTAssertNotNil(harness.loop.approvedConsentMeeting, "precondition: the approval waits for the poll loop")
+        harness.loop.stop()
 
         harness.loop.start()
         try await assertTheNextZoomRecordingHasNoOptions(harness)
