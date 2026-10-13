@@ -3,13 +3,12 @@ import ViewInspector
 import XCTest
 
 /// The menu bar menu shows one line per job, with the job's actions in a
-/// submenu, and names what each record item actually records.
+/// submenu.
 @MainActor
 final class MenuBarJobMenuTests: XCTestCase {
     private func makeView(
         pipelineQueue: PipelineQueue = PipelineQueue(),
         history: [TerminalJobRecord] = [],
-        noMic: Bool = false,
         onRemoveFailedJob: @escaping (UUID) -> Void = { _ in },
     ) -> MenuBarView {
         MenuBarView(
@@ -21,7 +20,7 @@ final class MenuBarJobMenuTests: XCTestCase {
             onStartStop: {},
             onRecordApp: {},
             onRecordMicrophone: {},
-            noMic: noMic,
+            noMic: false,
             manualRecordingPendingOrActive: false,
             onStopManualRecording: nil,
             onOpenLastProtocol: {},
@@ -45,19 +44,6 @@ final class MenuBarJobMenuTests: XCTestCase {
         )
         job.state = state
         return job
-    }
-
-    // MARK: - Record items
-
-    func testRecordAppLabelSaysTheMicrophoneIsRecordedToo() {
-        XCTAssertEqual(MenuBarView.recordAppLabel(noMic: false), "Record App + Microphone...")
-        XCTAssertEqual(MenuBarView.recordAppLabel(noMic: true), "Record App Audio...")
-    }
-
-    func testRecordAppItemFollowsTheNoMicrophoneSetting() throws {
-        let body = try makeView(noMic: true).inspect()
-        XCTAssertNoThrow(try body.find(text: "Record App Audio..."))
-        XCTAssertThrowsError(try body.find(text: "Record App + Microphone..."))
     }
 
     // MARK: - Job lines

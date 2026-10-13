@@ -302,7 +302,7 @@ struct MeetingTranscriberApp: App {
     }
 
     private var recordAppWindow: some Scene {
-        Window("Record App", id: "record-app") {
+        Window("Start Recording", id: "record-app") {
             AppPickerView(
                 appsProvider: SystemRunningAppsProvider(),
                 // The controller's wide predicate, not `appState.isManualRecording`.
@@ -311,8 +311,10 @@ struct MeetingTranscriberApp: App {
                 // menu item that opened it — it closes only on its own Start or
                 // Cancel — so it has to stay truthful across both halves.
                 startWouldBeRefused: appState.watching.isManualRecording,
-                onStartRecording: { pid, appName, title in
-                    appState.watching.startManualRecording(pid: pid, appName: appName, title: title)
+                noMic: appState.settings.noMic,
+                optionsContext: { appState.protocolOptionsContext() },
+                onStartRecording: { request, options in
+                    appState.watching.startRecording(request, protocolOptions: options)
                     closeWindow(id: "record-app")
                 },
                 onCancel: { closeWindow(id: "record-app") },

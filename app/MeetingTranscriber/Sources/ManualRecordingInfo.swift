@@ -9,6 +9,17 @@ struct ManualRecordingInfo: Equatable {
     let pid: pid_t?
     let appName: String
     let title: String
+    /// The start dialog's template and background, nil for a start without
+    /// it, whose job gets the default template. Never written to the
+    /// record-only sidecar.
+    let protocolOptions: MeetingProtocolOptions?
+
+    init(pid: pid_t?, appName: String, title: String, protocolOptions: MeetingProtocolOptions? = nil) {
+        self.pid = pid
+        self.appName = appName
+        self.title = title
+        self.protocolOptions = protocolOptions
+    }
 }
 
 extension ManualRecordingInfo {

@@ -447,6 +447,13 @@ final class AppState {
         watching.isRecording
     }
 
+    /// What a protocol options form shows, read from the settings and the
+    /// templates folder at the call, so a window that asks when it opens lists
+    /// templates added in Finder since.
+    func protocolOptionsContext() -> ProtocolOptionsContext {
+        ProtocolOptionsContext(settings: settings, store: .production)
+    }
+
     // Internal (not private): also formats `postedAt` in the RPC snapshot
     // extension (AppState+RPC.swift), where file-private wouldn't reach.
     static let isoFormatter = ISO8601DateFormatter()

@@ -377,8 +377,8 @@ final class WatchingController {
 
     // MARK: - Manual recording
 
-    func startManualRecording(pid: pid_t, appName: String, title: String) {
-        beginManualRecording(.app(pid: pid, appName: appName, title: title))
+    func startManualRecording(pid: pid_t, appName: String, title: String, protocolOptions: MeetingProtocolOptions? = nil) {
+        beginManualRecording(.app(pid: pid, appName: appName, title: title), protocolOptions: protocolOptions)
     }
 
     /// Record the system microphone with no app audio, for a meeting happening
@@ -389,7 +389,7 @@ final class WatchingController {
     /// the enforcement: every other entry point onto this path (the automation
     /// API, a future shortcut) would otherwise record the one thing that setting
     /// exists to keep off tape, with no compile error and nothing failing.
-    func startMicrophoneRecording() {
+    func startMicrophoneRecording(protocolOptions: MeetingProtocolOptions? = nil) {
         guard !settings.noMic else {
             notifier.notify(
                 title: "Microphone Recording Refused",
@@ -397,15 +397,17 @@ final class WatchingController {
             )
             return
         }
-        beginManualRecording(.microphone)
+        beginManualRecording(.microphone, protocolOptions: protocolOptions)
     }
 
     /// Start a manual recording, or refuse. Returns the start's task so a caller
     /// that has to answer for the outcome can await it; nil means one of the two
-    /// ownership guards below refused before anything began.
+    /// ownership guards below refused before anything began. Without
+    /// `protocolOptions` (`/v1/record`) the job gets the default template.
     @discardableResult
     func beginManualRecording(
         _ request: ManualRecordingRequest,
+        protocolOptions: MeetingProtocolOptions? = nil,
     ) -> Task<ManualRecordingStartResult, Never>? {
         // `toggleWatching`'s counterpart. The correctness added here rests on
         // `manualStartTask` being accurate, and without this a second start
@@ -421,7 +423,7 @@ final class WatchingController {
         guard watchLoop?.isManualRecording != true else { return nil }
         let task = Task { @MainActor in
             defer { manualStartTask = nil }
-            return await performManualRecording(request)
+            return await performManualRecording(request, protocolOptions: protocolOptions)
         }
         // Assigned after construction, not inline: the body is `@MainActor` and
         // so is this, so it cannot run before we return, and the field is set
@@ -434,6 +436,7 @@ final class WatchingController {
     /// two-liner and the work is readable on its own.
     private func performManualRecording(
         _ request: ManualRecordingRequest,
+        protocolOptions: MeetingProtocolOptions?,
     ) async -> ManualRecordingStartResult {
         // Settle an auto start before reading `watchLoop`. Mid-flight it is
         // still nil, so the stop below would find nothing and the auto task
@@ -502,10 +505,10 @@ final class WatchingController {
         do {
             switch request {
             case let .app(pid, appName, title):
-                try await loop.startManualRecording(pid: pid, appName: appName, title: title)
+                try await loop.startManualRecording(pid: pid, appName: appName, title: title, protocolOptions: protocolOptions)
 
             case .microphone:
-                try await loop.startMicrophoneRecording()
+                try await loop.startMicrophoneRecording(protocolOptions: protocolOptions)
             }
             // Read the title back off the loop rather than re-deriving it here:
             // the loop stamps it into `manualRecordingInfo`, and that is the

@@ -232,11 +232,12 @@ class WatchLoop {
 
     // MARK: - Manual Recording
 
-    func startManualRecording(pid: pid_t, appName: String, title: String) async throws {
+    func startManualRecording(pid: pid_t, appName: String, title: String, protocolOptions: MeetingProtocolOptions? = nil) async throws {
         try await startManualRecording(
             source: .forApp(pid: pid, noMic: noMic),
             appName: appName,
             title: title,
+            protocolOptions: protocolOptions,
         )
     }
 
@@ -248,11 +249,12 @@ class WatchLoop {
     /// this into a recording of nothing. Keeping the entry point out of reach
     /// while it is set is the menu's job, not this one's — a caller that got
     /// here asked for the microphone by name.
-    func startMicrophoneRecording() async throws {
+    func startMicrophoneRecording(protocolOptions: MeetingProtocolOptions? = nil) async throws {
         try await startManualRecording(
             source: .micOnly,
             appName: ManualRecordingInfo.microphoneAppName,
             title: ManualRecordingInfo.microphoneTitle,
+            protocolOptions: protocolOptions,
         )
     }
 
@@ -260,6 +262,7 @@ class WatchLoop {
         source: RecordingSource,
         appName: String,
         title: String,
+        protocolOptions: MeetingProtocolOptions?,
     ) async throws {
         guard state != .recording else {
             logger.warning("Cannot start manual recording — already recording")
@@ -289,7 +292,7 @@ class WatchLoop {
         activeRecorder = recorder
         update { next in
             next.phase = .recording
-            next.manualRecordingInfo = ManualRecordingInfo(pid: pid, appName: appName, title: title)
+            next.manualRecordingInfo = ManualRecordingInfo(pid: pid, appName: appName, title: title, protocolOptions: protocolOptions)
             next.detail = "Recording: \(title)"
         }
 
@@ -313,6 +316,7 @@ class WatchLoop {
             let recording = try recorder.stop()
             enqueueRecording(
                 title: info.title, appName: info.appName, recording: recording, trigger: .manual,
+                protocolOptions: info.protocolOptions,
             )
         } catch {
             logger.error("Failed to stop manual recording: \(error.localizedDescription, privacy: .public)")
@@ -468,6 +472,7 @@ class WatchLoop {
         recording: RecordingResult,
         trigger: RecordingSidecar.Trigger,
         participants: [String] = [],
+        protocolOptions: MeetingProtocolOptions? = nil,
     ) {
         if recordOnly() {
             do {
@@ -498,15 +503,8 @@ class WatchLoop {
             return
         }
 
-        let job = PipelineJob(
-            meetingTitle: title,
-            appName: appName,
-            mixPath: recording.mixPath,
-            appPath: recording.appPath,
-            micPath: recording.micPath,
-            micDelay: recording.micDelay,
-            participants: participants,
-            meetingStartTime: recording.recordingStartDate,
+        let job = Self.pipelineJob(
+            title: title, appName: appName, recording: recording, participants: participants, protocolOptions: protocolOptions,
         )
         pipelineQueue?.enqueue(job)
         logger.info("Enqueued pipeline job for: \(title, privacy: .private)")

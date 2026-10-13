@@ -122,6 +122,12 @@ enum A11yID {
         "protocolTemplateDelete.\(index)"
     }
 
+    /// The per-recording options form (`ProtocolOptionsForm`). Constants only:
+    /// its windows show background text and stay off every RPC allowlist.
+    static let protocolOptionsTemplatePicker = "protocolOptionsTemplatePicker"
+    static let protocolOptionsBackgroundEditor = "protocolOptionsBackgroundEditor"
+    static let protocolOptionsDestinationNotice = "protocolOptionsDestinationNotice"
+
     static let includeFullTranscriptToggle = "includeFullTranscriptToggle"
     static let saveRawTranscriptToggle = "saveRawTranscriptToggle"
     static let outputFolderSection = "outputFolderSection"

@@ -9,6 +9,7 @@ struct MenuBarView: View {
     /// line outlives the queue's one-minute reap and a restart.
     var history: [TerminalJobRecord] = []
     let onStartStop: () -> Void
+    /// Opens the start dialog, "Start Recording with Options…".
     let onRecordApp: () -> Void
     let onRecordMicrophone: () -> Void
     /// Whether the user set "No Microphone (app audio only)". Only reaches the
@@ -210,7 +211,7 @@ struct MenuBarView: View {
             Button {
                 onRecordApp()
             } label: {
-                Label(Self.recordAppLabel(noMic: noMic), systemImage: "record.circle")
+                Label("Start Recording with Options…", systemImage: "record.circle")
             }
             .keyboardShortcut("r")
         }
@@ -368,12 +369,6 @@ struct MenuBarView: View {
     }
 
     // MARK: - Helpers
-
-    /// "Record App..." alone reads as app audio only, while the recording
-    /// also takes the microphone unless "No Microphone" is set.
-    static func recordAppLabel(noMic: Bool) -> String {
-        noMic ? "Record App Audio..." : "Record App + Microphone..."
-    }
 
     /// One menu item per job, its actions in a submenu. A menu-style
     /// `MenuBarExtra` cannot lay anything out side by side: an `HStack` row

@@ -189,7 +189,7 @@ final class MenuBarViewTests: XCTestCase {
     }
 
     func testRecordMicrophoneButtonHiddenWhileRecording() throws {
-        // Same rule as Record App...: the menu offers Stop Recording instead.
+        // Same rule as Start Recording with Options…: the menu offers Stop Recording instead.
         let sut = makeView(status: makeStatus(state: .recording))
         let body = try sut.inspect()
         XCTAssertThrowsError(try body.find(button: "Record Microphone Only"))
@@ -714,18 +714,18 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertNoThrow(try body.find(text: "Diarization failed — speakers not identified"))
     }
 
-    // MARK: - Record App button
+    // MARK: - Start Recording with Options button
 
     func testRecordAppButtonExistsWhenIdle() throws {
         let sut = makeView(status: makeStatus(state: .idle))
         let body = try sut.inspect()
-        XCTAssertNoThrow(try body.find(text: "Record App + Microphone..."))
+        XCTAssertNoThrow(try body.find(text: "Start Recording with Options…"))
     }
 
     func testRecordAppButtonHiddenDuringRecording() throws {
         let sut = makeView(status: makeStatus(state: .recording))
         let body = try sut.inspect()
-        XCTAssertThrowsError(try body.find(text: "Record App + Microphone..."))
+        XCTAssertThrowsError(try body.find(text: "Start Recording with Options…"))
     }
 
     func testRecordAppButtonCallsCallback() throws {
@@ -751,7 +751,7 @@ final class MenuBarViewTests: XCTestCase {
             onQuit: {},
         )
         let body = try sut.inspect()
-        try body.find(button: "Record App + Microphone...").tap()
+        try body.find(button: "Start Recording with Options…").tap()
         XCTAssertTrue(called)
     }
 
@@ -878,7 +878,7 @@ final class MenuBarViewTests: XCTestCase {
     func testRecordAppAndStopBothHiddenDuringAutoRecording() throws {
         let sut = makeView(status: makeStatus(state: .recording), onStopManualRecording: nil)
         let body = try sut.inspect()
-        XCTAssertThrowsError(try body.find(text: "Record App + Microphone..."))
+        XCTAssertThrowsError(try body.find(text: "Start Recording with Options…"))
         XCTAssertThrowsError(try body.find(text: "Stop Recording"))
     }
 
@@ -887,7 +887,7 @@ final class MenuBarViewTests: XCTestCase {
         let sut = makeView(status: makeStatus(state: .idle), onStopManualRecording: {})
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Stop Recording"))
-        XCTAssertThrowsError(try body.find(text: "Record App + Microphone..."))
+        XCTAssertThrowsError(try body.find(text: "Start Recording with Options…"))
     }
 
     // MARK: - Job state labels

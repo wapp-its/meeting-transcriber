@@ -56,6 +56,52 @@ final class WatchingControllerManualRecordingTests: XCTestCase {
         XCTAssertTrue(controller.isManualRecording)
     }
 
+    // MARK: - The start dialog
+
+    /// "Microphone only" from the dialog takes the guarded entry point, so the
+    /// "No Microphone" refusal and its notification hold there too.
+    func testTheDialogsMicrophoneStartIsRefusedWhileNoMicrophoneIsSet() async {
+        let notifier = RecordingNotifier()
+        let controller = makeWatchingController(logDir: tmpDir, notifier: notifier, noMic: true, permissionHealth: .allHealthy)
+
+        controller.startRecording(.microphone, protocolOptions: MeetingProtocolOptions(template: .builtIn, rawBackground: "Goal"))
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+
+        XCTAssertNil(controller.watchLoop, "no recording may begin while the microphone is switched off")
+        XCTAssertEqual(notifier.calls.map(\.title), ["Microphone Recording Refused"])
+    }
+
+    func testTheDialogsStartHandsItsOptionsToTheRecording() async throws {
+        let options = MeetingProtocolOptions(template: .file(name: "Board"), rawBackground: "Agenda: budget")
+        // This process's own PID: the monitor ends an app recording whose
+        // process is gone, which would clear the info before it is read.
+        for request in [ManualRecordingRequest.app(pid: getpid(), appName: "Chrome", title: "Standup"), .microphone] {
+            let controller = makeWatchingController(logDir: tmpDir, permissionHealth: .allHealthy)
+
+            controller.startRecording(request, protocolOptions: options)
+            let start = try XCTUnwrap(controller.manualStartTask, "\(request)")
+            _ = await start.value
+
+            XCTAssertEqual(controller.watchLoop?.manualRecordingInfo?.protocolOptions, options, "\(request)")
+            controller.stopManualRecording()
+        }
+    }
+
+    /// `/v1/record`'s call shape: no options, so the job gets the default template.
+    func testAStartWithoutOptionsCarriesNone() async throws {
+        let controller = makeWatchingController(logDir: tmpDir, permissionHealth: .allHealthy)
+        addTeardownBlock { await controller.stopManualRecording() }
+
+        let start = try XCTUnwrap(controller.beginManualRecording(.microphone))
+        let started = await start.value
+
+        XCTAssertEqual(started, .started, "precondition")
+        XCTAssertNotNil(controller.watchLoop?.manualRecordingInfo, "precondition")
+        XCTAssertNil(controller.watchLoop?.manualRecordingInfo?.protocolOptions)
+    }
+
     // MARK: - What the user is told
 
     /// A start reports itself. These two live here rather than at the
