@@ -693,13 +693,14 @@ final class AppSettings {
         watchZoom = defaults.object(forKey: "watchZoom") as? Bool ?? true
         watchWebex = defaults.object(forKey: "watchWebex") as? Bool ?? true
         watchBrowserMeetings = defaults.object(forKey: "watchBrowserMeetings") as? Bool ?? false
-        consentDeniedApps = defaults.stringArray(forKey: "consentDeniedApps") ?? []
+        let storedCustomApps = defaults.stringArray(forKey: "watchCustomApps") ?? []
+        consentDeniedApps = Self.loadConsentDeniedApps(from: defaults, addedBundleIDs: storedCustomApps)
         recordWithoutAskingApps = defaults.stringArray(forKey: "recordWithoutAskingApps") ?? []
         watchWeChat = defaults.object(forKey: "watchWeChat") as? Bool ?? false
         watchTencentMeeting = defaults.object(forKey: "watchTencentMeeting") as? Bool ?? false
         watchFaceTime = defaults.object(forKey: "watchFaceTime") as? Bool ?? false
         watchWhatsApp = defaults.object(forKey: "watchWhatsApp") as? Bool ?? false
-        watchCustomApps = defaults.stringArray(forKey: "watchCustomApps") ?? []
+        watchCustomApps = storedCustomApps
         autoWatch = defaults.object(forKey: "autoWatch") as? Bool ?? false
 
         pollInterval = defaults.object(forKey: "pollInterval") as? Double ?? 3.0

@@ -57,6 +57,23 @@ struct ConsentDenyList: Equatable {
         guard let bundleID = AddedAppIdentity.bundleID(fromKey: entry) else { return entry }
         return "\(resolveAppName(bundleID)) (added app)"
     }
+
+    /// `denied` from a build that filed added apps under their display name,
+    /// carried over to their keys: every entry kept in order, plus the key of
+    /// each added app whose display name or bundle ID is listed. Nothing is
+    /// removed, because which app a legacy name entry was answered for (a
+    /// built-in, an added app, a browser) cannot be recovered, and dropping it
+    /// would unblock an app the user refused.
+    static func migratingAddedAppNames(
+        _ denied: [String],
+        addedBundleIDs: [String],
+        displayName: (String) -> String,
+    ) -> [String] {
+        addedBundleIDs.reduce(Self(denied: denied)) { list, bundleID in
+            guard denied.contains(displayName(bundleID)) || denied.contains(bundleID) else { return list }
+            return list.denying(AddedAppIdentity.key(bundleID: bundleID))
+        }.denied
+    }
 }
 
 /// Read/write access to the deny list, injected into `WatchLoop` so its tests
