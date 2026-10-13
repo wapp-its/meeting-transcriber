@@ -343,7 +343,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-52-keep-added-apps-apart-from-same-named.md",
-  "status": "open",
+  "status": "done",
   "title": "Keep added apps apart from same-named apps",
   "tracker": {
     "baseHashFlow": null,
@@ -357,5 +357,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/52"
   },
-  "updated_at": "2026-10-13T15:52:53.737984Z"
+  "updated_at": "2026-10-13T16:00:46.870387Z"
 }
