@@ -98,12 +98,16 @@ extension WatchLoop {
         return approvedConsentMeeting.map { ($0, approvedConsentProtocolOptions) }
     }
 
-    /// Answer a parked prompt as a decline, for `stop()`. Routed through the
-    /// notifier so the real prompt's parked continuation completes; without it
-    /// the question would linger for the rest of its timeout.
+    /// Answer a parked prompt as a decline, for `stop()` and a manual start.
+    /// Routed through the notifier so the real prompt's parked continuation
+    /// completes; without it the question would linger for the rest of its
+    /// timeout. An approval still waiting for the poll loop is dropped too,
+    /// with its options: that loop is ending, and a later one must not record
+    /// on an answer given before watching stopped.
     func declineParkedConsent() {
-        guard pendingConsentApp != nil else { return }
-        _ = notifier.resolveBrowserConsent(granted: false)
+        if pendingConsentApp != nil {
+            _ = notifier.resolveBrowserConsent(granted: false)
+        }
         // Cleared regardless of whether anything was waiting: a notifier with
         // no coordinator behind it never resolves, and a prompt stuck
         // "pending" forever would silence every future question.
