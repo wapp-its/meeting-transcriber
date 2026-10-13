@@ -59,19 +59,23 @@ final class ConsentPromptCoordinator: @unchecked Sendable {
     /// Resolve `id` exactly once — the first caller (answer or timeout) wins and
     /// removes it; later calls no-op. Cancels the timeout task so it doesn't
     /// linger once an answer arrives.
-    func resolve(id: String, granted: Bool) {
+    @discardableResult
+    func resolve(id: String, granted: Bool) -> Bool {
         resolve(id: id, answer: granted ? .granted : .declined)
     }
 
     /// The full form: a timeout resolves `.expired` through here, an answer
-    /// through the `granted:` overload above.
-    func resolve(id: String, answer: ConsentAnswer) {
+    /// through the `granted:` overload above. Returns whether a prompt was
+    /// waiting under `id`, so the menu can tell its prompt was already gone.
+    @discardableResult
+    func resolve(id: String, answer: ConsentAnswer) -> Bool {
         lock.lock()
         let continuation = pending.removeValue(forKey: id)
         let timeoutTask = timeouts.removeValue(forKey: id)
         lock.unlock()
         timeoutTask?.cancel()
         continuation?.resume(returning: answer)
+        return continuation != nil
     }
 
     /// Resolve every currently-pending prompt at once with `granted`, returning

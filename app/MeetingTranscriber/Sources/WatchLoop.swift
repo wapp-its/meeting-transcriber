@@ -49,7 +49,10 @@ class WatchLoop {
     /// app; injectable so tests need not wait it out.
     let meetingEndCountdown: TimeInterval
     let noMic: Bool
-    let micDeviceUID: String?
+    /// Dynamic accessor — read at every recording start, like
+    /// `verboseDiagnostics` below, so a microphone chosen while watching is on
+    /// reaches the next recording without restarting watching.
+    let micDeviceUID: () -> String?
     /// Dynamic accessor — read at recording-start time so toggling the setting
     /// at runtime takes effect on the next recording without an app restart.
     let verboseDiagnostics: () -> Bool
@@ -71,7 +74,7 @@ class WatchLoop {
 
     /// The open "meeting seems to have ended" question and the answer parked
     /// for the next poll. Internal for `WatchLoop+MeetingEnd.swift`, which owns
-    /// both, the way the consent extension owns `pendingConsentApp`.
+    /// both, the way the consent extension owns `pendingConsentQuestion`.
     var meetingEndQuestionID: String?
     var meetingEndAnswer: ReceivedMeetingEndAnswer?
     /// When "Stop Recording" was chosen, parked for the wait's next poll (`WatchLoop+StopByHand.swift`).
@@ -102,12 +105,12 @@ class WatchLoop {
     /// watching. Empty by default: every detected meeting asks.
     let recordWithoutAskingApps: () -> [String]
 
-    /// The app whose consent prompt is currently parked, nil when no question
-    /// is open. The answer is awaited in `consentTask` rather than inline, so
-    /// this is what keeps a second prompt from going out on every poll while
-    /// the first one waits. Internal (not `private(set)`) because
-    /// `WatchLoop+Consent.swift` owns the transitions.
-    var pendingConsentApp: String?
+    /// The consent prompt currently parked, nil when no question is open. The
+    /// answer is awaited in `consentTask` rather than inline, so this is what
+    /// keeps a second prompt from going out on every poll while the first one
+    /// waits. Internal (not `private(set)`) because `WatchLoop+Consent.swift`
+    /// owns the transitions; `pendingConsentApp` there is its app.
+    var pendingConsentQuestion: ConsentQuestion?
 
     /// Apps that needed a prompt while `pendingConsentApp`'s was open. Not a
     /// queue: they are kept out of detection until that question settles, so
@@ -126,7 +129,7 @@ class WatchLoop {
     /// Forget the open question. Not a decline: `WatchLoop+Consent` decides
     /// what an answer (or the lack of one) means.
     func clearConsentState() {
-        pendingConsentApp = nil
+        pendingConsentQuestion = nil
         appsWaitingForPrompt = []
         approvedConsentMeeting = nil
         consentTask = nil
@@ -146,7 +149,7 @@ class WatchLoop {
         maxDuration: TimeInterval = 14400,
         meetingEndCountdown: TimeInterval = WatchLoop.meetingEndQuestionCountdown,
         noMic: Bool = false,
-        micDeviceUID: String? = nil,
+        micDeviceUID: @escaping () -> String? = { nil },
         verboseDiagnostics: @escaping () -> Bool = { false },
         recordOnly: @escaping () -> Bool = { false },
         recordOnlyDestination: @escaping () -> RecordOnlyDestination = {
@@ -278,7 +281,7 @@ class WatchLoop {
 
         let recorder = await recorderFactory()
         try recorder.start(
-            source: source, micDeviceUID: micDeviceUID,
+            source: source, micDeviceUID: micDeviceUID(),
             debugLogging: verboseDiagnostics(),
         )
 
@@ -412,7 +415,7 @@ class WatchLoop {
         let recorder = await recorderFactory()
         try recorder.start(
             source: source,
-            micDeviceUID: micDeviceUID,
+            micDeviceUID: micDeviceUID(),
             debugLogging: verboseDiagnostics(),
         )
         activeRecorder = recorder

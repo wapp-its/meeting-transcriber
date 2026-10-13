@@ -116,22 +116,8 @@ final class MicEngineSession: MicEngineSessionProviding {
     /// to report and what it still reports there.
     var boundInputDevice: MicInputDevice? {
         pinOutcome
-            .deviceToReport(systemDefault: Self.systemDefaultInputDeviceID())
-            .map(Self.describe)
-    }
-
-    private static func describe(_ deviceID: AudioDeviceID) -> MicInputDevice {
-        MicInputDevice(
-            uid: readCFStringAudioProperty(deviceID, kAudioDevicePropertyDeviceUID),
-            name: readCFStringAudioProperty(deviceID, kAudioObjectPropertyName),
-        )
-    }
-
-    private static func systemDefaultInputDeviceID() -> AudioDeviceID? {
-        guard case let .value(deviceID) = defaultDeviceReading(
-            selector: kAudioHardwarePropertyDefaultInputDevice,
-        ), deviceID != kAudioObjectUnknown else { return nil }
-        return deviceID
+            .deviceToReport(systemDefault: MicInputDevice.systemDefaultInputDeviceID())
+            .map(MicInputDevice.init(deviceID:))
     }
 
     init(removeInputTap: @escaping (AVAudioEngine) -> Void = { $0.inputNode.removeTap(onBus: 0) }) {

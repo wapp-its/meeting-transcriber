@@ -57,6 +57,16 @@ class MockRecorder: RecordingProvider {
     var micSignalAges: ChannelSignalAges = .deliveringSignalNow
     var appSignalAges: ChannelSignalAges = .deliveringSignalNow
 
+    /// The microphone and the tapped processes a test wants the recording to
+    /// report. Defaults match the protocol's: no device, no microphone track,
+    /// no tapped process.
+    var micInputDevice: MicInputDevice?
+    var microphoneTrackActive = false
+    var tappedPIDs: [pid_t] = []
+    /// Every `selectMicrophone(deviceUID:)` call in order, so a test can tell
+    /// how many switches reached the recording and which device each asked for.
+    private(set) var selectMicrophoneCalls: [String?] = []
+
     /// Overrides the `recordingStartDate` `stop()` reports. `nil` (default)
     /// yields `Date()` at stop time, matching a real recorder; set it to pin a
     /// specific meeting-start time (e.g. filename-anchoring tests).
@@ -66,6 +76,10 @@ class MockRecorder: RecordingProvider {
         startCalled = true
         capturedSource = source
         capturedMicDeviceUID = micDeviceUID
+    }
+
+    func selectMicrophone(deviceUID: String?) {
+        selectMicrophoneCalls.append(deviceUID)
     }
 
     func stop() throws -> RecordingResult {
