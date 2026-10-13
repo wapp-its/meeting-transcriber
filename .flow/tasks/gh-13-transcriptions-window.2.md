@@ -63,9 +63,46 @@ The one list both views read, as pure logic, plus the controller actions behind 
 - [ ] Tests and lint pass.
 
 ## Done summary
-TBD
+The Transcriptions window and the shortened menu now have one list to read. TranscriptionList merges the queue's jobs with the finished-job history (a job in both listed once, from the live job), sorts it newest first by enqueue time, searches title and participants without regard to case or diacritics, and picks the menu's share (every unfinished job plus the 3 that finished last). PipelineController gained the list, a window-opening hook that loads failed jobs from the last session so they can be retried, retry forwarders and removeFailedJob, which takes a failed job out of the queue and the history for good without deleting a file.
 
+Tier: session (jev-unavailable(no_key)) -> explicit invocation opus at xhigh (actual: claude-opus-5-5)
+
+stage: impl-review - ran [2026-10-08T11:40:56Z..2026-10-08T11:45:40Z]
+
+The review ran on codex gpt-5.6-sol at xhigh with three draws (correctness, contracts, integration), each SHIP with no findings, so the validator pass had nothing to dispatch. Receipt /tmp/impl-review-receipt-372726e60d63-gh-13-transcriptions-window.2.json, fan-out rid 574099d7527448bdbde7d7ae981e39f3. The reviewers ran the focused suites themselves under CODEX_SANDBOX=workspace-write (45 of 45 passed) and wrote nothing into the tree.
+
+Acceptance criteria, each covered by a focused test (115 tests, rc 0, /private/tmp/gh13/t2-gate.log at 03afcc19):
+- A job both live and in the history is one entry with the live state; a record whose job id is not a UUID is skipped (R2). TranscriptionListTests.testAJobBothLiveAndInTheHistoryIsListedOnceWithItsLiveState
+- Dated entries newest first by enqueue time (a meeting start 100 minutes earlier does not move a job), a retried job keeps its place, records without a date last and newest stored first; the date shown is the meeting start, else the enqueue time (R2). TranscriptionListTests.testDatedEntriesComeNewestFirstThenUndatedNewestStoredFirst
+- Every JobState reads through JobMenuSummary.status(state:hasWarnings:progress:) and symbol(state:hasWarnings:) exactly as the menu did; the unchanged MenuBarJobMenuTests pin the PipelineJob overloads, which now delegate (R2). TranscriptionListTests.testEveryStateReadsTheWayTheMenuSaysIt
+- "muller" finds "Müller Sync", "SYNC" the same, " perez " a participant "Ana Pérez", empty and whitespace queries return everything, "Quarterly" nothing (R4). TranscriptionListTests.testSearchFindsATitleOrParticipantIgnoringCaseAndDiacritics
+- 2 unfinished plus 10 finished entries give the 2 unfinished and the 3 that finished last, in the order added; with no finished entries only the unfinished ones (R7). TranscriptionListTests.testTheMenuKeepsUnfinishedJobsAndTheThreeThatFinishedLast
+- A failed job added first, retried and finished last (record moved to the end via TerminalJobStore.upserting) is among the menu's 3 (R7). TranscriptionListTests.testARetriedJobThatFinishedLastIsAmongTheMenusFinishedJobs
+- Three live failed jobs whose records were evicted do not displace the 3 latest recorded completions; without any records the 3 newest-added finished live jobs are chosen (R7). TranscriptionListTests.testFailedJobsWhoseRecordsWereEvictedDoNotCrowdOutRecentCompletions
+- Open takes the protocol, else the transcript, else nothing, from a history record's stored paths (R5). TranscriptionListTests.testOpenTakesTheProtocolElseTheTranscript
+- TranscriptionFileOpener.perform returns false without calling the action for a missing file, and calls it and returns true for an existing temp file (R5). TranscriptionListTests.testTheFileOpenerActsOnlyOnAFileThatExists
+- removeFailedJob on a live failed job removes it from queue and history, marks its audio processed and leaves the audio file in place (R6). PipelineControllerTranscriptionsTests.testRemovingALiveFailedJobTakesItOutOfQueueAndHistoryAndMarksItsAudio
+- On a history-only failed record it removes the record, also after the store is re-read (R6). PipelineControllerTranscriptionsTests.testRemovingAFailedJobKnownOnlyFromTheHistoryDropsItsRecord
+- On a done record or a live waiting job it changes nothing (R6). PipelineControllerTranscriptionsTests.testRemoveLeavesADoneRecordAndAnUnfinishedJobAlone
+- Restart case: a failed job seeded in the snapshot (audio present) and the history is history-only and not retryable before prepareTranscriptionsWindow(), live with canRetryJob true after it, and absent from a further fresh controller after removeFailedJob and a snapshot flush (R3, R6). PipelineControllerTranscriptionsTests.testAFailedJobFromTheLastSessionIsRetryableOnceTheWindowOpensAndStaysRemoved
+- Remove clicked before the pipeline started (the menu case) still keeps the job gone after a relaunch, because removeFailedJob starts the pipeline first (R6). PipelineControllerTranscriptionsTests.testRemovingBeforeThePipelineStartedKeepsTheJobGone
+- docs/automation-api.md states cap 1000, that a failed job the user removed answers 404, and that retry is offered from the menu bar or the Transcriptions window (R9).
+- Lint with the pinned SwiftFormat 0.63.0 and SwiftLint 0.65.1 returned rc 0 (0 of 708 files need formatting, 0 violations, /private/tmp/gh13/t2-lint.log). ./scripts/pre-push.sh --with-appstore returned rc 0 (Homebrew and App Store release builds, /tmp/gh13/t2-prepush.out).
+
+Baseline before the edit was green (44 tests in PipelineControllerTests, MenuBarJobMenuTests, TerminalJobStoreTests and TerminalJobRecordTests, /private/tmp/gh13/t2-baseline.log). The new tests failed to build before the code existed (/private/tmp/gh13/t2-red.log). A mutation run applied 8 source mutations one at a time (history not de-duplicated, evicted failures ranked above records, menu ordered by finish order, search only case-insensitive, Remove without starting the pipeline, list sorted by meeting date, any record removed, opener ignoring existence); each turned its intended test red, and the sources were restored byte-identical before the commit (/tmp/gh13/t2-mut.out).
+
+Decisions:
+- TranscriptionEntry's two initialisers take finishOrder as a parameter and keep it nil for an unfinished state, so the "nil while unfinished" rule lives in the type. A finished live job without a record gets a negative order (rank minus count, by enqueue order), which places it below every record index.
+- TranscriptionList.entries and menuEntries break ties on equal enqueue times by input position, and menuEntries orders undated entries by finish order (oldest stored first), so neither depends on sort stability.
+- testOpenTakesTheProtocolElseTheTranscript and testRemovingBeforeThePipelineStartedKeepsTheJobGone go beyond the AC list. The first gives fileToOpen a caller (CI's swiftlint analyze flags unreferenced declarations); the second pins the ensureQueue() call in removeFailedJob, which no other test could catch.
+- TranscriptionFileOpener calls startAccessingSecurityScopedResource on scopeRoot directly, as openProtocolsFolder does, and runs the existence check inside the scope.
+
+Follow-ups and notes for the next tasks:
+- PipelineController.retryJob(id:) has no caller until task .4 wires the window's Retry closure. CI's swiftlint analyze (unused_declaration) would flag it at this commit; it is used by the PR head once .4 lands.
+- A user-facing route changes only in tasks .3 and .4; this task adds no view.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 03afcc19e41420b951a8c25f63da7ca38c59c609
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh13-home swift test --parallel --filter 'TerminalJobRecordTests|TerminalJobStoreTests|TranscriptionListTests|PipelineControllerTranscriptionsTests|MenuBarJobMenuTests|MenuBarViewTests|TranscriptionsViewTests|PipelineControllerTests' (rc 0, 115 tests, /private/tmp/gh13/t2-gate.log), PATH=$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH ./scripts/lint.sh (rc 0, 0/708 need formatting, 0 violations, /private/tmp/gh13/t2-lint.log), ./scripts/pre-push.sh --with-appstore (rc 0, /tmp/gh13/t2-prepush.out)
 - PRs:
