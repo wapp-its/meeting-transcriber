@@ -17,10 +17,11 @@ protocol RemoteVocabularyFetching: Sendable {
 ///   so a server trickling bytes would keep a check open indefinitely; the
 ///   whole fetch is therefore raced against a total deadline (60 s) and the
 ///   transfer is cancelled when it expires.
-/// - **Redirects** follow `redirectRefusal(from:to:tokenPresent:)`: never to a
-///   non-https address, and with a token never to another host, so the token
-///   only reaches the server the user named. A refused redirect leaves the 3xx
-///   as the task's result, which is reported as the refusal.
+/// - **Redirects** follow `redirectRefusal(from:to:status:tokenPresent:)`:
+///   never to a non-https address, and with a token never to another host, so
+///   the token only reaches the server the user named. A refused redirect
+///   leaves the 3xx as the task's result, which is reported as the refusal
+///   with that answer's exact status.
 /// - **Bounded body.** A body is read only up to the vocabulary size limit plus
 ///   one byte; a larger one is abandoned and reported as too large.
 struct RemoteVocabularyFetcher: RemoteVocabularyFetching {
@@ -46,14 +47,15 @@ struct RemoteVocabularyFetcher: RemoteVocabularyFetching {
         return configuration
     }
 
-    /// Returns why a redirect from the configured address to `target` is not
-    /// followed, or nil when it may be.
-    static func redirectRefusal(from origin: URL, to target: URL, tokenPresent: Bool) -> RemoteVocabularyFailure? {
-        guard target.scheme?.lowercased() == "https" else { return .insecureRedirect }
+    /// Returns why a redirect from the configured address to `target`, answered
+    /// with `status`, is not followed, or nil when it may be. The refusal keeps
+    /// that status, so the check's log line names the exact code.
+    static func redirectRefusal(from origin: URL, to target: URL, status: Int, tokenPresent: Bool) -> RemoteVocabularyFailure? {
+        guard target.scheme?.lowercased() == "https" else { return .insecureRedirect(status: status) }
         guard tokenPresent else { return nil }
         let originHost = origin.host(percentEncoded: false)?.lowercased()
         let targetHost = target.host(percentEncoded: false)?.lowercased()
-        return originHost == targetHost ? nil : .redirectToOtherServer
+        return originHost == targetHost ? nil : .redirectToOtherServer(status: status)
     }
 
     func fetch(url: URL, token: String?, validators: RemoteVocabularyValidators?) async -> RemoteVocabularyFetchResult {
@@ -178,7 +180,7 @@ private final class RedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
     func urlSession(
         _: URLSession,
         task _: URLSessionTask,
-        willPerformHTTPRedirection _: HTTPURLResponse,
+        willPerformHTTPRedirection response: HTTPURLResponse,
         newRequest request: URLRequest,
         completionHandler: @Sendable (URLRequest?) -> Void,
     ) {
@@ -186,7 +188,9 @@ private final class RedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
             completionHandler(nil)
             return
         }
-        if let refusal = RemoteVocabularyFetcher.redirectRefusal(from: origin, to: target, tokenPresent: tokenPresent) {
+        if let refusal = RemoteVocabularyFetcher.redirectRefusal(
+            from: origin, to: target, status: response.statusCode, tokenPresent: tokenPresent,
+        ) {
             refusalState.withLock { $0 = refusal }
             completionHandler(nil)
         } else {

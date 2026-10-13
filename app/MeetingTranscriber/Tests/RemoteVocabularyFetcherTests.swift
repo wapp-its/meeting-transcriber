@@ -154,21 +154,48 @@ final class RemoteVocabularyFetcherTests: XCTestCase {
 
     func testRedirectPolicy() throws {
         let origin = try XCTUnwrap(URL(string: "https://Lists.Example.org/vocabulary.txt"))
-        let cases: [(target: String, token: Bool, refusal: RemoteVocabularyFailure?)] = [
-            ("https://lists.example.org/moved.txt", true, nil),
-            ("https://cdn.example.net/vocabulary.txt", true, .redirectToOtherServer),
-            ("https://cdn.example.net/vocabulary.txt", false, nil),
-            ("http://lists.example.org/vocabulary.txt", false, .insecureRedirect),
-            ("http://lists.example.org/vocabulary.txt", true, .insecureRedirect),
+        let cases: [(target: String, status: Int, token: Bool, refusal: RemoteVocabularyFailure?)] = [
+            ("https://lists.example.org/moved.txt", 302, true, nil),
+            ("https://cdn.example.net/vocabulary.txt", 307, true, .redirectToOtherServer(status: 307)),
+            ("https://cdn.example.net/vocabulary.txt", 302, false, nil),
+            ("http://lists.example.org/vocabulary.txt", 301, false, .insecureRedirect(status: 301)),
+            ("http://lists.example.org/vocabulary.txt", 308, true, .insecureRedirect(status: 308)),
         ]
 
-        for (target, token, refusal) in cases {
+        for (target, status, token, refusal) in cases {
             let targetURL = try XCTUnwrap(URL(string: target))
             XCTAssertEqual(
-                RemoteVocabularyFetcher.redirectRefusal(from: origin, to: targetURL, tokenPresent: token),
+                RemoteVocabularyFetcher.redirectRefusal(from: origin, to: targetURL, status: status, tokenPresent: token),
                 refusal,
-                "\(target) token=\(token)",
+                "\(target) status=\(status) token=\(token)",
             )
+        }
+    }
+
+    /// The log line names the refused answer's own code, so a 301 and a 307
+    /// can be told apart when a server's setup is investigated.
+    func testARefusedRedirectCarriesItsExactStatus() async throws {
+        let insecure = try XCTUnwrap(URL(string: "http://lists.example.org/team/vocabulary.txt"))
+        let elsewhere = try XCTUnwrap(URL(string: "https://cdn.example.net/vocabulary.txt"))
+        let cases: [(status: Int, target: URL, token: String?, expected: RemoteVocabularyFailure)] = [
+            (301, insecure, nil, .insecureRedirect(status: 301)),
+            (308, insecure, "secret", .insecureRedirect(status: 308)),
+            (307, elsewhere, "secret", .redirectToOtherServer(status: 307)),
+            (303, elsewhere, "secret", .redirectToOtherServer(status: 303)),
+        ]
+
+        for (status, target, token, expected) in cases {
+            Stub.reset()
+            Stub.answer { request in
+                request.url == target
+                    ? .response(status: 200, headers: Self.plainText, body: Data("Aster\n".utf8))
+                    : .redirect(status: status, location: target)
+            }
+
+            let result = await makeFetcher(totalDeadline: .seconds(3)).fetch(url: Self.address, token: token, validators: nil)
+
+            XCTAssertEqual(result, .failed(expected), "\(status) → \(target)")
+            XCTAssertEqual(Stub.requests.map(\.url), [Self.address], "\(status) → \(target)")
         }
     }
 
@@ -196,7 +223,7 @@ final class RemoteVocabularyFetcherTests: XCTestCase {
 
         let result = await makeFetcher(totalDeadline: .seconds(3)).fetch(url: Self.address, token: "secret", validators: nil)
 
-        XCTAssertEqual(result, .failed(.redirectToOtherServer))
+        XCTAssertEqual(result, .failed(.redirectToOtherServer(status: 302)))
         XCTAssertEqual(Stub.requests.map(\.url), [Self.address])
     }
 

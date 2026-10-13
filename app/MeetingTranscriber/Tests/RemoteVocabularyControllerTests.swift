@@ -370,8 +370,12 @@ final class RemoteVocabularyControllerTests: XCTestCase {
                 "failed (The server reported no change for a copy this app does not have), HTTP 304",
             ),
             (
-                .failed(.insecureRedirect), .failed(.insecureRedirect),
-                "failed (The address redirects to an address without https), HTTP 3xx",
+                .failed(.insecureRedirect(status: 301)), .failed(.insecureRedirect(status: 301)),
+                "failed (The address redirects to an address without https), HTTP 301",
+            ),
+            (
+                .failed(.redirectToOtherServer(status: 307)), .failed(.redirectToOtherServer(status: 307)),
+                "failed (The address redirects to another server; the token is not sent there), HTTP 307",
             ),
             (
                 .failed(.invalidContent(.empty)), .modified(body: Data(" \n".utf8), validators: nil),

@@ -90,9 +90,11 @@ enum RemoteVocabularyFailure: Equatable, Sendable {
     case timedOut
     case httpStatus(Int)
     /// With a token set, a redirect to another host is not followed, so the
-    /// token never reaches a server the user did not name.
-    case redirectToOtherServer
-    case insecureRedirect
+    /// token never reaches a server the user did not name. Both redirect
+    /// refusals carry the refused answer's own status (301, 302, 307 …) for the
+    /// check's log line; the sentence Settings shows does not name it.
+    case redirectToOtherServer(status: Int)
+    case insecureRedirect(status: Int)
     case notTextFile
     case tooLarge
     case invalidContent(CustomVocabularyValidation)
