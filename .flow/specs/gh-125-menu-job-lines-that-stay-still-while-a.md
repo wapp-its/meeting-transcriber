@@ -2,15 +2,15 @@
 
 ## Conversation Evidence
 
-> user (turn 1): "And there is a bug with the "All transcriptions" menu - it disappears sometimes random while I hover over it - at the moment a transcription process is running (and it says longer than usual btw - what is happening?)"
-> user (turn 3): "Maybe we should remove the finished sessions from the context menu now that we have the transcription overview"
-> user (turn 4): "The "Processing" header in the menu is also misleading somehow"
-> user (turn 5): "All Transcriptions overview and Protocol folder could be together next to each other..."
+> user (turn 1, paraphrased): "While a transcription runs, the "All Transcriptions" menu item sometimes disappears while I hover over it. The menu also says "longer than usual". Why?"
+> user (turn 3, paraphrased): "Now that the Transcriptions window exists, maybe the finished jobs can leave the menu."
+> user (turn 4, paraphrased): "The "Processing" header in the menu is misleading too."
+> user (turn 5, paraphrased): "The Transcriptions window item and the protocol folder item could sit next to each other."
 > user (selected): "A — mic + menu now (Recommended)" (fix the menu now)
 > user (selected): "Start + expected finish (Recommended)" — option text: "e.g. "Transcribing · since 09:17 · ready about 09:21". Never changes while the menu is open; expected time comes from this recording's length and past speed, so 'longer than usual' is simply when the clock passes it."
 > user (selected): "Only active + needs you (Recommended)" — option text: "Running, waiting, speaker names needed, failed. Finished jobs only in the window; the newest protocol is still one click via "Open Last Protocol"."
 > user (selected): ""In progress" + "Needs you" (Recommended)" — option text: "Two small headers: running/waiting jobs under "In progress", speaker-names-needed and failed under "Needs you". Each header only when it has jobs."
-> diagnosis 2026-10-14 (code and stage timing log): the job line shows the running stage's elapsed seconds, refreshed once per second, and the menu is a menu-style menu bar extra, so each tick rebuilds the whole menu under the pointer. The "longer than usual" hint compares the elapsed time with the average wall-clock time of all past runs of that stage for the engine (2:02 for WhisperKit, short test imports included), ignoring the recording's length; the 16-minute meeting that morning took 4:41, about 3:18 would have been normal at the 30-day speed (0.21 s per audio second), and the hint would have shown after about 3 minutes even at normal speed. The "Processing" header stands above every job line: waiting, running, speaker names needed, failed and the last three finished.
+> diagnosis 2026-10-14 (code and stage timing log): the job line shows the running stage's elapsed seconds, refreshed once per second, and the menu is a menu-style menu bar extra, so each tick rebuilds the whole menu under the pointer. The "longer than usual" hint compares the elapsed time with the average wall-clock time of all past runs of that stage for the engine (2:02 for WhisperKit, short test imports included), ignoring the recording's length; a 16-minute recording took 4:41, about 3:18 would have been normal at the 30-day speed (0.21 s per audio second), and the hint would have shown after about 3 minutes even at normal speed. The "Processing" header stands above every job line: waiting, running, speaker names needed, failed and the last three finished.
 
 ## Goal & Context
 
@@ -31,7 +31,7 @@ The job line of a running stage, after the meeting title and the existing " — 
 - with an expected finish: `<stage label> · since <start> · ready about <finish>`, e.g. `Transcribing · since 09:17 · ready about 09:21`
 - without one (no history for this configuration, or no audio length): `<stage label> · since <start>`, e.g. `Transcribing · since 09:17`
 
-`<stage label>` is the job state's existing label (Transcribing, Diarizing, Generating Protocol or their current wording); `<start>` and `<finish>` use the system's short time format (09:17 on the owner's Mac). [inferred] The same text appears inside the job's submenu where the progress line is shown today. [inferred]
+`<stage label>` is the job state's existing label (Transcribing, Diarizing, Generating Protocol or their current wording); `<start>` and `<finish>` use the system's short time format (for example 09:17). [inferred] The same text appears inside the job's submenu where the progress line is shown today. [inferred]
 
 ## Edge Cases & Constraints
 
