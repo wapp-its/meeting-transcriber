@@ -43,8 +43,14 @@ say() { printf '\033[1m%s\033[0m\n' "$*"; }
 fail() { printf '\033[31m✗ %s\033[0m\n' "$1" >&2; exit "${2:-1}"; }
 
 # --- 0. Sich selbst aktuell halten --------------------------------------------
-self="$(command -v mt-update 2>/dev/null || true)"
-if [ -n "$self" ] && [ -w "$self" ] && [ -z "${MT_NO_SELF_UPDATE:-}" ]; then
+# Die eigene Datei über den Aufrufpfad finden, nicht über PATH: so aktualisiert
+# sich das Skript auch, wenn es mit vollem Pfad (~/.local/bin/mt-update) oder aus
+# einer App gestartet wird, deren PATH ~/.local/bin nicht enthält. Nur die
+# installierte Kopie heißt mt-update; mt-update.sh im Checkout des Branches tools
+# überschreibt sich nie selbst, sonst gingen ungespeicherte Änderungen verloren.
+self="$(cd "$(dirname "$0")" 2>/dev/null && pwd)/$(basename "$0")"
+if [ "$(basename "$self")" = "mt-update" ] && [ -f "$self" ] && [ -w "$self" ] \
+    && [ -z "${MT_NO_SELF_UPDATE:-}" ]; then
     tmp="$(mktemp)"
     if curl -fsSL "$TOOLS_RAW" -o "$tmp" 2>/dev/null && ! cmp -s "$tmp" "$self"; then
         install -m 755 "$tmp" "$self"

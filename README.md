@@ -5,6 +5,9 @@ Baut Meeting Transcriber aus dem neuesten Stand von
 plus den Branches in `branches.txt` und installiert die App nach
 `/Applications/MeetingTranscriber-Dev.app`.
 
+Die vollständige Anleitung für neue Nutzer (Voraussetzungen, erste Einrichtung)
+steht auf der [Startseite des Forks](https://github.com/wapp-its/meeting-transcriber).
+
 Voraussetzung: Xcode 26 oder neuer.
 
 Einmal einrichten:
@@ -13,17 +16,20 @@ Einmal einrichten:
 mkdir -p ~/.local/bin && curl -fsSL https://raw.githubusercontent.com/wapp-its/meeting-transcriber/tools/mt-update.sh -o ~/.local/bin/mt-update && chmod +x ~/.local/bin/mt-update
 ```
 
-Danach:
+Danach, in jeder Shell (`~/.local/bin` muss dafür nicht im `PATH` sein):
 
-- `mt-update` — neuesten Stand bauen, installieren, starten
-- `mt-update --check` — nur anzeigen, ob es Neues gibt
+- `~/.local/bin/mt-update` — neuesten Stand bauen, installieren, starten
+- `~/.local/bin/mt-update --check` — nur anzeigen, ob es Neues gibt
+
+Liegt `~/.local/bin` im `PATH`, reicht `mt-update`.
 
 Schlägt das Mischen oder Bauen fehl, bleibt die installierte App unverändert.
 Läuft gerade eine Aufnahme oder ein Transkriptions-Job, wartet `mt-update` nach
 dem Bauen, bis die App frei ist (höchstens 3 h), und ersetzt sie erst dann.
 Offene Sprecher-Benennungen blockieren nicht, sie erscheinen nach dem Neustart
 wieder. `MT_NO_WAIT=1 mt-update` bricht stattdessen ab.
-Das Skript aktualisiert sich bei jedem Lauf selbst von diesem Branch.
+Das Skript aktualisiert sich bei jedem Lauf selbst von diesem Branch, sofern die
+Datei `mt-update` heißt (die Kopie `mt-update.sh` im Checkout nie).
 
 ## Einreichen ans Original: `submit.sh`
 
