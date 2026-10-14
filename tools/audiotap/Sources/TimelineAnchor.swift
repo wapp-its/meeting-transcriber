@@ -16,6 +16,11 @@ import Foundation
 /// the gap between the last pre-restart buffer and the first post-restart buffer
 /// is bridged automatically. Not thread-safe — drive it from the single capture
 /// callback context.
+///
+/// The handlers feed it the session's pause-free recording clock rather than
+/// raw host time (`CapturePauseTimeline.recordingSeconds`): that clock stands
+/// still during a pause, so the audio either side of one is written back to
+/// back, and without a pause it is host time exactly.
 struct TimelineAnchor {
     let rate: Int
     private var anchorHostSeconds: Double?
