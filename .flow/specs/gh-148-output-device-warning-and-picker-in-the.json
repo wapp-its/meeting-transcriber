@@ -12,8 +12,124 @@
   "next_task": 1,
   "no_plan": true,
   "plan_review_rounds": 0,
-  "plan_review_status": "unknown",
-  "plan_reviewed_at": null,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-14T16:03:33.611458Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "1cbfb0604af196702f94404693bc59d1115e6dea01cebaa64ab33bea9f3f8454",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-d00e3c4a9fb74a0486017a88b7a55c32",
+            "classification": "introduced",
+            "findingId": "finding-d00e3c4a9fb74a0486017a88b7a55c32",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-34b6182335db29278adaff64c29fb3ab",
+            "classification": "introduced",
+            "findingId": "finding-34b6182335db29278adaff64c29fb3ab",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "852b322825b9c79dc1594a9ebb271a08b71f6496",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 335092,
+      "output_sha256": "e092240fd511796f6ebe8575559b69436a1310f19623606cc528aa6d1e4e44ae",
+      "reservation_id": "5e20cdfca3b941b8a16065a6e1a074a3",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T16:02:29.718761Z",
+      "tool_calls": 19,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "830ce539b78cd4e240e0b97e397718e7d4cfbdc8c4a33bd883d22624f33e0529",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-d00e3c4a9fb74a0486017a88b7a55c32",
+            "classification": "introduced",
+            "findingId": "finding-d00e3c4a9fb74a0486017a88b7a55c32",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-34b6182335db29278adaff64c29fb3ab",
+            "classification": "introduced",
+            "findingId": "finding-34b6182335db29278adaff64c29fb3ab",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "852b322825b9c79dc1594a9ebb271a08b71f6496",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 504,
+      "output_sha256": "dad4757bad6ad495f81b47cd8eb55263d392867a35863a2f60cdb23ce532ce87",
+      "reservation_id": "bbf04a4d0a0e4020b94d8037272bb16c",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T16:03:33.591900Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
   "spec_path": ".flow/specs/gh-148-output-device-warning-and-picker-in-the.md",
   "status": "open",
   "title": "Output device warning and picker in the menu",
@@ -29,5 +145,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nTeams can set the Mac's default output to its own virtual device \"Microsoft Teams Audio\" (`MSLoopbackDriverDevice_UID`) and keep playing the call through another device. If a recording starts in this state, the app track is exact zeros for the whole meeting. The tap is anchored on the default output. In this routing it probably follows the virtual device, not the device that plays the call. The app posts \"Recording Appears Silent\", but it doesn't say why. Also the more specific \"Capture Channel Silent\" alert doesn't fire when the microphone is muted at the same time.\n\nSeen here with a Teams meeting on the current fork build. The unified log shows that the Teams ModuleHost process set the default output itself, a few minutes before the meeting. The setting then stays like this after the call.\n\nUpstream reports the same case as https://github.com/pasrom/meeting-transcriber/issues/712 (with a re-anchoring fix on a contributor fork) and a related one as https://github.com/pasrom/meeting-transcriber/issues/699.\n\n## NOTES\n\n- Not a permission problem: two short system sounds that went into the virtual device were captured, the call audio was not.\n- A virtual default output alone is not the fault (see upstream 712), so we should not reject virtual devices in general.\n\n## TASKS\n\n- [ ] Warn at recording start when the default output is the Teams loopback device, with the fix (switch the output in Control Center)\n- [ ] Find out if anchoring the tap on the device Teams plays to restores the app track, or wait for the upstream fix",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/148"
   },
-  "updated_at": "2026-10-14T15:58:08.012248Z"
+  "updated_at": "2026-10-14T16:03:33.612529Z"
 }
