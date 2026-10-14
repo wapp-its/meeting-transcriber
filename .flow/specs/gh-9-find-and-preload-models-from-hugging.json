@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-9-hf-model-search",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-14T00:39:37.042937Z",
   "created_at": "2026-10-06T20:21:03.816784Z",
   "default_impl": null,
   "default_review": null,
@@ -10,7 +10,12 @@
     "gh-12-hugging-face-token-in-settings"
   ],
   "id": "gh-9-find-and-preload-models-from-hugging",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-9-find-and-preload-models-from-hugging.1": 0,
+    "gh-9-find-and-preload-models-from-hugging.2": 0,
+    "gh-9-find-and-preload-models-from-hugging.3": 0,
+    "gh-9-find-and-preload-models-from-hugging.4": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -121,19 +126,520 @@
       "task": null,
       "timestamp": "2026-10-06T20:33:54.357495Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "5d9aa84467d613a55c657ed4faeda399b87e4630af1a9f0566909ccfed46ddd8",
+      "backend": "codex",
+      "base_sha": "e8937d792c8dfdb333160c98936666fdeb35e0f2",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "7fabb21ed91bccc3e6206788a4700e0f187d14a5",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "c4d55025ce72474e85dd6fb09ec7657c",
+      "round_consumed": true,
+      "scope": "impl:gh-9-find-and-preload-models-from-hugging.1",
+      "superseded_by": null,
+      "task": "gh-9-find-and-preload-models-from-hugging.1",
+      "timestamp": "2026-10-13T22:46:06.872253Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "8bfbf9e228f881f998d2a147ff8c0ca873229d3320c15b24204de952a0c3ee7e",
+      "backend": "codex",
+      "base_sha": "a971da58cc8e7cab6f32387e3e86c74c4e6c282f",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-c56de0e34be63c2e110542661da7a8ce",
+            "classification": "introduced",
+            "findingId": "finding-c56de0e34be63c2e110542661da7a8ce",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "e8937d792c8dfdb333160c98936666fdeb35e0f2",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1071,
+      "output_sha256": "e7b5202475442795d584a15937a3b63e5fd49582de537154ab8eb4d596072a52",
+      "reservation_id": "0630306df92f478bbfbc0f551ca74497",
+      "round_consumed": true,
+      "scope": "impl:gh-9-find-and-preload-models-from-hugging.2",
+      "superseded_by": null,
+      "task": "gh-9-find-and-preload-models-from-hugging.2",
+      "timestamp": "2026-10-13T22:38:25.036625Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "b162b6627e73b82d4dc312adfe5b2741b1bff488d740fb2377521e399fc44b6f",
+      "backend": "codex",
+      "base_sha": "a971da58cc8e7cab6f32387e3e86c74c4e6c282f",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-e8d3ea5369c4100f2283a1c90f44d847",
+            "classification": "introduced",
+            "findingId": "finding-e8d3ea5369c4100f2283a1c90f44d847",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-c56de0e34be63c2e110542661da7a8ce",
+            "classification": "introduced",
+            "findingId": "finding-c56de0e34be63c2e110542661da7a8ce",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "d3dbe6c020e25cf2b608487b36dac1fbfdc5c2e8",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1288,
+      "output_sha256": "7c64adaa959f347af0f83080bcd4a1773a516e7fe94ef8b9e82578ee7d9de08b",
+      "reservation_id": "04c86aef15c2466b82024f4b2d043c3f",
+      "round_consumed": true,
+      "scope": "impl:gh-9-find-and-preload-models-from-hugging.2",
+      "superseded_by": null,
+      "task": "gh-9-find-and-preload-models-from-hugging.2",
+      "timestamp": "2026-10-13T22:43:05.887738Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "f7eb401785851d2b831d2db8c60d9b71886255fb4786e75d90bc39478d0473c8",
+      "backend": "codex",
+      "base_sha": "a971da58cc8e7cab6f32387e3e86c74c4e6c282f",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-e8d3ea5369c4100f2283a1c90f44d847",
+            "classification": "introduced",
+            "findingId": "finding-e8d3ea5369c4100f2283a1c90f44d847",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-c56de0e34be63c2e110542661da7a8ce",
+            "classification": "introduced",
+            "findingId": "finding-c56de0e34be63c2e110542661da7a8ce",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-cb9ff6840263b84b463d099d1dd22a96",
+            "classification": "introduced",
+            "findingId": "finding-cb9ff6840263b84b463d099d1dd22a96",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "21f685c1d0e3c75e5db4c9f67e70fe157504536c",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1348,
+      "output_sha256": "e39a8c4752b0f7f24614b036c614d34f7f410481575f182e80932afa39f8afd4",
+      "reservation_id": "ea78baeb97df4792b06fe1c6678ab5b9",
+      "round_consumed": true,
+      "scope": "impl:gh-9-find-and-preload-models-from-hugging.2",
+      "superseded_by": null,
+      "task": "gh-9-find-and-preload-models-from-hugging.2",
+      "timestamp": "2026-10-13T22:53:25.468439Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "034b7e517e1834086c770b36aa6fb3674e8b013ef71370bbe825367ac13503a6",
+      "backend": "codex",
+      "base_sha": "a971da58cc8e7cab6f32387e3e86c74c4e6c282f",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-e8d3ea5369c4100f2283a1c90f44d847",
+            "classification": "introduced",
+            "findingId": "finding-e8d3ea5369c4100f2283a1c90f44d847",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-c56de0e34be63c2e110542661da7a8ce",
+            "classification": "introduced",
+            "findingId": "finding-c56de0e34be63c2e110542661da7a8ce",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-cb9ff6840263b84b463d099d1dd22a96",
+            "classification": "introduced",
+            "findingId": "finding-cb9ff6840263b84b463d099d1dd22a96",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "7a29f0cceda850609ec7f505b5e770386fbd2070",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 660,
+      "output_sha256": "999c56664d432736ad2357a1827687a31a781be21b22391b77f0ebab41e2bbc3",
+      "reservation_id": "9b0cd7f5bd1e4317a0c61b2642491b23",
+      "round_consumed": true,
+      "scope": "impl:gh-9-find-and-preload-models-from-hugging.2",
+      "superseded_by": null,
+      "task": "gh-9-find-and-preload-models-from-hugging.2",
+      "timestamp": "2026-10-13T22:55:52.546094Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "4c61f3de231050ea4298699ca6c340363b03a35e23800e3216c291bc727f3acb",
+      "backend": "codex",
+      "base_sha": "3aa9398f8f6cbb552c7f0ac4c44956c555491b28",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-fe3a8bfacf71d915803f3c56ec218897",
+            "classification": "introduced",
+            "findingId": "finding-fe3a8bfacf71d915803f3c56ec218897",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "da380e663e2e99cf9376d46021d8315f19e67149",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1032,
+      "output_sha256": "9305136a73f2978a39bbc2ffe640b5ddc882820d7a575220698e727e7c41a685",
+      "reservation_id": "1202df3eee884109ba2d023955db5405",
+      "round_consumed": true,
+      "scope": "impl:gh-9-find-and-preload-models-from-hugging.3",
+      "superseded_by": null,
+      "task": "gh-9-find-and-preload-models-from-hugging.3",
+      "timestamp": "2026-10-13T23:24:38.092542Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "6e8cd7c80e0a0643d77266ecd3404de1b4fcabbe1d17a3c6630466836e166204",
+      "backend": "codex",
+      "base_sha": "a66628995b4ade9dd2cb8ea755bc76e05fc3f4fe",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "3a6e0f76fea8d21a445881e3531f45354fa17151",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "71ca6cc8902e4c3a928495b84d9cc466",
+      "round_consumed": true,
+      "scope": "impl:gh-9-find-and-preload-models-from-hugging.4",
+      "superseded_by": null,
+      "task": "gh-9-find-and-preload-models-from-hugging.4",
+      "timestamp": "2026-10-14T00:10:39.638257Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "884a44f4237596e4af6c37daa419786a7154e04dff0f4d0ab6ee8d9460d0f1ea",
+      "backend": "codex",
+      "base_sha": "557170da4da7da15941c5d62abf80fe43ead6af4",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "9d1397d06df55c91b2decf7993647b49ae4349c1",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 562075,
+      "output_sha256": "65b8853b52d39ad4adab8b16fccf287dfa665ed24f34a7c017081d1f64805632",
+      "reservation_id": "48b9a9d9ba2b4229b4f85f231cd57cf3",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T00:22:52.396738Z",
+      "tool_calls": 35,
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "435d070f7e0c5994082d424f4684ce18c254e8e40c7e5c8d43b6d04fb761e4f8",
+      "backend": "codex",
+      "base_sha": "557170da4da7da15941c5d62abf80fe43ead6af4",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "da4fe6df1d5077b8d343b4335656cee98666212a",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 558542,
+      "output_sha256": "ab9aed057ffd9af5907ceada74b02da0543b41a2e26111125884d89573b94303",
+      "reservation_id": "c901e02544a94d6f95460c635ecd8eb4",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T00:39:37.001071Z",
+      "tool_calls": 31,
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "bca31a18d66f60051920279864285d32d7df02a7aa74229e03a9aef681e0a39e",
+      "backend": "codex",
+      "base_sha": "a971da58cc8e7cab6f32387e3e86c74c4e6c282f",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "de1330f4fa90e40f2cab36894266d4259a7bcec9",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 799,
+      "output_sha256": "77720ea7a992683b0d78aea658afd9c80217ae7590212efb095cb9eb1f7f00df",
+      "reservation_id": "c2488e2b354f450c8cada7f3d880385c",
+      "round_consumed": true,
+      "scope": "impl:gh-9-find-and-preload-models-from-hugging.2",
+      "superseded_by": null,
+      "task": "gh-9-find-and-preload-models-from-hugging.2",
+      "timestamp": "2026-10-14T11:32:07.276656Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "26c2ea928036daa01401261bd65955aea4b8f9ba9604786dae05ec94f96c3663",
+      "backend": "codex",
+      "base_sha": "a971da58cc8e7cab6f32387e3e86c74c4e6c282f",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-e8d3ea5369c4100f2283a1c90f44d847",
+            "classification": "introduced",
+            "findingId": "finding-e8d3ea5369c4100f2283a1c90f44d847",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-c56de0e34be63c2e110542661da7a8ce",
+            "classification": "introduced",
+            "findingId": "finding-c56de0e34be63c2e110542661da7a8ce",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-cb9ff6840263b84b463d099d1dd22a96",
+            "classification": "introduced",
+            "findingId": "finding-cb9ff6840263b84b463d099d1dd22a96",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 2,
+      "head_sha": "19fc02f458d2e5bd88743b992e22af6c0e827e4c",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 689,
+      "output_sha256": "8632bfe71018623f3fa5b685128b441494af684357a030e734fb7dde8e3d6a79",
+      "reservation_id": "4d96e841fbc44447a5e0573b9c08be3e",
+      "round_consumed": true,
+      "scope": "impl:gh-9-find-and-preload-models-from-hugging.2",
+      "superseded_by": null,
+      "task": "gh-9-find-and-preload-models-from-hugging.2",
+      "timestamp": "2026-10-14T11:34:48.607520Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-9-find-and-preload-models-from-hugging.1": 1,
+    "impl:gh-9-find-and-preload-models-from-hugging.2": 3,
+    "impl:gh-9-find-and-preload-models-from-hugging.3": 1,
+    "impl:gh-9-find-and-preload-models-from-hugging.4": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-9-find-and-preload-models-from-hugging.1": 0,
+    "impl:gh-9-find-and-preload-models-from-hugging.2": 0,
+    "impl:gh-9-find-and-preload-models-from-hugging.3": 0,
+    "impl:gh-9-find-and-preload-models-from-hugging.4": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-9-find-and-preload-models-from-hugging.md",
-  "status": "open",
+  "status": "done",
   "title": "Find and preload models from Hugging Face",
   "tracker": {
     "baseHashFlow": null,
@@ -147,5 +653,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/9"
   },
-  "updated_at": "2026-10-06T20:54:53.563758Z"
+  "updated_at": "2026-10-14T11:34:48.630746Z"
 }

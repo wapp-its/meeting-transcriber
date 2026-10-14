@@ -39,9 +39,57 @@ Build the browser window on its own, against the catalog protocol from task 1: t
 - [ ] Choosing a repository shows its variants with size, the license (with "— non-commercial" where it applies), the gated notice and the model-card link; no variants shows the no-variant line without "Use"; "Use" and "Cancel" report through their closures and change no setting.
 - [ ] `cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh9-t3-home swift test --parallel --filter 'HuggingFace' > /private/tmp/gh9-t3.log 2>&1` green; `./scripts/lint.sh` clean with the pinned tools; `swift build -c release` clean.
 ## Done summary
-TBD
+The Hugging Face browser window now exists on its own, ready for task .4 to present. `HuggingFaceModelSearch` holds the query, results, chosen listing and one-line message. `HuggingFaceModelBrowserView` shows the search field, the results with download counts, and for a chosen repository its variants with size, the license, the gated notice and the model-card link. "Use" and "Cancel" report through closures and write no setting. Nothing presents the window yet.
 
+stage: impl-review - ran [3aa9398f..da380e66] SHIP round 1 (codex gpt-5.6-sol xhigh, 3-reviewer panel; receipt /tmp/impl-review-receipt-f5347a850d11-gh-9-find-and-preload-models-from-hugging.3.json). One P2 kept as a follow-up (see below). Integration: lane commit 31a1d768 cherry-picked onto 3aa9398f as da380e66; bookkeeping f8b16784 cherry-picked onto the spec branch. Assumption A7 (window presentation defaults) recorded in the spec as 8e9538a8.
+
+Tier: implementer - opus at xhigh (explicit invocation) (model: claude-opus-5-5)
+
+Commit `31a1d768` (`feat(app): Hugging Face model browser window and its search model`) on `lane/gh-9-hf-model-search.3`, range `5ca22e22..31a1d768`. Files: `Sources/HuggingFaceModelSearch.swift`, `Sources/Settings/HuggingFaceModelBrowserView.swift`, `Sources/A11yID.swift`, `Tests/HuggingFaceModelSearchTests.swift`, `Tests/HuggingFaceModelBrowserViewTests.swift` (all under `app/MeetingTranscriber/`).
+
+### Evidence (all measured)
+
+- **Baseline:** green via handoff. The conductor ran the `HuggingFace` filter and `lint.sh` green at `b49c9e04`. Only `.flow/tasks/...1.md` changed between `b49c9e04` and the lane base `5ca22e22` (`git log --name-only`), so the handoff holds.
+- **Red first:** the tests were written before the source. `swift build --build-tests` failed with `cannot find type 'HuggingFaceModelSearch' in scope` (log `/private/tmp/gh9tick/t3/red-first-build.log`). The fake catalog compiled at that point.
+- **Acceptance command** `cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh9-t3-home swift test --parallel --filter 'HuggingFace' > /private/tmp/gh9-t3.log 2>&1`: exit 0 on the committed tree, 59 tests, 0 failures. 22 are new (11 `HuggingFaceModelSearchTests`, 11 `HuggingFaceModelBrowserViewTests`). The other 37 existed already (17 catalog, 1 license, 2 live tests skipped without the env variable, 8 + 9 token tests).
+- **Flakiness:** the two new classes ran 5 times (3 serial, 2 parallel). Each run had exit 0, 22 tests and 0 failures.
+- **Lint** `PATH=/private/tmp/gh9tick/lint-bin:$PATH ./scripts/lint.sh`: exit 0, 0/779 files need formatting, 0 violations. The first run found 2 `trailing_closure` hits in the new view tests, which are fixed. The tests ran again after that fix.
+- **Release build** `swift build -c release`: exit 0, 0 warnings.
+- **CI analyze replay:** a clean `xcodebuild build-for-testing` (exit 0) and then `swiftlint analyze --strict` over its log. That run found 2 violations, both in `Sources/RecordingProvider.swift:144,146` (`unused_declaration`). Task .1 already reported them, and that file is untouched. There are 0 hits in this task's files.
+- **Mutation checks** (each guard broken alone, then the source restored, checked byte-identical with `cmp`):
+  - Without the search's adoption guard, `testAnOlderAnswerNeverReplacesTheResultsOfTheCurrentQuery` and `testCancelStopsPendingAndInFlightWork` fail (AC 1, "an older response never replaces newer results").
+  - Without the 2-character minimum, `testAQueryUnderTwoCharactersSendsNothingAndClearsResultsAndMessage` and the late-listing test fail.
+  - Without the listing's adoption guard, `testALateListingChangesNothingAfterBackChooseAgainOrAQueryEdit` and the cancel test fail.
+  - Without `.onDisappear { search.cancel() }`, `testClosingTheWindowCancelsPendingWork` fails.
+- **Coverage of the ACs:**
+  - AC 1: pause, last query only, under 2 characters, stale answer, and a late listing success or failure after back, choose-again, query edit or clear (8 cases in one table).
+  - AC 2: every `HuggingFaceCatalogError` case, the no-match line, cancel during the pause and in flight, and the view showing the message.
+  - AC 3: sizes including "size unknown", "Apache 2.0", " — non-commercial", the gated notice, the model-card URL, "License not stated", the no-variant line without "Use", and the "Use", "Cancel" and "Back to results" closures.
+- **Not run:** the live window. It is not presented anywhere until task .4. Its look is an owner check (modal panels are manual QA per CLAUDE.md).
+
+### Choices
+
+- DECIDED (rule 3): the `HuggingFaceModelSearch` init and the `onUse: (HuggingFaceModelVariant, HuggingFaceRepositoryListing) -> Void` / `onCancel: () -> Void` shapes are exactly as the task wrote them. The model is `@MainActor @Observable final class … : Identifiable` with `let id = UUID()`.
+- DECIDED (rule 1): the row identifiers carry the repository id and the variant name, as the task names them. A safety-floor check passed: `/ui/tree` prunes sheets (`uiTreeSheetRole`), so the names in these identifiers never reach it. None of the six identifiers is on `/ui/press`. A test pins this.
+- DECIDED (rule 1, `.flow/memory` `async-probe-result-adopted-after-its-2026-10-09`): an answer must still be current when it arrives. The model checks the current query or the chosen repository, as the task says. It also checks the task's own cancellation, so `cancel()` drops an answer already on its way. The checks run synchronously on the main actor at adoption time. A queued continuation therefore cannot pass them after the state moved (memory `stale-async-answer-queued-ahead-of-the-2026-10-09`).
+- ASSUMED (rule 4): while a new query waits for its pause or answer, the old results and message stay on screen and `isSearching` is true (spinner). A query under 2 characters clears both at once. The alternative is to clear on every keystroke. Switch point: `HuggingFaceModelSearch.queryDidChange()`.
+- ASSUMED (rule 4): the message and the spinner sit in a status line under the search field, not in the footer, because the refused-request message is long. A failed listing keeps the result list and shows its message there. `choose` clears an earlier message. Switch point: `HuggingFaceModelBrowserView.statusLine`, `HuggingFaceModelSearch.choose(_:)`.
+- ASSUMED (rule 4): a result without a download count shows no count, not "0". One download reads "1 download", and counts use locale grouping. Switch point: `HuggingFaceModelBrowserView.downloadsText(_:)`.
+- ASSUMED (rule 4): the window adds some copy that the task does not name. The heading is "Find a WhisperKit model on Hugging Face", the search prompt is "Model name, at least 2 characters", and the gated notice is orange. Switch point: `HuggingFaceModelBrowserView.body` and `listingDetails(_:)`.
+- DECIDED (rule 6): the protocol lets any error through. An error that is neither a catalog error nor a cancellation is shown as `.unreachable`, so the spinner never stays on. The production catalog throws only its own errors. Switch point: `HuggingFaceModelSearch.catalogError(_:)`.
+- DECIDED (rule 6): `FakeHuggingFaceCatalog`, `HuggingFaceSearchSample` and `HuggingFaceTokenSource` live in `HuggingFaceModelSearchTests.swift`, because the Touches list allows no extra helper file. The view tests reuse them, and task .4 can too. A `@MainActor` class satisfies the catalog protocol's async requirements under Swift 6.4.
+- DECIDED (rule 6): three tests are beyond the task's list. The first checks that the view shows the model's message (AC 2 "shows"). The second checks that `onDisappear` calls `cancel()`, which is the spec's "closing the window cancels pending requests". The mutation check shows it fails without the wiring. The third pins the `/ui/press` exclusion, as the vocabulary-source tests do.
+- DECIDED (rule 1): one commit holds the tests and the source. This is a feature, not a bug fix, and a test-only commit would not compile.
+
+### Follow-ups (not built)
+
+- `Sources/RecordingProvider.swift:144,146` `unused_declaration` hits are still there. They predate gh-9 and fail CI's `analyze` job (already reported by task .1).
+- `Tests/ViewInspectorIdentifierTests.swift:45,53,64` print an `ActorIsolatedCall` warning on every test build. This predates the task and the file is untouched.
+- Owner check after task .4 wires the sheet: how the window looks (layout, spinner, orange gated notice) and how the result list looks before anything is typed (an empty list, no hint).
+- Review follow-up (P2, confidence 75, `HuggingFaceModelSearch.queryDidChange`): search "sw", change the field to "zz", click an old "sw" result before the "zz" search finishes; that search can then put "No WhisperKit models match "zz"." on the status line under the "sw" listing. Nothing wrong is selected or saved. Preferred fix: a search that finishes while a repository is open must not change the message, and shows it again on "Back to results" (stays inside this task's files). Not fixed in this tick because the verdict was SHIP and the default (A7: old results stay visible) is the safe one.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: da380e663e2e99cf9376d46021d8315f19e67149, 8449fe2e79ea4c6e3b1e8e60e5fbe31197934a75
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh9-t3-home swift test --parallel --filter 'HuggingFace' > /private/tmp/gh9-t3.log 2>&1 -> exit 0, 59 tests (11 HuggingFaceModelSearchTests + 11 HuggingFaceModelBrowserViewTests new; 17 catalog, 1 license, 2 live (skipped without MEETINGTRANSCRIBER_HF_LIVE_TESTS), 8 + 9 token tests existing), 0 failures, cd app/MeetingTranscriber && swift test [--parallel] --filter 'HuggingFaceModel(Search|BrowserView)Tests', 5 runs (3 serial, 2 parallel) -> exit 0 each, 22 tests, 0 failures, PATH=/private/tmp/gh9tick/lint-bin:$PATH ./scripts/lint.sh (SwiftFormat 0.63.0, SwiftLint 0.65.1) -> exit 0, 0/779 files need formatting, 0 violations, cd app/MeetingTranscriber && swift build -c release -> exit 0, 0 warnings, xcodebuild build-for-testing (clean, -derivedDataPath scratch) + swiftlint analyze --strict -> build exit 0; analyze exit 2 with 2 unused_declaration hits in Sources/RecordingProvider.swift:144,146 only (pre-existing, file untouched); 0 in this task's files, red first: tests written before the source; swift build --build-tests failed with cannot find type 'HuggingFaceModelSearch' in scope, mutation: search adoption guard removed -> testAnOlderAnswerNeverReplacesTheResultsOfTheCurrentQuery + testCancelStopsPendingAndInFlightWork red; min length ignored -> testAQueryUnderTwoCharacters... + testALateListing... red; listing adoption guard removed -> testALateListing... + testCancelStops... red; onDisappear removed -> testClosingTheWindowCancelsPendingWork red; sources restored byte-identical (cmp), integrated at 8449fe2e79ea4c6e3b1e8e60e5fbe31197934a75: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh9-t3-home swift test --parallel --filter 'HuggingFace' (exit 0, no failures; parallel mode prints failures only); PATH=/private/tmp/gh9tick/lint-bin:$PATH ./scripts/lint.sh (exit 0, 0 violations)
 - PRs:
