@@ -35,12 +35,15 @@ protocol MeetingDetecting {
     /// meetings would come back every poll and could hide another app's call
     /// for as long as the prompt stays open. Hits for an excluded app still
     /// count, so it is confirmed again as soon as the exclusion lifts.
+    /// `excludedApps` holds identity keys (`AppMeetingPattern.identityKey`).
     func checkOnce(excluding excludedApps: Set<String>) -> DetectedMeeting?
 
     /// Check if a previously detected meeting is still active.
     func isMeetingActive(_ meeting: DetectedMeeting) -> Bool
 
     /// Reset confirmation counters and start cooldown for the given app.
+    /// `appName` carries the app's identity key (`AppMeetingPattern.identityKey`),
+    /// which is its name only for a built-in app or a browser.
     func reset(appName: String?)
 }
 
@@ -55,7 +58,7 @@ extension MeetingDetecting {
     /// apps at once implement the requirement themselves and pass over the
     /// excluded apps to the next confirmed one.
     func checkOnce(excluding excludedApps: Set<String>) -> DetectedMeeting? {
-        guard let meeting = checkOnce(), !excludedApps.contains(meeting.pattern.appName) else { return nil }
+        guard let meeting = checkOnce(), !excludedApps.contains(meeting.pattern.identityKey) else { return nil }
         return meeting
     }
 }

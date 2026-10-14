@@ -26,6 +26,7 @@ extension WatchingController {
             settings.consentDeniedApps.contains(app)
         }
         assertions.isIdentityDenied = isDenied
+        assertions.addedAppBundleIDs = settings.watchCustomApps
         let micInput = MicInputDetector(patterns: MicInputDetector.patterns(
             watching: settings.watchApps,
             customBundleIDs: settings.watchCustomApps,

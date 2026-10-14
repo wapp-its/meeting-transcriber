@@ -24,8 +24,8 @@ extension WatchLoop {
     /// meeting's signal gone.
     func holdRedetection(of meeting: DetectedMeeting) {
         guard redetectionHolds.hold(meeting) else { return }
-        // The detector identity only: the meeting title stays out of the log.
-        diagnostics.notice("redetect_hold_set app=\(meeting.pattern.appName)")
+        // The identity key only: the meeting title stays out of the log.
+        diagnostics.notice("redetect_hold_set app=\(meeting.pattern.identityKey)")
     }
 
     /// Release every hold whose meeting's signal is gone. Run at the top of
