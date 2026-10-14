@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-125-menu-job-lines",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-14T10:24:28.956732Z",
   "created_at": "2026-10-14T08:54:19.803241Z",
   "default_impl": null,
   "default_review": null,
@@ -242,16 +242,53 @@
       "task": "gh-125-menu-job-lines-that-stay-still-while-a.1",
       "timestamp": "2026-10-14T10:08:42.103394Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "125923ecbe0fb035c67f4cc51cfc8d3ca42f75f7be06eacb6c9552796df9621a",
+      "backend": "codex",
+      "base_sha": "a6aa37cd3c7081ee02b0f2edd1e4cc4f14763e83",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "90c9350525c1e5bc8aa2833290df09181238258c",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 520483,
+      "output_sha256": "4da8c0a15263246ebb51d5b9887dcb74c05e7119634db6105ff88cd481f90c9e",
+      "reservation_id": "1741d6a79c6a4f1f826b3cb016456ce6",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T10:24:28.937187Z",
+      "tool_calls": 23,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-125-menu-job-lines-that-stay-still-while-a.1": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-125-menu-job-lines-that-stay-still-while-a.1": 0,
     "plan": 0
   },
@@ -270,5 +307,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nWhile a job runs, the menu changes under the mouse. The item under the pointer (for example \"All Transcriptions...\") loses its highlight or disappears, and an open job submenu closes. The job line shows the elapsed time in seconds, so the whole menu is rebuilt once per second.\n\n## NOTES\n\n- `PipelineQueue.startElapsedTimer()` writes `activeJobElapsed` every second. `MenuBarView.stageProgressText` reads it for the job line (`jobMenuTitle`) and inside the job submenu. The `MenuBarExtra` uses the menu style, so every change rebuilds the `NSMenu`. A label that changes once per minute would still close the menu once per minute.\n- The \"longer than usual\" hint compares the running stage with the average wall-clock time of all past runs of that stage (`averageSeconds(forJobID:stage:)`, `StageTimingStats.isSlowerThanUsual`). It ignores the length of the recording, and the average includes short test imports. On 2026-10-14 the WhisperKit average was 2:02, so a 16 minute meeting shows \"longer than usual\" after about 3 minutes even at normal speed. Normal for that length is about 3:18 (0.21 s per audio second over the last 30 days). The run took 4:41, so it was slower, but the hint would have shown anyway. The speed per audio second (`avgRTF`) is already computed.\n- The \"Processing\" header is above every job in the menu: running, waiting, waiting for speaker names, failed and the last three finished ones. So it often labels jobs that are not processing.\n- Owner ideas from 2026-10-14: remove finished jobs from the menu now that \"All Transcriptions...\" exists, and put \"All Transcriptions...\" next to \"Open Protocols Folder\".\n\n## TASKS\n\n- [ ] Stop rebuilding the menu while it is open\n- [ ] Compare the hint with the expected time for the length of the recording\n- [ ] Decide the menu layout: header text, finished jobs out of the menu, \"All Transcriptions...\" next to \"Open Protocols Folder\"",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/125"
   },
-  "updated_at": "2026-10-14T10:08:42.127310Z"
+  "updated_at": "2026-10-14T10:24:28.959343Z"
 }
