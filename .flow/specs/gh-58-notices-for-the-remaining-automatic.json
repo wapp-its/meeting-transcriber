@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-58-auto-stop-notices",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-14T05:28:44.794107Z",
   "created_at": "2026-10-06T20:17:01.823767Z",
   "default_impl": null,
   "default_review": null,
@@ -247,17 +247,54 @@
       "task": "gh-58-notices-for-the-remaining-automatic.2",
       "timestamp": "2026-10-14T05:21:18.616196Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "25b1e3af9d64f41c525bf479af5b1a2de8bf5d319132925ba3079d770a4675f1",
+      "backend": "codex",
+      "base_sha": "48912ad6ea6909528e21b6e5f8d8c9287a7caf1a",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "b0c4fc4a150500defff801af489e1159ec6c6254",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 380400,
+      "output_sha256": "6eca9189df18692a84d02915f3b30c366c924f72efaeceaccfc3ee66fa285350",
+      "reservation_id": "919f5df1e08f444aad1840a4d7bf11b9",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T05:28:44.753138Z",
+      "tool_calls": 26,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-58-notices-for-the-remaining-automatic.1": 1,
     "impl:gh-58-notices-for-the-remaining-automatic.2": 1,
     "plan": 3,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-58-notices-for-the-remaining-automatic.1": 0,
     "impl:gh-58-notices-for-the-remaining-automatic.2": 0,
     "plan": 0
@@ -277,5 +314,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/58"
   },
-  "updated_at": "2026-10-14T05:21:18.638751Z"
+  "updated_at": "2026-10-14T05:28:44.798137Z"
 }
