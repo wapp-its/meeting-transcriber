@@ -571,7 +571,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-46-pause-and-resume-a-recording.md",
-  "status": "open",
+  "status": "done",
   "title": "Pause and resume a recording",
   "tracker": {
     "baseHashFlow": null,
@@ -585,5 +585,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/46"
   },
-  "updated_at": "2026-10-14T09:56:01.924974Z"
+  "updated_at": "2026-10-14T10:10:40.161776Z"
 }

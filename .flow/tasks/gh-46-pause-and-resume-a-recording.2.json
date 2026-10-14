@@ -9,7 +9,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-46-pause-and-resume-a-recording",
   "spec_path": ".flow/tasks/gh-46-pause-and-resume-a-recording.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Pause record and transcript markers",
   "updated_at": "2026-10-06T20:56:59.725907Z"
 }

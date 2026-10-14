@@ -11,7 +11,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-46-pause-and-resume-a-recording",
   "spec_path": ".flow/tasks/gh-46-pause-and-resume-a-recording.5.md",
-  "status": "todo",
+  "status": "done",
   "title": "Pauses at the recording's end: cut and sidecar",
   "updated_at": "2026-10-06T20:57:00.471388Z"
 }
