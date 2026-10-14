@@ -21,6 +21,7 @@ private struct AnimatedMenuBarIcon: View {
     let badge: BadgeKind
     let watchingOverlay: Bool
     let questionOverlay: Bool
+    let meetingEndCountdownOverlay: Bool
     let permissionOverlay: Bool
     let recordOnlyOverlay: Bool
     let micSilentOverlay: Bool
@@ -39,6 +40,7 @@ private struct AnimatedMenuBarIcon: View {
             animationFrame: animationFrame,
             watchingOverlay: watchingOverlay,
             questionOverlay: questionOverlay,
+            meetingEndCountdownOverlay: meetingEndCountdownOverlay,
             permissionOverlay: permissionOverlay,
             recordOnlyOverlay: recordOnlyOverlay,
             micSilentOverlay: micSilentOverlay,
@@ -186,6 +188,7 @@ struct MeetingTranscriberApp: App {
                 badge: appState.currentBadge,
                 watchingOverlay: appState.isWatching,
                 questionOverlay: appState.awaitingUserAnswer,
+                meetingEndCountdownOverlay: appState.meetingEndCountdownOverlay,
                 permissionOverlay: appState.hasPermissionProblem,
                 recordOnlyOverlay: appState.settings.recordOnly,
                 // `recordingSilentActive` paints both halves; folded into the

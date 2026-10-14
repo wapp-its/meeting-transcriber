@@ -78,7 +78,9 @@ class WatchLoop {
 
     /// The open "meeting seems to have ended" question and the answer parked
     /// for the next poll. Internal for `WatchLoop+MeetingEnd.swift`, which owns
-    /// both, the way the consent extension owns `pendingConsentQuestion`.
+    /// both, the way the consent extension owns `pendingConsentQuestion`. The
+    /// id is set exactly while the question's countdown runs, which is what
+    /// the menu bar icon's pulse reads (`AppState.meetingEndCountdownOverlay`).
     var meetingEndQuestionID: String?
     var meetingEndAnswer: ReceivedMeetingEndAnswer?
     /// When "Stop Recording" was chosen, parked for the wait's next poll (`WatchLoop+StopByHand.swift`).
