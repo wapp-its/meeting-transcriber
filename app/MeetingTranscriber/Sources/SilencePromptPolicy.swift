@@ -109,12 +109,16 @@ enum SilencePromptPolicy {
             return answered(answer, open: open, now: now, activity: activity)
         }
         let withdrawn = SilencePromptState(open: nil, countFrom: state.countFrom)
+        // Every held poll moves the count, so it restarts when the hold ends,
+        // whether or not the question is switched on at the time: the other
+        // question closing is a moment the person was just asked at, and
+        // switching this one on right after it must wait a full period.
+        let heldCount = SilencePromptState(open: nil, countFrom: now)
         guard let after else {
-            return (state.open == nil ? .none : .withdraw(.off), withdrawn)
+            return (state.open == nil ? .none : .withdraw(.off), held ? heldCount : withdrawn)
         }
         if held {
-            // Every held poll moves the count, so it restarts when the hold ends.
-            return (state.open == nil ? .none : .withdraw(.held), SilencePromptState(open: nil, countFrom: now))
+            return (state.open == nil ? .none : .withdraw(.held), heldCount)
         }
         guard let activity else { return (.none, state) }
         let silentSince = activity.silentSince

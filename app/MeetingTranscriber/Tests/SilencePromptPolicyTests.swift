@@ -234,4 +234,24 @@ final class SilencePromptPolicyTests: XCTestCase {
         var heldThroughout = SilencePromptState()
         XCTAssertEqual(poll(&heldThroughout, over: 0 ... 3600, held: true), [])
     }
+
+    /// The hold moves the count even while the question is switched off:
+    /// the other question closing is a moment the person was just asked at,
+    /// so switching the setting on right after it waits a full period.
+    func testAHoldWhileSwitchedOffStillRestartsTheCount() {
+        var state = SilencePromptState()
+        XCTAssertEqual(poll(&state, over: 0 ... 600, held: true, after: nil), [])
+        XCTAssertNil(state.open)
+        XCTAssertEqual(state.countFrom, at(600))
+        XCTAssertEqual(poll(&state, over: 601 ... 900), [TimedAction(second: 900, action: .ask(silentFor: 900))])
+
+        var openThenOff = SilencePromptState()
+        XCTAssertEqual(poll(&openThenOff, over: 0 ... 300), [TimedAction(second: 300, action: .ask(silentFor: 300))])
+        XCTAssertEqual(
+            poll(&openThenOff, over: 301 ... 600, held: true, after: nil),
+            [TimedAction(second: 301, action: .withdraw(.off))],
+        )
+        XCTAssertEqual(openThenOff.countFrom, at(600))
+        XCTAssertEqual(poll(&openThenOff, over: 601 ... 900), [TimedAction(second: 900, action: .ask(silentFor: 900))])
+    }
 }
