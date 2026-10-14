@@ -44,6 +44,7 @@ A false notice is worse than none: it sends the user to System Settings for a to
 ## Decision Context
 
 - **D1 · Fix the false microphone notice now, in its own spec.** why: owner picked "A — mic + menu now (Recommended)" after the diagnosis · status: active [owner-ratified 2026-10-14]
+- **D9 · Build as read back, the agent's additions included.** why: owner picked "Approve both (Recommended)" on the read-back and "Now, in this session (Recommended)" · status: active [owner-ratified 2026-10-14]
 - **A1 · One retry after a short pause, not "an engine-start failure counts as healthy".** flip at: the probe outcome that the microphone verdict is built from · test: the R2 test (both attempts fail, verdict broken, one notification) · alternatives: treat an engine-start failure as inconclusive and healthy, as the Accessibility check does, which would hide a grant that is really broken · status: active [agent-assumed 2026-10-14]
 - **A2 · The retry sits in the probe outcome, not in a later first check at launch.** flip at: where the startup check is scheduled · test: the R1 test (first attempt fails, retry succeeds, no notification) · alternatives: delay the launch check, which only moves the race and leaves activation and pre-recording checks exposed · status: active [agent-assumed 2026-10-14]
 - **A3 · The pause between the two attempts is about 2 s.** flip at: the retry pause value · test: the R1 test on the virtual clock · status: active [agent-assumed 2026-10-14]
