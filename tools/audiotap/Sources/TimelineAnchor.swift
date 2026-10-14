@@ -16,6 +16,11 @@ import Foundation
 /// the gap between the last pre-restart buffer and the first post-restart buffer
 /// is bridged automatically. Not thread-safe — drive it from the single capture
 /// callback context.
+///
+/// The handlers feed it the session's pause-free recording clock rather than
+/// raw host time (`CapturePauseTimeline.recordingSeconds`): that clock stands
+/// still during a pause, so the audio either side of one is written back to
+/// back, and without a pause it is host time exactly.
 struct TimelineAnchor {
     let rate: Int
     private var anchorHostSeconds: Double?
@@ -30,6 +35,15 @@ struct TimelineAnchor {
 
     init(rate: Int) {
         self.rate = rate
+    }
+
+    /// Anchor at `hostSeconds` with nothing written, unless already anchored.
+    /// For a buffer that writes nothing because every frame of it lies inside
+    /// a pause: the track's timeline still starts at its first buffer, as its
+    /// first-frame time says, so a gap between the resume and its next buffer
+    /// (a device restart) is filled rather than lost.
+    mutating func anchorIfUnset(hostSeconds: Double) {
+        if anchorHostSeconds == nil { anchorHostSeconds = hostSeconds }
     }
 
     /// Silent frames to insert before a buffer that presents at `hostSeconds`

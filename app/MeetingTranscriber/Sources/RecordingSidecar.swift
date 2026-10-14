@@ -11,8 +11,8 @@ struct RecordingSidecar: Codable {
 
     /// Schema version stamped into every new sidecar. Bump when fields are
     /// added/removed/repurposed so downstream consumers can branch on it.
-    /// 2 added `trigger`.
-    static let currentVersion = 2
+    /// 2 added `trigger`, 3 added `pauses`.
+    static let currentVersion = 3
 
     /// How the recording was started. Consumers apply different policies to
     /// the two: a very short auto capture is usually a false trigger worth
@@ -34,6 +34,12 @@ struct RecordingSidecar: Codable {
     let participants: [String]
     let micDelaySeconds: TimeInterval
     let files: Files
+    /// The stretches in which nothing was recorded, in order, each with its
+    /// wall-clock times and its position on the saved tracks. Nil when the
+    /// recording had none, which is also how a version 1 or 2 sidecar reads.
+    /// `startedAt` and `stoppedAt` stay wall-clock times, so the audio
+    /// recorded is about `stoppedAt - startedAt` minus the pauses' lengths.
+    let pauses: [RecordingPause]? // swiftlint:disable:this discouraged_optional_collection
 
     /// Raw storage so an unrecognised value decodes as `nil` instead of
     /// throwing. `read()` swallows decode errors, so a strict `Trigger?` would
@@ -56,7 +62,7 @@ struct RecordingSidecar: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case version, title, appName, startedAt, stoppedAt
-        case participants, micDelaySeconds, files
+        case participants, micDelaySeconds, files, pauses
         case triggerRaw = "trigger"
     }
 
@@ -71,6 +77,7 @@ struct RecordingSidecar: Codable {
         mixFilename: String,
         appFilename: String?,
         micFilename: String?,
+        pauses: [RecordingPause] = [],
     ) {
         self.version = Self.currentVersion
         self.title = title
@@ -81,6 +88,7 @@ struct RecordingSidecar: Codable {
         self.micDelaySeconds = micDelaySeconds
         self.triggerRaw = trigger.rawValue
         self.files = Files(mix: mixFilename, app: appFilename, mic: micFilename)
+        self.pauses = pauses.isEmpty ? nil : pauses
     }
 
     /// Writes the sidecar as `<basename>\(filenameSuffix)` into `directory`.

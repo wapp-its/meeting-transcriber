@@ -11,16 +11,17 @@ private let logger = Logger(subsystem: "com.meetingtranscriber.audiotap", catego
 /// 600-line lint cap — same pattern as `AppAudioCapture+Resampling.swift`.
 extension MicCaptureHandler {
     /// Write silence for the gap before `outputFrames` of real audio, so the
-    /// output file stays aligned to wall-clock. `when` is the buffer's hardware
-    /// presentation time (jitter-free); falls back to the callback clock if the
-    /// host time is invalid. The `TimelineAnchor` self-anchors on the first
-    /// buffer and bridges restart gaps (it is never reset), so steady-state
-    /// capture inserts nothing and only a real gap produces silence.
-    func fillTimelineGap(before when: AVAudioTime, outputFrames: Int) {
-        let hostTicks = when.isHostTimeValid ? when.hostTime : mach_absolute_time()
-        let hostSeconds = machTicksToSeconds(hostTicks)
+    /// output file stays aligned to the recording clock. `recordingSeconds` is
+    /// the audio's first frame on the session's pause-free recording clock
+    /// (the buffer's hardware presentation time minus every paused second
+    /// before it), so a pause is no gap, and a restart gap that overlaps one
+    /// is filled only for its unpaused part. The `TimelineAnchor` self-anchors
+    /// on the first buffer and bridges restart gaps (it is never reset), so
+    /// steady-state capture inserts nothing and only a real gap produces
+    /// silence.
+    func fillTimelineGap(atRecordingSeconds recordingSeconds: Double, outputFrames: Int) {
         let silence = timelineAnchor.silenceFramesBefore(
-            hostSeconds: hostSeconds, frameCount: outputFrames,
+            hostSeconds: recordingSeconds, frameCount: outputFrames,
         )
         guard silence > 0, let outputFile else { return }
         Self.writeSilence(frames: silence, to: outputFile)

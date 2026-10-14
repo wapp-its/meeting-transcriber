@@ -63,10 +63,43 @@
 
             XCTAssertEqual(
                 Set(object.keys),
-                ["recording", "startPending", "badge", "otherRecordingActive", "noMic", "microphoneHealthy"],
+                ["recording", "paused", "startPending", "badge", "otherRecordingActive", "noMic", "microphoneHealthy"],
                 "these key names are the published contract",
             )
             XCTAssertNil(object["state"], "a nil value is omitted, not sent as null")
+            XCTAssertEqual(object["paused"] as? Bool, false)
+        }
+
+        /// `paused` follows the running recording whatever its kind, unlike
+        /// `recording`, and `badge` keeps reading `recording` through the pause,
+        /// on `/v1/record` and on `/state` alike.
+        func testAPauseIsReportedForEveryKindOfRecordingWithTheBadgeUnchanged() async throws {
+            for appRecording in [false, true] {
+                let state = makeRPCTestState()
+                let (loop, _) = makeTestWatchLoop()
+                state.watching.watchLoop = loop
+                if appRecording {
+                    try await loop.startManualRecording(pid: 42, appName: "Chrome", title: "Standup")
+                } else {
+                    try await loop.startMicrophoneRecording()
+                }
+                defer { loop.stop() }
+                let kind = appRecording ? "app recording" : "microphone recording"
+                XCTAssertFalse(state.recordStatusDTO().paused, "\(kind): precondition, recording and not paused")
+                XCTAssertFalse(state.rpcStateSnapshot().recordingPaused, "\(kind): precondition")
+
+                XCTAssertEqual(loop.pauseRecording(), .changed, kind)
+                let paused = state.recordStatusDTO()
+                let snapshot = state.rpcStateSnapshot()
+                XCTAssertTrue(paused.paused, kind)
+                XCTAssertEqual(paused.badge, "recording", "\(kind): the badge does not change for a pause")
+                XCTAssertEqual(paused.recording, !appRecording, "\(kind): `recording` keeps its narrow meaning")
+                XCTAssertTrue(snapshot.recordingPaused, kind)
+                XCTAssertEqual(snapshot.badge, .recording, kind)
+
+                XCTAssertEqual(loop.resumeRecording(), .changed, kind)
+                XCTAssertFalse(state.recordStatusDTO().paused, kind)
+            }
         }
 
         /// The window a polling key would otherwise read as plain idle. Narrow

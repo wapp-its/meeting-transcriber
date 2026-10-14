@@ -176,7 +176,7 @@ extension SpeakerNamingSession {
             return
         }
 
-        delegate.namingStageDidStart(jobID: jobID)
+        delegate.startDiarizing(jobID: jobID, mode: diarizeProcess.mode)
 
         do {
             let title = job.meetingTitle
@@ -186,7 +186,6 @@ extension SpeakerNamingSession {
                 isDualSource: namingData.isDualSource,
                 speakerCount: speakerCount, title: title,
             )
-            delegate.namingStageDidEnd()
 
             // Dual-track always yields a combined result (the merge, or the
             // app-only / mic-only single-track fallback); single-source sets it
@@ -239,7 +238,6 @@ extension SpeakerNamingSession {
             }
         } catch {
             logger.error("Late re-diarization failed: \(error.localizedDescription, privacy: .public)")
-            delegate.namingStageDidEnd()
             delegate.updateJobState(id: jobID, to: .speakerNamingPending)
         }
     }
@@ -381,13 +379,16 @@ extension SpeakerNamingSession {
             return
         }
         // The rebuild renders from the cached segments, which never carried the
-        // recording-level note, so the rendering is handed it again. `note` has
-        // no default, so this caller cannot forget it the way a rule about
-        // write sites could.
+        // recording-level note or the pause markers, so the rendering is handed
+        // both again. Neither has a default, so this caller cannot forget them
+        // the way a rule about write sites could.
         guard let delegate, let rebuilt = delegate.renderLabeledTranscript(
             run: run, cachedSegments: cachedSegments,
             isDualSource: isDualSource, autoNames: autoNames,
-            note: delegate.job(withID: jobID)?.trackViability?.transcriptNote,
+            annotations: (
+                note: delegate.job(withID: jobID)?.trackViability?.transcriptNote,
+                pauses: delegate.job(withID: jobID)?.pauses ?? [],
+            ),
         ) else { return }
         do {
             try rebuilt.write(to: transcriptPath, atomically: true, encoding: .utf8)

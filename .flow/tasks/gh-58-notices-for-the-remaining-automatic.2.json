@@ -8,10 +8,10 @@
   ],
   "id": "gh-58-notices-for-the-remaining-automatic.2",
   "priority": null,
-  "review": "codex:gpt-5.6-sol:xhigh",
+  "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-58-notices-for-the-remaining-automatic",
   "spec_path": ".flow/tasks/gh-58-notices-for-the-remaining-automatic.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Pulse the menu bar icon while a meeting-end countdown runs",
   "updated_at": "2026-10-06T20:26:26.445074Z"
 }

@@ -10,12 +10,14 @@ import Foundation
 /// `stopManualRecording`, `startWatching`) are internal rather than private for
 /// exactly that.
 ///
-/// The verbs are about one recording shape, `RecordingSource.micOnly`.
-/// Everything else the loop can be doing — an app-picker recording, an
-/// auto-detected meeting — is somebody else's recording here: a start refuses
-/// rather than clobbering it, and a stop leaves it alone rather than ending a
-/// meeting the caller never asked about. The one way past that is a caller
-/// asking for it by name: a stop with `scope: "any"` (`applyRecordStopAny`).
+/// `start`, `stop` and `toggle` are about one recording shape,
+/// `RecordingSource.micOnly`. Everything else the loop can be doing — an
+/// app-picker recording, an auto-detected meeting — is somebody else's
+/// recording here: a start refuses rather than clobbering it, and a stop leaves
+/// it alone rather than ending a meeting the caller never asked about. The one
+/// way past that is a caller asking for it by name: a stop with
+/// `scope: "any"` (`applyRecordStopAny`). `pause` and `resume` act on whichever
+/// recording runs, because they end nothing (`WatchingController+Pause.swift`).
 @MainActor
 extension WatchingController {
     /// Whether a microphone-only recording is in progress.
@@ -63,6 +65,20 @@ extension WatchingController {
 
         case .toggle:
             return isRecordingMicrophoneOnly ? applyRecordStop() : await applyRecordStart()
+
+        case .pause: return applyRecordPause()
+
+        case .resume: return resumeRecording() == .changed ? .changed : .unchanged
+        }
+    }
+
+    /// A pause with no recording's capture running is refused rather than
+    /// answered "unchanged": nothing is paused, and nothing pretends to be.
+    private func applyRecordPause() -> RecordControlOutcome {
+        switch pauseRecording() {
+        case .changed: .changed
+        case .unchanged: .unchanged
+        case .nothingToPause: .blocked
         }
     }
 

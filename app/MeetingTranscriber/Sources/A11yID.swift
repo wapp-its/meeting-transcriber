@@ -21,6 +21,8 @@ enum A11yID {
     static let recordOnlyToggle = "recordOnlyToggle"
     static let watchBrowserToggle = "watchBrowserToggle"
     static let watchAtLaunchToggle = "watchAtLaunchToggle"
+    static let silencePromptToggle = "silencePromptToggle"
+    static let silencePromptMinutesStepper = "silencePromptMinutesStepper"
     static let browserConsentWarning = "browserConsentWarning"
     static let consentDenyListSection = "consentDenyListSection"
     /// Per-row Remove button in the never-record list, addressed by ROW INDEX,
@@ -71,6 +73,10 @@ enum A11yID {
 
     /// Menu bar item that opens the Transcriptions window.
     static let allTranscriptionsMenuItem = "allTranscriptionsMenuItem"
+
+    /// The menu's Pause Recording / Resume Recording item: one identifier for
+    /// both labels, since it is one item whose label follows the state.
+    static let pauseResumeRecording = "pauseResumeRecording"
 
     // Transcriptions window. Its rows show meeting titles and participants,
     // so the per-row buttons are addressed by ROW INDEX in the filtered list,
