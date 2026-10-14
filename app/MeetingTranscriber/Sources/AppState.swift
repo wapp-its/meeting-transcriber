@@ -70,6 +70,11 @@ final class AppState {
     /// `WatchingController` attaches it on the same transitions as `channelHealth`.
     let microphone: MicrophoneController
 
+    /// The Mac's sound output: the menu bar's Output entry and the warning
+    /// about a routing that keeps the meeting out of the app track.
+    /// `WatchingController` attaches it on the same transitions as `microphone`.
+    let output: OutputDeviceController
+
     /// Observable state for the live caption overlay. Always present (the
     /// `LiveCaptionsOverlay` window observes this); content is only populated
     /// when live transcription is on AND a recording is active. Owned here (read
@@ -176,10 +181,13 @@ final class AppState {
             warmupQueue: warmupQueue,
         )
         self.microphone = MicrophoneController(settings: settings, notifier: notifier)
+        // Labelled: as a trailing closure it would read as a change handler.
+        // swiftlint:disable:next trailing_closure
+        self.output = OutputDeviceController(notifier: notifier, indicatorEnabled: { [settings] in settings.perChannelIndicatorEnabled })
         self.watching = WatchingController(
             settings: settings, notifier: notifier, pipeline: pipeline,
             channelHealth: channelHealth, permissions: permissions,
-            liveTranscription: liveTranscription, microphone: microphone,
+            liveTranscription: liveTranscription, microphone: microphone, output: output,
         )
 
         #if !APPSTORE

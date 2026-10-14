@@ -18,6 +18,12 @@ extension AppState {
         )
     }
 
+    /// The menu bar's Output entry: the Mac's default output, its outputs, and
+    /// the Teams-routing warning mark.
+    var outputMenuState: OutputMenuState {
+        .resolve(devices: output.devices, current: output.current)
+    }
+
     /// Menu-bar **top-half** red tint: mic channel silent, OR both channels
     /// silent (`recordingSilentActive` paints both halves). Hoisted out of the
     /// menu-bar body for the same type-check-budget reason as
@@ -28,8 +34,10 @@ extension AppState {
     }
 
     /// Menu-bar **bottom-half** red tint: app-audio channel silent, OR both
-    /// channels silent. See `micSilentOverlay`.
+    /// channels silent, OR a recording on the Teams output routing, which the
+    /// tint shows from the moment it is seen rather than after a silence
+    /// window. See `micSilentOverlay`.
     var appSilentOverlay: Bool {
-        channelHealth.appSilentOverlay
+        channelHealth.appSilentOverlay || output.appChannelOverlay
     }
 }
