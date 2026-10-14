@@ -1,0 +1,51 @@
+# Fork-only (wapp-its/meeting-transcriber); never part of a submission to the
+# original (submit.sh blocks .github/workflows/wapp-*).
+#
+# Turns each finished attempt of the original's ci.yml into the status
+# `ci (upstream ci.yml)` on the commit that attempt tested, so no runner has to wait
+# for ci.yml (fork issue #128). A first failure is re-run once while the status stays
+# pending (hosted runners have known flakes); a second failure fails. A run that a
+# newer ci.yml run on the same branch replaced posts nothing. Details and the rules:
+# wapp-fork-ci/fork_ci.py.
+#
+# workflow_run only fires from the workflow file on the default branch (wapp/main).
+# If a finished run left its status pending, post the result by hand:
+#   GH_TOKEN=$(gh auth token --user wapp-its) python3 .github/workflows/wapp-fork-ci/fork_ci.py \
+#     result --repo wapp-its/meeting-transcriber --run-id <id> --attempt <n>
+name: wapp fork CI result
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  actions: write
+  checks: read
+  statuses: write
+  contents: read
+
+# One report at a time per commit, in order: a retry's result must not race the
+# report that started the retry.
+concurrency:
+  group: wapp-fork-ci-result-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  result:
+    name: report ci.yml result
+    if: github.repository == 'wapp-its/meeting-transcriber'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/workflows/wapp-fork-ci
+      - name: Post the status for the attempt that finished
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: >-
+          python3 .github/workflows/wapp-fork-ci/fork_ci.py result
+          --repo "$GITHUB_REPOSITORY" --run-id "$RUN_ID" --attempt "$ATTEMPT"

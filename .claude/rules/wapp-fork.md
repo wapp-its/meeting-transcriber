@@ -74,11 +74,22 @@ untouched by fork work.
   `feat/nemotron-diarization`, `local/diagnostics`). After a fork PR merges, run
   `mt-update` (see below); a new branch only needs its own `branches.txt` line when
   it must be tried before its merge.
-- **CI for fork PRs:** `.github/workflows/wapp-fork-ci.yml` starts the original's
-  `ci.yml` (lint, analyze, tests for both variants) on every PR into `wapp/main`; the
-  run shows on the PR's head commit. A fork PR merges once that run is green and the
-  local review receipts are clean: `gh pr merge --merge --match-head-commit <sha>`.
-  Hosted runners, macOS included, are free for this public repo.
+- **CI for fork PRs runs once, on request, right before the merge** (fork issue #128).
+  A push to a PR starts nothing. Once the head is final (after any catch-up with
+  `gh pr update-branch` and every bookkeeping commit), request it:
+  `GH_TOKEN=$(gh auth token --user wapp-its) gh workflow run wapp-fork-ci.yml -R wapp-its/meeting-transcriber -f pr=<number>`.
+  It sets the status `ci (upstream ci.yml)` on the PR head: `success` at once when
+  only `.flow/`, Markdown or `docs/` changed since a commit whose `ci.yml` run passed,
+  otherwise `pending` until the original's `ci.yml` (lint, analyze, tests for both
+  variants) finishes, about 25 to 60 minutes. A fork PR merges only when that status
+  is `success` on its current head and the local review receipts are clean:
+  `gh pr merge --merge --match-head-commit <sha>`. A head without the status was not
+  tested, so request again after any new push. A status still `pending` after
+  `ci.yml` finished means the result workflow did not fire: post the result by hand
+  with the command at the top of `.github/workflows/wapp-fork-ci-result.yml`. If the
+  request answers HTTP 422 "Actions has been disabled", a local run replaces CI (owner,
+  2026-10-13). Hosted runners, macOS included, are free for this public repo, but
+  GitHub pauses a fork's workflows when they run too much.
 - **Upstream sync:** `.github/workflows/wapp-upstream-sync.yml` runs every 6 h. Clean,
   building upstream changes are merged into `wapp/main` and pushed automatically; a
   conflict, a failed build or a refused push opens one issue labelled `upstream-sync`,
