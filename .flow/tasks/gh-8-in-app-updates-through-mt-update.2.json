@@ -8,7 +8,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-8-in-app-updates-through-mt-update",
   "spec_path": ".flow/tasks/gh-8-in-app-updates-through-mt-update.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "mt-update process runner: bounded check, detached install, liveness",
   "updated_at": "2026-10-14T11:19:50.186751Z"
 }

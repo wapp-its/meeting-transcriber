@@ -375,7 +375,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-8-in-app-updates-through-mt-update.md",
-  "status": "open",
+  "status": "done",
   "title": "In-app updates through mt-update",
   "tracker": {
     "baseHashFlow": null,
@@ -389,5 +389,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/8"
   },
-  "updated_at": "2026-10-14T13:14:52.276700Z"
+  "updated_at": "2026-10-14T15:02:02.821878Z"
 }
