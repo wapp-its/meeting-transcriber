@@ -240,10 +240,8 @@ final class WatchingController {
                 syncEngines?()
                 pipeline.rebuild()
 
-                let detector = makeDetector()
-
                 let loop = WatchLoop(
-                    detector: detector,
+                    detector: makeDetector(),
                     recorderFactory: makeRecorderFactory(),
                     pipelineQueue: pipeline.queue,
                     pollInterval: settings.pollInterval,
@@ -259,6 +257,8 @@ final class WatchingController {
                         .production(parent: pipeline.outputDirectory.resolve())
                     },
                     recordWithoutAskingApps: { [settings] in settings.recordWithoutAskingApps },
+                    speechActivity: { [channelHealth] in channelHealth.speechActivity },
+                    silencePromptAfter: { [settings] in settings.silencePromptAfter },
                     notifier: notifier,
                     denyListStore: ConsentDenyListStore(settings: settings),
                 )
@@ -484,6 +484,8 @@ final class WatchingController {
             recordOnlyDestination: { [pipeline] in
                 .production(parent: pipeline.outputDirectory.resolve())
             },
+            speechActivity: { [channelHealth] in channelHealth.speechActivity },
+            silencePromptAfter: { [settings] in settings.silencePromptAfter },
             notifier: notifier,
         )
         watchLoop = loop

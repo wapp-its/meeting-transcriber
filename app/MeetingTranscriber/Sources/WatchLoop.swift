@@ -81,6 +81,7 @@ class WatchLoop {
     var stopByHandRequestedAt: Date?
     /// Apps kept out of detection until their signal has gone once (`WatchLoop+RedetectionHold.swift`).
     var redetectionHolds = RedetectionHolds()
+    var silencePrompt: SilencePromptRuntime
 
     /// Wall-clock source. Defaults to `Date()`; tests inject a `TestClock`
     /// so timing-sensitive paths become deterministic instead of racing
@@ -156,6 +157,8 @@ class WatchLoop {
             .unscoped(AppPaths.recordingsDir)
         },
         recordWithoutAskingApps: @escaping () -> [String] = { [] },
+        speechActivity: @escaping () -> SpeechActivity? = { nil },
+        silencePromptAfter: @escaping () -> TimeInterval? = { nil },
         notifier: any AppNotifying = SilentNotifier(),
         diagnostics: any DiagnosticsLogging = OSLogDiagnostics(category: "WatchLoop"),
         nowProvider: @escaping () -> Date = Date.init,
@@ -186,6 +189,7 @@ class WatchLoop {
         self.consentPolicy = consentPolicy
         self.denyListStore = denyListStore
         self.recordWithoutAskingApps = recordWithoutAskingApps
+        self.silencePrompt = SilencePromptRuntime(speechActivity: speechActivity, after: silencePromptAfter)
     }
 
     nonisolated static var defaultOutputDir: URL {
@@ -284,6 +288,7 @@ class WatchLoop {
             source: source, micDeviceUID: micDeviceUID(),
             debugLogging: verboseDiagnostics(),
         )
+        silencePrompt.manualStartedAt = nowProvider()
 
         let pid = source.appPID
         activeRecorder = recorder
@@ -302,7 +307,7 @@ class WatchLoop {
         logger.info("Manual recording started for \(appName) (\(target)): \(title, privacy: .private)")
     }
 
-    func stopManualRecording() {
+    func stopManualRecording(cutAt: Date? = nil) {
         guard let recorder = activeRecorder, let info = manualRecordingInfo else { return }
 
         manualRecordingTask?.cancel()
@@ -310,7 +315,7 @@ class WatchLoop {
 
         var failureMessage: String?
         do {
-            let recording = try recorder.stop()
+            let recording = try stopManualCapture(recorder, cutAt: cutAt)
             enqueueRecording(
                 title: info.title, appName: info.appName, recording: recording, trigger: .manual,
             )
@@ -329,6 +334,7 @@ class WatchLoop {
     }
 
     private func cleanupManualRecording() {
+        endSilencePrompt()
         manualRecordingTask?.cancel()
         manualRecordingTask = nil
         activeRecorder = nil
