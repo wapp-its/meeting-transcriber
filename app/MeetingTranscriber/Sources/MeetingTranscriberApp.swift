@@ -157,7 +157,6 @@ struct MeetingTranscriberApp: App {
             onStopManualRecording: appState.canStopRecording ? {
                 appState.watching.stopRecording()
             } : nil,
-            onOpenLastProtocol: openLastProtocol,
             onOpenProtocol: openJobFile,
             onOpenProtocolsFolder: openProtocolsFolder,
             onOpenSettings: {
@@ -421,13 +420,6 @@ struct MeetingTranscriberApp: App {
         appState.pipeline.enqueueFiles(panel.urls)
     }
 
-    private func openLastProtocol() {
-        if let job = appState.pipeline.queue.completedJobs.last,
-           let path = job.protocolPath ?? job.transcriptPath {
-            NSWorkspace.shared.open(path)
-        }
-    }
-
     private func bringWindowToFront(id: String) {
         openWindow(id: id)
         NSApp.activate(ignoringOtherApps: true)
@@ -453,9 +445,10 @@ struct MeetingTranscriberApp: App {
         NSWorkspace.shared.open(protocols)
     }
 
-    /// A job line's Open, inside the output folder's security scope: after a
-    /// restart a history line can be opened before any queue holds that scope,
-    /// which the App Store build needs. A file that is gone opens nothing.
+    /// A job line's Open and "Open Last Protocol", inside the output folder's
+    /// security scope: after a restart a history line can be opened before any
+    /// queue holds that scope, which the App Store build needs. A file that is
+    /// gone opens nothing, through the same check the window's Open makes.
     private func openJobFile(_ url: URL) {
         _ = TranscriptionFileOpener.perform(url, scopeRoot: appState.settings.effectiveOutputDir) { file in
             NSWorkspace.shared.open(file)
@@ -525,10 +518,5 @@ struct MeetingTranscriberApp: App {
         autoWatchSetting: Bool = UserDefaults.standard.bool(forKey: "autoWatch"),
     ) -> Bool {
         commandLineArgs.contains("--auto-watch") || autoWatchSetting
-    }
-
-    /// Returns the protocol path from the last completed job, if any.
-    static func lastCompletedProtocolPath(completedJobs: [PipelineJob]) -> URL? {
-        completedJobs.last?.protocolPath
     }
 }

@@ -88,9 +88,7 @@ final class AccidentalNamingAcceptTests: XCTestCase {
             nil
         }
 
-        func namingStageDidStart(jobID _: UUID) {}
-
-        func namingStageDidEnd() {}
+        func startDiarizing(jobID _: UUID, mode _: DiarizerMode) {}
     }
 
     // MARK: - Helpers

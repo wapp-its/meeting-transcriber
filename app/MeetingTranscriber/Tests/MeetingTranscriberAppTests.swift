@@ -29,42 +29,6 @@ final class MeetingTranscriberAppTests: XCTestCase {
         XCTAssertFalse(result)
     }
 
-    // MARK: - lastCompletedProtocolPath
-
-    func testLastProtocolPathReturnsLatestJob() {
-        let url = URL(fileURLWithPath: "/tmp/protocol.md")
-        var job = PipelineJob(
-            meetingTitle: "Test",
-            appName: "Zoom",
-            mixPath: URL(fileURLWithPath: "/tmp/mix.wav"),
-            appPath: nil,
-            micPath: nil,
-            micDelay: 0,
-        )
-        job.protocolPath = url
-
-        let result = MeetingTranscriberApp.lastCompletedProtocolPath(completedJobs: [job])
-        XCTAssertEqual(result, url)
-    }
-
-    func testLastProtocolPathEmptyJobsReturnsNil() {
-        let result = MeetingTranscriberApp.lastCompletedProtocolPath(completedJobs: [])
-        XCTAssertNil(result)
-    }
-
-    func testLastProtocolPathNoProtocolReturnsNil() {
-        let job = PipelineJob(
-            meetingTitle: "Test",
-            appName: "Zoom",
-            mixPath: URL(fileURLWithPath: "/tmp/mix.wav"),
-            appPath: nil,
-            micPath: nil,
-            micDelay: 0,
-        )
-        let result = MeetingTranscriberApp.lastCompletedProtocolPath(completedJobs: [job])
-        XCTAssertNil(result)
-    }
-
     // MARK: - reportPreviousExit (issue #703)
 
     /// The one outcome that reaches the user: a marker whose process is gone.

@@ -59,13 +59,27 @@ struct StageConfig: Hashable {
     let diarizerMode: String?
 }
 
+/// A job's running stage as its menu line reads it: when the stage started
+/// and, once it can be computed, when it should be ready. Holds no clock of
+/// its own, so the line it renders is the same however much time passes.
+struct StageClock: Equatable {
+    /// The history the expected finish is read from: the run's own engine,
+    /// and for diarization and protocol generation the mode the run diarizes
+    /// with.
+    let config: StageConfig
+    let startedAt: Date
+    /// Nil until the stage has an audio length and a usable speed; once set,
+    /// unchanged until the stage ends.
+    var expectedFinish: Date?
+}
+
 enum StageTimingStats {
     /// Aggregate of one stage over a set of events. Returned keyed by stage, so
     /// the stage itself is the dictionary key, not a field here.
     struct StageAggregate: Equatable {
         let count: Int
         /// Mean wall-clock duration — the intuitive "how long does it usually
-        /// take" number shown in the menu and Settings.
+        /// take" number shown in Settings.
         let avgWallClockSeconds: Double
         /// Average real-time factor = processing-seconds per second of audio,
         /// computed as a ratio of totals (sum of wall-clock over sum of audio)
@@ -107,16 +121,29 @@ enum StageTimingStats {
         }.mapValues(aggregateGroup)
     }
 
-    /// Whether a still-running stage is taking meaningfully longer than its norm
-    /// — for an informational "longer than usual" hint, never an action.
-    /// Requires BOTH a ratio overrun AND an absolute floor, so a tiny stage
-    /// (whose average is a few seconds) doesn't trip on ordinary jitter — the
-    /// same small-denominator guard the build-perf tracker uses.
-    static func isSlowerThanUsual(
-        elapsed: Double, average: Double,
-        marginFactor: Double = 1.5, minOverrunSeconds: Double = 30,
-    ) -> Bool {
-        average > 0 && elapsed > average * marginFactor && (elapsed - average) >= minOverrunSeconds
+    /// Wall-clock seconds per second of audio for each configuration, keyed
+    /// the way `PipelineQueue` stamps its events and looks a running stage up:
+    /// transcription by engine alone, since the diarizer mode plays no part in
+    /// it, diarization and protocol generation by engine and diarizer mode. A
+    /// configuration none of whose events carried an audio length is absent.
+    static func speedByConfig(events: [StageTimingEvent]) -> [StageConfig: Double] {
+        Dictionary(grouping: events) { event in
+            StageConfig(
+                stage: event.stage, engine: event.engine,
+                diarizerMode: event.stage == .transcribing ? nil : event.diarizerMode,
+            )
+        }.compactMapValues { aggregateGroup($0).avgRTF }
+    }
+
+    /// When a stage that started at `start` should be done: its start plus the
+    /// recording's length times the stage's historical speed. Nil without a
+    /// positive audio length and a positive speed, so a missing or broken
+    /// history never yields a time before the start or a zero-length estimate.
+    static func expectedFinish(start: Date, audioSeconds: Double?, secondsPerAudioSecond: Double?) -> Date? {
+        guard let audioSeconds, audioSeconds > 0, audioSeconds.isFinite,
+              let speed = secondsPerAudioSecond, speed > 0, speed.isFinite
+        else { return nil }
+        return start.addingTimeInterval(audioSeconds * speed)
     }
 }
 

@@ -55,7 +55,6 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
             noMic: false,
             manualRecordingPendingOrActive: false,
             onStopManualRecording: recording ? { taps.stops += 1 } : nil,
-            onOpenLastProtocol: {},
             onOpenProtocol: { _ in },
             onOpenProtocolsFolder: {},
             onOpenSettings: {},
