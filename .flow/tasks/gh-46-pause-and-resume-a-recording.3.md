@@ -41,9 +41,58 @@ The app side of the capture pause, below the watch loop: the recorder protocols 
 - [ ] `./scripts/lint.sh` clean with the pinned tools (fetch them into a temp dir first on `PATH` if not installed); `DualSourceRecorder.swift` stays at or under 600 lines; `./scripts/pre-push.sh` (release build) passes.
 
 ## Done summary
-TBD
+The recorder can pause: `RecordingProvider` and `AudioCapturing` gain required `pause()`/`resume()` (plus `RecordingProvider.isPaused`), `DualSourceRecorder` forwards them to the capture session, carries the session's pause positions out on `RecordingResult.pauseOffsets` and refreshes its track files' modification dates every 10 s while paused so the staging recovery never takes a paused recording for a crashed one; `ChannelHealthController.applyTick` holds every check while the recorder reports paused and restarts its windows at the resume. Nothing in the app calls pause yet (task .4).
 
+stage: impl-review - skipped(policy: parallel-wave - conductor owns the review)
+
+Tier: implementer - opus (explicit invocation) (model: claude-opus-5-5)
+
+baseline: red (pre-edit, acceptance filter: 488 tests, 5 WatchLoopE2ETests failures from WhisperKit model loading under the parallel scratch home; environmental, the same 5 fail identically after the change and all 8 pass serially in a fresh home); lint 0 violations
+
+### Acceptance
+
+- `DualSourceRecorderPauseTests` (fake capture session, temp staging dir, 20 ms touch interval): `testPauseAndResumeReachTheSessionOnceEach` (once each, idempotent, `isPaused`), `testNothingReachesTheSessionOutsideARecording` (before start, after stop; stop clears `isPaused`), `testTheSessionsPausePositionsArriveOnTheRecording`, `testAPausedRecordingKeepsItsTracksFresh` (dates advance while paused; not after resume, not after stop), `testAPausedRecordingIsNeitherRecoveredNorCleanedUp` (tracks backdated 60 s, paused; `recoverCrashedRecordings` recovers only a crashed sibling, `cleanupTempFiles` deletes only an orphan sibling, the paused raw temp survives).
+- `ChannelHealthPauseTests` through `applyTick` with `MockRecorder`: `testNothingIsRaisedWhilePausedNorUntilTheWindowHasPassedFromTheResume` (tint, "Recording Appears Silent", "Capture Channel Silent": 20 s lead-in, 300 s pause with nothing raised, nothing in the 30 s after resume, raised exactly at resume + 30 s), `testAPauseClearsTheFlagsAlreadyRaised`, `testAFaultReportedBeforeThePauseIsNotReportedAgain`, `testAGiveUpDuringThePauseIsReportedOnTheFirstTickAfterIt` ("Capture Channel Lost" not posted while paused, posted on the first tick after).
+- Mutation check (measured): seven one-line mutations of the new code each fail their intended test (see evidence).
+- Existing suites: acceptance filter 497 tests, only the 5 pre-existing environmental WatchLoopE2ETests failures (identical file:line set to baseline); those 8 E2E tests pass serially in a fresh scratch home (exit 0). Spec app Quick filter exit 0 (280 tests).
+- `./scripts/lint.sh` exit 0 (0 violations). `./scripts/pre-push.sh` exit 0 (95 s).
+- `DualSourceRecorder.swift`: 681 lines before, 652 after (does not grow; the `file_length` disable stays). The room came from moving `downmixToMono` and `crossCheckAppRate` unchanged into `DualSourceRecorder+BuildRecording.swift` (own commit). `ChannelHealthController.swift`: 429 -> 461.
+- Not run: CI's `swiftlint analyze` (unused_declaration, needs an xcodebuild log). Every new declaration has a reference (`MockRecorder.pauseCallCount`/`resumeCallCount` are written by `pause()`/`resume()`; task .4's tests read them). App Store variant build (`pre-push.sh --with-appstore`) not run; no `#if APPSTORE` code was touched.
+
+### Decisions
+
+1. (1) `DualSourceRecorder.swift` must not grow (conductor fact, spec Line caps). Alternative: let it grow by 12 lines under the existing disable. Switch: the location of `downmixToMono`/`crossCheckAppRate` (now `DualSourceRecorder+BuildRecording.swift`). Test: `DualSourceRecorderTests` (downmix, cross-check) unchanged and green in the acceptance filter.
+2. (6) The recorder's pause state is one stored `pauseState: RecorderPauseState` (track URLs + toucher task) in the main file; `isPaused` is derived as "the toucher is running". Alternative: separate `isPaused` flag beside the task. Switch: `DualSourceRecorder+Pause.swift` `isPaused`. Test: `testPauseAndResumeReachTheSessionOnceEach`, `testNothingReachesTheSessionOutsideARecording`.
+3. (6) The first touch comes one interval after the pause, not at the pause instant (the last write is the pause instant itself). Switch: `touchTracksWhilePaused`. Test: `testAPausedRecordingKeepsItsTracksFresh`.
+4. (6) The toucher also ends when the recorder is deallocated (`[weak self]`), so a recorder dropped without a stop cannot keep a dead recording looking alive; a failed touch logs one warning per pause (no path). Switch: `touchTracksWhilePaused`. Test: none for the deallocation or the warning (not observable without a failing file system).
+5. (6) `buildRecording` copies `pauseOffsets` as reported, also in a degraded single-track fallback (one track unreadable or empty), where the saved timeline's origin can differ from the offsets' origin by the mic delay (typically well under a second). Alternative: shift the offsets there. Switch: `DualSourceRecorder+BuildRecording.swift` return. Test: `testTheSessionsPausePositionsArriveOnTheRecording`.
+6. (1) `MockRecorder.stop()` clears `isPaused`, mirroring the `RecordingProvider` contract that `stop()` ends an open pause. Alternative: leave it to the test. Switch: `MockRecorder.stop()`. Test: none in this task (task .4's end-path tests rely on it).
+7. (6) Channel health: the monitors are reset and the flags cleared once, at the pause edge, rather than on every paused tick (same behaviour, no 10 Hz observable writes). Levels and ages readouts (`micAges`, `micLevelDBFS`, ...) keep updating while paused; `lastSpeechAt` does not (it is cleared at the resume anyway). Switch: `ChannelHealthController.holdWhilePaused`. Test: `ChannelHealthPauseTests`.
+8. (6) `applyTick` returns nil while paused. Switch: `applyTick`. Test: covered implicitly.
+
+### Notes for the conductor
+
+- `RecordingCut.redirect(_:to:)` (outside this task's Touches) rebuilds `RecordingResult` field by field and drops `pauseOffsets`; task .5 or .4 must read the offsets before a redirect or carry them through it. Details in the run notes file `task3-recorder-pause-notes.md`.
+- During a pause `ChannelHealthController.speechActivity` keeps the pre-pause clock and last speech; gh-45's question must be held by the watch loop (task .4).
+- Phase 1b reference read after implementation; `IMPLEMENTER` "opus at xhigh" is the session model, so the phase was inert either way and no `implement` stage line applies.
+- Follow-ups (not filed, outside this task's surface): none beyond the two notes above.
+
+### Review and integration (conductor)
+
+stage: impl-review - ran [codex gpt-6-astra xhigh; round 1: three draws, correctness SHIP, contracts and integration NEEDS_WORK with two R7 findings, merged to 2, validator kept 2; fix pass by an Opus xhigh worker; round 2: single re-review SHIP, both prior findings fixed]
+
+Integrated onto feat/gh-46-pause-recording as b9252111, b680700e, 38d24390 (implementation) and b53fca92, 79f6a060 (review fixes), base 428b358f. Focused integrated verify at 79f6a060: app filter 685 tests with 5 environmental WatchLoopE2E failures (fresh scratch home without a model) that pass 8/8 in a serial rerun with a complete model; lint exit 0; pre-push exit 0.
+
+Review findings fixed:
+1. P2 (R7): a pause and resume between two 100 ms polls never set heldForPause. Fix: RecordingProvider.pausesBegun (required, no default) counted by DualSourceRecorder; ChannelHealthController.holdWhilePaused treats a changed count as both edges (spec A12).
+2. P2 (R7): a watchdog rebuilds-exhausted give-up during a pause was reported on the first resumed tick. Fix: after a resume the flag reaches the fault monitor only after a whole window of post-resume silence; latches and the terminal give-up report unchanged.
+
+Conductor decisions on the worker's report: the acceptance item 'DualSourceRecorder.swift stays at or under 600 lines' read as no growth (681 before, 652 after, file_length disable kept; the spec's Line-caps bullet records why) (rule 6); decisions 1-8 of the worker and the fix pass's counter-on-the-recorder choice (rule 5, recorded as A12) accepted.
+
+Notes carried to tasks .4/.5: RecordingCut.redirect(_:to:) drops pauseOffsets (read them before a redirect, task .5); ChannelHealthController.speechActivity keeps its pre-pause clock, so gh-45's silence question is held by the watch loop (task .4).
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: b92521117aae61035eeb329097159b8ca4dcb00e, b680700eb73e4fa5f09ca08a7842a721dfc00619, 38d243902ffb132251d024415530c405c8c83235, b53fca92aaeef27e0db8a657a63c43e99ddbabec, 79f6a0608bd1db93b3152e232d08f4c77a90d360
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/tmp/gh46-home-c3 swift test --parallel --filter 'DualSourceRecorder|ChannelHealth|ChannelFault|SilentRecording|WatchLoop|WatchingController|BuildRecording|RecordingPause|RecordControl|RPCRecordStatus|MenuBar|EmptyTrack|RecordingSidecar' (integrated head 79f6a060: 685 tests, 5 failed, all WatchLoopE2ETests under a fresh scratch home without a WhisperKit model), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/tmp/gh46-home-t2b swift test --filter 'WatchLoopE2ETests' (flaky-gate rerun, serial, scratch home with a complete model: exit 0, 8 tests, 0 failures), ./scripts/lint.sh with pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1 (integrated head 79f6a060: exit 0, 0 violations in 796 files), ./scripts/pre-push.sh (integrated head 79f6a060: exit 0, release build parity), worker at lane head 1202eeb1 (same tree as 38d24390): acceptance filter 497 tests with the same 5 environmental E2E failures as its pre-edit baseline; WatchLoopE2ETests serial fresh home 8/8; spec app Quick filter 280 tests exit 0; lint exit 0; pre-push exit 0; 7 single-line mutations each failed their intended test, fix pass at lane head fdbdf550 (same tree as 79f6a060): focused filter 446 tests exit 0; lint exit 0; pre-push exit 0; new tests red before the fix for the stated reason, review: codex gpt-6-astra xhigh, round 1 three draws (correctness SHIP, contracts NEEDS_WORK, integration NEEDS_WORK) merged to 2 findings, validator kept 2; round 2 single re-review SHIP (receipt /tmp/impl-review-receipt-d1afe3212e3b-gh-46-pause-and-resume-a-recording.3.json), cd app/MeetingTranscriber && CFFIXED_USER_HOME=<scratch> swift test --parallel --filter 'DualSourceRecorder|ChannelHealth|ChannelFault|SilentRecording|WatchLoop|WatchingController|BuildRecording', ./scripts/lint.sh, ./scripts/pre-push.sh
 - PRs:
