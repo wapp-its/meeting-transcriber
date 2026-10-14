@@ -2,11 +2,11 @@
 
 ## Conversation Evidence
 
-> user (turn 1): "Oh and its now automatically recording every meeting automatically. This should be an extra setting, but better default would be if it asks first if it should record, isnt it?"
+> user (turn 1, paraphrased): "The app now records every detected meeting automatically. That should be a setting, and the better default is to ask first whether to record."
 > user (turn 2, selected): "A: Ask first, per-app switch (Recommended)"
 > issue #3 (owner, Wunsch): "Option „Erkannte Meetings ohne Rückfrage aufnehmen", am besten je App einstellbar (z. B. Teams: immer, Browser: fragen) — als Gegenstück zur bestehenden Sperrliste consentDeniedApps."
 > issue #3 (owner, Hinweis): "Die Rückfrage erinnert auch daran, dass alle Beteiligten mit der Aufnahme einverstanden sein müssen (in der Schweiz strafrechtlich relevant, Art. 179bis ff. StGB). Beim automatischen Start liegt das ganz bei der Person, die aufnimmt — in der Einstellung kurz darauf hinweisen."
-> user (turn 3): "The not / swiss law - please add it as extra feature in own branch because its very specific and will never push upstream. And show it on the request dialog maybe"
+> user (turn 3, paraphrased): "Build the note on Swiss law as a separate feature on its own fork-only branch, because it is specific to Switzerland and not meant for the original. Maybe also show it in the recording prompt."
 > issue #3 (owner, Abnahme): "Option für Teams eingeschaltet → Teams-Meeting beginnt → Aufnahme startet ohne Mitteilung. Für andere Apps unverändert mit Rückfrage."
 
 ## Goal & Context

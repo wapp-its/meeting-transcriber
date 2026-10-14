@@ -1,0 +1,165 @@
+{
+  "branch_name": "feat/gh-124-mic-probe-retry",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-14T09:48:41.418925Z",
+  "created_at": "2026-10-14T08:52:41.565455Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-124-retry-the-microphone-check-before",
+  "impl_review_rounds": {
+    "gh-124-retry-the-microphone-check-before.1": 0
+  },
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-14T09:03:19.794127Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "5c9ea16ff83539d44f2eddd1f7c480ce4625e5d4ed32fdee1583988bb046be8c",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-b768acb2744f7748ed6bb1ed75445d5a",
+            "classification": "introduced",
+            "findingId": "finding-b768acb2744f7748ed6bb1ed75445d5a",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "445733963c6584201cd138f0fa6a3725c2cbad6b",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 224116,
+      "output_sha256": "43e6b2794748c6814c061ee8913f12a0ff2cc484c094d2cda5d190fde5c9c3f4",
+      "reservation_id": "558bf8361d174308bb8d3196cbd5f695",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T09:03:19.759646Z",
+      "tool_calls": 19,
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "fcca0609b6a5c3240e5e82202da3c27963cc831d8ae333f01bf09db6f364377a",
+      "backend": "codex",
+      "base_sha": "bf27a994e5e6289190e54d7c86a09da0c68cea2b",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "7e3e1bbe75743825408ee71f02e85b9fd5a542ac",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "73247374d8c9450096884e0b599f0398",
+      "round_consumed": true,
+      "scope": "impl:gh-124-retry-the-microphone-check-before.1",
+      "superseded_by": null,
+      "task": "gh-124-retry-the-microphone-check-before.1",
+      "timestamp": "2026-10-14T09:43:08.510806Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "45accfb207f1932664ae95cfbedda0a2ea1b75c3dda68d75dc3d0d2c7cdf9430",
+      "backend": "codex",
+      "base_sha": "75d0a2181d05142065b3416f394e66208f1bc7ed",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "dccf7da73fe9bd62c3fc7bf76794acea4709646e",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 241748,
+      "output_sha256": "ff9e3ffc7f9b8e9b82dbbe9da49e81b017ab0067811e1fcb5d49786230c2a9dc",
+      "reservation_id": "b0f2751788dc4ba59beb3051fd103664",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T09:48:41.304595Z",
+      "tool_calls": 14,
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "impl:gh-124-retry-the-microphone-check-before.1": 1,
+    "plan": 1,
+    "plan#completion": 1
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-124-retry-the-microphone-check-before.1": 0,
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-124-retry-the-microphone-check-before.md",
+  "status": "done",
+  "title": "Retry the microphone check before calling it broken",
+  "tracker": {
+    "baseHashFlow": "ca659b362d4b8617a508c5fa2b1e997631c4654b0079a3457719ff0a67fcb9fe",
+    "baseHashTracker": "5f2581339e0a4086da5360e9d502a83746e32089991cd22a99b17790be29d376",
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABXFD3QA",
+    "identifier": "#124",
+    "lastSyncedAt": "2026-10-14T08:52:42.788823Z",
+    "linkState": "linked",
+    "mergeBaseFlow": "# Retry the microphone check before calling it broken\n\n## Conversation Evidence\n\n> user (turn 1): \"I got several notifications in my notification pane. Especially the microphone Permission problem seems to be a false message\"\n> user (turn 1, screenshot): two \"Permission Problem\" notices at 06:00 and 08:03, text \"Microphone looks enabled but isn't working \u2014 toggle it off and on in System Settings\"\n> user (selected): \"A \u2014 mic + menu now (Recommended)\" (fix the false microphone notice now)\n> issue #124 (filed from the diagnosis, 2026-10-14): \"Retry the probe after a short delay when the engine start fails, and report broken only when the retry fails too\" \u00b7 \"Add a test with an injected probe that fails once and then works, and check that no notification is posted\"\n> diagnosis 2026-10-14 (system log, both launches, about 3 s after start): \"HALC_ProxyIOContext::_StartIO(): Start failed - StartAndWaitForState returned error 35\", then the audio engine's start failed with error 35, then \"Permission health check failed: microphone=broken\" and the notification. Every later check in the same run (6 checks, 09:02 to 09:23) reported the microphone healthy, and the 09:01 Teams call recorded a normal microphone track.\n\n## Goal & Context\n\nThe permission health check tells the user to toggle the microphone permission when the system says the permission is granted but a live probe cannot get audio from the microphone. On 2026-10-14 it raised that notice twice, each time right after the app restarted for an update, while the microphone worked. [paraphrase] The cause was a transient refusal from the audio system (\"try again\", error 35) when the probe started its audio engine about 3 s after launch; the check counts any probe failure as broken, retries nothing, and the per-process notification dedup does not survive a restart, so every launch can raise it again. [paraphrase]\n\nA false notice is worse than none: it sends the user to System Settings for a toggle that changes nothing, and it teaches them to ignore the notice that matters when the grant really is broken. [inferred]\n\n## Architecture & Data Models\n\n- The microphone verdict is computed per check: system authorization first, then the live probe when authorization is granted. [paraphrase] The probe has several failure kinds today (no input device, an unusable input format, the tap failing to install, the engine failing to start, no buffer before the probe's timeout); all of them map to the same \"broken\" outcome. [paraphrase]\n- The change owns one thing: the probe outcome that the verdict is built from. It becomes \"first attempt, and when that fails, one more attempt after a short pause\"; the verdict, the notification and its dedup stay as they are. [inferred]\n- The probe's waiting already runs on injectable time (now and sleep are injected in tests); the retry pause uses the same seam so tests run on a virtual clock. [paraphrase]\n\n## Edge Cases & Constraints\n\n- The retry applies to every caller of the check (launch, app activation, the check before a manual recording, the automation state read), because they all share the probe. [inferred]\n- The pause between the attempts is short (about 2 s) [inferred], so the worst case of a check stays a few seconds; a caller waiting on it (the check before a manual recording) waits that much longer only when the first attempt failed.\n- Waiting must not block the main thread. [inferred]\n- A persistent failure (a really broken grant, no input device at all) still ends as broken after the retry and posts the notice exactly as today. [inferred]\n- The permission-health end-to-end lane (granted microphone on the runner, expects \"healthy\") keeps passing. [inferred]\n\n## Acceptance Criteria\n\n- **R1:** When the first microphone probe fails and the retry after the pause succeeds, the check reports the microphone as healthy and posts no \"Permission Problem\" notification. Errors: holds for every probe failure kind (no input device, unusable format, tap install failure, engine start failure, no buffer before the timeout). [paraphrase]\n- **R2:** When both the first probe and the retry fail, the check reports the microphone as broken and the existing notification is posted once, as today (no error surface beyond today's notification and dedup). [inferred]\n- **R3:** A probe that succeeds on its first attempt is not retried, so a healthy check takes no longer than today (no error surface beyond R1). [inferred]\n- **R4:** Each failed attempt writes its failure kind to the unified log (not only to the per-process debug file, which the next process truncates), so a later report can tell a transient failure that recovered from a persistent one. Errors: no error surface beyond a log line. [inferred]\n\n## Boundaries\n\n- No change to the Screen Recording or Accessibility checks. [inferred]\n- No persistent dedup of the notification across launches. [inferred]\n- No change to the notification's text or to when the check runs. [inferred]\n\n## Decision Context\n\n- One retry after a short pause was chosen over treating an engine-start failure as healthy (the way the Accessibility check treats an inconclusive answer): a retry keeps detecting a grant that is really broken, while a blanket \"healthy\" for one failure kind would hide it. [inferred]\n- The retry sits in the probe outcome, not in the launch timing (for example delaying the first check): a delay would only move the race, and activation and pre-recording checks can meet the same transient. [inferred]\n\n## Quick commands\n\n```bash\ncd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh124-home swift test --parallel --filter 'PermissionHealthCheckTests|PermissionsControllerTests|PermissionsControllerNotificationTests' > /private/tmp/mt-gh124-focused.log 2>&1; rc=$?; tail -5 /private/tmp/mt-gh124-focused.log; test \"$rc\" = 0\n```\n\n<!-- Source: 15% user / 35% [paraphrase] / 50% [inferred] -->\n",
+    "mergeBaseTracker": "## BACKGROUND\n\nAfter an app start the permission check sometimes reports the microphone as broken. It then posts \"Microphone looks enabled but isn't working - toggle it off and on in System Settings\". The microphone works. On 2026-10-14 it happened after both mt-update restarts (06:00 and 08:03), and the Teams call at 09:01 recorded a normal microphone track.\n\n## NOTES\n\n- The system log shows the same cause both times, about 3 s after launch: `HALC_ProxyIOContext::_StartIO(): Start failed - StartAndWaitForState returned error 35`, then `AVAudioEngineGraph ... kAUStartIO ... error 35`. Error 35 is \"resource temporarily unavailable\", so the audio system was busy and a second try would probably work.\n- `probeMicrophone()` in `PermissionHealthCheck.swift` returns false when `engine.start()` throws, and `checkMicrophone` turns that into `.broken`. There is no retry. The startup check runs right away from the `.task` in `MeetingTranscriberApp`.\n- All later checks in the same run passed (6 checks between 09:02 and 09:23).\n- The notification dedup in `PermissionsController` only lives for one process, so every launch can notify again.\n- The Accessibility probe already treats an inconclusive answer as healthy. The microphone probe has nothing like it.\n- `/tmp/mt-permission.log` would have the reason line, but every process that writes it truncates it (also `xctest` runs), so the launch lines were gone.\n\n## TASKS\n\n- [ ] Retry the probe after a short delay when the engine start fails, and report broken only when the retry fails too\n- [ ] Add a test with an injected probe that fails once and then works, and check that no notification is posted",
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/124"
+  },
+  "updated_at": "2026-10-14T09:50:11.519991Z"
+}
