@@ -6,7 +6,7 @@
   "depends_on": [],
   "id": "gh-58-notices-for-the-remaining-automatic.1",
   "priority": null,
-  "review": "codex:gpt-5.6-sol:xhigh",
+  "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-58-notices-for-the-remaining-automatic",
   "spec_path": ".flow/tasks/gh-58-notices-for-the-remaining-automatic.1.md",
   "status": "todo",
