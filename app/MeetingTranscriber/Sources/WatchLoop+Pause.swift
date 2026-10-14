@@ -75,9 +75,8 @@ extension WatchLoop {
     /// capture reported another number of positions than there were pauses,
     /// the positions are estimated from the wall clock and a warning says so.
     ///
-    /// Taken straight after the recorder stops, before any cut: a cut that
-    /// cannot put a track back returns a result without the capture's
-    /// positions.
+    /// Taken straight after the recorder stops, before any cut, which places
+    /// its cut point with them and clips them there (`cutBack`).
     func takeRecordingPauses(endingAt stop: Date, capturedOffsets: [TimeInterval]) -> [RecordingPause] {
         guard let record = recordingPauses else { return [] }
         recordingPauses = nil

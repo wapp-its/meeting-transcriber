@@ -465,10 +465,10 @@ class WatchLoop {
         // Stop recording
         if cutAt == nil { clearStoredCut(of: recorder) }
         let stoppedAt = nowProvider()
-        var recording = try recorder.stop()
-        let pauses = takeRecordingPauses(endingAt: stoppedAt, capturedOffsets: recording.pauseOffsets)
+        let recording = try recorder.stop()
+        var stopped = (recording: recording, pauses: takeRecordingPauses(endingAt: stoppedAt, capturedOffsets: recording.pauseOffsets))
         if let cutAt {
-            recording = cutBack(recording, to: cutAt, startedAt: recordingStartedAt, stoppedAt: stoppedAt, recorder: recorder)
+            stopped = cutBack(stopped, to: cutAt, startedAt: recordingStartedAt, stoppedAt: stoppedAt, recorder: recorder)
             clearStoredCut(of: recorder)
         }
 
@@ -476,9 +476,9 @@ class WatchLoop {
         enqueueRecording(
             title: title,
             appName: meeting.pattern.appName,
-            recording: recording,
+            recording: stopped.recording,
             trigger: .auto,
-            pauses: pauses,
+            pauses: stopped.pauses,
             participants: participants,
         )
     }

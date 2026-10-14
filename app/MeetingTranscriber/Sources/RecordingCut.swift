@@ -49,10 +49,20 @@ enum RecordingCut {
     /// the mix short, which would cut into the meeting too. The later point
     /// wins: it never cuts meeting audio, and the two agree on an ordinary
     /// recording.
-    static func keptSeconds(cutAt: Date, startedAt: Date, stoppedAt: Date, mixDuration: TimeInterval?) -> TimeInterval {
-        let fromStart = cutAt.timeIntervalSince(startedAt)
+    ///
+    /// Paused time was never recorded, so each estimate leaves out the paused
+    /// time inside the interval it spans: before the cut for the one from the
+    /// start, between the cut and the stop for the one from the end. A cut
+    /// inside a pause therefore lands where that pause sits on the tracks.
+    /// Without pauses (and in recovery's cut, which has no pause list) both
+    /// are the wall-clock estimates.
+    static func keptSeconds(
+        cutAt: Date, startedAt: Date, stoppedAt: Date, mixDuration: TimeInterval?, pauses: [RecordingPause] = [],
+    ) -> TimeInterval {
+        let fromStart = cutAt.timeIntervalSince(startedAt) - pauses.pausedDuration(from: startedAt, to: cutAt)
         guard let mixDuration else { return fromStart }
-        return max(fromStart, mixDuration - stoppedAt.timeIntervalSince(cutAt))
+        let recordedAfterCut = stoppedAt.timeIntervalSince(cutAt) - pauses.pausedDuration(from: cutAt, to: stoppedAt)
+        return max(fromStart, mixDuration - recordedAfterCut)
     }
 
     /// The length of the audio at `url`, nil when it cannot be read.
@@ -70,6 +80,7 @@ enum RecordingCut {
             micDelay: recording.micDelay,
             recordingStartDate: recording.recordingStartDate,
             levelBalanced: recording.levelBalanced,
+            pauseOffsets: recording.pauseOffsets,
         )
     }
 

@@ -106,17 +106,16 @@ extension WatchLoop {
     /// is placed from when the loop saw the capture running, as a detected
     /// meeting's is; a stored cut record exists only for the meeting-end
     /// question, so `cutBack` finds none to update here. The recording's
-    /// pauses come with it, taken before the cut (`takeRecordingPauses`).
-    func stopManualCapture(
-        _ recorder: any RecordingProvider, cutAt: Date?,
-    ) throws -> (recording: RecordingResult, pauses: [RecordingPause]) {
+    /// pauses come with it, taken before the cut (`takeRecordingPauses`),
+    /// which places its cut point with them and clips them there.
+    func stopManualCapture(_ recorder: any RecordingProvider, cutAt: Date?) throws -> StoppedRecording {
         let startedAt = silencePrompt.manualStartedAt
         endSilencePrompt()
         let stoppedAt = nowProvider()
         let recording = try recorder.stop()
-        let pauses = takeRecordingPauses(endingAt: stoppedAt, capturedOffsets: recording.pauseOffsets)
-        guard let cutAt, let startedAt else { return (recording, pauses) }
-        return (cutBack(recording, to: cutAt, startedAt: startedAt, stoppedAt: stoppedAt, recorder: recorder), pauses)
+        let stopped = (recording: recording, pauses: takeRecordingPauses(endingAt: stoppedAt, capturedOffsets: recording.pauseOffsets))
+        guard let cutAt, let startedAt else { return stopped }
+        return cutBack(stopped, to: cutAt, startedAt: startedAt, stoppedAt: stoppedAt, recorder: recorder)
     }
 
     /// Post the question under a fresh id, so an answer to an earlier one can
