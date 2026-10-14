@@ -164,8 +164,13 @@ extension RecordingProvider {
 
     func selectMicrophone(deviceUID _: String?) {}
 
+    // Test recorders use these two no-op defaults. `swiftlint analyze` reports a
+    // default as unused when its signature differs from the throwing requirement,
+    // and adding `throws` here trips `unneeded_throws_rethrows` instead.
+    // swiftlint:disable:next unused_declaration
     func storePendingCut(cutAt _: Date, deadline _: Date, startedAt _: Date) {}
 
+    // swiftlint:disable:next unused_declaration
     func recordPendingCutResolution(keptSeconds _: TimeInterval, captureEndedAt _: Date) {}
 
     func clearPendingCut() -> PendingRecordingCut.RemoveOutcome {

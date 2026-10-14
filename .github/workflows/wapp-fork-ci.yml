@@ -50,6 +50,9 @@ jobs:
       - name: Judge the PR head, then start ci.yml or report the skip
         env:
           GH_TOKEN: ${{ github.token }}
+          # ci.yml is started with this personal token: GitHub starts no workflow for
+          # a run the workflow token started, so wapp-fork-ci-result.yml would not fire.
+          DISPATCH_TOKEN: ${{ secrets.WAPP_SYNC_TOKEN }}
           PR: ${{ inputs.pr }}
         run: >-
           python3 .github/workflows/wapp-fork-ci/fork_ci.py request
