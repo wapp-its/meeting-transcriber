@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-9-hf-model-search",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-14T00:22:52.440108Z",
   "created_at": "2026-10-06T20:21:03.816784Z",
   "default_impl": null,
   "default_review": null,
@@ -456,6 +456,42 @@
       "task": "gh-9-find-and-preload-models-from-hugging.4",
       "timestamp": "2026-10-14T00:10:39.638257Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "884a44f4237596e4af6c37daa419786a7154e04dff0f4d0ab6ee8d9460d0f1ea",
+      "backend": "codex",
+      "base_sha": "557170da4da7da15941c5d62abf80fe43ead6af4",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "9d1397d06df55c91b2decf7993647b49ae4349c1",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 562075,
+      "output_sha256": "65b8853b52d39ad4adab8b16fccf287dfa665ed24f34a7c017081d1f64805632",
+      "reservation_id": "48b9a9d9ba2b4229b4f85f231cd57cf3",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T00:22:52.396738Z",
+      "tool_calls": 35,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -464,12 +500,13 @@
     "impl:gh-9-find-and-preload-models-from-hugging.3": 1,
     "impl:gh-9-find-and-preload-models-from-hugging.4": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-9-find-and-preload-models-from-hugging.1": 0,
     "impl:gh-9-find-and-preload-models-from-hugging.2": 0,
     "impl:gh-9-find-and-preload-models-from-hugging.3": 0,
@@ -491,5 +528,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/9"
   },
-  "updated_at": "2026-10-14T00:10:39.659085Z"
+  "updated_at": "2026-10-14T00:22:52.445317Z"
 }
