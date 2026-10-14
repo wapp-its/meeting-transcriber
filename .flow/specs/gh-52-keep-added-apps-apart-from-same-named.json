@@ -1,7 +1,7 @@
 {
   "branch_name": "fix/gh-52-added-app-identity",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-10-13T15:52:53.735007Z",
+  "completion_reviewed_at": "2026-10-14T11:46:13.415141Z",
   "created_at": "2026-10-06T20:20:31.727861Z",
   "default_impl": null,
   "default_review": null,
@@ -429,6 +429,41 @@
       "task": "gh-52-keep-added-apps-apart-from-same-named.1",
       "timestamp": "2026-10-14T11:41:53.182139Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "f1e8b7f48bcfd370db1ed0f5947033d15b63d8bc0e5f5e719c676be4ac885a7b",
+      "backend": "codex",
+      "base_sha": "8def642b12039a7014770a156c2d5c60ba7438bf",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "c46f84029048adafe519ee80259e5d738644d920",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 7698,
+      "output_sha256": "e07b4ce12806ee98edce2e35b5c404882785b7688182f6f70ac43d4404f0a652",
+      "reservation_id": "fc1fde69792d4647809b9e0f83e63ca7",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T11:46:13.395605Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -436,7 +471,7 @@
     "impl:gh-52-keep-added-apps-apart-from-same-named.2": 1,
     "impl:gh-52-keep-added-apps-apart-from-same-named.3": 1,
     "plan": 1,
-    "plan#completion": 1
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -462,5 +497,5 @@
     "mergeBaseTracker": "## Problem\n\nMit \u201eAdd App\u2026\u201c (aus dem Original, eingemischt mit #47) l\u00e4sst sich jede App \u00fcberwachen. Die Erkennung kennt eine \u00fcberwachte App aber nur unter ihrem **Anzeigenamen**. Haben zwei verschiedene Apps denselben Namen, etwa eine hinzugef\u00fcgte App \u201eZoom\u201c neben dem eingebauten Zoom, teilen sie sich eine Identit\u00e4t:\n\n- **\u201eNever for this app\u201c** f\u00fcr die eine sperrt auch die andere (gespeichert wird der Name, `AppSettings.consentDeniedApps`).\n- Z\u00e4hler, Abk\u00fchlzeit und \u201eMeeting l\u00e4uft noch\u201c (`MicInputDetector.isMeetingActive`) gelten f\u00fcr beide: Aktivit\u00e4t in der einen kann die Aufnahme der anderen am Laufen halten.\n\n**Nicht betroffen:** die R\u00fcckfrage selbst. Seit #47 fragt eine hinzugef\u00fcgte App immer, unter jedem Namen; keine App nimmt ohne Zustimmung auf. Beide Fehler gehen in die vorsichtige Richtung (mehr gesperrt, Aufnahme etwas l\u00e4nger).\n\nGefunden von der Codex-Pr\u00fcfung zu #47 (zweite Runde).\n\n## Wann es wichtig wird\n\nWenn jemand eine App hinzuf\u00fcgt, deren Anzeigename einer eingebauten oder einer anderen hinzugef\u00fcgten App gleicht. \u201eAdd App\u2026\u201c lehnt Apps mit gleicher Bundle-ID oder gleichem Programmnamen schon ab; \u00fcbrig bleiben verschiedene Apps mit gleichem Anzeigenamen.\n\n## L\u00f6sungsidee\n\nHinzugef\u00fcgte Apps intern \u00fcber ihre Bundle-ID f\u00fchren (z. B. `custom:<bundleID>` als Schl\u00fcssel f\u00fcr Z\u00e4hler, Abk\u00fchlzeit, Sperrliste), den Anzeigenamen nur f\u00fcr die Oberfl\u00e4che. Ber\u00fchrt Code, den das Original oft \u00e4ndert (`MicInputDetector`, Sperrliste) \u2013 am besten zuerst dem Original vorschlagen, da der Fehler dort genauso besteht.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/52"
   },
-  "updated_at": "2026-10-14T11:41:53.196832Z"
+  "updated_at": "2026-10-14T11:46:13.416226Z"
 }
