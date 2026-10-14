@@ -28,6 +28,11 @@ extension MicCaptureHandler {
         let frameCount = Int(buffer.frameLength)
         let rate = buffer.format.sampleRate
         let kept = timeline.keptFrameRanges(bufferStartSeconds: startSeconds, frameCount: frameCount, sampleRate: rate)
+        guard !kept.isEmpty else {
+            // Nothing to write, but a first buffer still starts the track's timeline.
+            timelineAnchor.anchorIfUnset(hostSeconds: timeline.recordingSeconds(atHostSeconds: startSeconds))
+            return
+        }
         guard kept.first != 0 ..< frameCount else {
             write(
                 buffer, recordingSeconds: timeline.recordingSeconds(atHostSeconds: startSeconds),

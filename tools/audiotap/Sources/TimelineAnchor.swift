@@ -37,6 +37,15 @@ struct TimelineAnchor {
         self.rate = rate
     }
 
+    /// Anchor at `hostSeconds` with nothing written, unless already anchored.
+    /// For a buffer that writes nothing because every frame of it lies inside
+    /// a pause: the track's timeline still starts at its first buffer, as its
+    /// first-frame time says, so a gap between the resume and its next buffer
+    /// (a device restart) is filled rather than lost.
+    mutating func anchorIfUnset(hostSeconds: Double) {
+        if anchorHostSeconds == nil { anchorHostSeconds = hostSeconds }
+    }
+
     /// Silent frames to insert before a buffer that presents at `hostSeconds`
     /// carrying `frameCount` frames, to keep the written stream aligned to
     /// wall-clock. The first call sets the anchor and inserts nothing. Never

@@ -84,6 +84,11 @@ public extension AppAudioCapture {
         let kept = timeline.keptFrameRanges(
             bufferStartSeconds: startSeconds, frameCount: frameCount, sampleRate: Double(inputRate),
         )
+        guard !kept.isEmpty else {
+            // Nothing to write, but a first buffer still starts the track's timeline.
+            timelineAnchor.anchorIfUnset(hostSeconds: timeline.recordingSeconds(atHostSeconds: startSeconds))
+            return
+        }
         guard kept.first != 0 ..< frameCount else {
             writeKeptFrames(
                 fd: fd, interleaved: interleaved, inputRate: inputRate, inputChannels: inputChannels,

@@ -57,6 +57,81 @@ final class CapturePauseAlignmentTests: XCTestCase {
         }
     }
 
+    // MARK: - A track first heard inside a pause
+
+    /// Markers for `testATrackFirstHeardInsideAPauseKeepsTheGapAfterTheResume`,
+    /// all after the second buffer each track delivers after its gap, so none
+    /// sits in the buffer a converter starting there primes on.
+    private static let lateMarkers = (0 ..< 7).map { 3.25 + 0.1 * Double($0) }
+
+    /// Both tracks start inside a pause from 0 s to 2 s. In the reference run
+    /// both deliver throughout; in the other, one track delivers its first
+    /// buffer and then nothing until about 3 s, as across a device restart.
+    /// That first buffer writes nothing, but the track's file still starts
+    /// there: the unpaused second between the resume and its next buffer is
+    /// filled with silence, so every later marker sits where the reference
+    /// puts it, on both tracks, and the two stay aligned.
+    func testATrackFirstHeardInsideAPauseKeepsTheGapAfterTheResume() throws {
+        let reference = try runFromInsideAPause(gapIn: nil)
+        for gapTrack in ["app", "microphone"] {
+            let gapped = try runFromInsideAPause(gapIn: gapTrack)
+            for (track, whole, cut) in [("app", reference.app, gapped.app), ("microphone", reference.mic, gapped.mic)] {
+                let label = "gap in the \(gapTrack) track, \(track)"
+                let expected = Self.markerPositions(in: whole.file)
+                let actual = Self.markerPositions(in: cut.file)
+                XCTAssertEqual(expected.count, Self.lateMarkers.count, "\(label): every marker in the reference")
+                XCTAssertEqual(actual.count, Self.lateMarkers.count, "\(label): every marker written")
+                for (marker, (position, unbroken)) in zip(Self.lateMarkers, zip(actual, expected)) {
+                    XCTAssertEqual(position, unbroken, accuracy: Self.oneFrame, "\(label): marker at \(marker) s")
+                }
+                XCTAssertEqual(
+                    Double(cut.file.count), Double(whole.file.count), accuracy: Self.oneFrame, "\(label): file length",
+                )
+                let worst = zip(actual, expected).map { abs($0 - $1) }.max() ?? 0
+                print("first heard inside a pause, \(label): worst marker \(worst) frames, file \(cut.file.count - whole.file.count)")
+            }
+        }
+    }
+
+    /// The pause runs from 0 s to 2 s; both tracks deliver up to 4 s, except
+    /// the one named by `gapTrack`, which delivers its first buffer and then
+    /// only from 3 s on.
+    private func runFromInsideAPause(gapIn gapTrack: String?) throws -> Outputs {
+        let gate = CapturePauseGate()
+        gate.pause(atHostSeconds: Self.base)
+        let app = AppPauseTrackDriver(gate: gate)
+        let mic = try MicPauseTrackDriver(gate: gate)
+        let appBuffers = (0 ..< 400).map { (driver: app as any PauseTrackDriver, index: $0, start: Double($0) * 0.01, frames: 480) }
+        let micBuffers = (0 ..< 48).map { index in
+            (driver: mic as any PauseTrackDriver, index: index, start: 0.003 + Double(index * 3750) / 44100, frames: 3750)
+        }
+        let schedule = (appBuffers + micBuffers)
+            .filter { $0.driver.name != gapTrack || $0.index == 0 || $0.start >= 3 }
+            .map { ($0.driver, $0.start, $0.frames, end: $0.start + Double($0.frames) / $0.driver.inputRate) }
+            .sorted { $0.end < $1.end }
+
+        var resumed = false
+        for (driver, start, frames, end) in schedule {
+            if !resumed, end >= 2 {
+                gate.resume(atHostSeconds: Self.base + 2)
+                resumed = true
+            }
+            let samples = Self.pulses(at: Self.lateMarkers, start: start, frames: frames, rate: driver.inputRate)
+            try driver.deliver(samples, atHostSeconds: Self.base + start)
+        }
+        return try Outputs(app: app.finish(), mic: mic.finish())
+    }
+
+    /// Silence with a single-sample pulse at each of `markers` in the buffer.
+    private static func pulses(at markers: [Double], start: Double, frames: Int, rate: Double) -> [Float] {
+        var samples = [Float](repeating: 0, count: frames)
+        for marker in markers {
+            let index = Int(((marker - start) * rate).rounded())
+            if samples.indices.contains(index) { samples[index] = 0.9 }
+        }
+        return samples
+    }
+
     // MARK: - Driving both tracks through one gate
 
     private struct Outputs {
