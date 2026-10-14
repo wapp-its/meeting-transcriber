@@ -38,7 +38,7 @@ Verification (measured):
 
 Defect route:
 - prior fixes: none. git log on PermissionHealthCheck.swift / PermissionsController.swift (last mic change 1f7038b1, buffer flow); open fork PRs #115 #116 #117 and upstream PR #713 touch no permission file; memory bug track has no match; issue search finds only #124 itself
-- diagnosis: eliminated a genuinely broken grant (every later check in the same run healthy, the 09:01 call recorded a normal mic track, per the spec's system-log diagnosis); confirmed a transient engine-start refusal (HALC StartIO error 35, about 3 s after launch) counted as broken with no retry (system log, both launches, in the spec)
+- diagnosis: eliminated a genuinely broken grant (every later check in the same run healthy, the next call recorded a normal mic track, per the spec's system-log diagnosis); confirmed a transient engine-start refusal (HALC StartIO error 35, about 3 s after launch) counted as broken with no retry (system log, both launches, in the spec)
 - introduced by: skipped: no known-good revision
 - base: bf27a994 + outcome seam without retry: R1/R2/R4 red (false notice posted) | head: 7e3e1bbe: 63/63 focused tests green
 - live: not run: installed app must not be restarted; the refusal cannot be provoked on demand

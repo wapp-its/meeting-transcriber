@@ -2,11 +2,11 @@
 
 ## Conversation Evidence
 
-> user (turn 1): "I got several notifications in my notification pane. Especially the microphone Permission problem seems to be a false message"
-> user (turn 1, screenshot): two "Permission Problem" notices at 06:00 and 08:03, text "Microphone looks enabled but isn't working — toggle it off and on in System Settings"
+> user (turn 1, paraphrased): "Several notifications came in. The microphone permission problem in particular looks like a false alarm."
+> user (turn 1, screenshot): two "Permission Problem" notices on one day, text "Microphone looks enabled but isn't working — toggle it off and on in System Settings"
 > user (selected): "A — mic + menu now (Recommended)" (fix the false microphone notice now)
 > issue #124 (filed from the diagnosis, 2026-10-14): "Retry the probe after a short delay when the engine start fails, and report broken only when the retry fails too" · "Add a test with an injected probe that fails once and then works, and check that no notification is posted"
-> diagnosis 2026-10-14 (system log, both launches, about 3 s after start): "HALC_ProxyIOContext::_StartIO(): Start failed - StartAndWaitForState returned error 35", then the audio engine's start failed with error 35, then "Permission health check failed: microphone=broken" and the notification. Every later check in the same run (6 checks, 09:02 to 09:23) reported the microphone healthy, and the 09:01 Teams call recorded a normal microphone track.
+> diagnosis 2026-10-14 (system log, both launches, about 3 s after start): "HALC_ProxyIOContext::_StartIO(): Start failed - StartAndWaitForState returned error 35", then the audio engine's start failed with error 35, then "Permission health check failed: microphone=broken" and the notification. Every later check in the same run (6 checks over the next 20 minutes) reported the microphone healthy, and the next call recorded a normal microphone track.
 
 ## Goal & Context
 
