@@ -1,8 +1,8 @@
 import Foundation
 
 /// The apps kept out of meeting detection until their call signal has gone
-/// once, each with the meeting whose signal decides that. Keyed by the
-/// detector identity (`AppMeetingPattern.appName`), the name
+/// once, each with the meeting whose signal decides that. Keyed by
+/// `AppMeetingPattern.identityKey`, the key
 /// `MeetingDetecting.checkOnce(excluding:)` takes.
 ///
 /// A pure value: it never asks a detector. The caller passes the check to
@@ -18,7 +18,7 @@ struct RedetectionHolds: Equatable {
     /// Hold `meeting`'s app. True when the app was not held yet; holding it
     /// again keeps the one entry it has.
     mutating func hold(_ meeting: DetectedMeeting) -> Bool {
-        let app = meeting.pattern.appName
+        let app = meeting.pattern.identityKey
         guard meetings[app] == nil else { return false }
         meetings[app] = meeting
         return true

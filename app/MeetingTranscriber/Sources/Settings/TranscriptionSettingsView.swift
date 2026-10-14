@@ -8,19 +8,17 @@ struct TranscriptionSettingsView: View {
     var parakeetEngine: ParakeetEngine
     /// Forwarded to `VocabularySourceSettingsView`; nil hides its status line.
     var remoteVocabulary: RemoteVocabularyController?
+    /// Holds the load offer a model pick makes. `SettingsView` owns it, so the offer
+    /// survives this view being re-created.
+    var modelChoice = WhisperKitModelChoice()
+    /// Whether a complete copy of a model is on this Mac; tests replace the lookup.
+    var isModelOnDisk: (WhisperKitModelSelection) -> Bool = WhisperKitModelChoice.isOnDiskInProduction
+    /// Makes the catalog the Hugging Face browser searches; tests replace it.
+    var makeHubCatalog: () -> any HuggingFaceModelCataloging = { HuggingFaceModelCatalog() }
 
     /// Set when the user flips live captions on while a first-use Nemotron model
     /// download is pending — defers the actual enable to the consent alert.
     @State private var pendingCaptionEnable = false
-
-    private static let whisperKitModels: [(variant: String, label: String)] = [
-        ("openai_whisper-large-v3-v20240930_turbo", "Large V3 Turbo (recommended)"),
-        ("openai_whisper-large-v3-v20240930", "Large V3"),
-        ("openai_whisper-large-v2", "Large V2"),
-        ("openai_whisper-small", "Small"),
-        ("openai_whisper-base", "Base"),
-        ("openai_whisper-tiny", "Tiny"),
-    ]
 
     var body: some View {
         Form {
@@ -78,12 +76,15 @@ struct TranscriptionSettingsView: View {
     @ViewBuilder
     private var whisperKitModelPicker: some View { // swiftlint:disable:this attributes
         Picker("Model", selection: whisperKitModelPickerSelection) {
-            ForEach(Self.whisperKitModels, id: \.variant) { model in
+            ForEach(WhisperKitStockModel.all, id: \.variant) { model in
                 Text(model.label).tag(model.variant)
             }
             Text("Custom model\u{2026}").tag(Self.customModelTag)
+            Text("From Hugging Face\u{2026}").tag(Self.huggingFaceTag)
         }
         .accessibilityIdentifier(A11yID.whisperKitModelPicker)
+        .whisperKitLoadOfferAlert(modelChoice, engine: whisperKitEngine)
+        .huggingFaceBrowserSheet(modelChoice, onUse: useHubVariant)
 
         if settings.whisperKitCustomModelEnabled {
             customWhisperKitModelFields
@@ -183,8 +184,11 @@ struct TranscriptionSettingsView: View {
         Binding(
             get: { settings.whisperKitCustomModelEnabled ? Self.customModelTag : settings.whisperKitModel },
             set: { tag in
+                guard tag != Self.huggingFaceTag else { return openHuggingFaceBrowser() }
                 settings.whisperKitCustomModelEnabled = tag == Self.customModelTag
-                if tag != Self.customModelTag { settings.whisperKitModel = tag }
+                guard tag != Self.customModelTag else { return }
+                settings.whisperKitModel = tag
+                offerLoad(afterPicking: tag)
             },
         )
     }
@@ -447,13 +451,7 @@ struct TranscriptionSettingsView: View {
                 .font(.caption)
 
         case .unloaded:
-            Button("Load Model") {
-                if settings.transcriptionEngine == .whisperKit {
-                    let model = settings.whisperKitModelSelection
-                    whisperKitEngine.applyModelVariant(model.variant, origin: model.origin)
-                }
-                Task { await engine.loadModel() }
-            }
+            Button("Load Model", action: loadSelectedModel)
             whisperKitLoadFailureLine
         }
     }

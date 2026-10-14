@@ -33,6 +33,9 @@ struct SettingsView: View {
     var onSpeakerMutate: (() -> Void)?
 
     @State private var selection: SettingsTab = .general
+    /// Owned here rather than by the Transcription tab, so a pending load offer
+    /// survives that tab being re-created.
+    @State private var whisperKitModelChoice = WhisperKitModelChoice()
 
     var body: some View {
         splitView
@@ -78,6 +81,7 @@ struct SettingsView: View {
                 whisperKitEngine: whisperKitEngine,
                 parakeetEngine: parakeetEngine,
                 remoteVocabulary: remoteVocabulary,
+                modelChoice: whisperKitModelChoice,
             )
 
         case .speakers:

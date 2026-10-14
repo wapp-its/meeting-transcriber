@@ -90,7 +90,7 @@ untouched by fork work.
   request answers HTTP 422 "Actions has been disabled", a local run replaces CI (owner,
   2026-10-13). Hosted runners, macOS included, are free for this public repo, but
   GitHub pauses a fork's workflows when they run too much.
-- **Upstream sync:** `.github/workflows/wapp-upstream-sync.yml` runs every 6 h. Clean,
+- **Upstream sync:** `.github/workflows/wapp-upstream-sync.yml` runs once a night (02:17 UTC). Clean,
   building upstream changes are merged into `wapp/main` and pushed automatically; a
   conflict, a failed build or a refused push opens one issue labelled `upstream-sync`,
   which closes itself after the next clean run. Treat an open `upstream-sync` issue as

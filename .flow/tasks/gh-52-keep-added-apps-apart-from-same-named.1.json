@@ -9,7 +9,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-52-keep-added-apps-apart-from-same-named",
   "spec_path": ".flow/tasks/gh-52-keep-added-apps-apart-from-same-named.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Carry an identity key through detection and the consent gate",
   "updated_at": "2026-10-06T20:32:22.783062Z"
 }

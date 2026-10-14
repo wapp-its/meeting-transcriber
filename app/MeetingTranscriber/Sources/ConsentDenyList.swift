@@ -14,8 +14,10 @@ import Foundation
 /// way to stop being asked about an app is a setting, not an answer:
 /// `AppSettings.recordWithoutAskingApps`, which this list outranks.
 ///
-/// Entries are app identities exactly as the detectors report them (for a
-/// browser, the process name off the power assertion), and they are matched
+/// Entries are identity keys exactly as the detectors report them
+/// (`AppMeetingPattern.identityKey`): a built-in app's name, for a browser
+/// the process name off the power assertion, for an app added through
+/// "Add App…" `custom:<bundleID>` (`AddedAppIdentity`). They are matched
 /// exactly: a looser rule here would silence an app the user was never asked
 /// about.
 struct ConsentDenyList: Equatable {
@@ -41,6 +43,36 @@ struct ConsentDenyList: Equatable {
     /// stale view cannot corrupt the list.
     func reverting(_ app: String) -> Self {
         Self(denied: denied.filter { $0 != app })
+    }
+
+    /// The text a person reads for a stored entry. An added app's key reads as
+    /// its display name marked "(added app)", which tells it apart from a
+    /// built-in or another added app of the same name; an app that is not
+    /// installed resolves to its bundle ID. Every other entry already is a name
+    /// and reads as stored.
+    static func displayName(
+        for entry: String,
+        resolveAppName: (String) -> String = MicInputDetector.appDisplayName(bundleID:),
+    ) -> String {
+        guard let bundleID = AddedAppIdentity.bundleID(fromKey: entry) else { return entry }
+        return "\(resolveAppName(bundleID)) (added app)"
+    }
+
+    /// `denied` from a build that filed added apps under their display name,
+    /// carried over to their keys: every entry kept in order, plus the key of
+    /// each added app whose display name or bundle ID is listed. Nothing is
+    /// removed, because which app a legacy name entry was answered for (a
+    /// built-in, an added app, a browser) cannot be recovered, and dropping it
+    /// would unblock an app the user refused.
+    static func migratingAddedAppNames(
+        _ denied: [String],
+        addedBundleIDs: [String],
+        displayName: (String) -> String,
+    ) -> [String] {
+        addedBundleIDs.reduce(Self(denied: denied)) { list, bundleID in
+            guard denied.contains(displayName(bundleID)) || denied.contains(bundleID) else { return list }
+            return list.denying(AddedAppIdentity.key(bundleID: bundleID))
+        }.denied
     }
 }
 

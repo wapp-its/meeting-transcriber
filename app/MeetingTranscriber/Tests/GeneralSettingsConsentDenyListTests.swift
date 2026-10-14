@@ -82,4 +82,19 @@ final class GeneralSettingsConsentDenyListTests: XCTestCase {
             .tap()
         XCTAssertEqual(settings.consentDeniedApps, ["Slack"])
     }
+
+    func testAnAddedAppsEntryIsListedByNameAndRemovedAlone() throws {
+        // Located inside the section: the tab also carries a "Zoom" watch toggle.
+        let settings = try makeSettings(browserMeetings: false, denied: ["Zoom", "custom:com.example.not-installed"])
+        let view = GeneralSettingsView(settings: settings, notificationVisibility: nil)
+        let section = try view.inspect().find(viewWithAccessibilityIdentifier: A11yID.consentDenyListSection)
+        XCTAssertNoThrow(try section.find(text: "Zoom"))
+        XCTAssertNoThrow(try section.find(text: "com.example.not-installed (added app)"))
+
+        try view.inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.consentDeniedAppRemove(1))
+            .button()
+            .tap()
+        XCTAssertEqual(settings.consentDeniedApps, ["Zoom"])
+    }
 }

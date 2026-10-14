@@ -16,6 +16,13 @@ struct AppMeetingPattern: Equatable {
     /// Native desktop clients leave it false, and then the setting decides
     /// (see `asksBeforeRecording(recordWithoutAsking:)`).
     let requiresRecordingConsent: Bool
+    /// The key every per-app piece of detection and consent state is filed
+    /// under: confirmation counts, cooldowns, the deny list, the open-prompt
+    /// slot and the "call still running" check. `appName` is for display only.
+    /// A built-in app or a browser identity is keyed by its name; an app added
+    /// through "Add App…" by its bundle ID (`AddedAppIdentity`), so a
+    /// same-named app never shares its state.
+    let identityKey: String
 
     init(
         appName: String,
@@ -25,6 +32,7 @@ struct AppMeetingPattern: Equatable {
         minWindowWidth: CGFloat = 200,
         minWindowHeight: CGFloat = 200,
         requiresRecordingConsent: Bool = false,
+        identityKey: String? = nil,
     ) {
         self.appName = appName
         self.ownerNames = ownerNames
@@ -33,6 +41,7 @@ struct AppMeetingPattern: Equatable {
         self.minWindowWidth = minWindowWidth
         self.minWindowHeight = minWindowHeight
         self.requiresRecordingConsent = requiresRecordingConsent
+        self.identityKey = identityKey ?? appName
     }
 }
 

@@ -39,6 +39,24 @@ final class RedetectionHoldsTests: XCTestCase {
         XCTAssertEqual(holds.heldApps, ["Zoom"])
     }
 
+    func testAnAddedAppIsHeldUnderItsKeyBesideASameNamedBuiltIn() {
+        var holds = RedetectionHolds()
+        let added = meeting(MicInputDetector.MicPattern(
+            appName: "Zoom", bundleIDs: ["com.example.zoom"], matchesHelpers: true, usesBuiltInMeetingPattern: false,
+        ).meetingPattern)
+        let builtIn = meeting(.zoom)
+
+        XCTAssertTrue(holds.hold(added))
+        XCTAssertEqual(holds.heldApps, ["custom:com.example.zoom"])
+        XCTAssertTrue(holds.hold(builtIn), "the built-in Zoom's hold is new")
+        XCTAssertEqual(holds.heldApps, ["custom:com.example.zoom", "Zoom"])
+
+        XCTAssertEqual(holds.release { $0 == added }, ["custom:com.example.zoom"])
+        XCTAssertEqual(holds.heldApps, ["Zoom"])
+        XCTAssertEqual(holds.release { $0 == builtIn }, ["Zoom"])
+        XCTAssertTrue(holds.heldApps.isEmpty)
+    }
+
     func testRemoveAllEmptiesIt() {
         var holds = RedetectionHolds()
         _ = holds.hold(meeting(.teams))

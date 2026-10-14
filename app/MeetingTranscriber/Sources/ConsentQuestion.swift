@@ -11,15 +11,20 @@ import Foundation
 /// question, and an answer meant for the earlier one cannot reach it.
 struct ConsentQuestion: Equatable, Sendable {
     let id: UUID
-    /// The meeting pattern's `appName`: the name detection exclusion and the
-    /// re-prompt cooldowns key on, not the label shown in the text.
+    /// The meeting pattern's `appName`: the name a person reads, which
+    /// `/state` and `/v1/watch` report, not the label shown in the text.
     let app: String
+    /// The meeting pattern's `identityKey`: what detection exclusion and the
+    /// re-prompt cooldowns key on. Equal to `app` except for an app added
+    /// through "Add App…", whose key is `custom:<bundleID>`.
+    let identityKey: String
     let title: String
     let body: String
 
-    init(app: String, title: String, body: String, id: UUID = UUID()) {
+    init(app: String, title: String, body: String, identityKey: String? = nil, id: UUID = UUID()) {
         self.id = id
         self.app = app
+        self.identityKey = identityKey ?? app
         self.title = title
         self.body = body
     }

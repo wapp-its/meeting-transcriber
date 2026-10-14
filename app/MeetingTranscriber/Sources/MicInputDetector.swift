@@ -37,17 +37,29 @@ class MicInputDetector: MeetingDetecting {
         var matchesHelpers = false
         var usesBuiltInMeetingPattern = true
 
-        func matches(bundleID: String) -> Bool {
-            bundleIDs.contains { $0 == bundleID || (matchesHelpers && bundleID.hasPrefix($0 + ".")) }
+        /// The length of the longest of this pattern's bundle IDs that
+        /// `bundleID` is or is a helper of, nil when the process is not this
+        /// app's. The length ranks patterns that both match one process: an
+        /// added app's bundle ID can be a prefix of another added app's
+        /// (`com.acme.meet` and `com.acme.meet.beta`), and helper matching
+        /// would file the second app's microphone use under the first app's
+        /// key.
+        func matchLength(bundleID: String) -> Int? {
+            bundleIDs.lazy
+                .filter { $0 == bundleID || (matchesHelpers && bundleID.hasPrefix($0 + ".")) }
+                .map(\.count)
+                .max()
         }
 
         /// An app added through "Add App…" always asks before recording: it
         /// has no "record without asking" switch, and its display name can
         /// equal a built-in app's, whose switch must not carry over to it.
+        /// For the same reason it is keyed by its bundle ID, not its name.
         var meetingPattern: AppMeetingPattern {
             guard usesBuiltInMeetingPattern else {
                 return AppMeetingPattern(
                     appName: appName, ownerNames: [appName], meetingPatterns: [], requiresRecordingConsent: true,
+                    identityKey: AddedAppIdentity.key(bundleID: bundleIDs.first ?? appName),
                 )
             }
             return AppMeetingPattern.forAppName(appName)
@@ -122,8 +134,9 @@ class MicInputDetector: MeetingDetecting {
     /// Injectable window list for title lookup, mirroring PowerAssertionDetector.
     var windowListProvider: () -> [[String: Any]] = MeetingDetector.systemWindowList
 
-    /// Apps the user answered "Never for this app" about, so they never reach
-    /// confirmation. Same reason as `PowerAssertionDetector.isIdentityDenied`:
+    /// Apps the user answered "Never for this app" about, by identity key
+    /// (`AppMeetingPattern.identityKey`), so they never reach confirmation.
+    /// Same reason as `PowerAssertionDetector.isIdentityDenied`:
     /// a denied app holding the mic would otherwise re-confirm every few polls
     /// for as long as it does, and each skip at the consent gate resets every
     /// app's confirmation count.
@@ -148,7 +161,7 @@ class MicInputDetector: MeetingDetecting {
         self.patterns = patterns
         self.confirmationCount = confirmationCount
         matchers = patterns.reduce(into: [:]) { dict, pattern in
-            dict[pattern.meetingPattern.appName] = MeetingTitleMatcher(pattern: pattern.meetingPattern)
+            dict[pattern.meetingPattern.identityKey] = MeetingTitleMatcher(pattern: pattern.meetingPattern)
         }
     }
 
@@ -164,6 +177,9 @@ class MicInputDetector: MeetingDetecting {
         guard !patterns.isEmpty else { return nil }
 
         let processes = processProvider()
+        // Every piece of per-app state is filed under the identity key, so an
+        // added app never shares it with a same-named one; the name is only
+        // for the title and owner the person reads.
         var hitsThisRound: Set<String> = []
         var firstMatch: [String: pid_t] = [:]
         // The pattern that matched, kept rather than looked up again by name:
@@ -172,47 +188,59 @@ class MicInputDetector: MeetingDetecting {
         var matchedPattern: [String: AppMeetingPattern] = [:]
 
         for process in processes where process.isRunningInput {
-            guard let pattern = patterns.first(where: { $0.matches(bundleID: process.bundleID) }) else {
+            guard let pattern = mostSpecificPattern(for: process.bundleID) else {
                 logUnmatchedRunningInput(bundleID: process.bundleID)
                 continue
             }
-            let appName = pattern.meetingPattern.appName
-            if isIdentityDenied(appName) { continue }
-            if let until = cooldownUntil[appName], Date() < until { continue }
-            guard !hitsThisRound.contains(appName) else { continue }
-            hitsThisRound.insert(appName)
-            firstMatch[appName] = tapRootPID(for: process, pattern: pattern)
-            matchedPattern[appName] = pattern.meetingPattern
-            consecutiveHits[appName, default: 0] += 1
+            let key = pattern.meetingPattern.identityKey
+            if isIdentityDenied(key) { continue }
+            if let until = cooldownUntil[key], Date() < until { continue }
+            guard !hitsThisRound.contains(key) else { continue }
+            hitsThisRound.insert(key)
+            firstMatch[key] = tapRootPID(for: process, pattern: pattern)
+            matchedPattern[key] = pattern.meetingPattern
+            consecutiveHits[key, default: 0] += 1
         }
 
-        for (appName, hits) in consecutiveHits where !excludedApps.contains(appName) {
-            if hits >= confirmationCount, let pid = firstMatch[appName],
-               let meetingPattern = matchedPattern[appName] {
-                let title = matchers[appName]?.selectWindowTitle(from: windowListProvider())
-                    ?? PowerAssertionDetector.placeholderTitle(appName: appName)
+        for (key, hits) in consecutiveHits where !excludedApps.contains(key) {
+            if hits >= confirmationCount, let pid = firstMatch[key],
+               let meetingPattern = matchedPattern[key] {
+                let title = matchers[key]?.selectWindowTitle(from: windowListProvider())
+                    ?? PowerAssertionDetector.placeholderTitle(appName: meetingPattern.appName)
                 return DetectedMeeting(
                     pattern: meetingPattern,
                     windowTitle: title,
-                    ownerName: appName,
+                    ownerName: meetingPattern.appName,
                     windowPID: pid,
                 )
             }
         }
 
-        for appName in consecutiveHits.keys where !hitsThisRound.contains(appName) {
-            consecutiveHits[appName] = 0
+        for key in consecutiveHits.keys where !hitsThisRound.contains(key) {
+            consecutiveHits[key] = 0
         }
 
         return nil
     }
 
     func isMeetingActive(_ meeting: DetectedMeeting) -> Bool {
-        let candidates = patterns.filter { $0.meetingPattern.appName == meeting.pattern.appName }
-        guard !candidates.isEmpty else { return false }
-        return processProvider().contains { process in
-            process.isRunningInput && candidates.contains { $0.matches(bundleID: process.bundleID) }
+        processProvider().contains { process in
+            process.isRunningInput
+                && mostSpecificPattern(for: process.bundleID)?.meetingPattern.identityKey == meeting.pattern.identityKey
         }
+    }
+
+    /// The pattern a microphone-holding process belongs to: the one whose
+    /// matching bundle ID is longest, never the first one added. Two added
+    /// apps may have prefix-related bundle IDs (`com.acme.meet` and
+    /// `com.acme.meet.beta`), and helper matching would otherwise file the
+    /// second app's microphone use, and its liveness, under the first app's
+    /// key. Both detection and liveness go through this one rule.
+    private func mostSpecificPattern(for bundleID: String) -> MicPattern? {
+        patterns
+            .compactMap { pattern in pattern.matchLength(bundleID: bundleID).map { (pattern: pattern, length: $0) } }
+            .max { $0.length < $1.length }?
+            .pattern
     }
 
     /// A helper holding the mic is swapped for its main app, whose bundle the
