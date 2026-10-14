@@ -76,7 +76,7 @@ extension UpdateChecker {
         do {
             launch = try installer.startInstall { [weak self] exit in
                 Task { @MainActor [weak self] in
-                    self?.finishInstall(.forLiveExit(exit))
+                    self?.finishInstall(.forLiveExit(exit), installing: summary)
                 }
             }
         } catch {
@@ -107,7 +107,8 @@ extension UpdateChecker {
     func resumeAfterLaunch() -> Bool {
         guard let installer, !hasResumedAfterLaunch else { return false }
         hasResumedAfterLaunch = true
-        switch evaluatePendingInstall(installer) {
+        let pending = pendingStore.load()
+        switch evaluate(pending, installer: installer) {
         case .nothingPending:
             return false
 
@@ -117,16 +118,16 @@ extension UpdateChecker {
             return false
 
         case let .report(outcome, restoreWatching):
-            finishInstall(outcome)
+            finishInstall(outcome, installing: pending?.summary)
             return restoreWatching
         }
     }
 
     // MARK: - Private
 
-    private func evaluatePendingInstall(_ installer: any MtUpdateInstalling) -> UpdateLaunchEvaluation {
+    private func evaluate(_ pending: PendingUpdateInstall?, installer: any MtUpdateInstalling) -> UpdateLaunchEvaluation {
         UpdateLaunchEvaluation.evaluate(
-            pending: pendingStore.load(),
+            pending: pending,
             currentBuild: installer.currentBuild(),
         ) { installer.isRunning($0) }
     }
@@ -136,12 +137,13 @@ extension UpdateChecker {
             while let interval = self?.recheckInterval {
                 try? await Task.sleep(for: interval)
                 guard let self, let installer else { return }
-                switch evaluatePendingInstall(installer) {
+                let pending = pendingStore.load()
+                switch evaluate(pending, installer: installer) {
                 case .stillRunning:
                     continue
 
                 case let .report(outcome, _):
-                    finishInstall(outcome)
+                    finishInstall(outcome, installing: pending?.summary)
                     return
 
                 case .nothingPending:
@@ -156,9 +158,12 @@ extension UpdateChecker {
 
     /// The end of an install, for its live exit and for the launch-time
     /// report alike: posts its notice, clears the record and returns to idle.
-    /// A failure stays on show in `lastInstallError` and keeps the build on
-    /// offer, so Install is available again; a finished install clears it.
-    private func finishInstall(_ outcome: UpdateInstallOutcome) {
+    /// A failure stays on show in `lastInstallError`, and the build
+    /// `installing` names stays on offer, so Install is available again. An
+    /// instance that relaunched has no summary of its own until a check runs,
+    /// which is why the caller passes the record's. A finished install
+    /// clears it.
+    private func finishInstall(_ outcome: UpdateInstallOutcome, installing summary: String?) {
         guard let installer else { return }
         let notice = post(outcome, logPath: installer.installLogPath)
         pendingStore.clear()
@@ -169,6 +174,7 @@ extension UpdateChecker {
 
         case .mergeConflict, .buildFailed, .busyOrNotQuittable, .failed, .notStartable, .didNotFinish:
             lastInstallError = notice.body
+            availableBuildSummary = summary ?? availableBuildSummary
         }
     }
 

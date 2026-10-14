@@ -199,6 +199,11 @@ final class UpdateCheckerMtUpdateTests: XCTestCase {
         XCTAssertTrue(body.contains(fixture.installer.installLogPath), body)
         XCTAssertNil(fixture.store.load())
         XCTAssertEqual(fixture.checker.installState, .idle)
+
+        // The build that did not install is on offer again, without a check.
+        XCTAssertEqual(fixture.checker.availableBuildSummary, Self.summary)
+        fixture.checker.installNow(blockedReason: nil, isWatching: false)
+        XCTAssertEqual(fixture.installer.startInstallCalls, 1)
     }
 
     func testAnInstallStillRunningAtLaunchIsRecheckedUntilItHasGone() async throws {
@@ -221,6 +226,7 @@ final class UpdateCheckerMtUpdateTests: XCTestCase {
         XCTAssertEqual(fixture.notifier.calls.map(\.title), ["Update did not finish"])
         XCTAssertNil(fixture.store.load())
         XCTAssertEqual(fixture.checker.installState, .idle)
+        XCTAssertEqual(fixture.checker.availableBuildSummary, Self.summary)
         fixture.checker.checkNow()
         await waitFor(!fixture.checker.isChecking, timeout: .seconds(2))
         XCTAssertEqual(fixture.installer.checkCalls, 1)
