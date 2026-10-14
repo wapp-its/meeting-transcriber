@@ -17,6 +17,17 @@ enum PipelineSnapshot {
     static let snapshotFilename = "pipeline_queue.json"
     static let stagingFilename = "pipeline_queue.tmp"
 
+    /// The encoder every snapshot is written with. Keys are sorted because a
+    /// plain `JSONEncoder` writes an object's keys in hash order, which can
+    /// differ between two encodes of the same value in one process, so equal
+    /// job lists would not always give equal bytes. Loading does not depend on
+    /// key order, so snapshots written before this still load.
+    static func makeEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return encoder
+    }
+
     /// JSON-encode `jobs` and atomically replace any existing snapshot at
     /// `logDir/pipeline_queue.json`. The staging write goes to
     /// `pipeline_queue.tmp` first; `replaceItemAt` (which lowers to
@@ -38,7 +49,7 @@ enum PipelineSnapshot {
     static func save(
         _ jobs: [PipelineJob], to logDir: URL, replace: (_ snapshot: URL, _ staging: URL) throws -> Void,
     ) throws {
-        let data = try JSONEncoder().encode(jobs)
+        let data = try makeEncoder().encode(jobs)
         let stagingPath = logDir.appendingPathComponent(stagingFilename)
         try writeOwnerOnly(data, to: stagingPath)
         let snapshotPath = logDir.appendingPathComponent(snapshotFilename)

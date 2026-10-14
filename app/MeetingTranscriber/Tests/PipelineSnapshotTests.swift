@@ -148,7 +148,7 @@ final class PipelineSnapshotTests: XCTestCase {
         })
 
         XCTAssertEqual(modeAtSwap, 0o600)
-        XCTAssertEqual(bytesAtSwap, try JSONEncoder().encode([job]))
+        XCTAssertEqual(bytesAtSwap, try PipelineSnapshot.makeEncoder().encode([job]))
         XCTAssertFalse(FileManager.default.fileExists(atPath: staging.path), "the failed swap left the staging copy")
         XCTAssertFalse(FileManager.default.fileExists(atPath: dir.appendingPathComponent(PipelineSnapshot.snapshotFilename).path))
     }
