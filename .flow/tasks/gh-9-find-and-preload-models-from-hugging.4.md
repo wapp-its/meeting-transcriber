@@ -42,9 +42,71 @@ Wire the browser into Settings: the "From Hugging Face…" picker entry opens it
 - [ ] README and `docs/architecture-macos.md` updated; `CLAUDE.md`/`AGENTS.md` untouched.
 - [ ] `cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh9-t4-home swift test --parallel --filter 'HuggingFace|WhisperKitModelChoice|WhisperKitModelLoadOffer|AppSettingsUseHubModel|WhisperKitCustomModel|TranscriptionSettings|SettingsInteraction|SettingsView' > /private/tmp/gh9-t4.log 2>&1` green; `./scripts/lint.sh` clean with the pinned tools; `./scripts/pre-push.sh --with-appstore` clean (release build of both variants).
 ## Done summary
-TBD
+The model picker now has a "From Hugging Face…" entry. It opens the model browser as a sheet and changes no setting. "Use" on a variant writes the custom-model settings (repository and variant), or selects the stock entry when the variant is one the picker lists from `argmaxinc/whisperkit-coreml`. It always clears the custom model folder. The browser searches with the saved Hugging Face token, read for each request. The load question appears only after the sheet has closed. README and `docs/architecture-macos.md` describe the flow.
 
+stage: impl-review - ran [a6662899..3a6e0f76] SHIP round 1, 0 findings (codex gpt-5.6-sol xhigh, 3-reviewer panel; receipt /tmp/impl-review-receipt-13d6800aa401-gh-9-find-and-preload-models-from-hugging.4.json). Integration: fast-forward of the lane (SHAs unchanged); bookkeeping 1b98038e.
+Tier: implementer - opus at xhigh (explicit invocation) (model: claude-opus-5-5)
+
+Commits (`a6662899..3a6e0f76`):
+- `6f4aae1a` feat(app): pick a WhisperKit model from the Hugging Face browser
+- `3a6e0f76` docs: describe picking a WhisperKit model from Hugging Face
+
+Workspace: `/Users/flach/.ai-sync/worktrees/-Users-flach-Sources-meeting-transcriber/lane/gh-9-hf-model-search.4` (branch `lane/gh-9-hf-model-search.4`, clean).
+
+### Evidence (all measured)
+
+- **Baseline:** green via handoff (`BASELINE_HANDOFF`). Between `8449fe2e` and the lane base `a6662899`, only `.flow/` files changed (`git log --format= --name-only 8449fe2e..a6662899`), so the handoff holds.
+- **Red-first:** I wrote the 3 new test files before the implementation. `swift build --build-tests` then failed with 39 error lines, all caused by the missing API: no member `useHubModel`, `hubBrowser`, `pendingLoadOffer` or `browserDidDismiss`, plus "failed to produce diagnostic" errors where `use(...)` and `makeHubCatalog` are called. Log: `/private/tmp/gh9tick/t4/red-first-build.log`.
+- **Acceptance command:** `cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh9-t4-home swift test --parallel --filter 'HuggingFace|WhisperKitModelChoice|WhisperKitModelLoadOffer|AppSettingsUseHubModel|WhisperKitCustomModel|TranscriptionSettings|SettingsInteraction|SettingsView' > /private/tmp/gh9-t4.log 2>&1`. Result: exit 0, 226/226 tests ran, 0 failures. The 2 `HuggingFaceCatalogLiveTests` are included but skip without the env variable. The log is newer than every committed source file.
+- **New tests:** 12 tests, 0 failures. They are `AppSettingsUseHubModelTests` (3), `WhisperKitModelChoiceHubTests` (5) and `TranscriptionSettingsHuggingFaceEntryTests` (4).
+- **Live Hub test:** `MEETINGTRANSCRIBER_HF_LIVE_TESTS=1 CFFIXED_USER_HOME=/private/tmp/gh9-t4-home swift test --filter HuggingFaceCatalogLiveTests`. Result: exit 0, 2 tests passed against huggingface.co (not skipped).
+- **Lint:** `PATH=/private/tmp/gh9tick/lint-bin:$PATH ./scripts/lint.sh` with the pinned SwiftFormat 0.63.0 and SwiftLint 0.65.1. Result: exit 0; 0/782 files require formatting; 0 violations in 782 files. The first runs found a `braces` format hit and a `multiple_closures_with_trailing_closure` hit, both fixed. The tests ran again after the fixes.
+- **Release parity:** `./scripts/pre-push.sh --with-appstore` exited 0. Both release variants built without warnings.
+- **CI Build & Analyze replay:** `xcodebuild build-for-testing` followed by `swiftlint analyze --strict` (script `/private/tmp/gh9tick/t4/analyze.sh`).
+  - xcodebuild exited 0.
+  - Analyze reports only 2 `unused_declaration` hits, in `Sources/RecordingProvider.swift:144,146`. This task does not touch that file. There are 0 hits in this task's files.
+  - The slowest type-checked body in the touched files is 33.0 ms (`loadSelectedModel`, pre-existing). `openHuggingFaceBrowser` takes 9.8 ms, well under the 300 ms limit.
+- **Mutation checks:** 7 changes; each one turned at least one test red. After each check the file was restored, and `cmp` confirmed the original. Script and summaries are in `/private/tmp/gh9tick/t4/mut/`.
+
+  | Mutation | Tests red |
+  |---|---|
+  | m1 picker setter without the Hugging Face guard | 4 (all entry tests) |
+  | m2 `useHubModel` without the folder clear | 2 |
+  | m3 offer asked at "Use" instead of after dismissal | 4 |
+  | m4 sheet without `onDismiss` | 1 (`testUseFillsTheCustomFieldsAndAsksOnceTheBrowserHasClosed`) |
+  | m5b token closure returns nil | 1 (`testTheBrowserSearchesWithTheSavedHuggingFaceToken`) |
+  | m6 `onUse` not called | 1 (`testUseFillsTheCustomFieldsAndAsksOnceTheBrowserHasClosed`) |
+  | m7 token read once at open | 1 (`testTheBrowserSearchesWithTheSavedHuggingFaceToken`) |
+
+  The first version of m5 (`{ nil }`) did not compile: warnings are errors, and an unused `let` broke the build. m5b is the version that compiles.
+
+**Token wiring:** a test covers it, not review alone. `TranscriptionSettingsHuggingFaceEntryTests.testTheBrowserSearchesWithTheSavedHuggingFaceToken` opens the browser from the real picker and then saves a token through the injectable `HuggingFaceTokenStore` (the fake `HuggingFaceTokenStoreFake`). It then checks that the catalog received that token with the next search. Mutations m5b and m7 turn it red. No test reads the production Keychain account.
+
+### Choices
+
+- **DECIDED (rule 1)** — the `Task: gh-9-find-and-preload-models-from-hugging.4` trailer is in both commit bodies, as the dispatch instructed (the wapp/main precedent). Task .2 left it out, because `submit.sh` refuses commit messages that name spec ids. The conductor may need to remove it before any submission to the original.
+- **DECIDED (rule 1)** — the token goes to the search exactly as saved, and "" when none is saved. The catalog from task .1 sends an `Authorization` header only for a non-empty trimmed token.
+- **DECIDED (rule 1)** — "Use" defers the chosen model on the engine at once (assumption A6). A load still running for the previous model therefore cannot go on to it while the question waits.
+- **DECIDED (rule 1)** — the load question names the listed variant's `sizeBytes`, also when "Use" selects a stock entry (task text).
+- **DECIDED (rule 1)** — "Cancel" only closes the browser (`hubBrowser = nil`). It writes nothing and asks nothing.
+- **DECIDED (rule 1)** — the live Hub test ran once, as the task's Key context says.
+- **DECIDED (rule 6)** — `huggingFaceTag`, `openHuggingFaceBrowser` and `useHubVariant` live in the `+ModelChoice` extension. This keeps the main view's type body under SwiftLint's length limit.
+- **DECIDED (rule 6)** — I added tests beyond the minimum: the Cancel sheet wiring, using the model that is already loaded (no question), and the token read at request time.
+- **ASSUMED (rule 4)** — the README wording. Switch point: the "Custom WhisperKit models" section of `README.md`.
+- **ASSUMED (rule 4)** — the 5 new rows in the App Entry & UI table, placed after the `Settings/TranscriptionSettingsView.swift` row. `+ModelChoice.swift` is named in the `WhisperKitModelChoice.swift` row instead of getting its own row. Switch point: that table in `docs/architecture-macos.md`.
+- **OPEN CHOICE:** none. Nothing outside Touches was needed, and no new persisted key or format was added.
+
+### Follow-ups (not built)
+
+1. `Sources/RecordingProvider.swift:144,146` fail CI's `swiftlint analyze --strict` with `unused_declaration`. They are older than this task, but CI's Build & Analyze job may fail on them.
+2. `Tests/ViewInspectorIdentifierTests.swift:45,53,64` print `ActorIsolatedCall` warnings in the xcodebuild replay. They are older than this task.
+3. The owner's manual check of the live flow and look; the run note lists what is untested live.
+4. Untested: if the Settings window closes while the sheet is open, the browser may appear again on reopen, because `WhisperKitModelChoice` is `@State` in `SettingsView` and keeps `hubBrowser` set.
+5. The status-line follow-up from task .3 is still open.
+6. The README Settings table's "Transcribe" row does not mention the new entry; the custom-model section does.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 6f4aae1ad0819bdf517a2cfd792969aea5c521a6, 3a6e0f76fea8d21a445881e3531f45354fa17151, 1b98038e
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh9-t4-home swift test --parallel --filter 'HuggingFace|WhisperKitModelChoice|WhisperKitModelLoadOffer|AppSettingsUseHubModel|WhisperKitCustomModel|TranscriptionSettings|SettingsInteraction|SettingsView' > /private/tmp/gh9-t4.log 2>&1 -> exit 0, 226/226 tests ran, 0 failures (the 2 HuggingFaceCatalogLiveTests skip without the env variable); the 12 new tests are included, cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh9-t4-home swift test --filter 'AppSettingsUseHubModelTests|WhisperKitModelChoiceHubTests|TranscriptionSettingsHuggingFaceEntryTests' -> exit 0, 12 tests, 0 failures (3 + 5 + 4), cd app/MeetingTranscriber && MEETINGTRANSCRIBER_HF_LIVE_TESTS=1 CFFIXED_USER_HOME=/private/tmp/gh9-t4-home swift test --filter HuggingFaceCatalogLiveTests -> exit 0, 2 tests passed against huggingface.co (not skipped), PATH=/private/tmp/gh9tick/lint-bin:$PATH ./scripts/lint.sh -> exit 0, swiftformat 0/782 files require formatting, swiftlint 0 violations in 782 files, ./scripts/pre-push.sh --with-appstore -> exit 0, release builds of both variants complete without warnings, CI Build & Analyze replay (xcodebuild build-for-testing + swiftlint analyze --strict) -> xcodebuild exit 0; analyze reports only 2 unused_declaration hits in Sources/RecordingProvider.swift:144,146, a file this task does not touch; 0 hits in this task's files; slowest type-checked body in touched files 33.0 ms (pre-existing loadSelectedModel), red-first: swift build --build-tests before the implementation -> failed with 39 error lines, all from the missing API: no member useHubModel, hubBrowser, pendingLoadOffer or browserDidDismiss, plus failed-to-produce-diagnostic errors where use(...) and makeHubCatalog are called, mutation checks, each restored with cmp clean: no hub-tag guard -> 4 tests red; no folder clear -> 2 red; offer asked immediately -> 4 red; no onDismiss -> 1 red; token closure returns nil -> 1 red; onUse not called -> 1 red; token read once at open -> 1 red, review wrapper on 1b98038e: acceptance filter 226/226 (exit 0); lint 0 violations in 782 files (exit 0); ./scripts/pre-push.sh --with-appstore exit 0 (both release variants), integrated at 1b98038eafa4a85c8f3449722c6d485b5af7b462: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh9-t4-home swift test --parallel --filter 'HuggingFace|WhisperKitModelChoice|WhisperKitModelLoadOffer|AppSettingsUseHubModel|WhisperKitCustomModel|TranscriptionSettings|SettingsInteraction|SettingsView' (exit 0, no failures; parallel mode prints failures only); PATH=/private/tmp/gh9tick/lint-bin:$PATH ./scripts/lint.sh (exit 0, 0 violations)
 - PRs:

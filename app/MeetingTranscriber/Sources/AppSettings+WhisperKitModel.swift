@@ -65,6 +65,23 @@ extension AppSettings {
         return WhisperKitModelSelection(variant: variant, origin: .hub(repoID: repoID))
     }
 
+    /// What "Use" in the Hugging Face browser writes: `variant` of `repoID`, exactly as
+    /// if both had been typed under "Custom model…", except that a variant of the stock
+    /// repository that the picker lists selects that stock entry instead. Clears the
+    /// custom model folder either way, since a folder wins over the repository and
+    /// would otherwise keep loading, or come back when "Custom model…" is picked again.
+    func useHubModel(repoID: String, variant: String) {
+        updateWhisperKitCustomModelFolder(path: "", bookmark: nil)
+        if repoID == WhisperKitLocalSnapshot.repoID, WhisperKitStockModel.model(for: variant) != nil {
+            whisperKitCustomModelEnabled = false
+            whisperKitModel = variant
+        } else {
+            whisperKitCustomRepo = repoID
+            whisperKitCustomVariant = variant
+            whisperKitCustomModelEnabled = true
+        }
+    }
+
     func setWhisperKitCustomModelFolder(_ url: URL) {
         let bookmark = VocabularyFileAccess.withAccess(to: url) { scopedURL in
             try? scopedURL.bookmarkData(
