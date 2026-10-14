@@ -79,6 +79,7 @@ stage: implement - ran (model: claude-opus-5-5; worker in lane worktree, paralle
 stage: impl-review - ran [2026-10-13T14:45Z..15:02Z] (model: gpt-5.6-sol xhigh; round 1 three-draw fan-out: correctness NEEDS_WORK, contracts SHIP, integration SHIP; one P1 finding fixed in a4d2e4ac; round 2 SHIP, no surviving findings)
 stage: catch-up - ran [2026-10-14] (merge of wapp/main 8def642b, commit 193573df: the menu-answer work had replaced the stored `pendingConsentApp` with a stored `ConsentQuestion`; this task's `PendingConsent` was folded into it, so `ConsentQuestion.app` is the display name and the new `ConsentQuestion.identityKey` the key; the shared `ConsentLoopDoubles.ParkingNotifier` took over the menu work's prompt-id answering)
 stage: impl-review - ran [2026-10-14] (model: gpt-5.6-sol xhigh; catch-up round, three-draw fan-out on 193573df against wapp/main: correctness SHIP, contracts SHIP, integration SHIP; one P3 kept, this record not reconciled after the merge, fixed here)
+stage: impl-review - ran [2026-10-14] (model: gpt-5.6-sol xhigh; re-review on 658edccc: SHIP, both prior findings fixed: the 2026-10-13 P1 that the catch-up round's receipt lineage had carried back as open, and the P3 above)
 stage: plan-sync - skipped(config: planSync.enabled=false)
 
 Tier: implementer - opus (explicit invocation) (model: claude-opus-5-5)
