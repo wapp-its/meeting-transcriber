@@ -37,6 +37,9 @@ extension PipelineQueue {
         /// the same one. The job holds the fact it comes from; this is that
         /// fact's rendering for the length of one run.
         let note: String?
+        /// The recording's pauses, carried like `note` so the diarization stage
+        /// places the same markers and keeps its merged blocks from spanning one.
+        let pauses: [RecordingPause]
         /// Segments cached for diarization reuse (avoids double transcription).
         let cachedSegments: [TimestampedSegment]? // swiftlint:disable:this discouraged_optional_collection
         let isDualSource: Bool
@@ -198,12 +201,14 @@ extension PipelineQueue {
 
             let transcription = try await transcribe(ctx, engine: engine, workDir: workDir)
 
-            // The transcript WITHOUT its recording-level note. A dropped track
-            // renders that one line even when the surviving track produced no
-            // segments, and the rendered string would then pass a check meant
-            // to catch exactly that: a note-only transcript saved as a success,
-            // with a protocol generated from one sentence.
-            let body = transcription.cachedSegments?.transcriptText(note: nil) ?? transcription.transcript
+            // The transcript WITHOUT its recording-level note or its pause
+            // markers. A dropped track renders that one line even when the
+            // surviving track produced no segments, and the rendered string
+            // would then pass a check meant to catch exactly that: a note-only
+            // transcript saved as a success, with a protocol generated from one
+            // sentence. A pause marker is rendered whatever was said, so it
+            // would pass the same way.
+            let body = transcription.cachedSegments?.transcriptText(note: nil, pauses: []) ?? transcription.transcript
             guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 // Compute input RMS only on the failure path — loading the whole
                 // mix file is expensive (~MB-per-minute) and we only need it when
@@ -282,6 +287,13 @@ extension PipelineQueue {
     /// stored as prose, so the wording never has to be parsed back.
     private func transcriptNote(_ jobID: UUID) -> String? {
         job(withID: jobID)?.trackViability?.transcriptNote
+    }
+
+    /// The pauses this job's transcript marks. Read from the job, which holds
+    /// them for the recording's whole life, so every rendering of it places
+    /// the same markers.
+    private func transcriptPauses(_ jobID: UUID) -> [RecordingPause] {
+        job(withID: jobID)?.pauses ?? []
     }
 
     /// Which tracks of a dual-source recording carry audio, and the record of
@@ -459,7 +471,9 @@ extension PipelineQueue {
             )
             let normalizedSegments = normalize(segments, with: normalizer)
             cachedSegments = normalizedSegments
-            transcript = normalizedSegments.transcriptText(note: transcriptNote(ctx.jobID))
+            transcript = normalizedSegments.transcriptText(
+                note: transcriptNote(ctx.jobID), pauses: transcriptPauses(ctx.jobID),
+            )
         } else {
             // Single-source: resample mix to 16kHz
             guard let mixPath = ctx.mixPath else {
@@ -490,9 +504,8 @@ extension PipelineQueue {
             }
 
             cachedSegments = segments
-            // Single-source has one track and no viability verdict, so nothing
-            // to annotate.
-            transcript = segments.transcriptText(note: nil)
+            // Single-source has one track and no viability verdict, so no note.
+            transcript = segments.transcriptText(note: nil, pauses: transcriptPauses(ctx.jobID))
         }
 
         stopElapsedTimer()
@@ -509,6 +522,7 @@ extension PipelineQueue {
         return TranscriptionOutput(
             transcript: transcript,
             note: transcriptNote(ctx.jobID),
+            pauses: transcriptPauses(ctx.jobID),
             cachedSegments: cachedSegments,
             isDualSource: isDualSource,
             terminologyNormalizer: normalizer,
@@ -782,7 +796,7 @@ extension PipelineQueue {
         return renderLabeledTranscript(
             run: run, cachedSegments: cachedSegments,
             isDualSource: transcription.isDualSource, autoNames: autoNames,
-            note: transcription.note,
+            annotations: (note: transcription.note, pauses: transcription.pauses),
         )
     }
 
@@ -792,11 +806,12 @@ extension PipelineQueue {
     /// (`labeledTranscript`) and the late re-diarization rewrite
     /// (the session's `rewriteTranscriptFromLateRun`) so both re-segment
     /// identically. Returns nil when the run carries no usable diarization.
-    /// Internal (not private) because it is a `SpeakerNamingSessionDelegate`
-    /// witness.
+    /// `annotations` is what the job adds around the speech: the recording
+    /// note and the pauses. Internal (not private) because it is a
+    /// `SpeakerNamingSessionDelegate` witness.
     func renderLabeledTranscript(
         run: DiarizationRun, cachedSegments: [TimestampedSegment],
-        isDualSource: Bool, autoNames: [String: String], note: String?,
+        isDualSource: Bool, autoNames: [String: String], annotations: (note: String?, pauses: [RecordingPause]),
     ) -> String? {
         // Suppressed copies leave before anything gets a speaker. Left in,
         // they would be labeled like real speech and merged into adjacent
@@ -826,7 +841,8 @@ extension PipelineQueue {
         }
         guard let topology else { return nil }
         let labeled = DiarizationProcess.labelSegments(topology, autoNames: autoNames)
-        return DiarizationProcess.mergeConsecutiveSpeakers(labeled).transcriptText(note: note)
+        return DiarizationProcess.mergeConsecutiveSpeakers(labeled, breakingAt: annotations.pauses.map(\.offsetSeconds))
+            .transcriptText(note: annotations.note, pauses: annotations.pauses)
     }
 
     /// Stage 3 — persist the transcript + audio, run protocol generation
