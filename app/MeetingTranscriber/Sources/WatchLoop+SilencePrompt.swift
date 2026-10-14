@@ -25,6 +25,9 @@ struct SilencePromptRuntime {
     /// is measured from. Set at every manual start and read at the stop, so
     /// ending the question leaves it alone.
     var manualStartedAt: Date?
+    /// The recording was resumed since the last poll, so part of the time
+    /// since then was paused (`WatchLoop+Pause.swift`).
+    var resumedSinceLastPoll = false
 }
 
 /// A "Stop now" to the silence question: where the saved audio ends (nil
@@ -47,17 +50,23 @@ extension WatchLoop {
     /// Run the policy for this poll and act on it. Returns the stop when the
     /// person chose "Stop now"; the caller ends the recording and logs it.
     ///
+    /// Paused time is not silence: a poll that finds the recording paused, or
+    /// resumed since the poll before, holds the question as well, so the
+    /// count restarts at the resume. Both poll loops get that hold from here.
+    ///
     /// - Parameters:
     ///   - held: Another question is open, so this one must not be.
     ///   - trigger: Which kind of recording is asked about, for the log.
     func stepSilencePrompt(held: Bool, trigger: RecordingSidecar.Trigger) -> SilenceStop? {
         let answer = silencePrompt.answer
         silencePrompt.answer = nil
+        let paused = isPaused || silencePrompt.resumedSinceLastPoll
+        silencePrompt.resumedSinceLastPoll = false
         let (action, state) = SilencePromptPolicy.step(
             after: silencePrompt.after(),
             now: nowProvider(),
             activity: silencePrompt.speechActivity(),
-            held: held,
+            held: held || paused,
             answer: answer,
             state: silencePrompt.policy,
         )
@@ -88,6 +97,7 @@ extension WatchLoop {
         withdrawSilenceQuestion(.ended)
         silencePrompt.policy = SilencePromptState()
         silencePrompt.answer = nil
+        silencePrompt.resumedSinceLastPoll = false
     }
 
     /// Stop a manual recording's capture, its silence question taken back
@@ -95,14 +105,18 @@ extension WatchLoop {
     /// now" gave one. Every other stop passes nil and keeps all of it. The cut
     /// is placed from when the loop saw the capture running, as a detected
     /// meeting's is; a stored cut record exists only for the meeting-end
-    /// question, so `cutBack` finds none to update here.
-    func stopManualCapture(_ recorder: any RecordingProvider, cutAt: Date?) throws -> RecordingResult {
+    /// question, so `cutBack` finds none to update here. The recording's
+    /// pauses come with it, taken before the cut (`takeRecordingPauses`).
+    func stopManualCapture(
+        _ recorder: any RecordingProvider, cutAt: Date?,
+    ) throws -> (recording: RecordingResult, pauses: [RecordingPause]) {
         let startedAt = silencePrompt.manualStartedAt
         endSilencePrompt()
         let stoppedAt = nowProvider()
         let recording = try recorder.stop()
-        guard let cutAt, let startedAt else { return recording }
-        return cutBack(recording, to: cutAt, startedAt: startedAt, stoppedAt: stoppedAt, recorder: recorder)
+        let pauses = takeRecordingPauses(endingAt: stoppedAt, capturedOffsets: recording.pauseOffsets)
+        guard let cutAt, let startedAt else { return (recording, pauses) }
+        return (cutBack(recording, to: cutAt, startedAt: startedAt, stoppedAt: stoppedAt, recorder: recorder), pauses)
     }
 
     /// Post the question under a fresh id, so an answer to an earlier one can
