@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-2-protocol-templates",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-10-14T11:52:20.617517Z",
+  "completion_reviewed_at": "2026-10-14T14:19:20.551074Z",
   "created_at": "2026-10-06T20:32:22.750230Z",
   "default_impl": null,
   "default_review": null,
@@ -927,18 +927,89 @@
       "timestamp": "2026-10-14T11:52:20.580857Z",
       "tool_calls": 32,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "50d8051704d8d7f5c7e2a0c4d2ddab323c61f0677c91016dd991d9d1ea6e60d7",
+      "backend": "codex",
+      "base_sha": "156166401170eb5229395624ca52b2c832470b5d",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "1e4562313fe04da1181cd7788fa46eb7927be692",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "3859d6349d764666a86e2c189c90a5e9",
+      "round_consumed": true,
+      "scope": "impl:gh-2-protocol-templates-and-background-info.1",
+      "superseded_by": null,
+      "task": "gh-2-protocol-templates-and-background-info.1",
+      "timestamp": "2026-10-14T14:12:46.906774Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "a65dd95129665a190b104a31665f9e5a2fe6b182d03e7c471484656a5ae0e098",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 2,
+      "head_sha": "1e4562313fe04da1181cd7788fa46eb7927be692",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 10058,
+      "output_sha256": "f4163cc187a13a720ef34b9e937e360f3fb9c5cd010a0d1bee43df8588ea1a94",
+      "reservation_id": "1fefda79e8bf4f0ba8915b56c9fc54a6",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T14:19:20.530401Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
-    "impl:gh-2-protocol-templates-and-background-info.1": 1,
+    "impl:gh-2-protocol-templates-and-background-info.1": 2,
     "impl:gh-2-protocol-templates-and-background-info.2": 1,
     "impl:gh-2-protocol-templates-and-background-info.3": 2,
     "impl:gh-2-protocol-templates-and-background-info.4": 2,
     "impl:gh-2-protocol-templates-and-background-info.5": 1,
     "plan": 1,
-    "plan#completion": 2
+    "plan#completion": 3
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
     "completion": 0,
@@ -964,5 +1035,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/2"
   },
-  "updated_at": "2026-10-14T11:52:20.621794Z"
+  "updated_at": "2026-10-14T14:19:20.552049Z"
 }
