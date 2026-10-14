@@ -2901,16 +2901,6 @@ final class PipelineQueueTests: XCTestCase {
 
     // MARK: - State Machine Edge Cases
 
-    func testCompletedJobsFilter() {
-        var doneJob = makeJob(title: "Done Meeting")
-        doneJob.state = .done
-        queue.enqueue(doneJob)
-        queue.enqueue(makeJob(title: "Waiting Meeting"))
-
-        XCTAssertEqual(queue.completedJobs.count, 1)
-        XCTAssertEqual(queue.completedJobs[0].meetingTitle, "Done Meeting")
-    }
-
     func testCancelNonexistentJobIsNoOp() {
         queue.enqueue(makeJob())
         let countBefore = queue.jobs.count

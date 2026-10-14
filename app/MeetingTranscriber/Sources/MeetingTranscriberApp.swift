@@ -163,8 +163,12 @@ struct MeetingTranscriberApp: App {
             onTogglePause: appState.canPauseRecording ? {
                 appState.watching.togglePause()
             } : nil,
-            onOpenLastProtocol: openLastProtocol,
             onOpenProtocol: openJobFile,
+            onOpenLastProtocol: { url in
+                Self.openLastProtocol(
+                    url, scopeRoot: appState.settings.effectiveOutputDir, notifier: NotificationManager.shared,
+                )
+            },
             onOpenProtocolsFolder: openProtocolsFolder,
             onOpenSettings: {
                 bringWindowToFront(id: "settings")
@@ -428,13 +432,6 @@ struct MeetingTranscriberApp: App {
         appState.pipeline.enqueueFiles(panel.urls)
     }
 
-    private func openLastProtocol() {
-        if let job = appState.pipeline.queue.completedJobs.last,
-           let path = job.protocolPath ?? job.transcriptPath {
-            NSWorkspace.shared.open(path)
-        }
-    }
-
     private func bringWindowToFront(id: String) {
         openWindow(id: id)
         NSApp.activate(ignoringOtherApps: true)
@@ -534,8 +531,15 @@ struct MeetingTranscriberApp: App {
         commandLineArgs.contains("--auto-watch") || autoWatchSetting
     }
 
-    /// Returns the protocol path from the last completed job, if any.
-    static func lastCompletedProtocolPath(completedJobs: [PipelineJob]) -> URL? {
-        completedJobs.last?.protocolPath
+    /// "Open Last Protocol": the file inside the output folder's security
+    /// scope, through the check the Transcriptions window's Open makes. When
+    /// the file is gone the window says "The file was moved or deleted."; the
+    /// menu has closed by then, so the same sentence arrives as a notification.
+    static func openLastProtocol(
+        _ url: URL, scopeRoot: URL, notifier: any AppNotifying,
+        open: (URL) -> Void = { NSWorkspace.shared.open($0) },
+    ) {
+        guard !TranscriptionFileOpener.perform(url, scopeRoot: scopeRoot, action: open) else { return }
+        notifier.notify(title: "Open Last Protocol", body: "The file was moved or deleted.", urgency: .standard)
     }
 }

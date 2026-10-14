@@ -48,11 +48,9 @@ protocol SpeakerNamingSessionDelegate: AnyObject {
         run: DiarizationRun, cachedSegments: [TimestampedSegment],
         isDualSource: Bool, autoNames: [String: String], annotations: (note: String?, pauses: [RecordingPause]),
     ) -> String?
-    /// Enter the diarizing stage for a late re-run: `updateJobState(.diarizing)`
-    /// + start the menu's elapsed timer.
-    func namingStageDidStart(jobID: UUID)
-    /// Leave a timed naming stage: stop the elapsed timer.
-    func namingStageDidEnd()
+    /// Enter the diarizing stage for a late re-run that diarizes in `mode`,
+    /// the mode its expected finish is read from.
+    func startDiarizing(jobID: UUID, mode: DiarizerMode)
 }
 
 extension SpeakerNamingSessionDelegate {
@@ -347,7 +345,6 @@ final class SpeakerNamingSession {
             jobID: jobID, slug: slug, usedDiarizerMode: diarizeProcess.mode,
             wroteSidecarsIn: saved ? outputDir : nil,
         )
-        delegate?.namingStageDidEnd()
 
         // Stash recognition forensics so the late-confirm path can write the
         // JSONL row when the user actually confirms (possibly later, via the
