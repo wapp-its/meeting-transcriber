@@ -7,6 +7,22 @@ protocol RecordingProvider {
     func start(source: RecordingSource, micDeviceUID: String?, debugLogging: Bool) throws
     func stop() throws -> RecordingResult
 
+    /// Pause the recording in progress: nothing captured from now until
+    /// `resume()` reaches its tracks, and what follows is written directly
+    /// after what came before. Does nothing when not recording or already
+    /// paused. `resume()` does nothing while not paused, and `stop()` ends a
+    /// pause still open.
+    ///
+    /// No defaults for these three, unlike the reporting members below: a
+    /// double that took a silent default would keep recording while the app
+    /// says it is paused.
+    func pause()
+    func resume()
+
+    /// Whether the recording in progress is paused. The channel-health
+    /// polling reads it to hold its checks meanwhile.
+    var isPaused: Bool { get }
+
     /// Instantaneous app-audio level in dBFS. -120 when no capture session is
     /// active or the tap stopped delivering buffers in the last 0.5 s.
     /// Drives the menu-bar asymmetric-silence indicator. Default: -120

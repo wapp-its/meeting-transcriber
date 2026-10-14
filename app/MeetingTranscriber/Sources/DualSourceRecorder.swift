@@ -25,6 +25,9 @@ struct RecordingResult {
     /// Whether the two tracks were mixed with the speech-level balance. Its
     /// gains come from all of the audio, so a cut mixes the kept tracks again.
     var levelBalanced = false
+    /// Where each pause begins on the saved tracks' timeline, in seconds and
+    /// in order (`AudioCaptureResult.pauseOffsets`). Empty without a pause.
+    var pauseOffsets: [TimeInterval] = []
 }
 
 /// The format `buildRecording` should expect the app track to arrive in, passed
@@ -60,6 +63,8 @@ class DualSourceRecorder: RecordingProvider {
     /// outlives `stop()`, which drops `startTimestamp`: the live cut runs after
     /// the stop, and the stored cut is cleared only then.
     private var pendingCutStem: String?
+    /// The pause of the recording in progress (`DualSourceRecorder+Pause.swift`).
+    var pauseState = RecorderPauseState()
 
     var appLevelDBFS: Double {
         captureSession?.appLevelDBFS ?? -120
@@ -125,6 +130,9 @@ class DualSourceRecorder: RecordingProvider {
     /// Injectable so a test can make one sync fail.
     private let pendingCutSync: PendingRecordingCut.Sync
 
+    /// How often a paused recording refreshes its tracks' modification dates.
+    let pausedTrackTouchInterval: Duration
+
     /// The closure defaults wrap the static they call rather than naming it:
     /// a bare reference to a static declared in another file compiles here
     /// and then fails to link.
@@ -132,10 +140,12 @@ class DualSourceRecorder: RecordingProvider {
         recordingsDir: URL = DualSourceRecorder.defaultRecordingsDir,
         makeCaptureSession: @escaping CaptureSessionFactory = { try LiveCaptureSession.make($0) },
         pendingCutSync: @escaping PendingRecordingCut.Sync = { try PendingRecordingCut.fullSync($0) },
+        pausedTrackTouchInterval: Duration = .seconds(10),
     ) {
         self.recordingsDir = recordingsDir
         self.makeCaptureSession = makeCaptureSession
         self.pendingCutSync = pendingCutSync
+        self.pausedTrackTouchInterval = pausedTrackTouchInterval
     }
 
     /// Remove leftover raw app temp files (current or legacy suffix) a previous
@@ -492,6 +502,7 @@ class DualSourceRecorder: RecordingProvider {
         }
         captureSession = session
         tappedPIDs = effectivePids
+        pauseState = RecorderPauseState(tracks: [appTempURL, micURL].compactMap(\.self))
 
         isRecording = true
         recordingStartDate = Date()
@@ -522,6 +533,7 @@ class DualSourceRecorder: RecordingProvider {
     private func finishRecording() throws -> RecordingResult {
         isRecording = false
         tappedPIDs = []
+        endPause()
 
         // Stop capture session and get result
         guard let session = captureSession else {

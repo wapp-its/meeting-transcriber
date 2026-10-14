@@ -32,6 +32,12 @@ private final class CapturingRecorder: RecordingProvider {
             recordingStartDate: Date(),
         )
     }
+
+    func pause() {}
+    func resume() {}
+    var isPaused: Bool {
+        false
+    }
 }
 
 /// Regression coverage for the bug where `handleMeeting` (auto-watch path)

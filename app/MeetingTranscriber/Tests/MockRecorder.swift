@@ -95,6 +95,15 @@ class MockRecorder: RecordingProvider {
     /// so a test can look at the tracks at the moment the resolution is stored.
     var duringPendingCutResolution: (() -> Void)?
 
+    /// How often `pause()` and `resume()` were called, and the state they
+    /// flip. Settable so a test can stage a paused recorder directly; `stop()`
+    /// clears it, as the real recorder's does.
+    private(set) var pauseCallCount = 0
+    private(set) var resumeCallCount = 0
+    var isPaused = false
+    /// The capture's pause positions `stop()` reports.
+    var pauseOffsets: [TimeInterval] = []
+
     func start(source: RecordingSource, micDeviceUID: String?, debugLogging _: Bool) {
         calls.append(.start)
         startCalled = true
@@ -104,6 +113,16 @@ class MockRecorder: RecordingProvider {
 
     func selectMicrophone(deviceUID: String?) {
         selectMicrophoneCalls.append(deviceUID)
+    }
+
+    func pause() {
+        pauseCallCount += 1
+        isPaused = true
+    }
+
+    func resume() {
+        resumeCallCount += 1
+        isPaused = false
     }
 
     func storePendingCut(cutAt: Date, deadline: Date, startedAt: Date) throws {
@@ -125,6 +144,7 @@ class MockRecorder: RecordingProvider {
     func stop() throws -> RecordingResult {
         calls.append(.stop)
         stopCalled = true
+        isPaused = false
         guard let mix = mixPath else {
             throw RecorderError.noAudioData
         }
@@ -134,6 +154,7 @@ class MockRecorder: RecordingProvider {
             micPath: micPath,
             micDelay: 0,
             recordingStartDate: recordingStartDate ?? Date(),
+            pauseOffsets: pauseOffsets,
         )
     }
 }
@@ -150,5 +171,11 @@ final class ThrowingRecorder: RecordingProvider {
 
     func stop() throws -> RecordingResult {
         throw RecorderError.notRecording
+    }
+
+    func pause() {}
+    func resume() {}
+    var isPaused: Bool {
+        false
     }
 }

@@ -34,6 +34,13 @@ final class ChannelFaultIntegrationTests: XCTestCase {
                 appPath: nil, micPath: nil, micDelay: 0, recordingStartDate: Date(),
             )
         }
+
+        // Required members, no defaults to take.
+        func pause() {}
+        func resume() {}
+        var isPaused: Bool {
+            false
+        }
     }
 
     func testAProviderThatDoesNotSimulateCaptureIsNeverReportedAsBroken() {

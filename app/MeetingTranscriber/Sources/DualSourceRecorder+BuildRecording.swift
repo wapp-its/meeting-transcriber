@@ -225,6 +225,7 @@ extension DualSourceRecorder {
             micDelay: normalisation.reportedDelay,
             recordingStartDate: recordingStartDate,
             levelBalanced: levelBalance && appPath != nil && micPath != nil,
+            pauseOffsets: captureResult.pauseOffsets,
         )
     }
 
