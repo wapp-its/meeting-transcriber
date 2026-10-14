@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-14T12:37:55.069195Z",
+  "depends_on": [
+    "gh-138-local-model-for-protocols-in-the.3"
+  ],
+  "id": "gh-138-local-model-for-protocols-in-the.6",
+  "priority": null,
+  "review": "codex:gpt-6-astra:xhigh",
+  "spec": "gh-138-local-model-for-protocols-in-the",
+  "spec_path": ".flow/tasks/gh-138-local-model-for-protocols-in-the.6.md",
+  "status": "todo",
+  "title": "Settings: Local model rows and Check Model",
+  "updated_at": "2026-10-14T12:44:36.087945Z"
+}
