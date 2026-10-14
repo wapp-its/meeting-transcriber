@@ -43,6 +43,11 @@ final class DualSourceRecorderLifecycleTests: XCTestCase {
         /// The configuration the recorder handed the factory, so a test can
         /// assert on the choices and write to the URLs it picked.
         var lastConfiguration: AudioCaptureConfiguration?
+        /// How often the recorder forwarded a pause and a resume.
+        private(set) var pauseCallCount = 0
+        private(set) var resumeCallCount = 0
+        /// The pause positions `stop()` reports.
+        var pauseOffsets: [TimeInterval] = []
 
         func start() throws {
             if let startError { throw startError }
@@ -52,10 +57,18 @@ final class DualSourceRecorderLifecycleTests: XCTestCase {
             selectMicrophoneCalls.append(deviceUID)
         }
 
+        func pause() {
+            pauseCallCount += 1
+        }
+
+        func resume() {
+            resumeCallCount += 1
+        }
+
         func stop() -> AudioCaptureResult {
             AudioCaptureResult(
                 appAudioFileURL: appTrack, micAudioFileURL: micTrack,
-                actualSampleRate: 16000, actualChannels: 1, micDelay: 0,
+                actualSampleRate: 16000, actualChannels: 1, micDelay: 0, pauseOffsets: pauseOffsets,
             )
         }
     }

@@ -46,7 +46,7 @@ protocol SpeakerNamingSessionDelegate: AnyObject {
     /// transcript segments (a queue pipeline stage, reused by the late rewrite).
     func renderLabeledTranscript(
         run: DiarizationRun, cachedSegments: [TimestampedSegment],
-        isDualSource: Bool, autoNames: [String: String], note: String?,
+        isDualSource: Bool, autoNames: [String: String], annotations: (note: String?, pauses: [RecordingPause]),
     ) -> String?
     /// Enter the diarizing stage for a late re-run: `updateJobState(.diarizing)`
     /// + start the menu's elapsed timer.

@@ -410,6 +410,12 @@ final class AppState {
         permissions.health?.isHealthy == false
     }
 
+    /// Whether the running recording is paused: the icon's pause mark and the
+    /// menu item's label. A single-member accessor like `hasPermissionProblem`.
+    var isRecordingPaused: Bool {
+        watching.isRecordingPaused
+    }
+
     /// Single-member accessors that keep the menu-bar body's type-check cheap.
     /// Reading `pipeline.queue.…` directly in that body adds a member-resolution
     /// layer per use that pushed its type-check over budget on slower CI runners
@@ -441,6 +447,13 @@ final class AppState {
     /// the recording would begin a moment later regardless.
     var canStopRecording: Bool {
         watching.isRecording
+    }
+
+    /// Whether the menu offers Pause/Resume: a recording's capture is running.
+    /// Narrower than `canStopRecording`, because a detected meeting records a
+    /// moment before its recorder is up, and nothing pretends to pause then.
+    var canPauseRecording: Bool {
+        watching.canPauseRecording
     }
 
     // Internal (not private): also formats `postedAt` in the RPC snapshot

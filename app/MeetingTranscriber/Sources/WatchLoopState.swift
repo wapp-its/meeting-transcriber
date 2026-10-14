@@ -1,16 +1,19 @@
 import Foundation
 
-/// Value-type snapshot of `WatchLoop`'s five observable fields. The class
+/// Value-type snapshot of `WatchLoop`'s six observable fields. The class
 /// keeps the fields as `@Observable` stored properties (so SwiftUI bindings
 /// continue working); `WatchLoopState` is the form tests and other readers
 /// (e.g. the RPC state snapshot) use for equality checks against a single
-/// value rather than five field-wise comparisons.
+/// value rather than six field-wise comparisons.
 struct WatchLoopState: Equatable {
     var phase: WatchLoop.State
     var currentMeeting: DetectedMeeting?
     var lastError: String?
     var detail: String
     var manualRecordingInfo: ManualRecordingInfo?
+    /// When the recording in progress was paused; nil while it runs, and
+    /// whenever the phase is not `.recording` (`WatchLoop+Pause.swift`).
+    var pausedSince: Date?
 
     /// Initial state at `WatchLoop` construction. Matches the field
     /// defaults declared on the class — see `WatchLoop.init`.
@@ -20,6 +23,7 @@ struct WatchLoopState: Equatable {
         lastError: nil,
         detail: "",
         manualRecordingInfo: nil,
+        pausedSince: nil,
     )
 }
 
@@ -50,7 +54,7 @@ extension WatchLoop {
         return currentMeeting.map { .forApp(pid: $0.windowPID, noMic: noMic) }
     }
 
-    /// Value-type view of the five observable fields. Useful for tests,
+    /// Value-type view of the six observable fields. Useful for tests,
     /// `AppState+RPC` snapshots, and as the input/output shape for the
     /// upcoming pure-function reducer slice.
     var snapshot: WatchLoopState {
@@ -60,6 +64,7 @@ extension WatchLoop {
             lastError: lastError,
             detail: detail,
             manualRecordingInfo: manualRecordingInfo,
+            pausedSince: pausedSince,
         )
     }
 }

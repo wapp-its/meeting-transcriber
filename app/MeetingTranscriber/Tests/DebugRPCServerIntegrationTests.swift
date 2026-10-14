@@ -1214,7 +1214,7 @@
 
         func testV1RecordGETReturnsStatus() async throws {
             let dto = RecordStatusDTO(
-                recording: true, startPending: false, state: "recording", badge: "recording",
+                recording: true, paused: false, startPending: false, state: "recording", badge: "recording",
                 otherRecordingActive: false, noMic: false, microphoneHealthy: true,
             )
             // Typed local, not a trailing closure — see testV1WatchGETReturnsStatus.
@@ -1240,7 +1240,7 @@
             let base = try await startServer(
                 recordStatus: {
                     RecordStatusDTO(
-                        recording: isRecording, startPending: false, state: isRecording ? "recording" : nil,
+                        recording: isRecording, paused: false, startPending: false, state: isRecording ? "recording" : nil,
                         badge: "inactive", otherRecordingActive: false,
                         noMic: false, microphoneHealthy: true,
                     )
@@ -1273,7 +1273,7 @@
 
         func testV1RecordPOSTBlockedReturns409() async throws {
             let dto = RecordStatusDTO(
-                recording: false, startPending: false, state: "recording", badge: "recording",
+                recording: false, paused: false, startPending: false, state: "recording", badge: "recording",
                 otherRecordingActive: true, noMic: false, microphoneHealthy: true,
             )
             let base = try await startServer(recordStatus: { dto }, recordControl: { _ in .blocked })
@@ -1293,7 +1293,7 @@
         /// neither a 200 nor a 503, and the body has to say which switch is off.
         func testV1RecordPOSTRefusedReturns412() async throws {
             let dto = RecordStatusDTO(
-                recording: false, startPending: false, state: nil, badge: "inactive",
+                recording: false, paused: false, startPending: false, state: nil, badge: "inactive",
                 otherRecordingActive: false, noMic: true, microphoneHealthy: false,
             )
             let base = try await startServer(recordStatus: { dto }, recordControl: { _ in .refused })
@@ -1323,9 +1323,36 @@
             let control: (RecordAction) -> RecordControlOutcome = { _ in .changed }
             let base = try await startServer(recordControl: control)
             var req = request("POST", base.appendingPathComponent("v1/record"), headers: authHeader)
-            req.httpBody = Data(#"{"action":"pause"}"#.utf8)
+            req.httpBody = Data(#"{"action":"rewind"}"#.utf8)
             let (_, response) = try await URLSession.shared.upload(for: req, from: XCTUnwrap(req.httpBody))
             XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 400)
+        }
+
+        /// A `pause` with no recording's capture running is refused like a
+        /// clobbering start, and the body still describes the state.
+        func testV1RecordPOSTPauseWithNothingToPauseReturns409() async throws {
+            let dto = RecordStatusDTO(
+                recording: false, paused: false, startPending: false, state: "watching", badge: "inactive",
+                otherRecordingActive: false, noMic: false, microphoneHealthy: true,
+            )
+            var received: RecordAction?
+            let base = try await startServer(
+                recordStatus: { dto },
+                recordControl: { action in
+                    received = action
+                    return .blocked
+                },
+            )
+
+            var req = request("POST", base.appendingPathComponent("v1/record"), headers: authHeader)
+            req.httpBody = Data(#"{"action":"pause"}"#.utf8)
+            let (data, response) = try await URLSession.shared.upload(for: req, from: XCTUnwrap(req.httpBody))
+
+            XCTAssertEqual(received, .pause, "the verb must reach the control seam")
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 409)
+            let decoded = try JSONDecoder().decode(RecordStatusDTO.self, from: data)
+            XCTAssertFalse(decoded.paused)
+            XCTAssertEqual(decoded.state, "watching")
         }
 
         /// The method arm of the control-resource table. Without it a `DELETE`

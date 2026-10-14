@@ -40,6 +40,8 @@ final class MenuBarViewTests: XCTestCase {
         noMic: Bool = false,
         manualRecordingPendingOrActive: Bool = false,
         onShowAllTranscriptions: @escaping () -> Void = {},
+        isRecordingPaused: Bool = false,
+        onTogglePause: (() -> Void)? = nil,
     ) -> MenuBarView {
         MenuBarView(
             status: status,
@@ -52,6 +54,8 @@ final class MenuBarViewTests: XCTestCase {
             noMic: noMic,
             manualRecordingPendingOrActive: manualRecordingPendingOrActive,
             onStopManualRecording: onStopManualRecording,
+            isRecordingPaused: isRecordingPaused,
+            onTogglePause: onTogglePause,
             onOpenLastProtocol: {},
             onOpenProtocol: { _ in },
             onOpenProtocolsFolder: {},
@@ -795,6 +799,41 @@ final class MenuBarViewTests: XCTestCase {
         let body = try sut.inspect()
         try body.find(button: "Stop Recording").tap()
         XCTAssertTrue(called)
+    }
+
+    // MARK: - Pause / Resume Recording
+
+    /// The one wiring test: found by its identifier, tapped, the callback ran;
+    /// labelled by the pause state, on the line directly under Stop Recording.
+    func testThePauseItemSitsUnderStopRecordingAndCallsItsCallback() throws {
+        for (paused, label, other) in [(false, "Pause Recording", "Resume Recording"), (true, "Resume Recording", "Pause Recording")] {
+            var toggles = 0
+            let sut = makeView(
+                status: makeStatus(state: .recording),
+                onStopManualRecording: {},
+                isRecordingPaused: paused,
+                // swiftlint:disable:next trailing_closure
+                onTogglePause: { toggles += 1 },
+            )
+
+            let item = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.pauseResumeRecording)
+            XCTAssertNoThrow(try item.find(text: label), label)
+            XCTAssertThrowsError(try item.find(text: other), label)
+            let titles = try sut.inspect().findAll(ViewType.Button.self).map { try $0.find(ViewType.Text.self).string() }
+            XCTAssertEqual(Array(titles.prefix(2)), ["Stop Recording", label])
+
+            try item.button().tap()
+            XCTAssertEqual(toggles, 1, label)
+        }
+    }
+
+    func testThePauseItemIsAbsentWithoutACallback() throws {
+        // swiftlint:disable:next trailing_closure
+        let body = try makeView(status: makeStatus(state: .recording), onStopManualRecording: {}).inspect()
+
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.pauseResumeRecording))
+        XCTAssertThrowsError(try body.find(text: "Pause Recording"))
+        XCTAssertThrowsError(try body.find(text: "Resume Recording"))
     }
 
     // MARK: - Update indicator

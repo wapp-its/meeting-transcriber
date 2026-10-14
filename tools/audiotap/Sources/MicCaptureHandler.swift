@@ -138,6 +138,10 @@ public class MicCaptureHandler: @unchecked Sendable {
     /// instead of an under-run (issue #379 follow-up — see `+Timeline`).
     /// `internal` for that cross-file extension; survives restarts (never reset).
     var timelineAnchor = TimelineAnchor(rate: Int(speechSampleRate))
+    /// Cuts the paused frames out of each buffer; kept across restarts, reset with the anchor.
+    var pauseCutter = CapturePauseCutter()
+    /// The session's pauses, shared with the app track; see `+Write`.
+    let pauseGate: CapturePauseGate
     public private(set) var firstFrameTime: UInt64 = 0
 
     // State for an injected DebugTapFault (above). Always compiled but inert
@@ -203,6 +207,7 @@ public class MicCaptureHandler: @unchecked Sendable {
         stallClock: @escaping @Sendable () -> TimeInterval = MicStallWatchdogPolicy.monotonicNow,
         isDevicePresent: @escaping @Sendable (String) -> Bool = MicCaptureHandler.isDevicePresentOnSystem,
         configChangeLimits: MicConfigChangePolicy.Limits = .production,
+        pauseGate: CapturePauseGate = CapturePauseGate(),
     ) {
         self.decideRetry = decideRetry
         stallWatchdog = OSAllocatedUnfairLock(initialState: MicStallWatchdogPolicy(limits: stallWatchdogLimits))
@@ -214,6 +219,7 @@ public class MicCaptureHandler: @unchecked Sendable {
         self.liveSink = liveSink
         self.debugFault = debugFault
         self.sessionFactory = sessionFactory
+        self.pauseGate = pauseGate
         session = sessionFactory()
     }
 
@@ -303,6 +309,7 @@ public class MicCaptureHandler: @unchecked Sendable {
             // belongs to this file's sample stream. Restarts keep the file
             // (and the anchor), so a restart gap is bridged with silence.
             timelineAnchor = TimelineAnchor(rate: Int(fileSampleRate))
+            pauseCutter = CapturePauseCutter()
         }
 
         // Locals, captured by value below. Sharing them across sessions loses
@@ -331,48 +338,19 @@ public class MicCaptureHandler: @unchecked Sendable {
         // installTapOnBus raises an ObjC NSException for an invalid/incompatible
         // format (issue #379); Swift can't catch that. Build the tap block, then
         // install it through the ObjC shim so a raise becomes a recoverable throw.
-        // swiftlint:disable closure_parameter_position closure_body_length
-        let tapBlock: AVAudioNodeTapBlock = {
-            [weak self] buffer, when in
-            // swiftlint:enable closure_parameter_position closure_body_length
+        let tapBlock: AVAudioNodeTapBlock = { [weak self] buffer, when in
             guard let self, self.isRecording else { return }
             if self.firstFrameTime == 0 {
                 self.firstFrameTime = mach_absolute_time()
             }
-            // Every buffer, whatever it carries: zeros are a working input.
+            // Every buffer, whatever it carries and paused or not: zeros are
+            // a working input, and the levels and buffer ages keep reading
+            // the live device during a pause.
             self.noteBufferForStallWatchdog()
             self.accumulateDebugRMS(buffer: buffer)
             self.publishCurrentLevel()
             self.maybeReportDebugRMS()
-            do {
-                if let converter {
-                    let outputFrames = resampleOutputCapacity(
-                        inputFrames: buffer.frameLength, ratio: resampleRatio,
-                    )
-                    guard let outputBuffer = AVAudioPCMBuffer(
-                        pcmFormat: converter.outputFormat,
-                        frameCapacity: outputFrames,
-                    ) else { return }
-                    var error: NSError?
-                    let feed = FeedOnce(buffer: buffer)
-                    converter.convert(to: outputBuffer, error: &error) { _, outStatus in
-                        feed.next(outStatus)
-                    }
-                    if let error {
-                        logger.warning("Mic resample error: \(error.localizedDescription, privacy: .public)")
-                    } else {
-                        self.fillTimelineGap(before: when, outputFrames: Int(outputBuffer.frameLength))
-                        try self.outputFile?.write(from: outputBuffer)
-                        self.forwardToLiveSink(buffer: outputBuffer)
-                    }
-                } else {
-                    self.fillTimelineGap(before: when, outputFrames: Int(buffer.frameLength))
-                    try self.outputFile?.write(from: buffer)
-                    self.forwardToLiveSink(buffer: buffer)
-                }
-            } catch {
-                logger.warning("Mic write error: \(error.localizedDescription, privacy: .public)")
-            }
+            self.writeUnpausedFrames(of: buffer, at: when, converter: converter, resampleRatio: resampleRatio)
         }
 
         try session.installTap(format: installFormat, block: tapBlock)

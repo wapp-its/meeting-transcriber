@@ -45,9 +45,77 @@ The user-facing controls on top of task 4's `WatchLoop.pauseRecording()` / `resu
 - [ ] `./scripts/lint.sh` clean with the pinned tools; `./scripts/pre-push.sh --with-appstore` passes (release build, both variants).
 
 ## Done summary
-TBD
+The user-facing pause controls now reach task .4's watch-loop pause. The menu shows "Pause Recording" / "Resume Recording" on the line under "Stop Recording" while a recording's capture runs, for every kind of recording. While paused, the menu bar icon draws a static pause symbol in place of the waveform, and every existing overlay still draws over it. `POST /v1/record` accepts `pause` and `resume` for any recording; a `pause` with no capture running answers 409. `GET`/`POST /v1/record` report `paused`, `/state` reports `recordingPaused`, and `badge` stays `recording`. `docs/automation-api.md` and `docs/stream-deck.md` describe all of it.
 
+stage: impl-review - skipped(policy: parallel-wave - conductor owns the review after integration)
+
+Tier: implementer - opus (explicit invocation) (model: claude-opus-5-5)
+
+baseline: green via handoff (conductor, at e9bb94be, which is this lane's BASE_COMMIT; nothing changed since, checked with `git log --name-only e9bb94be..HEAD`), and lint measured green before any edit (`./scripts/lint.sh` with the pinned tools, rc 0, 0 violations in 798 files).
+
+### Gates (worker, on lane commits 508db808 and 37d55bcc, all measured)
+
+- Task AC filter `RecordControl|RPCRecordStatus|RPCBadge|DebugRPCServerIntegration|MenuBar|BadgeKind|WatchingController|AppState`, scratch home /tmp/gh46-home-t6, `--parallel`: 408 tests, rc 0, 0 failures, 0 skips. All 74 `DebugRPCServerIntegrationTests` ran (socket tests included). Log: /tmp/gh46-tick/w6/t6.log.
+- `./scripts/lint.sh` with the pinned SwiftFormat 0.63.0 and SwiftLint 0.65.1: rc 0, 0 violations in 800 files (log /tmp/gh46-tick/w6/lint2.log).
+- `./scripts/pre-push.sh --with-appstore` (release build of both variants): rc 0 in 199 s, "OK — pre-push parity check passed." Both variants built (Homebrew, then `-DAPPSTORE`), and the log has no warning or error line. Log: /tmp/gh46-tick/w6/prepush.log.
+- `flowctl gate classify --base e9bb94be`: exit 1 (FULL), so the focused commands above ran and no GATE_SKIPPED line applies.
+- Snapshot: `MenuBarIconSnapshotTests.testPausedSnapshot` recorded `Tests/__Snapshots__/MenuBarIconSnapshotTests/testPausedSnapshot.recording.png` on its first run (expected "No reference was found" failure). The rerun against the committed reference was green: 8 tests, rc 0 (log /tmp/gh46-tick/w6/snapshot2.log). I looked at the reference upscaled: two upright bars, clearly not the waveform.
+- Mutation check: seven one-point mutations, each applied alone, run against its test class, and restored from HEAD (tree clean afterwards). Each failed its intended test. M1: pause with nothing to pause answers `.unchanged`. M2: DTO `paused` hardcoded false. M3: `/state` `recordingPaused` hardcoded false. M4: the icon body ignores the pause. M5: menu labels swapped. M6: the menu toggle only ever pauses. M7: pause routed through the microphone-only check. Results: /tmp/gh46-tick/w6/mutations-all.txt.
+- Not run: CI's `swiftlint analyze` (`unused_declaration`), which needs a clean `xcodebuild build-for-testing`. A reference exists for every new declaration (inferred clean).
+- Not run, owner checks per spec: the icon's look in light and dark menu bars, and a real call paused and resumed from the menu, Stream Deck or curl.
+
+### Tests by acceptance criterion
+
+1. `WatchingControllerRecordControlTests`:
+   - `testPauseActsOnEveryKindOfRecordingAndARepeatIsUnchanged` covers a microphone recording, an app recording and a detected meeting: `.changed`, the loop paused, the repeat `.unchanged`, the loop still recording.
+   - `testWithNothingRecordingPauseIsRefusedAndResumeIsUnchanged`: `pause` is `.blocked` and `resume` is `.unchanged`.
+   - `testResumeChangesOnlyAPausedRecording`: `.unchanged` while running, `.changed` while paused.
+   - `testTheMenuTogglePausesThenResumesTheRunningRecording` covers the menu toggle and `canPauseRecording`.
+   - The existing start/stop/toggle tests are unchanged and green.
+2. `RPCRecordStatusTests`: the wire-shape pin now includes `paused`, false in `.notRecording`. `testAPauseIsReportedForEveryKindOfRecordingWithTheBadgeUnchanged` has two rows, microphone and app recording. In each, `paused` and `/state.recordingPaused` are true while paused, and `badge` is `recording` on both surfaces. `recording` keeps its microphone-only meaning, and `paused` is false after resume. `DebugRPCServerIntegrationTests`: `testV1RecordPOSTPauseWithNothingToPauseReturns409` checks that the verb reaches the seam as `.pause` and that the answer is 409 with the status body. The unknown-verb test now sends `rewind` (it used `pause`, which is now a verb) and still gets 400.
+3. `MenuBarViewTests`:
+   - `testThePauseItemSitsUnderStopRecordingAndCallsItsCallback` finds the item by `A11yID.pauseResumeRecording` and checks its label in both states. The item is the button right after "Stop Recording", and a tap calls the callback once.
+   - `testThePauseItemIsAbsentWithoutACallback`: no item when `onTogglePause` is nil.
+4. `MenuBarIconPauseTests` (new file, matching `MenuBarIcon*Tests.swift`):
+   - `testThePausedIconReplacesEveryRecordingFrameAndHoldsStill`: differs from every recording frame, identical across frames.
+   - `testThePausedIconIsATemplateUnlessARedOverlayIsOn`: a template image unless a red overlay is on.
+   - `testEveryOverlayStillDrawsOverThePauseSymbol`: the watching dot, question mark, permission badge, record-only dot and both silent tints still draw, each with the pause symbol still under it (pixel probes).
+   - `testTheCountdownPulseStillRunsOverThePauseSymbol`: the countdown pulse still runs while paused (A10).
+   - `BadgeKindComputeTests` and `RPCBadgeStateTests` are untouched and green. `MenuBarIconSnapshotTests.testPausedSnapshot` was added (dev-only).
+5. Docs, `docs/automation-api.md`: the endpoint table; GET and POST `/v1/record`, with a "Pausing a recording" paragraph and a curl example; the 200, 409, 400 and 503 response text; the `RecordStatusDTO` example and the `paused` and `badge` bullets; the `WatchStatusDTO` `badge` note; the 409 row of the status-code table. `docs/stream-deck.md`: a "Pausing a recording" subsection in the `/v1/record` section (says `mt-cli` has no pause verb yet) and the 409 row.
+6. AC filter: the gate above.
+7. Lint and pre-push: the gates above.
+
+### Decisions
+
+- D-a (rule 1, task Approach, spec A4): the one entry point is the new `Sources/WatchingController+Pause.swift`. It holds `pauseRecording()` and `resumeRecording()` (a nil loop gives `.nothingToPause` / `.unchanged`), `togglePause()` for the menu, and the read accessors `isRecordingPaused` and `canPauseRecording`. `applyRecordAction` joins starts first. Then `pause` maps changed/unchanged/nothingToPause to `.changed`/`.unchanged`/`.blocked`, and `resume` maps changed to `.changed` and anything else to `.unchanged`. Neither goes through `isRecordingMicrophoneOnly`. Live captions are not flushed. Test: the record-control tests, mutation M7.
+- D-b (rule 5): `MenuBarIcon.swift` was at 599 of 600 lines, and the pause drawing took it to 623. An extension file (`MenuBarIcon+Pause.swift`) would be outside the declared Touches, so I added `// swiftlint:disable file_length` on line 1. `AppSettings.swift`, `PipelineQueue.swift`, `SpeakerNamingView.swift` and `DualSourceRecorder.swift` carry the same suppression. Alternative: move `drawPauseSymbol` (or the `BadgeKind.compute` extension) into a new file and drop the suppression. Switch point: `MenuBarIcon.swift` line 1. Test: `./scripts/lint.sh`.
+- D-c (rule 4, icon shape): two pill-shaped bars, 3 pt wide, 11 pt tall and 3 pt apart, centred where the waveform sits, in the icon's own colour. They are drawn through `renderImage` with no cache, re-rendered per animation tick like the red overlays. The watching dot's clear ring should take a small bite out of the right bar's top corner, as it does out of the waveform (inferred from the geometry, not rendered). Alternatives: the SF Symbol `pause.fill`, square-ended bars, a paused frame cache. Switch point: `MenuBarIcon.drawPauseSymbol`. Tests: `MenuBarIconPauseTests`, the snapshot reference.
+- D-d (rule 1, A10 over the task's "frame 0" wording): the pause symbol ignores the frame. The real animation frame still reaches `renderImage`, so a meeting-end countdown keeps pulsing over a paused icon. Switch point: `MenuBarIcon.image` (the frame passed with `pausedOverlay`). Test: `testTheCountdownPulseStillRunsOverThePauseSymbol`, mutation M4.
+- D-e (rule 1, D5): the item is `MenuBarView.pauseResumeItem`. It is rendered in `sessionControls` after the Stop Recording / watch-toggle branch, so it is the line under "Stop Recording", and it is present exactly when `onTogglePause` is set. The scene sets the callback from `AppState.canPauseRecording` (the loop's `canPause`). The icons are `pause.circle` / `record.circle` and there is no keyboard shortcut (none requested). Test: the two `MenuBarViewTests`, mutation M5.
+- D-f (rule 6): `AppState.isRecordingPaused` sits next to `hasPermissionProblem` and `AppState.canPauseRecording` next to `canStopRecording`. Both are single-hop reads through `WatchingController`, for the type-check budget. `/state` and `/v1/record` read `watching.isRecordingPaused`.
+- D-g (rule 6): `paused` sits right after `recording` in `RecordStatusDTO`, is always present, and is false in `.notRecording`. The docs state that a paused detected meeting reads `recording: false, paused: true`. They also state that `pause` and `resume` answer 503 only when a start already in flight does not settle within 20 s, which is what `joinStarts` does.
+- D-h (rule 1, the AC's "unknown verb still 400"): the integration test's unknown verb changed from `pause` to `rewind`. Declared intent: `pause` is now valid.
+
+### Notes for the conductor
+
+- Not done, outside the declared Touches: the route's doc comment in `Sources/DebugRPCServer+V1.swift:77-78` (task Approach: "update its doc lines") still reads "`POST /v1/record` — start/stop/toggle a microphone recording `{action}`, or end any recording `{"action":"stop","scope":"any"}`". Suggested replacement: "start/stop/toggle a microphone recording or pause/resume any recording `{action}`, or end any recording `{"action":"stop","scope":"any"}`". The route itself needs no code change: the 409 test drives it.
+- Feature-map route change: the menu bar gains "Pause Recording" / "Resume Recording" under "Stop Recording" while a recording runs. `/v1/record` gains the `pause` and `resume` verbs.
+- Touches: every changed file is inside the declared set. `WatchingController+Pause.swift` matches `WatchingController*.swift` and `MenuBarIconPauseTests.swift` matches `MenuBarIcon*Tests.swift`.
+- Owner checks (spec Verification, not tasks): the paused icon in light and dark mode, and whether the bite the watching dot takes out of the right bar is acceptable.
+
+### Review and integration (conductor)
+
+stage: impl-review - ran [codex gpt-6-astra xhigh; round 1: three draws (correctness, contracts, integration) all SHIP, 0 findings; no fix pass]
+
+Integrated onto feat/gh-46-pause-recording as 3934635d, edff80ee (lane commits 508db808, 37d55bcc) plus the conductor's 40aebdcf (the route doc comment in DebugRPCServer+V1.swift the task's Approach asked for, outside the worker's Touches), base e9bb94be. Focused integrated verify at 40aebdcf: task AC filter 408 tests exit 0 (socket tests included); lint exit 0. pre-push --with-appstore: worker-measured exit 0 at the lane head; run again on the final head at quiesce.
+
+Conductor decisions on the worker's report: D-b (file_length disable on MenuBarIcon.swift) is a rule-5 assumption recorded as A14; D-c (icon shape) a rule-4 assumption recorded as A15; D-d (A10 over the task's frame-0 wording, rule 1), D-a, D-e (rule 1), D-f, D-g (rule 6) accepted; D-h (the unknown-verb integration test now sends rewind instead of pause) accepted as a requirement change: pause is a valid verb now, the test's intent (an unknown verb answers 400) is unchanged. The route doc comment (rule 6) was done by the conductor as 40aebdcf.
+
+Owner checks (spec Verification, not tasks): the paused icon in light and dark menu bars, and whether the watching dot's bite out of the right bar is acceptable; a real call paused and resumed from the menu, Stream Deck or curl.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 3934635d2fb0699d1e9fb55cea1266798b072aa5, edff80eeafc8031ce6a9616088813bfb6d6a7276, 40aebdcfc1e9e618558d4dfe5f367d5233b5689a
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/tmp/gh46-home-c6 swift test --parallel --filter 'RecordControl|RPCRecordStatus|RPCBadge|DebugRPCServerIntegration|MenuBar|BadgeKind|WatchingController|AppState' (integrated head 40aebdcf: exit 0, 408 tests, 0 failures, 0 skipped, socket tests included), ./scripts/lint.sh with pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1 (integrated head 40aebdcf: exit 0, 0 violations in 800 files), worker at lane head 37d55bcc (same tree minus the route doc comment): task AC filter 408 tests exit 0; lint exit 0; ./scripts/pre-push.sh --with-appstore exit 0 in 199 s (both release variants); MenuBarIconSnapshotTests rerun against the recorded paused reference exit 0; 7 single-point mutations each failed their intended test, ./scripts/pre-push.sh --with-appstore on the final integrated head: run once at quiesce (Phase 4), see the spec's work summary, review: codex gpt-6-astra xhigh, round 1 three draws (correctness, contracts, integration) all SHIP, 0 findings (receipt /tmp/impl-review-receipt-d1afe3212e3b-gh-46-pause-and-resume-a-recording.6.json), cd app/MeetingTranscriber && CFFIXED_USER_HOME=<scratch> swift test --parallel --filter 'RecordControl|RPCRecordStatus|RPCBadge|DebugRPCServerIntegration|MenuBar|BadgeKind|WatchingController|AppState', ./scripts/lint.sh, ./scripts/pre-push.sh --with-appstore
 - PRs:

@@ -83,6 +83,11 @@ struct PipelineJob: Identifiable, Codable {
     /// protocol prompts must preserve `nil` so they never treat processing time
     /// as authoritative meeting context.
     var meetingStartTime: Date?
+    /// The recording's pauses, each rendered as a marker line in every
+    /// transcript of this job. Nil means none: optional so a snapshot written
+    /// before this field existed still decodes. It describes the recording,
+    /// not a run, so a retry keeps it.
+    var pauses: [RecordingPause]? // swiftlint:disable:this discouraged_optional_collection
 
     /// Timestamp used only for output artifact names. Reimports and recovery
     /// have no real meeting start, so their filenames use enqueue time.
@@ -269,6 +274,7 @@ struct PipelineJob: Identifiable, Codable {
         micDelay: TimeInterval,
         participants: [String] = [],
         meetingStartTime: Date? = nil,
+        pauses: [RecordingPause] = [],
         autoSkipNaming: Bool = false,
         // swiftlint:disable:next discouraged_optional_boolean
         includeFullTranscriptInProtocol: Bool? = nil,
@@ -285,6 +291,7 @@ struct PipelineJob: Identifiable, Codable {
         self.participants = participants
         self.enqueuedAt = Date()
         self.meetingStartTime = meetingStartTime
+        self.pauses = pauses.isEmpty ? nil : pauses
         self.state = .waiting
         self.error = nil
         self.warnings = []

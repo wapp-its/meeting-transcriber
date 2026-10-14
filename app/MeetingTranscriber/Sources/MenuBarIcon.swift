@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import AppKit
 
 /// Badge overlay kind for the menu bar icon.
@@ -152,9 +153,15 @@ enum MenuBarIcon {
     /// the template rule is unchanged. It bypasses the cache like the red overlays, so a faded
     /// frame never comes from a cache rendered without it. The countdown only runs while a
     /// detected meeting records, so the badge is the animated `.recording`.
+    ///
+    /// `pausedOverlay` draws a static pause symbol in place of the badge's body while the
+    /// recording is paused (`AppState.isRecordingPaused`); the badge stays `.recording`. Only
+    /// the body changes: every overlay above draws over it as over the waveform, the countdown
+    /// pulse included. In the icon's own colour, so the template rule is unchanged.
     static func image(
         badge: BadgeKind,
         animationFrame: Int = 0,
+        pausedOverlay: Bool = false,
         watchingOverlay: Bool = false,
         questionOverlay: Bool = false,
         meetingEndCountdownOverlay: Bool = false,
@@ -163,13 +170,14 @@ enum MenuBarIcon {
         micSilentOverlay: Bool = false,
         appSilentOverlay: Bool = false,
     ) -> NSImage {
-        if meetingEndCountdownOverlay || permissionOverlay || recordOnlyOverlay || micSilentOverlay || appSilentOverlay {
+        if pausedOverlay || meetingEndCountdownOverlay || permissionOverlay || recordOnlyOverlay || micSilentOverlay || appSilentOverlay {
             // Honour the cache's frame discipline: animated badges advance, static ones
             // stay on frame 0. Without this, the live animationFrame leaks through and
             // makes `.inactive` (idle waveform) bounce as if recording.
             let frame = badge.isAnimated ? animationFrame : 0
             return renderImage(
                 badge: badge, frame: frame,
+                pausedOverlay: pausedOverlay,
                 watchingOverlay: watchingOverlay,
                 questionOverlay: questionOverlay,
                 meetingEndCountdownOverlay: meetingEndCountdownOverlay,
@@ -200,6 +208,7 @@ enum MenuBarIcon {
     private static func renderImage(
         badge: BadgeKind,
         frame: Int,
+        pausedOverlay: Bool = false,
         watchingOverlay: Bool = false,
         questionOverlay: Bool = false,
         meetingEndCountdownOverlay: Bool = false,
@@ -231,19 +240,19 @@ enum MenuBarIcon {
             let foreground = needsExplicitForeground && isDark ? NSColor.white : NSColor.black
             foreground.setFill()
 
-            drawBadgeBody(badge: badge, in: rect, frame: frame)
+            drawBadgeBody(badge: badge, in: rect, frame: frame, paused: pausedOverlay)
 
             // Tint halves AFTER the base body is drawn. Clipping to the upper /
             // lower half + repainting the same body with red fill overlays the
             // tint without altering bar geometry — clean per-channel signal.
             if micSilentOverlay {
                 drawTintedHalf(in: rect, half: .top) {
-                    drawBadgeBody(badge: badge, in: rect, frame: frame)
+                    drawBadgeBody(badge: badge, in: rect, frame: frame, paused: pausedOverlay)
                 }
             }
             if appSilentOverlay {
                 drawTintedHalf(in: rect, half: .bottom) {
-                    drawBadgeBody(badge: badge, in: rect, frame: frame)
+                    drawBadgeBody(badge: badge, in: rect, frame: frame, paused: pausedOverlay)
                 }
             }
 
@@ -286,7 +295,11 @@ enum MenuBarIcon {
 
     /// Single dispatch for the badge's main body shape. Extracted so the
     /// per-half tint pass can re-draw the same body under a clip rect.
-    private static func drawBadgeBody(badge: BadgeKind, in rect: NSRect, frame: Int) {
+    private static func drawBadgeBody(badge: BadgeKind, in rect: NSRect, frame: Int, paused: Bool) {
+        guard !paused else {
+            drawPauseSymbol(in: rect)
+            return
+        }
         switch badge {
         case .transcribing:
             drawTranscribingAnimation(in: rect, frame: frame)
@@ -326,6 +339,18 @@ enum MenuBarIcon {
         NSBezierPath(rect: clip).setClip()
         NSColor.systemRed.setFill()
         body()
+    }
+
+    /// Two rounded bars, centred where the waveform sits; the same on every
+    /// frame, since nothing is being captured.
+    private static func drawPauseSymbol(in rect: NSRect) {
+        let width: CGFloat = 3.0
+        let gap: CGFloat = 3.0
+        let height: CGFloat = 11.0
+        for x in [rect.midX - gap / 2 - width, rect.midX + gap / 2] {
+            let bar = NSRect(x: x, y: rect.midY - height / 2, width: width, height: height)
+            NSBezierPath(roundedRect: bar, xRadius: width / 2, yRadius: width / 2).fill()
+        }
     }
 
     // MARK: - Recording Animation (bouncing waveform)
