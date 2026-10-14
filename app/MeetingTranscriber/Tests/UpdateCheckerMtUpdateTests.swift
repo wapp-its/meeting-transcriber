@@ -199,6 +199,7 @@ final class UpdateCheckerMtUpdateTests: XCTestCase {
         XCTAssertTrue(body.contains(fixture.installer.installLogPath), body)
         XCTAssertNil(fixture.store.load())
         XCTAssertEqual(fixture.checker.installState, .idle)
+        XCTAssertEqual(fixture.checker.lastInstallError, body)
 
         // The build that did not install is on offer again, without a check.
         XCTAssertEqual(fixture.checker.availableBuildSummary, Self.summary)
