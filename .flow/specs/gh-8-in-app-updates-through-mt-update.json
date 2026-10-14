@@ -1,7 +1,7 @@
 {
   "branch_name": "local/gh-8-self-update",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-14T13:14:52.272489Z",
   "created_at": "2026-10-06T20:23:38.220779Z",
   "default_impl": null,
   "default_review": null,
@@ -317,6 +317,42 @@
       "task": "gh-8-in-app-updates-through-mt-update.4",
       "timestamp": "2026-10-14T12:50:40.214444Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "867c2b087cb1cb2bdc9b4e01c810b84c084ce1f2427bc5debaff560aac41ce12",
+      "backend": "codex",
+      "base_sha": "8def642b12039a7014770a156c2d5c60ba7438bf",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "7f1d821d463612464030d9172147f07877c67022",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 633044,
+      "output_sha256": "b7c66d0a315afaa39a527c73e31f500a0111ec2913324281799e7651df026305",
+      "reservation_id": "64a7a8565b4e4002a716f604174f06a8",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T13:14:52.243880Z",
+      "tool_calls": 34,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -325,12 +361,13 @@
     "impl:gh-8-in-app-updates-through-mt-update.3": 1,
     "impl:gh-8-in-app-updates-through-mt-update.4": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-8-in-app-updates-through-mt-update.1": 0,
     "impl:gh-8-in-app-updates-through-mt-update.2": 0,
     "impl:gh-8-in-app-updates-through-mt-update.3": 0,
@@ -352,5 +389,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/8"
   },
-  "updated_at": "2026-10-14T12:50:44.891545Z"
+  "updated_at": "2026-10-14T13:14:52.276700Z"
 }
