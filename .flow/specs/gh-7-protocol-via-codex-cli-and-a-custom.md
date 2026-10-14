@@ -83,7 +83,7 @@ Without `{prompt_file}` and `{transcript_file}`, the full prompt goes to stdin; 
 - Timeout and output cap are injectable, so the timeout and cap tests run in seconds. Prompt tests pass their own prompt file to `ProtocolGenerator.buildSystemPrompt` so the developer's custom prompt never changes the result. [inferred]
 - Every existing `ClaudeCLIProtocolGenerator*Tests` passes after the move with no edits beyond renamed symbols; they are the regression guard for the Claude preset. [inferred]
 - Both variants build: the Homebrew build with the new providers, the App Store build (`-Xswiftc -DAPPSTORE`) without them. [inferred]
-- A real Codex run and a real `ollama run` belong to the owner (his Codex login; ollama is not installed); they are human checks, not tasks. [inferred]
+- A real Codex run and a real `ollama run` need a Codex login and an ollama install, which the build machine does not have; they are human checks, not tasks. [inferred]
 
 ## Acceptance Criteria
 

@@ -25,6 +25,9 @@ struct RecordingResult {
     /// Whether the two tracks were mixed with the speech-level balance. Its
     /// gains come from all of the audio, so a cut mixes the kept tracks again.
     var levelBalanced = false
+    /// Where each pause begins on the saved tracks' timeline, in seconds and
+    /// in order (`AudioCaptureResult.pauseOffsets`). Empty without a pause.
+    var pauseOffsets: [TimeInterval] = []
 }
 
 /// The format `buildRecording` should expect the app track to arrive in, passed
@@ -60,6 +63,8 @@ class DualSourceRecorder: RecordingProvider {
     /// outlives `stop()`, which drops `startTimestamp`: the live cut runs after
     /// the stop, and the stored cut is cleared only then.
     private var pendingCutStem: String?
+    /// The pause of the recording in progress (`DualSourceRecorder+Pause.swift`).
+    var pauseState = RecorderPauseState()
 
     var appLevelDBFS: Double {
         captureSession?.appLevelDBFS ?? -120
@@ -125,6 +130,9 @@ class DualSourceRecorder: RecordingProvider {
     /// Injectable so a test can make one sync fail.
     private let pendingCutSync: PendingRecordingCut.Sync
 
+    /// How often a paused recording refreshes its tracks' modification dates.
+    let pausedTrackTouchInterval: Duration
+
     /// The closure defaults wrap the static they call rather than naming it:
     /// a bare reference to a static declared in another file compiles here
     /// and then fails to link.
@@ -132,10 +140,12 @@ class DualSourceRecorder: RecordingProvider {
         recordingsDir: URL = DualSourceRecorder.defaultRecordingsDir,
         makeCaptureSession: @escaping CaptureSessionFactory = { try LiveCaptureSession.make($0) },
         pendingCutSync: @escaping PendingRecordingCut.Sync = { try PendingRecordingCut.fullSync($0) },
+        pausedTrackTouchInterval: Duration = .seconds(10),
     ) {
         self.recordingsDir = recordingsDir
         self.makeCaptureSession = makeCaptureSession
         self.pendingCutSync = pendingCutSync
+        self.pausedTrackTouchInterval = pausedTrackTouchInterval
     }
 
     /// Remove leftover raw app temp files (current or legacy suffix) a previous
@@ -492,6 +502,7 @@ class DualSourceRecorder: RecordingProvider {
         }
         captureSession = session
         tappedPIDs = effectivePids
+        pauseState = RecorderPauseState(tracks: [appTempURL, micURL].compactMap(\.self))
 
         isRecording = true
         recordingStartDate = Date()
@@ -522,6 +533,7 @@ class DualSourceRecorder: RecordingProvider {
     private func finishRecording() throws -> RecordingResult {
         isRecording = false
         tappedPIDs = []
+        endPause()
 
         // Stop capture session and get result
         guard let session = captureSession else {
@@ -612,47 +624,6 @@ class DualSourceRecorder: RecordingProvider {
         case let .notPublished(error): throw PendingCutWriteError(published: false, underlying: error)
         case let .publishedNotSynced(error): throw PendingCutWriteError(published: true, underlying: error)
         }
-    }
-
-    /// Downmix interleaved multi-channel audio to mono. Passthrough if already
-    /// mono. Delegates to the AudioTapLib implementation so the averaging logic
-    /// lives once (the capture-time resampler uses the same function).
-    nonisolated static func downmixToMono(_ samples: [Float], channels: Int) -> [Float] {
-        AudioTapLib.downmixToMono(samples, channels: channels)
-    }
-
-    /// Cross-check the device-reported sample rate against raw file size and mic duration.
-    /// Returns the corrected rate (snapped to standard), or the device rate if cross-check
-    /// is unavailable or agrees.
-    nonisolated static func crossCheckAppRate(
-        deviceRate: Int,
-        appRawBytes: Int,
-        appChannels: Int,
-        micDurationSeconds: Double?,
-        micDelay: TimeInterval,
-    ) -> Int {
-        guard let micDuration = micDurationSeconds, micDuration > 3.0 else {
-            return deviceRate
-        }
-        let appDuration = micDuration + micDelay
-        guard appDuration > 3.0 else { return deviceRate }
-
-        guard let inferred = SampleRateQuery.inferRateFromDuration(
-            rawBytes: appRawBytes,
-            bytesPerSample: MemoryLayout<Float>.size,
-            channels: max(appChannels, 1),
-            durationSeconds: appDuration,
-        ) else { return deviceRate }
-
-        let snapped = SampleRateQuery.snapToStandardRate(inferred)
-
-        // Only override if significantly different (> 5% deviation)
-        let deviation = abs(Double(snapped - deviceRate)) / Double(max(deviceRate, 1))
-        if deviation > 0.05 {
-            logger.warning("Rate cross-check: device=\(deviceRate), inferred=\(inferred), snapped=\(snapped) — overriding")
-            return snapped
-        }
-        return deviceRate
     }
 
     // Pinned Gregorian/POSIX: these stems are the final user-visible filenames

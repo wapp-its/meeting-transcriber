@@ -11,9 +11,9 @@ import Foundation
 /// where either of those means capturing nothing at all.
 ///
 /// The fields are facts, not advice. A client decides what to draw from them:
-/// `recording` for the key itself, and `otherRecordingActive` / `noMic` /
-/// `microphoneHealthy` to explain a refusal it just received — or to grey the
-/// key out before pressing.
+/// `recording` for the key itself, `paused` for a pause key, and
+/// `otherRecordingActive` / `noMic` / `microphoneHealthy` to explain a refusal
+/// it just received — or to grey the key out before pressing.
 struct RecordStatusDTO: Codable, Equatable {
     /// Whether a microphone-only recording is in progress.
     ///
@@ -22,6 +22,11 @@ struct RecordStatusDTO: Codable, Equatable {
     /// and reporting them here would invite a client to `stop` one it never
     /// started. `otherRecordingActive` carries those.
     let recording: Bool
+    /// Whether the running recording is paused, whatever kind it is: unlike
+    /// `recording`, a paused detected meeting or app recording reads true too,
+    /// because `pause` and `resume` act on whichever recording runs. `badge`
+    /// keeps reading `recording` while paused, so this is the one signal.
+    let paused: Bool
     /// Whether a start has been accepted but is not recording yet.
     ///
     /// A start can sit for a while: it waits on the microphone permission gate,
@@ -61,6 +66,7 @@ struct RecordStatusDTO: Codable, Equatable {
     /// special-case launch.
     static let notRecording = Self(
         recording: false,
+        paused: false,
         startPending: false,
         state: nil,
         badge: BadgeKind.inactive.rawValue,
@@ -71,7 +77,9 @@ struct RecordStatusDTO: Codable, Equatable {
 }
 
 /// What a `POST /v1/record` asks for. `start`/`stop` sit alongside `toggle` for
-/// the reason spelled out on `WatchAction`.
+/// the reason spelled out on `WatchAction`. `pause`/`resume` act on whichever
+/// recording runs, not only a microphone-only one, and have no toggle of their
+/// own for the same reason.
 ///
 /// A separate enum from that one, rather than a shared verb set, so a verb added
 /// to one resource does not silently appear on the other's payload.
@@ -79,6 +87,8 @@ enum RecordAction: String, Codable {
     case start
     case stop
     case toggle
+    case pause
+    case resume
 }
 
 /// What a record-control request actually achieved. Maps 1:1 onto the HTTP
@@ -97,7 +107,8 @@ enum RecordControlOutcome: Equatable {
     case changed
     /// Already in the requested state; nothing to do. → 200
     case unchanged
-    /// Refused: another recording owns the loop and starting would clobber it. → 409
+    /// Refused: another recording owns the loop and starting would clobber it,
+    /// or a `pause` found no recording's capture running. → 409
     case blocked
     /// Refused on a precondition the caller has to fix first — "No Microphone"
     /// is set, or the microphone permission is denied or broken. → 412

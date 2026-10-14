@@ -11,8 +11,9 @@ extension WatchLoop {
         title: String,
         appName: String,
         recording: RecordingResult,
-        participants: [String],
+        pauses: [RecordingPause],
         protocolOptions: MeetingProtocolOptions?,
+        participants: [String] = [],
     ) -> PipelineJob {
         PipelineJob(
             meetingTitle: title,
@@ -23,6 +24,7 @@ extension WatchLoop {
             micDelay: recording.micDelay,
             participants: participants,
             meetingStartTime: recording.recordingStartDate,
+            pauses: pauses,
             protocolTemplate: protocolOptions?.template,
             protocolBackground: protocolOptions?.background,
         )

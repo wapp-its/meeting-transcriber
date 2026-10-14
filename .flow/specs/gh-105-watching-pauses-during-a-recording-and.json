@@ -1,0 +1,165 @@
+{
+  "branch_name": "gh-105-watching-pauses-during-a-recording-and",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-13T14:17:52.453591Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-105-watching-pauses-during-a-recording-and",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-13T14:50:23.369303Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "db371690409b05888d89b7bb2c8a6b29ecae394351d28a97dda802d83075a96b",
+      "backend": "codex",
+      "base_sha": "47c550ada129a452cc2922d9f24653bb3212b497",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-07af1e7dbcf84e0ed5ff0d901793a82a",
+            "classification": "introduced",
+            "findingId": "finding-07af1e7dbcf84e0ed5ff0d901793a82a",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-0c430584f9d273401e709f441201e476",
+            "classification": "introduced",
+            "findingId": "finding-0c430584f9d273401e709f441201e476",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-803f32dabd7e4e5d4df1fbc53c935f1e",
+            "classification": "introduced",
+            "findingId": "finding-803f32dabd7e4e5d4df1fbc53c935f1e",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "47c550ada129a452cc2922d9f24653bb3212b497",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 358968,
+      "output_sha256": "1a3ce2f78ef50b3ba649bd9625403e19d5d1016e80a0bd64789d7c8036357fbc",
+      "reservation_id": "9bfc5fc783b24ba5a577f27b290e1877",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-13T14:46:25.067172Z",
+      "tool_calls": 23,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "89ba069106329f55b23f4c79e1d68475fd290c6664658868ca58a3c15d72eecf",
+      "backend": "codex",
+      "base_sha": "47c550ada129a452cc2922d9f24653bb3212b497",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-07af1e7dbcf84e0ed5ff0d901793a82a",
+            "classification": "introduced",
+            "findingId": "finding-07af1e7dbcf84e0ed5ff0d901793a82a",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-0c430584f9d273401e709f441201e476",
+            "classification": "introduced",
+            "findingId": "finding-0c430584f9d273401e709f441201e476",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-803f32dabd7e4e5d4df1fbc53c935f1e",
+            "classification": "introduced",
+            "findingId": "finding-803f32dabd7e4e5d4df1fbc53c935f1e",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "47c550ada129a452cc2922d9f24653bb3212b497",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 876,
+      "output_sha256": "0e1d4a683c25675ad43b654ea29f3ab0ed362140ad2b138e5e3ca356358b4896",
+      "reservation_id": "679c633598454a1e92f97d96f5e06bd7",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-13T14:50:22.893075Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-105-watching-pauses-during-a-recording-and.md",
+  "status": "open",
+  "title": "Watching pauses during a recording and resumes after it",
+  "tracker": {
+    "baseHashFlow": "b3dcdbd9a15724c36986047fdeaa8fe6d7abeb23f71631d15eeee2c6c6830388",
+    "baseHashTracker": "b48cc99ff0572515977de10a8b72077abf9dc666e1b11886fe1cc96ecdb7c956",
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABV9jyDA",
+    "identifier": "#105",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": "# Watching pauses during a recording and resumes after it\n\n## Conversation Evidence\n\n> user (turn 1, 2026-10-08): \"when a recording is running it should show a stop and pause or also the continue button when it happened.\"\n> user (turn 4, 2026-10-12): \"stop watching - is it needed? Could it record several apps in parallel? Or should we just hide the stop watching while its recording? Or would we want to record two apps at the same time? Doesnt make sense in 99% of the cases, actually watching should be paused while recording isnt it?\"\n> user (turn 6, selected): \"A \u2014 Pause rule, one small plan (Recommended)\"\n> user (turn 7, selected): \"A \u2014 Skip every running call (Recommended)\"\n> user (turn 7, selected): \"A \u2014 No, the stop cancels it (Recommended)\"\n\n## Goal & Context\n\nThe app records one meeting at a time. While a detected meeting records, it only checks whether that meeting has ended and looks for no other meeting; when the meeting ends it watches again on its own. So for detected meetings, watching already pauses during a recording and resumes after it. The owner wants that to be the rule for every recording, and the menu to stop offering a watch control while a recording runs. [paraphrase]\n\nTwo things break the rule today. First, a manual recording (app + microphone, or microphone only, started from the menu, the app picker or the automation API) switches watching off when it starts, and nothing switches it back on when it ends: watching stays off until someone presses Start Watching or the app is restarted with \"Watch for meetings when the app starts\". The next meeting is then neither detected nor recorded, without any notice. The automation API's microphone start already restores watching after a start that failed or was refused, but no successful recording and no menu or picker start does. Second, since gh-94 the menu shows the watch toggle below the first divider during every recording: during a detected meeting it reads \"Stop Watching for Meetings\" and ends the recording and watching together, and during a manual recording it reads \"Start Watching for Meetings\" and a click is silently refused. [inferred]\n\n<!-- Source: 30% [paraphrase] / 70% [inferred] (current behaviour, checked in the code on wapp/main at 47c550ad) -->\n\n## Architecture & Data Models\n\n- **Who owns the resume.** \"Watching was on when this manual recording took over, so turn it back on afterwards\" is a fact about one manual recording. It is set when a manual start stops an active watch loop, cleared by a stop-watching request during the recording, and consumed when that recording ends. The component that starts and stops the watch loop owns it; no new setting and nothing persisted. [inferred]\n- **What signals the end.** The resume hangs on the recording's end as the watch loop itself reports it (leaving the recording state), not on the menu's Stop Recording action: two endings, the recorded app quitting and the 4-hour limit, happen inside the loop without the controller being called, and today leave the controller holding an idle loop. [inferred]\n- **Holding calls that are still running.** Resuming starts watching the same way the launch-time auto-watch does. Before the resumed watching decides about any meeting, every meeting the detectors report active at that moment is placed under gh-94's re-detection hold, and gh-94's release rule (the first watching poll that finds that meeting's signal gone) applies unchanged. Holds belong to a watch loop, so the resumed loop places them itself; nothing is carried over from the loop the manual recording replaced. [inferred]\n- **Menu.** The watch toggle is not rendered while any recording runs. The menu already knows when a recording runs: it is the same condition that shows \"Stop Recording\" under the status line (gh-94 R1, R8). [inferred]\n\n## API Contracts\n\n- `POST /v1/watch` `stop` while a manual recording runs: the response is unchanged (200, nothing changed now, as documented), and in addition the resume is cancelled, so watching stays off after the recording. `start` (and a `toggle` that resolves to a start) keeps answering 409 while a manual recording runs. [paraphrase]\n- `GET /v1/watch` and `GET /state`: no new fields. `watching` reads true again once watching has resumed. [inferred]\n- `docs/automation-api.md` (`/v1/watch`) gains the two facts above: watching resumes after a manual recording when it was on before the recording started, and a `stop` sent during the recording cancels that. [inferred]\n\n## Edge Cases & Constraints\n\n- **The app quits during a manual recording:** nothing resumes in this run; the next launch follows \"Watch for meetings when the app starts\" as today. [inferred]\n- **A failed or refused manual start** (microphone or Screen Recording permission refused, the recorder throwing at start) resumes watching like any other end, from the menu and the app picker as well as from the automation API. One mechanism covers all of them; the automation API's existing restore after a failed start is folded into it rather than kept as a second path. [inferred]\n- **The recorder fails at stop:** the failure is reported as today, and watching still resumes. [inferred]\n- **No permission prompt at resume:** resuming must not raise a system dialog (it starts like the launch-time auto-watch, not like a Start Watching press). If watching cannot start, the result is the same as a failed auto-watch start today; the recording's own processing is unaffected. [inferred]\n- **Resumed watching starts fresh:** current settings (apps to watch, ask-first and never-for-this-app rules) apply, as after a Start Watching press; in-memory state of the watch loop the manual recording replaced is not carried over. [inferred]\n- **A second manual start while one runs** is refused as today; the resume belongs to the running recording only. [inferred]\n- **gh-46 (pause, planned):** pausing does not end a recording, so it never resumes watching; only the recording's end does. [inferred]\n- **Record-only mode:** unaffected; the resume works the same. [inferred]\n- **Watching off when the manual recording started:** it stays off; with the toggle hidden during the recording, someone who wants watching on afterwards presses Start Watching once the recording has ended. [paraphrase]\n\n## Acceptance Criteria\n\n- **R1:** While any recording runs (a detected meeting, an app recording started from the menu or app picker, a microphone-only recording), the menu bar menu shows neither \"Start Watching for Meetings\" nor \"Stop Watching for Meetings\". When no recording runs, the watch toggle is shown directly under the status line exactly as today. Errors: none; in the moment between registering a manual start and its recording running, the menu shows what it shows today. [paraphrase]\n- **R2:** If meeting watching was on when a manual recording started (app + microphone or microphone only; from the menu, the app picker or `POST /v1/record`), watching is on again once that recording has ended, whichever way it ended: Stop Recording in the menu, a `/v1/record` stop, the recorded app quitting, the 4-hour limit, a start that failed or was refused, or a recorder that failed at stop. If watching was off when the recording started, it stays off. Errors: resuming raises no system permission prompt; if watching cannot start, the outcome is that of a failed launch-time auto-watch start, and the recording's own processing (job or record-only files) is unaffected. [paraphrase]\n- **R3:** When watching resumes after a manual recording, every meeting the detectors report active at that moment is neither recorded nor asked about (\"Record \u2026 meeting?\") until a watching poll has found that meeting's signal gone once; a meeting that starts after the resume is detected, asked about and recorded as usual. Errors: none beyond the detector's own. [paraphrase]\n- **R4:** A `POST /v1/watch` `stop` sent while a manual recording runs cancels the resume: after that recording ends, watching stays off. The response is unchanged (200, as documented); `start` during a manual recording keeps answering 409. Errors: a `stop` after the recording has ended stops watching as today. [paraphrase]\n- **R5:** `GET /v1/watch` reports `watching: true` once watching has resumed, with no new fields, and `docs/automation-api.md` states that watching resumes after a manual recording when it was on before, and that a `stop` sent during the recording cancels the resume. Errors: none. [inferred]\n- **R6:** Nothing else changes: a detected meeting's recording pauses and resumes watching as today, \"Stop Recording\" on a detected meeting keeps watching on (gh-94), `/v1/record` keeps its documented verbs and answers, and the watch toggle outside recordings behaves as today. Errors: none. [inferred]\n\n## Boundaries\n\n- No new setting and no menu item to pause or resume watching by hand. [inferred]\n- No notification when watching resumes. [inferred]\n- No change to how detected meetings end, to `/v1/record`, or to \"Watch for meetings when the app starts\". [inferred]\n- Follow-up, not planned: show in the menu during a manual recording that watching will resume after it. [inferred]\n\n## Decision Context\n\n- **D1 \u00b7 A recording pauses meeting watching and its end resumes it: no watch toggle in the menu while any recording runs, and watching comes back after a manual recording if it was on before.** why: owner 2026-10-12 \"actually watching should be paused while recording isnt it?\" and the pick \"A \u2014 Pause rule, one small plan\" (2026-10-13) \u00b7 alternatives: B (hide the toggle now, the resume later) rejected because watching would still stay off after manual recordings; C (keep the menu as built) rejected because the toggle does nothing during a manual recording \u00b7 status: active [owner-stated 2026-10-13]\n- **D2 \u00b7 When watching resumes, every call active at that moment is held until its signal has gone once, not only the app that was recorded.** why: owner pick \"A \u2014 Skip every running call\" (2026-10-13) \u00b7 alternatives: hold only the recorded app, rejected because another app's call would be recorded or asked about from the middle, and the app picker's app name is not the detector's identity \u00b7 status: active [owner-ratified 2026-10-13]\n- **D3 \u00b7 A stop-watching request during a manual recording cancels the resume.** why: owner pick \"A \u2014 No, the stop cancels it\" (2026-10-13) \u00b7 alternatives: resume anyway, rejected because the API would answer \"not watching\" and watching would then come back on its own \u00b7 status: active [owner-ratified 2026-10-13]\n- **A1 \u00b7 Resuming raises no permission prompt: it starts like the launch-time auto-watch, not like a Start Watching press.** flip at: the owner wants to be asked for a missing permission at that moment \u00b7 test: the resume tests (no prompt requested) \u00b7 status: active [agent-assumed 2026-10-13]\n- **A2 \u00b7 Resumed watching starts fresh with the current settings and keeps no in-memory state of the loop the manual recording replaced.** flip at: a decline or cooldown from before the recording is lost and someone is asked twice in real use \u00b7 test: the resume tests start a new loop \u00b7 status: active [agent-assumed 2026-10-13]\n- **A3 \u00b7 A failed or refused manual start resumes watching from every entry point, through one mechanism that replaces the automation API's own restore after a failed microphone start.** flip at: the API restore turns out to need behaviour the shared one cannot give \u00b7 test: the existing `/v1/record` failed-start tests stay green \u00b7 status: active [agent-inferred 2026-10-13]\n\n## Requirement coverage\n\n| Req | Description | Task(s) | Gap justification |\n| --- | --- | --- | --- |\n| R1 | No watch toggle in the menu while any recording runs | fn-N.M (TBD - populate via /flow-next:plan) | \u2014 |\n| R2 | Watching resumes after a manual recording if it was on | fn-N.M (TBD - populate via /flow-next:plan) | \u2014 |\n| R3 | Calls active at resume are held until their signal is gone once | fn-N.M (TBD - populate via /flow-next:plan) | \u2014 |\n| R4 | `/v1/watch` stop during a manual recording cancels the resume | fn-N.M (TBD - populate via /flow-next:plan) | \u2014 |\n| R5 | `/v1/watch` reports the resumed state; docs updated | fn-N.M (TBD - populate via /flow-next:plan) | \u2014 |\n| R6 | Nothing else changes | fn-N.M (TBD - populate via /flow-next:plan) | \u2014 |\n",
+    "mergeBaseTracker": "## Problem\n\nStartet man bei laufender \u00dcberwachung eine **manuelle Aufnahme** (\u201eRecord App + Microphone\u2026\u201c, \u201eRecord Microphone Only\u201c), schaltet die App die \u00dcberwachung ab (`WatchingController.beginManualRecording`, Schritt \u201eStop auto-watch if active\u201c). Nach \u201eStop Recording\u201c bleibt sie **aus**: `stopManualRecording()` setzt nur `watchLoop = nil`. Sie kommt erst mit \u201eStart Watching for Meetings\u201c zur\u00fcck oder beim n\u00e4chsten App-Start, wenn \u201eBeim Start \u00fcberwachen\u201c an ist.\n\nIm Alltag: kurz eine Sprachnotiz oder ein Gespr\u00e4ch im Raum aufgenommen, danach wird das n\u00e4chste Teams-Meeting **weder erkannt noch aufgenommen**, ohne Hinweis. Bei erkannten Meetings ist es anders: nach deren Ende \u00fcberwacht die App von selbst weiter.\n\nDazu ein toter Men\u00fceintrag: w\u00e4hrend einer manuellen Aufnahme zeigt das Men\u00fc \u201eStart Watching for Meetings\u201c, ein Klick darauf wird still ignoriert (`toggleWatching` verweigert, solange eine manuelle Aufnahme die Schleife besitzt).\n\nOwner, 2026-10-08: \u201eactually watching should be paused while recording isn't it?\u201c\n\n## Wunsch\n\n- War die \u00dcberwachung **vor** der manuellen Aufnahme an, l\u00e4uft sie **nach** deren Ende wieder an, so wie nach einem erkannten Meeting. War sie aus, bleibt sie aus.\n- Damit eine Anruf-App, die noch im Anruf ist (die manuell aufgenommene App selbst oder Teams nach einer Mikrofon-Aufnahme), nicht sofort erkannt und aufgenommen oder nachgefragt wird, gilt die Sperre aus #94 (\u201eerst wieder erkennen, wenn das Signal einmal weg war\u201c) f\u00fcr die aufgenommene App.\n- Gilt auch, wenn die manuelle Aufnahme aus einem anderen Grund endet (Ziel-App beendet, 4-h-Grenze).\n\n## Abnahme\n\n- \u00dcberwachung an \u2192 \u201eRecord App + Microphone\u2026\u201c mit Teams \u2192 \u201eStop Recording\u201c \u2192 Symbol zeigt wieder \u201e\u00fcberwacht\u201c (#41); Teams noch im Anruf \u2192 keine neue Aufnahme, keine R\u00fcckfrage, bis der Anruf endet; n\u00e4chster Anruf \u2192 normal erkannt.\n- \u00dcberwachung aus \u2192 manuelle Aufnahme \u2192 Stopp \u2192 \u00dcberwachung bleibt aus.\n- Automation-API: `/v1/watch` meldet nach dem Stopp denselben Zustand wie vor dem Start.\n\n## Bezug\n\n#94 (Stopp von Hand, f\u00fchrt die wiederverwendbare Erkennungssperre `RedetectionHolds` ein), #98 (Men\u00fc w\u00e4hrend einer Aufnahme), #41 (\u00dcberwachung sichtbar am Symbol).\n\n",
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/105"
+  },
+  "updated_at": "2026-10-13T14:50:23.411177Z"
+}

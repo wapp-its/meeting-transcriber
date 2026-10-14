@@ -40,10 +40,14 @@ public class AppAudioCapture: @unchecked Sendable {
     /// #379 follow-up — see `writeCapturedBuffer` in `+Resampling`). `internal`
     /// for that cross-file extension; touched only on `writeQueue`.
     var timelineAnchor = TimelineAnchor(rate: Int(speechSampleRate))
+    /// Cuts the paused frames out of each buffer; touched only on `writeQueue`.
+    var pauseCutter = CapturePauseCutter()
     /// Measures the rate the tap is actually delivering, so a device that
     /// renegotiates in place is followed (issue #673). Touched only on
     /// `writeQueue`, like the anchor above.
     var deliveredRateTracker = DeliveredRateTracker()
+    /// The session's pauses, shared with the microphone; see `+Resampling`.
+    let pauseGate: CapturePauseGate
     /// What the currently installed attempt built, or nil while nothing is
     /// installed. Main-queue confined: only `start()`, the restart adoption and
     /// `stopCapture` touch it, and all three run there. An attempt in flight
@@ -207,6 +211,7 @@ public class AppAudioCapture: @unchecked Sendable {
         silentTrackWatchdog: Bool = false,
         signalAgesOverride: (@Sendable () -> ChannelSignalAges)? = nil,
         clockOverride: (@Sendable () -> TimeInterval)? = nil,
+        pauseGate: CapturePauseGate = CapturePauseGate(),
     ) {
         self.pids = pids
         self.outputFileDescriptor = outputFileDescriptor
@@ -219,6 +224,7 @@ public class AppAudioCapture: @unchecked Sendable {
         self.silentTrackWatchdog = silentTrackWatchdog
         self.signalAgesOverride = signalAgesOverride
         self.clockOverride = clockOverride
+        self.pauseGate = pauseGate
         resampler = StreamingMonoResampler(targetRate: Int(speechSampleRate))
         // Armed here or never: off must mean no watchdog state at all.
         if silentTrackWatchdog {

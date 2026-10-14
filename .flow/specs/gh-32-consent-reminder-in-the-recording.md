@@ -2,7 +2,7 @@
 
 ## Conversation Evidence
 
-> user (turn 3): "The not / swiss law - please add it as extra feature in own branch because its very specific and will never push upstream. And show it on the request dialog maybe"
+> user (turn 3, paraphrased): "Build the note on Swiss law as a separate feature on its own fork-only branch, because it is specific to Switzerland and not meant for the original. Maybe also show it in the recording prompt."
 > issue #3 (owner, Hinweis): "Die Rückfrage erinnert auch daran, dass alle Beteiligten mit der Aufnahme einverstanden sein müssen (in der Schweiz strafrechtlich relevant, Art. 179bis ff. StGB). Beim automatischen Start liegt das ganz bei der Person, die aufnimmt — in der Einstellung kurz darauf hinweisen."
 
 ## Goal & Context

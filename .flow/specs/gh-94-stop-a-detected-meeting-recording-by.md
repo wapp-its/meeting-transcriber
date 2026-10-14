@@ -3,7 +3,7 @@
 ## Conversation Evidence
 
 > issue #94 (Problem, translated): "A recording you start yourself (app + microphone, microphone only) can be ended in the menu with **'Stop Recording'**. An **automatically detected** meeting recording cannot: the menu item appears only for manual recordings (`MeetingTranscriberApp.swift`, `onStopManualRecording` only when `isManualRecording`). It ends only by itself: meeting signal gone for 15 s, then the 2-minute countdown from #54, whose 'Stop now' exists only in the notification."
-> issue #94 (Problem, owner 2026-10-08): "usually it's annoying, I need to wait till it automatically stops … It's stopping only automatically."
+> issue #94 (Problem, owner 2026-10-08, paraphrased): "A detected meeting recording only stops by itself, so after a meeting you have to wait for it."
 > issue #94 (Wish, translated): "**'Stop Recording' in the menu for every running recording**, detected meetings included: ends at once and starts processing as for a manual recording."
 > issue #94 (Wish, translated): "The same over the automation API (`/v1/record` `stop`, today only for microphone-only recordings), so that Stream Deck can do it."
 > issue #94 (Wish, translated): "After stopping, the same meeting must **not right away** be detected and recorded again, or asked about again, while its call signal is still there (Teams window open, microphone held). Only once the signal has been gone once does normal detection apply again."
@@ -94,7 +94,7 @@ PATH="$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH" ./scripts/li
 
 ## Decision Context
 
-- **D1 · "Stop Recording" in the menu for every running recording, detected meetings included; it ends the recording and processes it like a manual stop, withdrawing a pending gh-54 countdown.** why: issue #94 Wish and the owner's words (2026-10-08) "I need to wait till it automatically stops … It's stopping only automatically" · status: active [owner-stated 2026-10-08]
+- **D1 · "Stop Recording" in the menu for every running recording, detected meetings included; it ends the recording and processes it like a manual stop, withdrawing a pending gh-54 countdown.** why: issue #94 Wish and the owner's report (2026-10-08) that a detected recording only stops by itself · status: active [owner-stated 2026-10-08]
 - **D2 · After a stop by hand, the same app is not detected, recorded or asked about again while its call signal is still there; normal detection resumes once the signal has been gone once.** why: issue #94 Wish ("Erst wenn das Signal einmal weg war, gilt wieder die normale Erkennung") and Acceptance · status: active [owner-stated 2026-10-08]
 - **A1 · A stop by hand while gh-54's question is open ends like Stop Watching does then (cut back to signal loss plus end grace unless "Keep recording" came first); otherwise the whole recording is kept.** why: gh-54 R6 and D2 treat Stop Watching and "Stop now" during the countdown that way, so two stop controls cannot disagree about the same minutes · flip at: the owner wants the countdown minutes kept on a stop by hand · test: the open-question case in WatchLoopStopByHandTests · status: active [agent-inferred 2026-10-08]
 - **A2 · A stop by hand takes effect at the next poll of the meeting-end wait (within the poll interval, 3 s by default), like gh-54's "Stop now", rather than waking the wait at once.** flip at: the owner notices the delay · test: WatchLoopStopByHandTests (ends at the poll after the request) · status: active [agent-assumed 2026-10-08]

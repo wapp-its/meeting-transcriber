@@ -372,6 +372,7 @@ final class SilentTrackWatchdogWiringTests: XCTestCase {
                 ),
                 fileDescriptor: FileHandle.nullDevice.fileDescriptor,
                 attemptBody: nil,
+                pauseGate: CapturePauseGate(),
             )
         }
         XCTAssertNotNil(capture(true).silentTrackDiagnostics.watchdogCounters)

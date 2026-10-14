@@ -60,6 +60,7 @@ final class AudioCaptureResultTests: XCTestCase {
         appChannels: Int = 1,
         configuredRate: Int = 48000,
         configuredChannels: Int = 2,
+        pauses: CapturePauseTimeline = CapturePauseTimeline(),
     ) -> AudioCaptureResult {
         AudioCaptureResult.make(
             appOutputURL: appURL,
@@ -67,6 +68,7 @@ final class AudioCaptureResultTests: XCTestCase {
             configured: (sampleRate: configuredRate, channels: configuredChannels),
             app: .init(firstFrameTicks: appTicks, sampleRate: appRate, channels: appChannels),
             mic: .init(recorded: micRecorded, firstFrameTicks: micTicks),
+            pauses: pauses,
         )
     }
 
@@ -149,5 +151,60 @@ final class AudioCaptureResultTests: XCTestCase {
         // There is no app first frame to measure the mic against, so the delay
         // must stay 0 rather than becoming the mic's own absolute timestamp.
         XCTAssertEqual(make(appURL: nil, appTicks: 0, micTicks: 5000).micDelay, 0)
+    }
+
+    // MARK: - Pauses (first frames and pause positions on the recording clock)
+
+    /// Host seconds as the ticks `make` takes. One tick of rounding is far
+    /// below the microsecond the assertions allow.
+    private func ticks(_ seconds: Double) -> UInt64 {
+        secondsToMachTicks(seconds)
+    }
+
+    private func pauses(_ spans: (start: Double, end: Double?)...) -> CapturePauseTimeline {
+        var timeline = CapturePauseTimeline()
+        for span in spans {
+            timeline.pause(atHostSeconds: span.start)
+            if let end = span.end { timeline.resume(atHostSeconds: end) }
+        }
+        return timeline
+    }
+
+    func testMakeReportsTheMicDelayWithoutThePauseBetweenTheFirstFrames() {
+        // 3 s apart on the host clock, 2 s of it paused: the tracks lose the
+        // same 2 s, so on the saved timeline the mic is 1 s late.
+        let result = make(appTicks: ticks(100), micTicks: ticks(103), pauses: pauses((100.5, 102.5)))
+
+        XCTAssertEqual(result.micDelay, 1, accuracy: 1e-6)
+    }
+
+    func testMakeWithoutAPauseReportsNoPauseOffsets() {
+        XCTAssertEqual(make(appTicks: ticks(100), micTicks: ticks(101)).pauseOffsets, [])
+    }
+
+    func testMakePlacesEachPauseOnTheSavedTimeline() {
+        typealias FirstFrames = (app: Double, mic: Double)
+        let cases: [(String, FirstFrames, pauses: CapturePauseTimeline, offsets: [Double])] = [
+            // Origin at the app, the mic started later; the second pause comes
+            // 2 s earlier on the saved timeline than on the host clock.
+            ("two pauses", (100, 100.25), pauses((110, 112), (120, 125)), [10, 18]),
+            ("the mic started first", (100, 99.5), pauses((110, 112)), [10.5]),
+            ("a pause before any first frame", (100, 100.25), pauses((90, 95)), [0]),
+            ("a pause around the first frames", (100, 100.25), pauses((99, 101)), [0]),
+            ("a pause still open at the stop", (100, 100.25), pauses((110, nil)), [10]),
+        ]
+        for (name, firstFrames, timeline, offsets) in cases {
+            let result = make(appTicks: ticks(firstFrames.app), micTicks: ticks(firstFrames.mic), pauses: timeline)
+            XCTAssertEqual(result.pauseOffsets.count, offsets.count, name)
+            for (offset, expected) in zip(result.pauseOffsets, offsets) {
+                XCTAssertEqual(offset, expected, accuracy: 1e-6, name)
+            }
+        }
+    }
+
+    func testMakeWithoutAnyFirstFramePutsEveryPauseAtZero() {
+        let result = make(appTicks: 0, micTicks: 0, pauses: pauses((110, 112), (120, nil)))
+
+        XCTAssertEqual(result.pauseOffsets, [0, 0])
     }
 }

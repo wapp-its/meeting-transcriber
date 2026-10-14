@@ -6,10 +6,10 @@
   "depends_on": [],
   "id": "gh-58-notices-for-the-remaining-automatic.1",
   "priority": null,
-  "review": "codex:gpt-5.6-sol:xhigh",
+  "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-58-notices-for-the-remaining-automatic",
   "spec_path": ".flow/tasks/gh-58-notices-for-the-remaining-automatic.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Warn before the 4-hour maximum and say why a recording stopped",
   "updated_at": "2026-10-06T20:26:25.937037Z"
 }

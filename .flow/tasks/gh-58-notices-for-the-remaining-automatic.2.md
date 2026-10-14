@@ -49,9 +49,48 @@ Makes a running gh-54 countdown visible on the menu bar icon (R4): the loop publ
 - [ ] `docs/architecture-macos.md` names the countdown pulse in the `MenuBarIcon.swift` row and the overlay paragraphs.
 - [ ] `swift build --build-tests -Xswiftc -DAPPSTORE` succeeds and `./scripts/lint.sh` (pinned tools) is clean; no Swift file passes 600 lines.
 ## Done summary
-TBD
+The menu bar icon now pulses while a "meeting seems to have ended" countdown runs (R4). On frames 3 to 5 of the 6-frame cycle the whole icon is drawn at 30 % alpha, and on frames 0 to 2 it is drawn as usual. The pulse reads the loop's state alone, so it shows whatever the notification settings, and it stops on every way out of the countdown. `BadgeKind`, `BadgeKind.compute`, `WatchStatusDTO` and `RecordStatusDTO` are unchanged, so the `/v1` `badge` value stays `recording`.
 
+stage: impl-review - ran [2026-10-14T05:17:16Z..2026-10-14T05:21:18Z] (model: gpt-6-astra, effort xhigh, spec codex:gpt-6-astra:xhigh; 3 draws correctness/contracts/integration, all SHIP, 0 findings; receipt /tmp/impl-review-receipt-6573a37d1fd3-gh-58-notices-for-the-remaining-automatic.2.json)
+
+### Decisions
+
+- rule 1 · The countdown state is gh-54's `WatchLoop.meetingEndQuestionID` (conductor decision); no `meetingEndDeadline` was added. `AppState.meetingEndCountdownOverlay` is `watching.watchLoop?.meetingEndQuestionID != nil`. Switch point `AppState+MenuBarIcon.swift:meetingEndCountdownOverlay`. Test `WatchLoopMeetingEndDeadlineTests.testTheCountdownStateIsSetOnlyWhileItRunsAndClearedByEveryWayOut` covers signal back, Keep recording, Stop now, expiry, the maximum length, Stop Recording, Stop Watching (the wait's task cancelled) and an error thrown by `sleepProvider`.
+- rule 1 · gh-45's long-silence question gets no mark (conductor decision; R4 "nothing else makes the icon pulse"). Test `testTheSilenceQuestionSetsNothingAndItsStopNowLeavesNothingSet`.
+- rule 1 · A silence "Stop now" cannot end a running countdown. The countdown going up takes the silence question back (`SilencePromptPolicy.step`, held path; pinned by `WatchLoopSilencePromptDetectedTests.testTheSilenceQuestionGivesWayToTheMeetingEndQuestion`), and a later answer to the withdrawn question is ignored. The test therefore pins the nearest real case: a Stop now answered just before the poll at which the countdown would open ends the recording there, and no countdown opens. Same test.
+- rule 6 · The accessor lives in a new `AppState+MenuBarIcon.swift`, the file the task names, and not in `AppState+ConsentPrompt.swift`, which is about the recording prompt. `AppState.swift` stays at 488 lines.
+- rule 6 · The `AppState` test sits in `WatchLoopMeetingEndDeadlineTests`, because `AppStateTests.swift` is outside Touches. It wires a real loop into `AppState`, drives a real countdown, and checks that the flag equals the loop state at every poll and is off after the countdown and with no loop. Test `testTheMenuBarIconsCountdownFlagFollowsTheLoop`.
+- rule 6 · Faded frames are the second half of the cycle, `frame % frameCount >= frameCount / 2`, at alpha 0.3 (spec A1). Switch points `MenuBarIcon.isCountdownFadedFrame` and `MenuBarIcon.countdownFadedAlpha`. Test `MenuBarIconCountdownTests.testFramesZeroToTwoAreDrawnAsWithoutTheCountdownAndThreeToFiveFaded` checks the bare icon, the icon with the watching dot, and the icon with the dot plus red overlays.
+- rule 6 · The fade is one CG transparency layer, opened and closed by a pair of helpers (`beginFadedLayer`/`endFadedLayer`), so the render closure stays under SwiftLint's `closure_body_length` of 30.
+- rule 6 · With the flag on, the image bypasses the cache on every frame, as the task text asks, so a countdown re-renders the icon on each 0.4 s tick, as the red overlays already do.
+- rule 6 · "With the flag off every badge renders as before" is asserted as identity with the cached image (`XCTAssertIdentical`), across every badge and frame, with the dot and with the question mark. CI has no stored reference image to compare pixels against; the dev-only `MenuBarIconSnapshotTests` keep the pixel record, and their reference images are unchanged. Test `testWithTheFlagOffEveryBadgeRendersAsBefore`.
+- rule 6 · The loop tests drive `handleMeeting`, which runs `waitForMeetingEnd`, rather than the wait alone, because Stop Recording is accepted only while a detected meeting records. The mock recorder's mix path is a temp file that does not exist, so a cut touches no shared file.
+- rule 6 · After "Keep recording" or a returning signal, the pulse stops at the loop's next poll (at most one poll interval, 3 s in the app), because that is where the loop closes the question.
+- rule 6 · One sentence was added to the `meetingEndQuestionID` doc comment in `WatchLoop.swift`: it names the icon as a reader and says the id is set exactly while the countdown runs. The test above enforces that.
+- rule 6 · My own unpushed red commit was rewritten once (`git reset --soft`) before the implementation commit so that it carries the lint-clean tests. It was red for the same reason before and after the rewrite: `extra argument 'meetingEndCountdownOverlay'`.
+
+### State
+
+- Commits on `feat/gh-58-auto-stop-notices`, base 2249a398:
+  - 24eef668 adds the tests, red because the icon flag and the `AppState` flag did not exist yet (`/private/tmp/mt-gh58/t2-red.log`).
+  - 1192aac8 adds the implementation and the docs.
+- Measured, baseline before any edit: green, 177 focused tests (`/private/tmp/mt-gh58/t2-baseline.log`).
+- Measured on the final tree: the focused run passed 199 of 199 tests, suite_rc=0 (`/private/tmp/mt-gh58/t2-final.log`). It covered the spec's Quick-command classes, the task's Verification classes, `MenuBarIconQuestionTests`, `AppStateConsentPromptTests`, `WatchLoopStopByHandTests` and `WatchLoopSilencePromptDetectedTests`.
+- Measured, mutation check (`/private/tmp/mt-gh58/t2-mutant.log`): with the fade switched off, the pixel test fails on frames 3 to 5 for all three overlay sets. With the question withdrawal removed from the wait's `defer`, the countdown-state test fails for Stop now, expiry, the maximum length, Stop Recording, Stop Watching and the thrown error, and the `AppState` test fails too. Both files were restored from backups afterwards.
+- Measured: `./scripts/lint.sh` with the pinned tools reports 0 violations in 780 files and 0 files needing formatting (`/private/tmp/mt-gh58/t2-lint2.log`). No Swift file passes 600 lines; `MenuBarIcon.swift` has 593.
+- Measured: `swift build --build-tests -Xswiftc -DAPPSTORE` succeeds (`/private/tmp/mt-gh58/t2-appstore.log`).
+- Measured: a clean `xcodebuild build-for-testing` plus `swiftlint analyze --strict` reports only the 2 known `unused_declaration` hits in `RecordingProvider.swift:144` and `:146`, which predate this task. No new compiler warning appears in a changed file (`/private/tmp/mt-gh58/t2-analyze.log`, `/private/tmp/mt-gh58/xcodebuild2.log`).
+- Not run: the owner's look-and-feel check of the pulse in a light and a dark menu bar. The spec's Verification leaves it to the owner after merge.
+
+### Follow-ups
+
+- The two `unused_declaration` hits in `RecordingProvider.swift` fail CI's analyze job if it runs again. They predate this task.
+- No route to a mapped feature changed; only the icon's look during a countdown.
+
+Tier: implementer claude-opus-5-5 at xhigh (project routing block; host spawn-model parameter) (model: claude-opus-5-5)
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 24eef668d56c614e73ba304ad0fb7f3d13187b56, 1192aac854f9f44e7d42d66330e30bfb43ff264e
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh58/home swift test --parallel --filter 'RecordingStopNoticesTests|WatchLoopStopNoticeTests|MenuBarIconCountdownTests|WatchLoopMeetingEndDeadlineTests|MenuBarIconTests|MenuBarIconWatchingTests|MenuBarIconNextFrameTests|MenuBarIconQuestionTests|BadgeKindComputeTests|AppStateTests|AppStateConsentPromptTests|WatchLoopMeetingEndTests|NotificationManagerMeetingEndTests|WatchLoopStopByHandTests|WatchLoopSilencePromptDetectedTests' (199 tests, suite_rc=0; baseline: green, 177 tests), PATH="$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH" ./scripts/lint.sh (0 violations, 780 files), cd app/MeetingTranscriber && swift build --build-tests -Xswiftc -DAPPSTORE (succeeded), xcodebuild clean build-for-testing + swiftlint analyze --strict (only the 2 known pre-existing unused_declaration hits in RecordingProvider.swift:144/146)
 - PRs:
