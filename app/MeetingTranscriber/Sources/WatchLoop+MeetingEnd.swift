@@ -30,7 +30,9 @@ extension WatchLoop {
     /// earlier version let the `CancellationError` escape and discarded the
     /// whole recording. Stopped while the question is open, the recording ends
     /// as an unanswered question would, cut back. Every way out of here takes
-    /// the open question back, and the long-silence question with it.
+    /// the open question back, and the long-silence question with it. A
+    /// recording that nears its maximum length is warned once, and one the
+    /// maximum ends is told so (`WatchLoop+StopNotices.swift`).
     ///
     /// `recording` is the meeting's recorder and when the loop saw its capture
     /// running, where the cut is measured from. With it, each question's cut
@@ -49,6 +51,8 @@ extension WatchLoop {
             countdown: meetingEndCountdown,
         )
         var phase = MeetingEndPhase.listening(signalLostAt: nil)
+        var capWarned = false
+        let title = Self.cleanTitle(meeting.windowTitle)
         defer {
             withdrawMeetingEndQuestion()
             endSilencePrompt()
@@ -94,8 +98,14 @@ extension WatchLoop {
 
                 case let .stop(stop):
                     diagnostics.notice(stop.reason.logLine(trigger: .auto, signalAbsentFor: stop.signalAbsentFor))
+                    if stop.reason == .maxDuration {
+                        postStopNotice(RecordingStopNotices.capReached(recordingTitle: title, maxDuration: maxDuration))
+                    }
                     return stop.cutAt
                 }
+                warnBeforeMaximumIfDue(
+                    elapsed: poll.now.timeIntervalSince(startTime), recordingTitle: title, trigger: .auto, warned: &capWarned,
+                )
                 try await sleepProvider(pollInterval)
             }
         } catch is CancellationError {}

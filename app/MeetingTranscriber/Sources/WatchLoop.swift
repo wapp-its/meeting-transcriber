@@ -44,6 +44,10 @@ class WatchLoop {
     let pollInterval: TimeInterval
     let endGracePeriod: TimeInterval
     let maxDuration: TimeInterval
+    /// How long before `maxDuration` a recording is warned that it is about to
+    /// end (`RecordingCapWarningPolicy`). Fixed in the app; injectable so tests
+    /// can use a short maximum.
+    let capWarningLead: TimeInterval
     /// How long the "meeting seems to have ended" question stays open before
     /// the recording ends anyway. Fixed at `meetingEndQuestionCountdown` in the
     /// app; injectable so tests need not wait it out.
@@ -148,6 +152,7 @@ class WatchLoop {
         pollInterval: TimeInterval = 3.0,
         endGracePeriod: TimeInterval = 15.0,
         maxDuration: TimeInterval = 14400,
+        capWarningLead: TimeInterval = RecordingCapWarningPolicy.defaultLead,
         meetingEndCountdown: TimeInterval = WatchLoop.meetingEndQuestionCountdown,
         noMic: Bool = false,
         micDeviceUID: @escaping () -> String? = { nil },
@@ -175,6 +180,7 @@ class WatchLoop {
         self.pollInterval = pollInterval
         self.endGracePeriod = endGracePeriod
         self.maxDuration = maxDuration
+        self.capWarningLead = capWarningLead
         self.meetingEndCountdown = meetingEndCountdown
         self.noMic = noMic
         self.micDeviceUID = micDeviceUID
