@@ -10,7 +10,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-148-output-device-warning-and-picker-in-the",
   "spec_path": ".flow/tasks/gh-148-output-device-warning-and-picker-in-the.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement Output device warning and picker in the menu",
   "updated_at": "2026-10-14T16:18:36.321915Z"
 }

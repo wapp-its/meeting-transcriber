@@ -294,7 +294,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-148-output-device-warning-and-picker-in-the.md",
-  "status": "open",
+  "status": "done",
   "title": "Output device warning and picker in the menu",
   "tracker": {
     "baseHashFlow": "75d384db3ebd2db0558609fec50a306c63a4616ad9d2325569258a19438e335a",
@@ -308,5 +308,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nTeams can set the Mac's default output to its own virtual device \"Microsoft Teams Audio\" (`MSLoopbackDriverDevice_UID`) and keep playing the call through another device. If a recording starts in this state, the app track is exact zeros for the whole meeting. The tap is anchored on the default output. In this routing it probably follows the virtual device, not the device that plays the call. The app posts \"Recording Appears Silent\", but it doesn't say why. Also the more specific \"Capture Channel Silent\" alert doesn't fire when the microphone is muted at the same time.\n\nSeen here with a Teams meeting on the current fork build. The unified log shows that the Teams ModuleHost process set the default output itself, a few minutes before the meeting. The setting then stays like this after the call.\n\nUpstream reports the same case as https://github.com/pasrom/meeting-transcriber/issues/712 (with a re-anchoring fix on a contributor fork) and a related one as https://github.com/pasrom/meeting-transcriber/issues/699.\n\n## NOTES\n\n- Not a permission problem: two short system sounds that went into the virtual device were captured, the call audio was not.\n- A virtual default output alone is not the fault (see upstream 712), so we should not reject virtual devices in general.\n\n## TASKS\n\n- [ ] Warn at recording start when the default output is the Teams loopback device, with the fix (switch the output in Control Center)\n- [ ] Find out if anchoring the tap on the device Teams plays to restores the app track, or wait for the upstream fix",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/148"
   },
-  "updated_at": "2026-10-14T17:03:13.516202Z"
+  "updated_at": "2026-10-14T17:03:51.228957Z"
 }
