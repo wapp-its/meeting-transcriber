@@ -57,9 +57,48 @@ Adds the cap warning (R1), the cap notice (R2) and the app-exit notice (R3): one
 - [ ] The stops themselves are unchanged: `WatchLoopMonitorTests`, `ManualRecordingMonitorPolicyTests`, `WatchLoopEndPolicyTests`, `WatchLoopTimingTests` and gh-54's tests (`WatchLoopMeetingEndTests`, `NotificationManagerMeetingEndTests` or their renamed successors) pass without edits to their assertions.
 - [ ] `swift build --build-tests -Xswiftc -DAPPSTORE` succeeds and `./scripts/lint.sh` (pinned tools) is clean; no Swift file passes 600 lines.
 ## Done summary
-TBD
+A recording now warns the person once, 10 minutes before its 4-hour maximum. It says so when the maximum ends the recording, and when a manual recording ends because its app quit. Each warning writes a `recording_cap_warning trigger=<auto|manual> remaining_s=<n>` diagnostic line with no title or meeting content (R1, R2, R3).
 
+stage: impl-review - ran [2026-10-14T04:46Z..2026-10-14T04:50:06Z] (model: gpt-6-astra, effort xhigh, spec codex:gpt-6-astra:xhigh; 3 draws correctness/contracts/integration, all SHIP, 0 findings; receipt /tmp/impl-review-receipt-6573a37d1fd3-gh-58-notices-for-the-remaining-automatic.1.json)
+
+### Decisions
+
+- rule 1 · Two `RecordOnlyE2ETests` assertions now check the record-only failure notice by its title rather than every notifier call (conductor decision A). R2 posts "Recording Ended" when the maximum ends a recording, record-only included, and those tests end their recording through a 0.1 s maximum. Line 41 asserts that no call is titled "Record-only output failed". Lines 83-87 assert that exactly one call carries that title. Commit 8928d60b; the edit outside Touches was authorised for this one file. Tests `test_handleMeeting_recordOnly_writesSidecarAndSkipsPipeline`, `test_handleMeeting_recordOnly_writeFailure_notifiesAndDoesNotEnqueue`.
+- rule 1 · The warning is checked only on a poll the recording continues from, after the long-silence step, in both loops (conductor decision). Switch points `WatchLoop+ManualRecording.swift:monitorManualRecording` and `WatchLoop+MeetingEnd.swift:waitForMeetingEnd`. Test `WatchLoopStopNoticeTests.testASilenceStopOnThePollTheWindowOpensGetsNoNotice`.
+- rule 1 · The detected-meeting cap notice is posted in the `.stop` arm only when `stop.reason == .maxDuration` (conductor decision). Switch point `WatchLoop+MeetingEnd.swift:waitForMeetingEnd`. Tests `testDetectedMeetingHeldPastTheMaximumIsWarnedOnceAndToldWhenTheMaximumEndsIt`, `testDetectedMeetingEndedByTheCountdownBeforeTheWindowGetsNoNotice`.
+- rule 1 · Both warnings measure elapsed time the same way each loop's cap check does: `poll.now - startTime` in the wait, and the monitor's own `startTime` in the manual loop. Same tests.
+- rule 1 · A silence stop and a stop by hand post neither notice. Tests `testASilenceStopOnThePollTheWindowOpensGetsNoNotice`, `testManualRecordingStoppedByHandBeforeTheWindowGetsNoNotice`.
+- rule 6 · `RecordOnlyDestination` moved unchanged from `WatchLoop.swift` into `WatchLoop+RecordOnly.swift` (inside Touches) so that the new init parameter fits under the 600-line limit. `WatchLoop.swift` is now 574 lines. Covered by the build, `WatchLoopTests` and `RecordOnlyE2ETests`.
+- rule 6 · The shared posting helper lives in a new `WatchLoop+StopNotices.swift` (inside the `WatchLoop+*.swift` Touches glob), so `RecordingStopNotices.swift` stays pure.
+- rule 6 · The builder returns the 3-member tuple the task names, as `RecordingStopNotices.Notice`. SwiftLint `large_tuple` warns only above 4 members.
+- rule 6 · When the maximum is not a whole number of hours, the length phrase rounds it to the nearest whole minute, as `askToEnd` does for its countdown. Switch point `RecordingStopNotices.lengthPhrase`. Test `testTheMaximumLengthIsNamedInWholeHoursOrElseWholeMinutes`.
+- rule 6 · A title counts as empty only when `isEmpty` is true, with no whitespace trimming, as the task text says. Switch point: the three builders in `RecordingStopNotices`. Test `testAnEmptyTitleIsLeftOutOfEveryText`.
+- rule 6 · The loop tests poll every 10 virtual seconds with a 120 s maximum and a 60 s lead, instead of the spec's key-context values of 1.0 / 0.5 / 0.05 s. Steps of 0.05 s accumulate floating-point error and would make `remaining_s` land on 0 or 1. With 10 s steps every poll lands on a whole second, and the window opens at exactly 60 s. Test `WatchLoopStopNoticeTests`.
+- rule 6 · The manual loop reads `manualRecordingInfo` once per poll, before any stop, and posts nothing when it is nil, which means the recording was already stopped another way. Test `testManualRecordingStoppedByHandBeforeTheWindowGetsNoNotice`.
+
+### State
+
+- Commits on `feat/gh-58-auto-stop-notices`, base 8f161090:
+  - 9d63040e moves `RecordOnlyDestination`.
+  - 2f102041 adds the tests, red because the API did not exist yet.
+  - d8ecb564 adds the implementation.
+  - 8928d60b narrows the two `RecordOnlyE2ETests` assertions.
+- Measured on the final tree: the focused run (`/private/tmp/mt-gh58/t1-tests-final.log`) passed 141 of 141 tests, suite_rc=0.
+- Measured on the final tree: `./scripts/lint.sh` with the pinned tools reports 0 violations in 777 files (`/private/tmp/mt-gh58/lint-3.log`).
+- Measured on d8ecb564, before the test-only commit 8928d60b: `swift build --build-tests -Xswiftc -DAPPSTORE` succeeds.
+- Measured on d8ecb564: a clean `xcodebuild build-for-testing` plus `swiftlint analyze --strict` reports 2 `unused_declaration` hits, in `RecordingProvider.swift:144` and `:146` (pending-cut protocol defaults). This change does not touch that file, and the same two hits appear at base 8f161090 (`/private/tmp/mt-gh58/analyze-base.log`).
+- Measured, wider run: `WatchLoopE2ETests` (5 tests) fail because the WhisperKit model is not loaded in the fresh scratch home ("unloaded is not equal to loaded"). This is the known model-download failure and has nothing to do with notifications.
+- Baseline before any edit: green, 125 focused tests.
+
+### Follow-ups
+
+- The two `unused_declaration` hits in `RecordingProvider.swift` fail CI's analyze job if it runs again. They predate this task.
+- No route to a mapped feature changed.
+
+Tier: implementer claude-opus-5-5 at xhigh (project routing block; host spawn-model parameter) (model: claude-opus-5-5)
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 9d63040e745ca7ec529ac3ee006313aad400518c, 2f1020411fd19f04d7665047f6dd3b3f52628020, d8ecb5644db088ba5e0ddeb76faabb5efd1edf4b, 8928d60b01bbe7ca8189727ce595d5adf3c9c7f9
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh58/home swift test --parallel --filter 'RecordingStopNoticesTests|WatchLoopStopNoticeTests|WatchLoopMonitorTests|ManualRecordingMonitorPolicyTests|WatchLoopEndPolicyTests|WatchLoopTimingTests|WatchLoopMeetingEndTests|NotificationManagerMeetingEndTests|WatchLoopCancellationTests|WatchLoopStopByHandTests|WatchLoopSilencePromptDetectedTests|WatchLoopSilencePromptTests|WatchLoopTests|RecordOnlyE2ETests', PATH="$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH" ./scripts/lint.sh
 - PRs:

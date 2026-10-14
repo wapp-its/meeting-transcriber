@@ -44,6 +44,10 @@ class WatchLoop {
     let pollInterval: TimeInterval
     let endGracePeriod: TimeInterval
     let maxDuration: TimeInterval
+    /// How long before `maxDuration` a recording is warned that it is about to
+    /// end (`RecordingCapWarningPolicy`). Fixed in the app; injectable so tests
+    /// can use a short maximum.
+    let capWarningLead: TimeInterval
     /// How long the "meeting seems to have ended" question stays open before
     /// the recording ends anyway. Fixed at `meetingEndQuestionCountdown` in the
     /// app; injectable so tests need not wait it out.
@@ -74,7 +78,9 @@ class WatchLoop {
 
     /// The open "meeting seems to have ended" question and the answer parked
     /// for the next poll. Internal for `WatchLoop+MeetingEnd.swift`, which owns
-    /// both, the way the consent extension owns `pendingConsentQuestion`.
+    /// both, the way the consent extension owns `pendingConsentQuestion`. The
+    /// id is set exactly while the question's countdown runs, which is what
+    /// the menu bar icon's pulse reads (`AppState.meetingEndCountdownOverlay`).
     var meetingEndQuestionID: String?
     var meetingEndAnswer: ReceivedMeetingEndAnswer?
     /// When "Stop Recording" was chosen, parked for the wait's next poll (`WatchLoop+StopByHand.swift`).
@@ -148,6 +154,7 @@ class WatchLoop {
         pollInterval: TimeInterval = 3.0,
         endGracePeriod: TimeInterval = 15.0,
         maxDuration: TimeInterval = 14400,
+        capWarningLead: TimeInterval = RecordingCapWarningPolicy.defaultLead,
         meetingEndCountdown: TimeInterval = WatchLoop.meetingEndQuestionCountdown,
         noMic: Bool = false,
         micDeviceUID: @escaping () -> String? = { nil },
@@ -175,6 +182,7 @@ class WatchLoop {
         self.pollInterval = pollInterval
         self.endGracePeriod = endGracePeriod
         self.maxDuration = maxDuration
+        self.capWarningLead = capWarningLead
         self.meetingEndCountdown = meetingEndCountdown
         self.noMic = noMic
         self.micDeviceUID = micDeviceUID
@@ -564,37 +572,5 @@ class WatchLoop {
         case .recording: .recording
         case .error: .error
         }
-    }
-}
-
-/// Pair of URLs used by `WatchLoop` when persisting record-only output: the
-/// `scope` URL is what `startAccessingSecurityScopedResource()` is called on
-/// (the bookmark-resolved parent the user actually picked), and `writeDir` is
-/// the sub-path under that scope where the WAV + sidecar files land.
-///
-/// The split exists because Apple's security-scoped-bookmark API only grants
-/// access on the URL that resolved from the bookmark — calling start-access
-/// on a *child* path silently fails inside the App Store sandbox while
-/// appearing to work in the unsandboxed Homebrew build. The factory methods
-/// below make the two cases (real bookmark vs. transient app dir) explicit
-/// at every call site.
-struct RecordOnlyDestination: Equatable {
-    let scope: URL
-    let writeDir: URL
-
-    /// Production path: `parent` is the user-picked Output Folder (potentially
-    /// resolved from a security-scoped bookmark) and the WAVs land under
-    /// `parent/recordings/` so a Syncthing or rsync pair has a stable subtree.
-    static func production(parent: URL) -> Self {
-        Self(
-            scope: parent,
-            writeDir: parent.appendingPathComponent("recordings", isDirectory: true),
-        )
-    }
-
-    /// Test/default path: no security scope to manage — `scope == writeDir`,
-    /// so start-access is a harmless no-op and the writer hits `url` directly.
-    static func unscoped(_ url: URL) -> Self {
-        Self(scope: url, writeDir: url)
     }
 }
