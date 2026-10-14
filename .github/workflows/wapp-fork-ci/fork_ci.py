@@ -141,6 +141,10 @@ def decide_skip(head_sha, green_runs, git):
 
 
 def request(args):
+    # GitHub starts no workflow for a run started with the workflow's own token, so
+    # wapp-fork-ci-result.yml only fires for a ci.yml run started with a personal token.
+    # Taken out of the environment so only the dispatch call ever sees it.
+    dispatch_token = os.environ.pop("DISPATCH_TOKEN", None)
     try:
         pr = gh("GET", "repos/%s/pulls/%d" % (args.repo, args.pr))
     except GhError as e:
@@ -162,9 +166,6 @@ def request(args):
     if action == "skip":
         post_status(args.repo, head_sha, "success", reason[0].upper() + reason[1:], green["html_url"])
         return
-    # GitHub starts no workflow for a run started with the workflow's own token, so
-    # wapp-fork-ci-result.yml only fires for a ci.yml run started with a personal token.
-    dispatch_token = os.environ.get("DISPATCH_TOKEN")
     if not dispatch_token:
         print("warning: DISPATCH_TOKEN is not set, so wapp-fork-ci-result.yml will not fire for "
               "this run; post its result by hand (see the top of wapp-fork-ci-result.yml)")

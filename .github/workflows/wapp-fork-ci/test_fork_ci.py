@@ -232,6 +232,7 @@ class RequestSkipTests(unittest.TestCase):
         for call in self.h.calls():
             expected = "personal-token" if call["path"].endswith("/dispatches") else "workflow-token"
             self.assertEqual(call["token"], expected, call["path"])
+            self.assertFalse(call["dispatch_token_in_env"], call["path"])
 
     def test_missing_dispatch_token_still_starts_ci_and_warns(self):
         head = self.h.commit({"app/Sources/Code.swift": "let a = 5\n"})
