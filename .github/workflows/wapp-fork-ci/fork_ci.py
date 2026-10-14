@@ -13,8 +13,10 @@ GitHub reads no workflow from a subdirectory there.
 
     fork_ci.py result --repo <owner/name> --run-id <id> --attempt <n>
         Turns one completed ci.yml run attempt into the status on the commit it
-        tested: success; a first failure is re-run once; a second failure fails; a
-        run superseded by a newer one on the same branch posts nothing. Started by
+        tested: success; a first failure is re-run once; a second failure fails. It
+        posts nothing for a run superseded by a newer one on the same branch, for an
+        attempt that is no longer the run's latest, and for a run that did not test
+        the commit it names (pull_request, or another workflow named CI). Started by
         wapp-fork-ci-result.yml, and runnable by hand if that workflow did not fire.
 
 Talks to GitHub only through `gh api`, so test_fork_ci.py can stand in for it.
@@ -28,7 +30,12 @@ from urllib.parse import quote
 
 CONTEXT = "ci (upstream ci.yml)"
 HOME_BRANCH = "wapp/main"
+CI_PATH = ".github/workflows/ci.yml"
+# Runs that test the commit they name. A pull_request run tests GitHub's merge commit
+# with the PR base instead, and ci.yml skips its tests there for some paths.
+DIRECT_EVENTS = ("workflow_dispatch", "push")
 GREEN_CANDIDATES = 50
+ANNOTATION_PAGES = 10
 CULPRIT = re.compile(r"'(.+?)' failed and cancelled this run")
 
 
@@ -89,7 +96,7 @@ def decide_skip(head_sha, green_runs, git):
     seen = set()
     for run in green_runs:
         sha = run.get("head_sha") or ""
-        if not sha or sha in seen or not git.has_commit(sha):
+        if run.get("event") not in DIRECT_EVENTS or not sha or sha in seen or not git.has_commit(sha):
             continue
         seen.add(sha)
         try:
@@ -167,32 +174,45 @@ def find_culprit(repo, run_id, attempt):
         if job.get("conclusion") == "success":
             continue
         check_run = (job.get("check_run_url") or "").rsplit("/", 1)[-1] or str(job["id"])
-        try:
-            notes = gh("GET", "repos/%s/check-runs/%s/annotations" % (repo, check_run)) or []
-        except GhError:
-            continue
-        for note in notes:
-            match = CULPRIT.search(note.get("message") or "")
-            if match:
-                return match.group(1)
+        for page in range(1, ANNOTATION_PAGES + 1):
+            try:
+                notes = gh("GET", "repos/%s/check-runs/%s/annotations?per_page=100&page=%d"
+                           % (repo, check_run, page)) or []
+            except GhError:
+                break
+            for note in notes:
+                match = CULPRIT.search(note.get("message") or "")
+                if match:
+                    return match.group(1)
+            if len(notes) < 100:
+                break
     return None
 
 
 def result(args):
+    # The run as it is now, so an older attempt's late or replayed event is recognised.
     try:
-        run = gh("GET", "repos/%s/actions/runs/%d/attempts/%d" % (args.repo, args.run_id, args.attempt))
+        run = gh("GET", "repos/%s/actions/runs/%d" % (args.repo, args.run_id))
     except GhError as e:
-        sys.exit("run %d attempt %d could not be read: %s" % (args.run_id, args.attempt, e))
+        sys.exit("run %d could not be read: %s" % (args.run_id, e))
+    if (run.get("path") or "").split("@")[0] != CI_PATH or run.get("event") not in DIRECT_EVENTS:
+        print("run %d is %s from %s, not a ci.yml run on the commit it names; nothing to report"
+              % (args.run_id, run.get("event"), run.get("path")))
+        return
+    if run.get("run_attempt") != args.attempt:
+        print("run %d is at attempt %s, not %d; nothing to report"
+              % (args.run_id, run.get("run_attempt"), args.attempt))
+        return
     sha, url = run["head_sha"], run["html_url"]
     if run.get("status") != "completed":
         print("run %d attempt %d is %s; nothing to report" % (args.run_id, args.attempt, run.get("status")))
         return
-    if run.get("conclusion") == "success":
-        post_status(args.repo, sha, "success", "ci.yml passed" + (" on retry" if args.attempt > 1 else ""), url)
-        return
     if superseded(args.repo, run):
         print("run %d was superseded by a newer ci.yml run on %s; nothing to report"
               % (args.run_id, run["head_branch"]))
+        return
+    if run.get("conclusion") == "success":
+        post_status(args.repo, sha, "success", "ci.yml passed" + (" on retry" if args.attempt > 1 else ""), url)
         return
     culprit = find_culprit(args.repo, args.run_id, args.attempt)
     what = culprit or "see the run"

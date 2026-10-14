@@ -85,8 +85,9 @@ class Harness:
             "head": {"sha": head_sha, "ref": ref, "repo": repo},
         }}
 
-    def green(self, *shas):
-        runs = [{"id": 100 + i, "head_sha": sha, "html_url": "https://example.invalid/runs/%d" % (100 + i)}
+    def green(self, *shas, event="workflow_dispatch"):
+        runs = [{"id": 100 + i, "head_sha": sha, "event": event,
+                 "html_url": "https://example.invalid/runs/%d" % (100 + i)}
                 for i, sha in enumerate(shas)]
         self.fixtures["GET repos/%s/actions/workflows/ci.yml/runs?status=success&per_page=50" % REPO] = {
             "json": {"workflow_runs": runs}}
@@ -264,6 +265,13 @@ class RequestSkipTests(unittest.TestCase):
         self.h.green(feature)
         self.assert_skipped(self.h.request(), head)
 
+    def test_pull_request_runs_are_not_evidence(self):
+        # a pull_request run tests GitHub's merge commit, not the head it names
+        head = self.h.commit({".flow/specs/x.json": "{}{}\n"})
+        self.h.pr(head)
+        self.h.green(self.green_sha, event="pull_request")
+        self.assert_started(self.h.request(), head, "no passing")
+
     def test_green_commit_missing_from_history_starts_ci(self):
         head = self.h.commit({".flow/specs/x.json": "{}{}\n"})
         self.h.pr(head)
@@ -343,10 +351,13 @@ class ResultTests(unittest.TestCase):
     def setUp(self):
         self.h = Harness(self)
 
-    def attempt(self, attempt, conclusion, status="completed", created="2026-10-14T10:00:00Z"):
-        self.h.fixtures["GET repos/%s/actions/runs/%d/attempts/%d" % (REPO, RUN_ID, attempt)] = {"json": {
+    def attempt(self, attempt, conclusion, status="completed", created="2026-10-14T10:00:00Z",
+                event="workflow_dispatch", path=".github/workflows/ci.yml"):
+        """The run as GitHub reports it now: its latest attempt is `attempt`."""
+        self.h.fixtures["GET repos/%s/actions/runs/%d" % (REPO, RUN_ID)] = {"json": {
             "id": RUN_ID, "run_attempt": attempt, "status": status, "conclusion": conclusion,
-            "head_sha": HEAD, "head_branch": "feat/x", "created_at": created, "html_url": RUN_URL}}
+            "event": event, "path": path, "head_sha": HEAD, "head_branch": "feat/x",
+            "created_at": created, "html_url": RUN_URL}}
 
     def branch_runs(self, *runs):
         self.h.fixtures["GET repos/%s/actions/workflows/ci.yml/runs?branch=feat%%2Fx&per_page=30" % REPO] = {
@@ -358,8 +369,8 @@ class ResultTests(unittest.TestCase):
                                "check_run_url": "https://api.example.invalid/check-runs/%d" % jid}
                               for jid, name, concl in jobs]}}
 
-    def annotations(self, job_id, *messages):
-        self.h.fixtures["GET repos/%s/check-runs/%d/annotations" % (REPO, job_id)] = {
+    def annotations(self, job_id, *messages, page=1):
+        self.h.fixtures["GET repos/%s/check-runs/%d/annotations?per_page=100&page=%d" % (REPO, job_id, page)] = {
             "json": [{"message": m} for m in messages]}
 
     def result(self, attempt):
@@ -385,11 +396,46 @@ class ResultTests(unittest.TestCase):
         self.assertEqual(self.only_status()["state"], "success")
         self.assertEqual(self.reruns(), [])
 
-    def test_success_of_a_superseded_run_still_reports_its_own_commit(self):
+    def test_superseded_success_posts_nothing(self):
+        # a newer run on the branch reports for itself; an older success must not overwrite it
         self.attempt(1, "success")
         self.branch_runs((RUN_ID, "2026-10-14T10:00:00Z"), (556, "2026-10-14T10:05:00Z"))
-        self.assertEqual(self.result(1).returncode, 0)
-        self.assertEqual(self.only_status()["state"], "success")
+        result = self.result(1)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.h.writes(), [])
+        self.assertIn("superseded", result.stdout)
+
+    def test_pull_request_run_posts_nothing(self):
+        self.attempt(1, "success", event="pull_request")
+        result = self.result(1)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.h.writes(), [])
+
+    def test_other_workflow_named_ci_posts_nothing(self):
+        self.attempt(1, "success", path=".github/workflows/other.yml")
+        result = self.result(1)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.h.writes(), [])
+
+    def test_stale_attempt_posts_nothing_and_does_not_retry(self):
+        # the result for attempt 1 arrives (or is replayed) after attempt 2 exists
+        self.attempt(2, "failure")
+        self.branch_runs((RUN_ID, "2026-10-14T10:00:00Z"))
+        self.jobs(1, (2, "lint", "failure"))
+        result = self.result(1)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.h.writes(), [])
+
+    def test_culprit_annotation_on_a_later_page_is_found(self):
+        self.attempt(2, "cancelled")
+        self.branch_runs((RUN_ID, "2026-10-14T10:00:00Z"))
+        self.jobs(2, (2, "test (appstore)", "cancelled"))
+        self.annotations(2, *["warning %d" % i for i in range(100)])
+        self.annotations(2, "'test (appstore)' failed and cancelled this run", page=2)
+        self.assertEqual(self.result(2).returncode, 0)
+        fields = self.only_status()
+        self.assertEqual(fields["state"], "failure")
+        self.assertIn("test (appstore)", fields["description"])
 
     def test_first_failure_retries_and_stays_pending(self):
         self.attempt(1, "failure")
