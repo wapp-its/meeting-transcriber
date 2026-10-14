@@ -10,6 +10,8 @@ struct RecorderPauseState {
     var tracks: [URL] = []
     /// Runs exactly while the recording is paused.
     var trackToucher: Task<Void, Never>?
+    /// The pauses this recording has begun; see `RecordingProvider.pausesBegun`.
+    var pausesBegun = 0
 }
 
 /// Pausing the recording in progress. The capture session does the cutting;
@@ -27,9 +29,14 @@ extension DualSourceRecorder {
         pauseState.trackToucher != nil
     }
 
+    var pausesBegun: Int {
+        pauseState.pausesBegun
+    }
+
     func pause() {
         guard isRecording, !isPaused, let captureSession else { return }
         captureSession.pause()
+        pauseState.pausesBegun += 1
         pauseState.trackToucher = touchTracksWhilePaused()
     }
 

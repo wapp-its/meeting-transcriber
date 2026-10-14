@@ -23,6 +23,13 @@ protocol RecordingProvider {
     /// polling reads it to hold its checks meanwhile.
     var isPaused: Bool { get }
 
+    /// How many pauses the recording in progress has begun, counted when a
+    /// `pause()` takes effect. A poller that samples `isPaused` misses a pause
+    /// that begins and ends between two of its reads; a change in this count
+    /// is how it still sees one. Compare it for change only: it may start
+    /// over with each recording.
+    var pausesBegun: Int { get }
+
     /// Instantaneous app-audio level in dBFS. -120 when no capture session is
     /// active or the tap stopped delivering buffers in the last 0.5 s.
     /// Drives the menu-bar asymmetric-silence indicator. Default: -120

@@ -77,6 +77,25 @@ final class DualSourceRecorderPauseTests: XCTestCase {
         XCTAssertEqual(session.resumeCallCount, 1, "a resume while running is not a second resume")
     }
 
+    /// The count a poller compares to see a pause that began and ended
+    /// between two of its reads: one per pause that took effect.
+    func testOnlyAPauseThatTakesEffectIsCounted() throws {
+        let dir = try makeTempDirectory(prefix: "pause_count")
+        let (recorder, _) = makeRecorder(dir: dir)
+        recorder.pause()
+        XCTAssertEqual(recorder.pausesBegun, 0, "nothing to pause before the start")
+
+        try recorder.start(source: .micOnly)
+        recorder.pause()
+        recorder.pause()
+        recorder.resume()
+        XCTAssertEqual(recorder.pausesBegun, 1, "a pause while paused is not a second pause")
+
+        recorder.pause()
+        recorder.resume()
+        XCTAssertEqual(recorder.pausesBegun, 2)
+    }
+
     /// Before the start and after the stop there is no recording to pause,
     /// and the stop ends a pause still open.
     func testNothingReachesTheSessionOutsideARecording() throws {

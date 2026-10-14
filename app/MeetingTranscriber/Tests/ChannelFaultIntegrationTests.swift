@@ -41,6 +41,10 @@ final class ChannelFaultIntegrationTests: XCTestCase {
         var isPaused: Bool {
             false
         }
+
+        var pausesBegun: Int {
+            0
+        }
     }
 
     func testAProviderThatDoesNotSimulateCaptureIsNeverReportedAsBroken() {

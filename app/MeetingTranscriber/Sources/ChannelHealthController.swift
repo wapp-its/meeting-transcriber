@@ -115,6 +115,9 @@ final class ChannelHealthController {
 
     /// Whether the last tick found the recording paused; see `holdWhilePaused`.
     @ObservationIgnored private var heldForPause = false
+    /// The recorder's `pausesBegun` at the last tick, so a pause that began
+    /// and ended between two ticks is still seen.
+    @ObservationIgnored private var pausesSeen = 0
 
     /// The silence clock of the recording in progress, for the long-silence
     /// question; nil before its first tick. Only the channels the
@@ -281,6 +284,7 @@ final class ChannelHealthController {
         firstTickAt = nil
         lastSpeechAt.removeAll()
         heldForPause = false
+        pausesSeen = 0
     }
 
     /// While the recording is paused nothing it captures is saved, so nothing
@@ -294,15 +298,23 @@ final class ChannelHealthController {
     /// already reported is not reported again, and a give-up that happened
     /// during the pause is reported on that first tick, since the give-up
     /// check does not wait for the window.
-    private func holdWhilePaused(_ paused: Bool, now: Date) -> Bool {
-        if paused, !heldForPause {
+    ///
+    /// A pause that began and ended between two ticks leaves `isPaused` false
+    /// at both; the recorder's pause count is what still shows it, and that
+    /// tick takes both edges at once.
+    private func holdWhilePaused(_ recorder: any RecordingProvider, now: Date) -> Bool {
+        let paused = recorder.isPaused
+        let pausedSinceLastTick = recorder.pausesBegun != pausesSeen
+        pausesSeen = recorder.pausesBegun
+        if paused || pausedSinceLastTick, !heldForPause {
             heldForPause = true
             channelHealthMonitor.reset()
             silentRecordingMonitor.reset()
             micSilentActive = false
             appSilentActive = false
             recordingSilentActive = false
-        } else if !paused, heldForPause {
+        }
+        if !paused, heldForPause {
             heldForPause = false
             firstTickAt = now
             lastSpeechAt.removeAll()
@@ -329,7 +341,7 @@ final class ChannelHealthController {
         }
         micLevelDBFS = mic
         appLevelDBFS = app
-        if holdWhilePaused(recorder.isPaused, now: now) { return nil }
+        if holdWhilePaused(recorder, now: now) { return nil }
         // The monitor's own threshold, not a copy of its default: the init
         // allows a different one, and a second constant could then disagree
         // with the episode the tint is drawn from.

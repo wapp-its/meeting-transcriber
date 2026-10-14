@@ -97,10 +97,16 @@ class MockRecorder: RecordingProvider {
 
     /// How often `pause()` and `resume()` were called, and the state they
     /// flip. Settable so a test can stage a paused recorder directly; `stop()`
-    /// clears it, as the real recorder's does.
+    /// clears it, as the real recorder's does. Setting it to true counts a
+    /// pause begun, however it was set, as the real recorder counts one per
+    /// pause that took effect.
     private(set) var pauseCallCount = 0
     private(set) var resumeCallCount = 0
-    var isPaused = false
+    var isPaused = false {
+        didSet { if isPaused, !oldValue { pausesBegun += 1 } }
+    }
+
+    private(set) var pausesBegun = 0
     /// The capture's pause positions `stop()` reports.
     var pauseOffsets: [TimeInterval] = []
 
@@ -177,5 +183,9 @@ final class ThrowingRecorder: RecordingProvider {
     func resume() {}
     var isPaused: Bool {
         false
+    }
+
+    var pausesBegun: Int {
+        0
     }
 }

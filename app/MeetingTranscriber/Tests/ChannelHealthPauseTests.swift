@@ -132,4 +132,26 @@ final class ChannelHealthPauseTests: XCTestCase {
         XCTAssertEqual(notifier.calls.map(\.title), ["Capture Channel Lost"])
         XCTAssertEqual(controller.micFault, .gaveUp)
     }
+
+    // MARK: - A pause between two ticks
+
+    /// The poll reads `isPaused` once per tick, so a short pause can begin and
+    /// end between two reads. Silence observed through 29 s, then a pause and
+    /// a resume before the 30 s tick: nothing at 30 s, where the window from
+    /// before the pause would have ended, and the warning once the window has
+    /// passed from the resume.
+    func testAPauseBetweenTwoTicksStillRestartsTheWindows() {
+        for scenario in [Self.tint, Self.silentRecording, Self.captureFault] {
+            let (controller, recorder, notifier) = make(scenario)
+            tick(controller, recorder, from: 0, through: window - 1)
+
+            recorder.pause()
+            recorder.resume()
+            tick(controller, recorder, from: window, through: 2 * window - 1)
+            XCTAssertTrue(nothingRaised(controller, notifier), "\(scenario.name): raised on the window from before the pause")
+
+            tick(controller, recorder, from: 2 * window, through: 2 * window)
+            XCTAssertTrue(scenario.raised(controller, notifier), "\(scenario.name): not raised once the window passed from the resume")
+        }
+    }
 }
