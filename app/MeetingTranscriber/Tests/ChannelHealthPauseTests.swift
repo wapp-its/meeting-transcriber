@@ -154,4 +154,69 @@ final class ChannelHealthPauseTests: XCTestCase {
             XCTAssertTrue(scenario.raised(controller, notifier), "\(scenario.name): not raised once the window passed from the resume")
         }
     }
+
+    // MARK: - The silent-track watchdog
+
+    /// Both channels carrying signal.
+    private static let healthy = Scenario(
+        name: "healthy", micDBFS: -30, appDBFS: -30, micAges: .deliveringSignalNow,
+    ) { _, _ in
+        false
+    }
+
+    /// The watchdog's give-up stays set for the rest of the recording. Raised
+    /// during the pause, it rests on silence nothing was recording, so after
+    /// the resume it counts only beside silence heard since the resume:
+    /// nothing while the app track carries signal, and the report once the
+    /// track has been silent for the window.
+    func testAWatchdogGiveUpDuringThePauseIsNotReportedWhileTheAppTrackCarriesSignal() {
+        let (controller, recorder, notifier) = make(Self.healthy)
+        tick(controller, recorder, from: 0, through: 10)
+        recorder.isPaused = true
+        tick(controller, recorder, from: 11, through: 20)
+        recorder.appSilentTrackWatchdogGaveUp = true
+        tick(controller, recorder, from: 21, through: 300)
+
+        recorder.isPaused = false
+        tick(controller, recorder, from: 301, through: 301)
+        XCTAssertTrue(nothingRaised(controller, notifier), "reported on the first tick after the resume")
+        tick(controller, recorder, from: 302, through: 301 + 4 * window)
+        XCTAssertTrue(nothingRaised(controller, notifier), "reported while the app track carries signal")
+
+        // The app track then goes to zeros while the microphone carries speech.
+        let silentFrom = 302 + 4 * window
+        recorder.appLevelDBFS = -120
+        var firstReport: TimeInterval?
+        for offset in stride(from: silentFrom, through: silentFrom + window, by: 1) {
+            recorder.appSignalAges = ChannelSignalAges(secondsSinceLastBuffer: 0, secondsSinceLastEnergy: offset - silentFrom)
+            controller.applyTick(recorder: recorder, now: t0.addingTimeInterval(offset))
+            if firstReport == nil, !notifier.calls.isEmpty { firstReport = offset - silentFrom }
+        }
+        XCTAssertEqual(firstReport, window, "seconds into the silence when it was reported")
+        XCTAssertEqual(controller.appFault, .rebuildsExhausted)
+        XCTAssertEqual(notifier.calls.map(\.title), ["Capture Channel Silent"])
+    }
+
+    /// Zeros heard before the resume, during the pause or before it, are not
+    /// silence in what is being recorded: an app track silent all along still
+    /// has to stay silent for the window counted from the resume.
+    func testAWatchdogGiveUpDuringThePauseWaitsForTheWindowFromTheResume() {
+        let (controller, recorder, notifier) = make(Self.healthy)
+        tick(controller, recorder, from: 0, through: 10)
+        recorder.isPaused = true
+        recorder.appLevelDBFS = -120
+        recorder.appSignalAges = ChannelHealthHarness.deliveringSilence
+        tick(controller, recorder, from: 11, through: 20)
+        recorder.appSilentTrackWatchdogGaveUp = true
+        tick(controller, recorder, from: 21, through: 300)
+
+        recorder.isPaused = false
+        let resume: TimeInterval = 301
+        tick(controller, recorder, from: resume, through: resume + window - 1)
+        XCTAssertTrue(notifier.calls.isEmpty, "reported inside the window after the resume: \(notifier.calls.map(\.title))")
+
+        tick(controller, recorder, from: resume + window, through: resume + window)
+        XCTAssertEqual(controller.appFault, .rebuildsExhausted)
+        XCTAssertEqual(notifier.calls.map(\.title), ["Capture Channel Silent"])
+    }
 }

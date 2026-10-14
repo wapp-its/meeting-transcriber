@@ -118,6 +118,8 @@ final class ChannelHealthController {
     /// The recorder's `pausesBegun` at the last tick, so a pause that began
     /// and ended between two ticks is still seen.
     @ObservationIgnored private var pausesSeen = 0
+    /// Whether this recording has resumed from a pause; see `watchdogGiveUpCounts`.
+    @ObservationIgnored private var resumedFromPause = false
 
     /// The silence clock of the recording in progress, for the long-silence
     /// question; nil before its first tick. Only the channels the
@@ -285,6 +287,7 @@ final class ChannelHealthController {
         lastSpeechAt.removeAll()
         heldForPause = false
         pausesSeen = 0
+        resumedFromPause = false
     }
 
     /// While the recording is paused nothing it captures is saved, so nothing
@@ -316,10 +319,25 @@ final class ChannelHealthController {
         }
         if !paused, heldForPause {
             heldForPause = false
+            resumedFromPause = true
             firstTickAt = now
             lastSpeechAt.removeAll()
         }
         return paused
+    }
+
+    /// The silent-track watchdog's give-up stays set for the rest of the
+    /// recording, and `ChannelFaultMonitor` reports it without waiting for the
+    /// window, because in a recording that ran throughout it only comes after
+    /// minutes of zeros. After a resume it may rest on zeros from the pause,
+    /// when a muted far end is just what a break sounds like, or from before
+    /// it. So once the recording has resumed, the give-up counts only beside
+    /// silence heard since the resume: no non-zero sample for the whole window,
+    /// counted from the resume at the earliest.
+    private func watchdogGiveUpCounts(ages: ChannelSignalAges, elapsedSinceStart: TimeInterval) -> Bool {
+        guard resumedFromPause else { return true }
+        let silentFor = min(ages.secondsSinceLastEnergy ?? elapsedSinceStart, elapsedSinceStart)
+        return silentFor >= faultWindow
     }
 
     /// Internal test seam: drives one polling tick against an arbitrary
@@ -450,6 +468,7 @@ final class ChannelHealthController {
         let gaveUp = channel == .mic ? recorder.micCaptureGaveUp : recorder.appCaptureGaveUp
         // Only the app channel has a silent-track watchdog.
         let rebuildsExhausted = channel == .app && recorder.appSilentTrackWatchdogGaveUp
+            && watchdogGiveUpCounts(ages: ages, elapsedSinceStart: elapsedSinceStart)
         let otherChannel: AudioChannel = channel == .mic ? .app : .mic
         // The window the monitors were built with, not the live setting: a
         // change mid-recording would otherwise judge the fault against one
