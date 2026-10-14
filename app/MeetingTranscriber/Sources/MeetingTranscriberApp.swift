@@ -19,6 +19,7 @@ extension Notification.Name {
 /// every open Window.
 private struct AnimatedMenuBarIcon: View {
     let badge: BadgeKind
+    let pausedOverlay: Bool
     let watchingOverlay: Bool
     let questionOverlay: Bool
     let meetingEndCountdownOverlay: Bool
@@ -38,6 +39,7 @@ private struct AnimatedMenuBarIcon: View {
         Image(nsImage: MenuBarIcon.image(
             badge: badge,
             animationFrame: animationFrame,
+            pausedOverlay: pausedOverlay,
             watchingOverlay: watchingOverlay,
             questionOverlay: questionOverlay,
             meetingEndCountdownOverlay: meetingEndCountdownOverlay,
@@ -157,6 +159,10 @@ struct MeetingTranscriberApp: App {
             onStopManualRecording: appState.canStopRecording ? {
                 appState.watching.stopRecording()
             } : nil,
+            isRecordingPaused: appState.isRecordingPaused,
+            onTogglePause: appState.canPauseRecording ? {
+                appState.watching.togglePause()
+            } : nil,
             onOpenLastProtocol: openLastProtocol,
             onOpenProtocol: openJobFile,
             onOpenProtocolsFolder: openProtocolsFolder,
@@ -186,6 +192,7 @@ struct MeetingTranscriberApp: App {
         } icon: {
             AnimatedMenuBarIcon(
                 badge: appState.currentBadge,
+                pausedOverlay: appState.isRecordingPaused,
                 watchingOverlay: appState.isWatching,
                 questionOverlay: appState.awaitingUserAnswer,
                 meetingEndCountdownOverlay: appState.meetingEndCountdownOverlay,
