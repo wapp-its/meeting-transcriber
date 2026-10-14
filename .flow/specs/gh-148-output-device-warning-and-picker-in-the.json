@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-148-output-device-warning-and-picker-in-the",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-14T17:03:13.515037Z",
   "created_at": "2026-10-14T15:58:06.770150Z",
   "default_impl": null,
   "default_review": null,
@@ -208,16 +208,88 @@
       "task": "gh-148-output-device-warning-and-picker-in-the.1",
       "timestamp": "2026-10-14T16:47:27.943552Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "dce2e78fd7960760413934186f1b0a621efb98ef1066a430b0920b5dfd9df70d",
+      "backend": "codex",
+      "base_sha": "8b6aca129f3381c2bf380ce1b7d657c4b7fe45e2",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "799b13ee627c0a17e2f07d979895e34075c8506c",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 345701,
+      "output_sha256": "f737458dcaecf0cb7aff3877f50a60c4cbf5028e8b11def7c5b109b3888e6b0f",
+      "reservation_id": "e6678aa0dc7b498aababee489b4f2157",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T16:51:58.976937Z",
+      "tool_calls": 14,
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "56401f7aa7063acdf45f367d8a47d4bcbd02dff1b518aa97b866852f7e828f5d",
+      "backend": "codex",
+      "base_sha": "8b6aca129f3381c2bf380ce1b7d657c4b7fe45e2",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "897f5cb732804a418c5d1d2875a67459a125e44b",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 8054,
+      "output_sha256": "446a0b52d4598ce12215a2967e6bd72bb2e7832aa39c4bd2ecd2e0c1b7d95795",
+      "reservation_id": "94798ce17229460a9dd6ab4d6eb2c5c9",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T17:03:13.480741Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-148-output-device-warning-and-picker-in-the.1": 1,
     "plan": 2,
-    "plan#completion": 0
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-148-output-device-warning-and-picker-in-the.1": 0,
     "plan": 0
   },
@@ -236,5 +308,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nTeams can set the Mac's default output to its own virtual device \"Microsoft Teams Audio\" (`MSLoopbackDriverDevice_UID`) and keep playing the call through another device. If a recording starts in this state, the app track is exact zeros for the whole meeting. The tap is anchored on the default output. In this routing it probably follows the virtual device, not the device that plays the call. The app posts \"Recording Appears Silent\", but it doesn't say why. Also the more specific \"Capture Channel Silent\" alert doesn't fire when the microphone is muted at the same time.\n\nSeen here with a Teams meeting on the current fork build. The unified log shows that the Teams ModuleHost process set the default output itself, a few minutes before the meeting. The setting then stays like this after the call.\n\nUpstream reports the same case as https://github.com/pasrom/meeting-transcriber/issues/712 (with a re-anchoring fix on a contributor fork) and a related one as https://github.com/pasrom/meeting-transcriber/issues/699.\n\n## NOTES\n\n- Not a permission problem: two short system sounds that went into the virtual device were captured, the call audio was not.\n- A virtual default output alone is not the fault (see upstream 712), so we should not reject virtual devices in general.\n\n## TASKS\n\n- [ ] Warn at recording start when the default output is the Teams loopback device, with the fix (switch the output in Control Center)\n- [ ] Find out if anchoring the tap on the device Teams plays to restores the app track, or wait for the upstream fix",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/148"
   },
-  "updated_at": "2026-10-14T16:47:27.972836Z"
+  "updated_at": "2026-10-14T17:03:13.516202Z"
 }
