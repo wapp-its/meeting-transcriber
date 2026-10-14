@@ -113,19 +113,50 @@ final class UpdateChecker {
     var lastCheckDate: Date?
     var lastError: String?
 
+    // mt-update mode (`UpdateChecker+MtUpdate.swift`); unused in GitHub mode.
+
+    /// What the newer build mt-update found brings; nil when none was found.
+    var availableBuildSummary: String?
+    var installState: UpdateInstallState = .idle
+    /// Why the last install failed, until the next check or install.
+    var lastInstallError: String?
+
+    /// Present only in mt-update mode, which it selects.
+    let installer: (any MtUpdateInstalling)?
+    let notifier: any AppNotifying
+    let pendingStore: PendingUpdateInstallStore
+    /// How often a launch that found its install still running looks again.
+    let recheckInterval: Duration
+    /// `resumeAfterLaunch` evaluates the pending record once per instance.
+    var hasResumedAfterLaunch = false
+
     private let provider: any UpdateProviding
     private let currentVersion: (Int, Int, Int)
     private var checkTask: Task<Void, Never>?
     private var periodicTask: Task<Void, Never>?
 
-    init(provider: any UpdateProviding = GitHubReleaseProvider()) {
+    init(
+        provider: any UpdateProviding = GitHubReleaseProvider(),
+        installer: (any MtUpdateInstalling)? = nil,
+        notifier: any AppNotifying = SilentNotifier(),
+        pendingStore: PendingUpdateInstallStore = .init(defaults: .standard),
+        recheckInterval: Duration = .seconds(30),
+    ) {
         self.provider = provider
+        self.installer = installer
+        self.notifier = notifier
+        self.pendingStore = pendingStore
+        self.recheckInterval = recheckInterval
         let version =
             Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
         self.currentVersion = Self.parseVersion(version) ?? (0, 0, 0)
     }
 
     func checkNow(includePreReleases: Bool = false) {
+        if let installer {
+            checkWithMtUpdate(installer)
+            return
+        }
         // Deduplicate concurrent calls
         guard checkTask == nil else { return }
 
