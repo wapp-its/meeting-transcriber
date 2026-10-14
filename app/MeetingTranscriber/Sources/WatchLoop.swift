@@ -500,6 +500,7 @@ class WatchLoop {
                     appName: appName,
                     recording: recording,
                     trigger: trigger,
+                    pauses: pauses,
                     participants: participants,
                 )
             } catch {

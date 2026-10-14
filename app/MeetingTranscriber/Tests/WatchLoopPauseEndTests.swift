@@ -4,8 +4,8 @@ import XCTest
 
 /// A paused recording at its end. A cut back from the meeting-end question or
 /// the long-silence question lands on the saved tracks' timeline, which leaves
-/// the paused time out, and the job carries the pauses clipped at the cut
-/// time; a failed cut keeps them as recorded. Driven
+/// the paused time out, and the job and the record-only sidecar carry the
+/// pauses clipped at the cut time; a failed cut keeps them as recorded. Driven
 /// on `TestClock`, polling once a virtual second with a 10 s end grace and a
 /// 40 s countdown, so every timing below is exact, with tracks as long as the
 /// audio the capture would have saved.
@@ -66,12 +66,14 @@ final class WatchLoopPauseEndTests: XCTestCase {
     /// Record the meeting through `handleMeeting`. Its signal goes at 20 s, so
     /// the question goes up at 30 s with its cut there, and nobody answers:
     /// the recording ends at the 70 s deadline.
-    private func endUnanswered(_ harness: EndHarness, pausing spans: Spans, queue: PipelineQueue) async throws {
+    private func endUnanswered(
+        _ harness: EndHarness, pausing spans: Spans, queue: PipelineQueue?, recordOnlyTo outputDir: URL? = nil,
+    ) async throws {
         harness.onTick = { h, t in
             if t == 20 { h.signal.active = false }
             self.act(on: spans, h, t)
         }
-        try await harness.makeLoop(queue: queue).handleMeeting(meeting)
+        try await harness.makeLoop(queue: queue, recordOnlyTo: outputDir).handleMeeting(meeting)
         XCTAssertEqual(harness.elapsed, 70, "precondition: ended unanswered at the deadline")
     }
 
@@ -160,6 +162,58 @@ final class WatchLoopPauseEndTests: XCTestCase {
         XCTAssertEqual(harness.diagnostics.lines(.notice, startingWith: "recording_cut"), ["recording_cut kept_s=11"])
         XCTAssertEqual(queue.jobs.first?.pauses, [pause(8, 12, offset: 8)])
     }
+
+    // MARK: - Record-only
+
+    /// A paused recording's sidecar lists each pause with its wall-clock times
+    /// and position, under the version that added them; an unpaused one has
+    /// no `pauses` key.
+    func testARecordOnlySidecarCarriesThePausesUnderTheNewVersion() async throws {
+        let rows: [(name: String, spans: Spans, pauses: [RecordingPause])] = [
+            ("paused", [(10, 20)], [pause(10, 20, offset: 10)]),
+            ("never paused", [], []),
+        ]
+        for row in rows {
+            let harness = EndHarness()
+            let dir = try makeTempDirectory(prefix: "pause-end-record-only")
+            harness.recorder.mixPath = dir.appendingPathComponent("\(Self.basename)\(RecordingFileSuffix.mix)")
+            try Data().write(to: XCTUnwrap(harness.recorder.mixPath))
+            harness.recorder.pauseOffsets = row.pauses.map(\.offsetSeconds)
+            let outputDir = dir.appendingPathComponent("output", isDirectory: true)
+            let loop = harness.makeLoop(queue: nil, recordOnlyTo: outputDir)
+            harness.onTick = { h, t in
+                self.act(on: row.spans, h, t)
+                if t == 30 { h.loop?.stopManualRecording() }
+            }
+
+            try await recordManually(loop)
+
+            let url = outputDir.appendingPathComponent("\(Self.basename)\(RecordingSidecar.filenameSuffix)")
+            let raw = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any], row.name)
+            XCTAssertEqual(raw["version"] as? Int, 3, row.name)
+            XCTAssertEqual(raw["pauses"] != nil, !row.pauses.isEmpty, "\(row.name): a pauses key only when paused")
+            let sidecar = try XCTUnwrap(RecordingSidecar.read(fromDirectory: outputDir, basename: Self.basename), row.name)
+            XCTAssertEqual(sidecar.pauses ?? [], row.pauses, row.name)
+        }
+    }
+
+    /// Cut back by the meeting-end question, the sidecar stops at the cut time
+    /// on the wall clock, which the pauses do not shorten, and carries the
+    /// pauses clipped there.
+    func testARecordOnlyCutRecordingsSidecarCarriesTheClippedPausesAndStopsAtTheCut() async throws {
+        let harness = EndHarness()
+        try giveTracks(to: harness, seconds: 50)
+        harness.recorder.pauseOffsets = [25]
+        let outputDir = try makeTempDirectory(prefix: "pause-end-output")
+
+        try await endUnanswered(harness, pausing: [(25, 45)], queue: nil, recordOnlyTo: outputDir)
+
+        let sidecar = try XCTUnwrap(RecordingSidecar.read(fromDirectory: outputDir, basename: Self.basename))
+        XCTAssertEqual(sidecar.stoppedAt, EndHarness.at(30), "the cut time, not the stop")
+        XCTAssertEqual(sidecar.pauses, [pause(25, 30, offset: 25)])
+        let mix = try AVAudioFile(forReading: outputDir.appendingPathComponent("\(Self.basename)\(RecordingFileSuffix.mix)"))
+        XCTAssertEqual(mix.length, 400_000, "the tracks keep the audio before the pause")
+    }
 }
 
 /// Everything a loop under test talks to. `onTick` runs after every virtual
@@ -209,7 +263,7 @@ private final class EndHarness {
         clock.now.timeIntervalSince(Self.start)
     }
 
-    func makeLoop(queue: PipelineQueue) -> WatchLoop {
+    func makeLoop(queue: PipelineQueue?, recordOnlyTo outputDir: URL? = nil) -> WatchLoop {
         let sleepProvider: (TimeInterval) async -> Void = { interval in
             await self.clock.sleep(for: interval)
             self.onTick(self, self.elapsed)
@@ -225,6 +279,8 @@ private final class EndHarness {
             pollInterval: 1,
             endGracePeriod: 10,
             meetingEndCountdown: 40,
+            recordOnly: { outputDir != nil },
+            recordOnlyDestination: { .unscoped(outputDir ?? FileManager.default.temporaryDirectory) },
             speechActivity: speechActivity,
             silencePromptAfter: { self.silenceAfter },
             notifier: notifier,
