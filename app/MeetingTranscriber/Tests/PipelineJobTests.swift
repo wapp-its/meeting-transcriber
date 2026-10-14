@@ -218,6 +218,53 @@ final class PipelineJobTests: XCTestCase {
         XCTAssertEqual(decoded.sidecarOutputDirs.map(\.path), ["/tmp/second"])
     }
 
+    // MARK: - Pauses
+
+    private static let pauses = [
+        RecordingPause(
+            startedAt: Date(timeIntervalSince1970: 1000), endedAt: Date(timeIntervalSince1970: 1300),
+            offsetSeconds: 120,
+        ),
+    ]
+
+    func testPausesSurviveEncoding() throws {
+        let job = PipelineJob(
+            meetingTitle: "Standup", appName: "Microsoft Teams",
+            mixPath: URL(fileURLWithPath: "/tmp/mix.wav"),
+            appPath: nil, micPath: nil, micDelay: 0,
+            pauses: Self.pauses,
+        )
+
+        let decoded = try JSONDecoder().decode(PipelineJob.self, from: JSONEncoder().encode(job))
+
+        XCTAssertEqual(decoded.pauses, Self.pauses)
+        XCTAssertNil(Self.makeJob().pauses, "a recording without pauses stores none")
+    }
+
+    /// A snapshot written before pauses existed has to decode, or a restart
+    /// after the update drops every job the user had queued.
+    func testAJobDecodesWithoutThePausesKey() throws {
+        var job = Self.makeJob()
+        job.pauses = Self.pauses
+        var fields = try Self.encodedFields(of: job)
+        XCTAssertNotNil(fields.removeValue(forKey: "pauses"))
+        let older = try JSONSerialization.data(withJSONObject: fields)
+
+        let decoded = try JSONDecoder().decode(PipelineJob.self, from: older)
+
+        XCTAssertNil(decoded.pauses)
+    }
+
+    /// The pauses describe the recording, which a retry processes again.
+    func testARetryKeepsThePauses() {
+        var job = Self.makeJob()
+        job.pauses = Self.pauses
+
+        job.prepareForRetry()
+
+        XCTAssertEqual(job.pauses, Self.pauses)
+    }
+
     /// A job's encoded form as a mutable dictionary, so a test can produce a
     /// state no writer reaches and decode it back.
     private static func encodedFields(of job: PipelineJob) throws -> [String: Any] {

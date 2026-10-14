@@ -74,6 +74,10 @@ enum A11yID {
     /// Menu bar item that opens the Transcriptions window.
     static let allTranscriptionsMenuItem = "allTranscriptionsMenuItem"
 
+    /// The menu's Pause Recording / Resume Recording item: one identifier for
+    /// both labels, since it is one item whose label follows the state.
+    static let pauseResumeRecording = "pauseResumeRecording"
+
     // Transcriptions window. Its rows show meeting titles and participants,
     // so the per-row buttons are addressed by ROW INDEX in the filtered list,
     // like `jobRetryButton`, and no identifier carries a title, participant or

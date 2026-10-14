@@ -379,7 +379,7 @@ final class SpeakerNamingSessionTests: XCTestCase {
 
         func renderLabeledTranscript(
             run _: DiarizationRun, cachedSegments _: [TimestampedSegment],
-            isDualSource _: Bool, autoNames _: [String: String], note _: String?,
+            isDualSource _: Bool, autoNames _: [String: String], annotations _: (note: String?, pauses: [RecordingPause]),
         ) -> String? {
             nil
         }

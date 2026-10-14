@@ -23,6 +23,12 @@ struct MenuBarView: View {
     let manualRecordingPendingOrActive: Bool
     /// Stops whatever is recording, a detected meeting included; set only while a recording runs.
     let onStopManualRecording: (() -> Void)?
+    /// Whether the running recording is paused, which picks the label of the
+    /// item `onTogglePause` drives.
+    var isRecordingPaused = false
+    /// Pauses a running recording or resumes a paused one, whatever kind it is;
+    /// set only while a recording's capture is running.
+    var onTogglePause: (() -> Void)?
     /// A job line's Open: the job's protocol, else its transcript.
     let onOpenProtocol: (URL) -> Void
     /// "Open Last Protocol": the newest finished job's protocol, else its
@@ -193,6 +199,23 @@ struct MenuBarView: View {
             .keyboardShortcut(".")
         } else {
             watchToggle
+        }
+        pauseResumeItem
+    }
+
+    /// The line under "Stop Recording", for every kind of recording.
+    @ViewBuilder private var pauseResumeItem: some View {
+        if let onTogglePause {
+            Button {
+                onTogglePause()
+            } label: {
+                if isRecordingPaused {
+                    Label("Resume Recording", systemImage: "record.circle")
+                } else {
+                    Label("Pause Recording", systemImage: "pause.circle")
+                }
+            }
+            .accessibilityIdentifier(A11yID.pauseResumeRecording)
         }
     }
 

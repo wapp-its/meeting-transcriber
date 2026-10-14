@@ -18,6 +18,14 @@ import Foundation
 protocol AudioCapturing: AnyObject {
     func start() throws
     func stop() -> AudioCaptureResult
+
+    /// Stop writing either track until `resume()`, and write on directly
+    /// after it (`AudioCaptureSession.pause()`). Required for the same reason
+    /// as the members below: a session that picked up a default would keep
+    /// writing while the recorder reports it paused.
+    func pause()
+    func resume()
+
     var appLevelDBFS: Double { get }
     var micLevelDBFS: Double { get }
     var appCaptureGaveUp: Bool { get }

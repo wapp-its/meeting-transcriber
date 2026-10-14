@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-46-pause-recording",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-14T09:56:01.920457Z",
   "created_at": "2026-10-06T20:28:05.930565Z",
   "default_impl": null,
   "default_review": null,
@@ -11,7 +11,14 @@
     "gh-54-ask-before-auto-stopping-a-meeting"
   ],
   "id": "gh-46-pause-and-resume-a-recording",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-46-pause-and-resume-a-recording.1": 0,
+    "gh-46-pause-and-resume-a-recording.2": 0,
+    "gh-46-pause-and-resume-a-recording.3": 0,
+    "gh-46-pause-and-resume-a-recording.4": 0,
+    "gh-46-pause-and-resume-a-recording.5": 0,
+    "gh-46-pause-and-resume-a-recording.6": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -154,19 +161,417 @@
       "task": null,
       "timestamp": "2026-10-06T20:59:14.194110Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "6759ee29930a8e078f8530d210a827e7f4ee0b464e681e1ed57542b92e29abdc",
+      "backend": "codex",
+      "base_sha": "5d62cea103054fd36f0cca317a18f634192ae219",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-e0b02151b736f3e3ce798239a9dc66b4",
+            "classification": "introduced",
+            "findingId": "finding-e0b02151b736f3e3ce798239a9dc66b4",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-2fa96207bfca4548f5da5e6acd67187b",
+            "classification": "introduced",
+            "findingId": "finding-2fa96207bfca4548f5da5e6acd67187b",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "7efa8c6025596660c6120d12fb7713b2053d716b",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 2120,
+      "output_sha256": "748daf82e925df2427dc9a25dc51d6d0fc0de6e5f331339b45744f79bf8e863b",
+      "reservation_id": "9739145f69db4704a8dc9a7dd77e8381",
+      "round_consumed": true,
+      "scope": "impl:gh-46-pause-and-resume-a-recording.1",
+      "superseded_by": null,
+      "task": "gh-46-pause-and-resume-a-recording.1",
+      "timestamp": "2026-10-14T06:58:08.662152Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "3706bcde8ec5107fb6fecc97e238e83a97fa9b07bcf591943ff1129e0a6ca3c4",
+      "backend": "codex",
+      "base_sha": "5d62cea103054fd36f0cca317a18f634192ae219",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-e0b02151b736f3e3ce798239a9dc66b4",
+            "classification": "introduced",
+            "findingId": "finding-e0b02151b736f3e3ce798239a9dc66b4",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-2fa96207bfca4548f5da5e6acd67187b",
+            "classification": "introduced",
+            "findingId": "finding-2fa96207bfca4548f5da5e6acd67187b",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "d3ec7c818a0ff84614e0e42585399060023668de",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1299,
+      "output_sha256": "8ca21c6664bcabf952e0c1b5f3f20d63842b26f465f986be5d35c49e58105806",
+      "reservation_id": "e61f67ca55b246759b82973c2b679855",
+      "round_consumed": true,
+      "scope": "impl:gh-46-pause-and-resume-a-recording.1",
+      "superseded_by": null,
+      "task": "gh-46-pause-and-resume-a-recording.1",
+      "timestamp": "2026-10-14T07:23:15.067175Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "852e9718cf6cdf8c4172ae3c856116b7563a6d0853bcd9048adaddce97d66010",
+      "backend": "codex",
+      "base_sha": "1972a313c7c43add376d83daf6943ddb3b81bde7",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "887a29367d477ebc9ae515b638ae5415e995c70c",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "0439c39200ab41b98c9f38e57c58aeaf",
+      "round_consumed": true,
+      "scope": "impl:gh-46-pause-and-resume-a-recording.2",
+      "superseded_by": null,
+      "task": "gh-46-pause-and-resume-a-recording.2",
+      "timestamp": "2026-10-14T07:34:05.865000Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "1fb5349833d178e7fda9986175b4fe46fc9cc5cd17af2fd5c05f219dfbd61541",
+      "backend": "codex",
+      "base_sha": "428b358fd0feea05210d92ce730d6afbc4768319",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-e613b585823737a2bf6a4666a6a5a02e",
+            "classification": "introduced",
+            "findingId": "finding-e613b585823737a2bf6a4666a6a5a02e",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-b0291763f40c2a708bfb0cb24491f7d4",
+            "classification": "introduced",
+            "findingId": "finding-b0291763f40c2a708bfb0cb24491f7d4",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "38d243902ffb132251d024415530c405c8c83235",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 2148,
+      "output_sha256": "2bbb8b8ad86c7e036034bb68811b6a4a2d37a223c52bdaf368cbe9fc75cb3bde",
+      "reservation_id": "b6f1f504026a4a87bdaf5b539a211a8f",
+      "round_consumed": true,
+      "scope": "impl:gh-46-pause-and-resume-a-recording.3",
+      "superseded_by": null,
+      "task": "gh-46-pause-and-resume-a-recording.3",
+      "timestamp": "2026-10-14T07:55:25.086422Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "485a774939688c0c9dc5bf21a53610ac68711f486826198ded41a17dff0aac40",
+      "backend": "codex",
+      "base_sha": "428b358fd0feea05210d92ce730d6afbc4768319",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-e613b585823737a2bf6a4666a6a5a02e",
+            "classification": "introduced",
+            "findingId": "finding-e613b585823737a2bf6a4666a6a5a02e",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-b0291763f40c2a708bfb0cb24491f7d4",
+            "classification": "introduced",
+            "findingId": "finding-b0291763f40c2a708bfb0cb24491f7d4",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "79f6a0608bd1db93b3152e232d08f4c77a90d360",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 961,
+      "output_sha256": "c389048de0fab86b0198437efbd4e11030c4b184f4cd3c4047217a5e1fdc1748",
+      "reservation_id": "3983b5d6802a4f19a81ed7594625eecd",
+      "round_consumed": true,
+      "scope": "impl:gh-46-pause-and-resume-a-recording.3",
+      "superseded_by": null,
+      "task": "gh-46-pause-and-resume-a-recording.3",
+      "timestamp": "2026-10-14T08:08:31.384777Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "cd7864ba69b1cacb636ee69bcf45114f7b92143d1f33016c1fe7e34e6224cfc1",
+      "backend": "codex",
+      "base_sha": "24d36763c21e3a22bffd313e27931cbe6cb66dec",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "735b87fb278fb7036b293b270306cd6badb17af3",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "b8a1a16f46b34afda38a2679a0e0cdd1",
+      "round_consumed": true,
+      "scope": "impl:gh-46-pause-and-resume-a-recording.4",
+      "superseded_by": null,
+      "task": "gh-46-pause-and-resume-a-recording.4",
+      "timestamp": "2026-10-14T08:47:46.187861Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "6829c5efd97ad09c1e46da90dbd085c55622d16b36f67105e7fe4440998cc069",
+      "backend": "codex",
+      "base_sha": "e9bb94be1dc4472bb59ea3f1d8b4a7f55bbfeeaf",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "40aebdcfc1e9e618558d4dfe5f367d5233b5689a",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "85d4483c99ce429a941a7fa31326d4ee",
+      "round_consumed": true,
+      "scope": "impl:gh-46-pause-and-resume-a-recording.6",
+      "superseded_by": null,
+      "task": "gh-46-pause-and-resume-a-recording.6",
+      "timestamp": "2026-10-14T09:23:34.486201Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "b5fbfbe50dcc6014429a043746c47cb4b5a81ad9c220d6b1c2cc417b7c837a0b",
+      "backend": "codex",
+      "base_sha": "d60ca9049a96461596f100d8bddeabf7c004805f",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "659c699e53d4915d1cabded0ebb00d45ae0a7aa8",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "f3923d24eac9483abff9f3567aedd06e",
+      "round_consumed": true,
+      "scope": "impl:gh-46-pause-and-resume-a-recording.5",
+      "superseded_by": null,
+      "task": "gh-46-pause-and-resume-a-recording.5",
+      "timestamp": "2026-10-14T09:30:11.450321Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "6478c0f7a2b2bd7ae3fadab17383d5244c952aca6536af353af610e5c2ea1800",
+      "backend": "codex",
+      "base_sha": "69e42de9481a7b557dfcf693a46a0781228ed062",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65d8f1b0591dd8ae76608bad9cf8c0a9438bb4e4",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 946453,
+      "output_sha256": "30d916e75601a6940103331992ddf22c53f1dc5ed8add088821ea57aa5659182",
+      "reservation_id": "2491d9bd80b142478438fb1ad08a6737",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T09:56:01.880540Z",
+      "tool_calls": 45,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-46-pause-and-resume-a-recording.1": 1,
+    "impl:gh-46-pause-and-resume-a-recording.2": 1,
+    "impl:gh-46-pause-and-resume-a-recording.3": 1,
+    "impl:gh-46-pause-and-resume-a-recording.4": 1,
+    "impl:gh-46-pause-and-resume-a-recording.5": 1,
+    "impl:gh-46-pause-and-resume-a-recording.6": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-46-pause-and-resume-a-recording.1": 0,
+    "impl:gh-46-pause-and-resume-a-recording.2": 0,
+    "impl:gh-46-pause-and-resume-a-recording.3": 0,
+    "impl:gh-46-pause-and-resume-a-recording.4": 0,
+    "impl:gh-46-pause-and-resume-a-recording.5": 0,
+    "impl:gh-46-pause-and-resume-a-recording.6": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-46-pause-and-resume-a-recording.md",
-  "status": "open",
+  "status": "done",
   "title": "Pause and resume a recording",
   "tracker": {
     "baseHashFlow": null,
@@ -180,5 +585,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/46"
   },
-  "updated_at": "2026-10-06T21:00:53.520824Z"
+  "updated_at": "2026-10-14T10:10:40.161776Z"
 }

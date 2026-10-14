@@ -75,8 +75,8 @@
         /// - `GET  /v1/watch` — watching status
         /// - `POST /v1/watch` — start/stop/toggle watching `{action}`
         /// - `GET  /v1/record` — microphone-recording status
-        /// - `POST /v1/record` — start/stop/toggle a microphone recording `{action}`,
-        ///   or end any recording `{"action":"stop","scope":"any"}`
+        /// - `POST /v1/record` — start/stop/toggle a microphone recording or pause/resume
+        ///   any recording `{action}`, or end any recording `{"action":"stop","scope":"any"}`
         func routeV1(_ request: HTTPRequest, path: String) async -> HTTPResponse {
             let idempotencyKey = request.headers["idempotency-key"]
             // `path` is query-stripped; read the opt-in off the raw target.
