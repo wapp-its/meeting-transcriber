@@ -550,7 +550,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-9-find-and-preload-models-from-hugging.md",
-  "status": "open",
+  "status": "done",
   "title": "Find and preload models from Hugging Face",
   "tracker": {
     "baseHashFlow": null,
@@ -564,5 +564,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/9"
   },
-  "updated_at": "2026-10-14T00:39:37.046136Z"
+  "updated_at": "2026-10-14T00:42:40.761164Z"
 }

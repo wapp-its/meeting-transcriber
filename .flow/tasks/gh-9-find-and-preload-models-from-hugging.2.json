@@ -6,7 +6,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-9-find-and-preload-models-from-hugging",
   "spec_path": ".flow/tasks/gh-9-find-and-preload-models-from-hugging.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Offer to load a newly picked stock model",
   "updated_at": "2026-10-13T15:49:15.254990Z"
 }
