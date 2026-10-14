@@ -22,7 +22,7 @@ A false notice is worse than none: it sends the user to System Settings for a to
 
 ## Edge Cases & Constraints
 
-- The retry applies to every caller of the check (launch, app activation, the check before a manual recording, the automation state read), because they all share the probe. [inferred]
+- The retry applies to every live run of the check (launch, app activation, and a live check when no result is cached yet), because they all share the probe; consumers of the cached result (the automation state read, the check before a manual recording when a result exists) see the retried verdict without running it themselves. Check scheduling stays as it is. [inferred]
 - The pause between the attempts is short (about 2 s) [inferred], so the worst case of a check stays a few seconds; a caller waiting on it (the check before a manual recording) waits that much longer only when the first attempt failed.
 - Waiting must not block the main thread. [inferred]
 - A persistent failure (a really broken grant, no input device at all) still ends as broken after the retry and posts the notice exactly as today. [inferred]
