@@ -17,15 +17,15 @@ Puts mt-update mode into `UpdateChecker` and wires it into the app: the check br
 - Live exit: `UpdateInstallOutcome.forLiveExit`, post `UpdateInstallNotice(outcome:logPath: installer.installLogPath)` with `.standard` urgency, clear the record, back to idle; on a failure set `lastInstallError` to the notice body and keep the summary (Install is offered again, R6); on `finishedWithoutRestart` clear the summary.
 - `resumeAfterLaunch() -> Bool` (returns whether watching should be restored): only in mt-update mode and only once per instance. `UpdateLaunchEvaluation.evaluate(pending: pendingStore.load(), currentBuild: installer.currentBuild(), isRunning: installer.isRunning)`: report → post the notice, clear the record, return `restoreWatching`; still running → installing since the record's start, and a task that sleeps `recheckInterval` and re-evaluates until it is no longer running; that terminal evaluation posts its notice, clears the record and sets the install state back to idle (this instance never gets the child's termination callback, so nothing else would), after which checks and Install work again; nothing pending → false. One shared "finish" path for the live exit and the recheck keeps the idle reset in one place.
 - `AppState` (`AppState.swift:117-135`): `makeUpdateChecker()` becomes `makeUpdateChecker(notifier:)` with an explicit return type (keep `init` under the type-check budget, see the comment at the top of `init`); under `#if !APPSTORE`, `MtUpdateProvider.detect()` non-nil → `UpdateChecker(installer:notifier:pendingStore:)`, else today's `UpdateChecker()`. Add `var updateInstallBlockedReason: String?` (`UpdateInstallGate.blockedReason(isRecording: watching.isRecording, manualRecordingStarting: watching.isManualRecording, waitingJobs: pipeline.queue.pendingJobs.count, activeJobs: pipeline.queue.activeJobs.count)`), `func installUpdate()` (→ `updateChecker.installNow(blockedReason:isWatching:)`) and `func resumeUpdateAfterLaunch()` (when `resumeAfterLaunch()` returns true and not already watching → `watching.toggleWatching(userInitiated: false)`, the auto-watch path). `currentBadge` (`:385`) reads `updateChecker.hasAvailableUpdate`.
-- `AppState+RPC.swift:241-250`: `available: updateChecker.hasAvailableUpdate`, `availableVersion: update?.tagName ?? updateChecker.availableBuildSummary`.
-- `MeetingTranscriberApp.swift:215-217`: the existing `.task` calls `appState.resumeUpdateAfterLaunch()` before `startPeriodicChecks`.
+- `AppState+RPC.swift:243-252`: `available: updateChecker.hasAvailableUpdate`, `availableVersion: update?.tagName ?? updateChecker.availableBuildSummary`.
+- `MeetingTranscriberApp.swift:229-231`: the existing `.task` calls `appState.resumeUpdateAfterLaunch()` before `startPeriodicChecks`.
 
 ### Investigation targets
 **Required** (read before coding):
 - `app/MeetingTranscriber/Sources/UpdateChecker.swift:106-202` — the class to extend
 - `app/MeetingTranscriber/Sources/AppState.swift:100-160` — factories and init budget
-- `app/MeetingTranscriber/Sources/WatchingController.swift:177-215` — `isWatching`, `isRecording`, the wide `isManualRecording`, `toggleWatching`
-- `app/MeetingTranscriber/Sources/MeetingTranscriberApp.swift:198-217` — auto-watch observer and the update `.task`
+- `app/MeetingTranscriber/Sources/WatchingController.swift:177-223` — `isWatching`, `isRecording`, the wide `isManualRecording`, `toggleWatching`
+- `app/MeetingTranscriber/Sources/MeetingTranscriberApp.swift:212-231` — auto-watch observer and the update `.task`
 
 **Optional** (reference as needed):
 - `app/MeetingTranscriber/Tests/UpdateCheckerTests.swift:1-30,250-310` — mock provider, `yieldUntil`, defaults suite
