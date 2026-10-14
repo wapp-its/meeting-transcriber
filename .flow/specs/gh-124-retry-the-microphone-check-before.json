@@ -8,7 +8,9 @@
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-124-retry-the-microphone-check-before",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-124-retry-the-microphone-check-before.1": 0
+  },
   "next_task": 1,
   "no_plan": true,
   "plan_review_rounds": 0,
@@ -59,15 +61,52 @@
       "timestamp": "2026-10-14T09:03:19.759646Z",
       "tool_calls": 19,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "fcca0609b6a5c3240e5e82202da3c27963cc831d8ae333f01bf09db6f364377a",
+      "backend": "codex",
+      "base_sha": "bf27a994e5e6289190e54d7c86a09da0c68cea2b",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "7e3e1bbe75743825408ee71f02e85b9fd5a542ac",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "73247374d8c9450096884e0b599f0398",
+      "round_consumed": true,
+      "scope": "impl:gh-124-retry-the-microphone-check-before.1",
+      "superseded_by": null,
+      "task": "gh-124-retry-the-microphone-check-before.1",
+      "timestamp": "2026-10-14T09:43:08.510806Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-124-retry-the-microphone-check-before.1": 1,
     "plan": 1,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-124-retry-the-microphone-check-before.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-124-retry-the-microphone-check-before.md",
@@ -85,5 +124,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nAfter an app start the permission check sometimes reports the microphone as broken. It then posts \"Microphone looks enabled but isn't working - toggle it off and on in System Settings\". The microphone works. On 2026-10-14 it happened after both mt-update restarts (06:00 and 08:03), and the Teams call at 09:01 recorded a normal microphone track.\n\n## NOTES\n\n- The system log shows the same cause both times, about 3 s after launch: `HALC_ProxyIOContext::_StartIO(): Start failed - StartAndWaitForState returned error 35`, then `AVAudioEngineGraph ... kAUStartIO ... error 35`. Error 35 is \"resource temporarily unavailable\", so the audio system was busy and a second try would probably work.\n- `probeMicrophone()` in `PermissionHealthCheck.swift` returns false when `engine.start()` throws, and `checkMicrophone` turns that into `.broken`. There is no retry. The startup check runs right away from the `.task` in `MeetingTranscriberApp`.\n- All later checks in the same run passed (6 checks between 09:02 and 09:23).\n- The notification dedup in `PermissionsController` only lives for one process, so every launch can notify again.\n- The Accessibility probe already treats an inconclusive answer as healthy. The microphone probe has nothing like it.\n- `/tmp/mt-permission.log` would have the reason line, but every process that writes it truncates it (also `xctest` runs), so the launch lines were gone.\n\n## TASKS\n\n- [ ] Retry the probe after a short delay when the engine start fails, and report broken only when the retry fails too\n- [ ] Add a test with an injected probe that fails once and then works, and check that no notification is posted",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/124"
   },
-  "updated_at": "2026-10-14T09:03:19.796133Z"
+  "updated_at": "2026-10-14T09:43:08.538471Z"
 }
