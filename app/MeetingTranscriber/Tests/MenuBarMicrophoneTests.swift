@@ -22,6 +22,7 @@ final class MenuBarMicrophoneTests: XCTestCase {
             manualRecordingPendingOrActive: false,
             onStopManualRecording: nil,
             onOpenProtocol: { _ in },
+            onOpenLastProtocol: { _ in },
             onOpenProtocolsFolder: {},
             onOpenSettings: {},
             onNameSpeakers: nil,

@@ -156,15 +156,12 @@ actor StageTimingLog {
 
     private let path: URL
     private let encoder: JSONEncoder
-    private let decoder: JSONDecoder
 
     init(path: URL = StageTimingLog.defaultPath) {
         self.path = path
         self.encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.sortedKeys]
-        self.decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
     }
 
     func append(_ events: [StageTimingEvent]) {
@@ -197,8 +194,22 @@ actor StageTimingLog {
     /// Load events with `ts` within the last `interval` seconds. Skips lines that
     /// fail to decode (forward-compat for future schema changes).
     func loadRecent(within interval: TimeInterval, now: Date = Date()) -> [StageTimingEvent] {
+        Self.events(at: path, within: interval, now: now)
+    }
+
+    /// `loadRecent` without waiting for the actor, for a caller that must have
+    /// the history before it goes on: `PipelineQueue` reads it when it is
+    /// created. An append still in flight can leave a half-written last line,
+    /// which is skipped like any other line that does not decode.
+    nonisolated func loadRecentNow(within interval: TimeInterval, now: Date = Date()) -> [StageTimingEvent] {
+        Self.events(at: path, within: interval, now: now)
+    }
+
+    private static func events(at path: URL, within interval: TimeInterval, now: Date) -> [StageTimingEvent] {
         guard let data = try? Data(contentsOf: path),
               let text = String(data: data, encoding: .utf8) else { return [] }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
         let cutoff = now.addingTimeInterval(-interval)
         var out: [StageTimingEvent] = []
         for line in text.split(separator: "\n", omittingEmptySubsequences: true) {

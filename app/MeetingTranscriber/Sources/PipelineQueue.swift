@@ -167,10 +167,13 @@ class PipelineQueue {
 
     /// Historical wall-clock seconds per audio second per configuration (last
     /// 30 days), read only when a running stage's expected finish is filled
-    /// in. Refreshed from `stageTimingLog` at launch and after each stage;
-    /// empty until the log has data. No view reads it, so a refresh redraws
+    /// in. Read from `stageTimingLog` when the queue is created and reloaded
+    /// after each stage; empty until the log has data. No view reads it, so a refresh redraws
     /// nothing.
     @ObservationIgnored private var stageSpeedByConfig: [StageConfig: Double] = [:]
+
+    /// How far back the speeds look.
+    private static let stageHistoryWindow: TimeInterval = 30 * 86400
 
     /// When the current `.transcribing`/`.diarizing`/`.generatingProtocol` state
     /// was entered, per job — so `updateJobState` can record the state's duration
@@ -460,7 +463,14 @@ class PipelineQueue {
             recognitionStatsLog: recognitionStatsLog,
         )
         naming.delegate = self
-        refreshStageSpeeds()
+        // Read here, not in a Task: a job the restore resumes enters its stage
+        // right at launch, and a finish missed when a stage starts is never
+        // filled in later. A small local file, read like the snapshot is.
+        if let stageTimingLog {
+            stageSpeedByConfig = StageTimingStats.speedByConfig(
+                events: stageTimingLog.loadRecentNow(within: Self.stageHistoryWindow),
+            )
+        }
     }
 
     /// May run off the main actor: the snapshot worker can hold the last
@@ -928,16 +938,12 @@ class PipelineQueue {
         engine.map { String(describing: type(of: $0)) }
     }
 
-    private func refreshStageSpeeds() {
-        Task { [weak self] in await self?.reloadStageSpeeds() }
-    }
-
     /// Reload recent timings and recompute the per-config speeds. A clock that
     /// already has its expected finish keeps it. Internal (not private) so a
-    /// test can wait for the history to be read before it drives a stage.
+    /// test can reload the history the way the end of a stage does.
     func reloadStageSpeeds() async {
         guard let stageTimingLog else { return }
-        let events = await stageTimingLog.loadRecent(within: 30 * 86400)
+        let events = await stageTimingLog.loadRecent(within: Self.stageHistoryWindow)
         stageSpeedByConfig = StageTimingStats.speedByConfig(events: events)
     }
 

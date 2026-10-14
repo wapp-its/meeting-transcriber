@@ -37,7 +37,6 @@ final class PipelineQueueStageClockTests: XCTestCase {
                 outputDir: dir, logDir: dir,
                 stageTimingLog: log, inFlightRuns: InFlightRunRegistry(),
             )
-            await queue.reloadStageSpeeds()
             var atStart: StageClock?
             queue.onJobStateChange = { job, _, newState in
                 if newState == .transcribing { atStart = queue.stageClock(forJobID: job.id) }
@@ -91,7 +90,6 @@ final class PipelineQueueStageClockTests: XCTestCase {
             outputDir: dir, logDir: dir, diarizeEnabled: true,
             stageTimingLog: log, inFlightRuns: InFlightRunRegistry(),
         )
-        await queue.reloadStageSpeeds()
         var presentations = 0
         queue.speakerNamingHandler = { _ in
             presentations += 1
@@ -120,6 +118,49 @@ final class PipelineQueueStageClockTests: XCTestCase {
             XCTAssertEqual(finish.timeIntervalSince(clock.startedAt), seconds, accuracy: 0.001)
         }
         XCTAssertEqual(protocolClock?.config.diarizerMode, "sortformer")
+    }
+
+    /// A job the restore finds mid-protocol starts again right at launch. Its
+    /// finish is read from the history all the same: the queue has read it by
+    /// the time it exists, since a finish missed at a stage's start is never
+    /// filled in later.
+    func testAStageResumedAtLaunchReadsTheHistory() async throws {
+        let dir = try makeTempDirectory(prefix: "stage_clock_restore")
+        // A long history, which a read in the background would still be busy
+        // with when the restore starts the job. A tenth of a second per second
+        // of audio.
+        let log = await makeLog(
+            in: dir, Array(repeating: speed(.generatingProtocol, wall: 60, audio: 600, engine: "MockEngine"), count: 1000),
+        )
+        var job = try PipelineJob(
+            meetingTitle: "Resume", appName: "Teams",
+            mixPath: createTestAudioFile(in: dir), appPath: nil, micPath: nil, micDelay: 0,
+        )
+        job.state = .generatingProtocol
+        job.audioDuration = 600
+        job.namingSlug = "resume"
+        let transcript = dir.appendingPathComponent("resume.txt")
+        try "[00:00] Speaker: Hello".write(to: transcript, atomically: true, encoding: .utf8)
+        job.transcriptPath = transcript
+        try JSONEncoder().encode([job]).write(to: dir.appendingPathComponent(PipelineSnapshot.snapshotFilename))
+
+        let queue = PipelineQueue(
+            engine: MockEngine(),
+            diarizationFactory: { MockDiarization() },
+            protocolGeneratorFactory: { MockProtocolGen() },
+            outputDir: dir, logDir: dir,
+            stageTimingLog: log, inFlightRuns: InFlightRunRegistry(),
+        )
+        var atStart: StageClock?
+        queue.onJobStateChange = { job, _, newState in
+            if newState == .generatingProtocol { atStart = queue.stageClock(forJobID: job.id) }
+        }
+        queue.loadSnapshot()
+        await queue.awaitProcessing()
+
+        let clock = try XCTUnwrap(atStart, "the restored job never generated its protocol")
+        let finish = try XCTUnwrap(clock.expectedFinish, "no finish for a stage resumed at launch")
+        XCTAssertEqual(finish.timeIntervalSince(clock.startedAt), 60, accuracy: 0.001)
     }
 
     private func diarizer(_ mode: DiarizerMode) -> MockDiarization {

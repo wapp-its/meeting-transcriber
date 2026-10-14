@@ -158,6 +158,11 @@ struct MeetingTranscriberApp: App {
                 appState.watching.stopRecording()
             } : nil,
             onOpenProtocol: openJobFile,
+            onOpenLastProtocol: { url in
+                Self.openLastProtocol(
+                    url, scopeRoot: appState.settings.effectiveOutputDir, notifier: NotificationManager.shared,
+                )
+            },
             onOpenProtocolsFolder: openProtocolsFolder,
             onOpenSettings: {
                 bringWindowToFront(id: "settings")
@@ -445,10 +450,9 @@ struct MeetingTranscriberApp: App {
         NSWorkspace.shared.open(protocols)
     }
 
-    /// A job line's Open and "Open Last Protocol", inside the output folder's
-    /// security scope: after a restart a history line can be opened before any
-    /// queue holds that scope, which the App Store build needs. A file that is
-    /// gone opens nothing, through the same check the window's Open makes.
+    /// A job line's Open, inside the output folder's security scope: after a
+    /// restart a history line can be opened before any queue holds that scope,
+    /// which the App Store build needs. A file that is gone opens nothing.
     private func openJobFile(_ url: URL) {
         _ = TranscriptionFileOpener.perform(url, scopeRoot: appState.settings.effectiveOutputDir) { file in
             NSWorkspace.shared.open(file)
@@ -518,5 +522,17 @@ struct MeetingTranscriberApp: App {
         autoWatchSetting: Bool = UserDefaults.standard.bool(forKey: "autoWatch"),
     ) -> Bool {
         commandLineArgs.contains("--auto-watch") || autoWatchSetting
+    }
+
+    /// "Open Last Protocol": the file inside the output folder's security
+    /// scope, through the check the Transcriptions window's Open makes. When
+    /// the file is gone the window says "The file was moved or deleted."; the
+    /// menu has closed by then, so the same sentence arrives as a notification.
+    static func openLastProtocol(
+        _ url: URL, scopeRoot: URL, notifier: any AppNotifying,
+        open: (URL) -> Void = { NSWorkspace.shared.open($0) },
+    ) {
+        guard !TranscriptionFileOpener.perform(url, scopeRoot: scopeRoot, action: open) else { return }
+        notifier.notify(title: "Open Last Protocol", body: "The file was moved or deleted.", urgency: .standard)
     }
 }

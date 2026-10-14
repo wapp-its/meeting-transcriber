@@ -8,7 +8,9 @@
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-125-menu-job-lines-that-stay-still-while-a",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-125-menu-job-lines-that-stay-still-while-a.1": 1
+  },
   "next_task": 1,
   "no_plan": true,
   "plan_review_rounds": 0,
@@ -135,6 +137,59 @@
       "task": null,
       "timestamp": "2026-10-14T08:59:56.573018Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "a1280e6a133c414371d68541d318eee41c6e75e52a7b35b04afbc7a622e9ba0f",
+      "backend": "codex",
+      "base_sha": "f9812570a0f9bcd9e4103a51b0735e14d279f0f4",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-5c7c7cab7652cdaf850f68a27a7fd6e2",
+            "classification": "introduced",
+            "findingId": "finding-5c7c7cab7652cdaf850f68a27a7fd6e2",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-3570cd5f8551a9300894762e70be3792",
+            "classification": "introduced",
+            "findingId": "finding-3570cd5f8551a9300894762e70be3792",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "3d113def8ae3cde645390828db7de8a044768c99",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 441757,
+      "output_sha256": "16c60f4ba975cefb964ae8d755934fba3c5c4c37079c83411a5c1e9cc3c323a7",
+      "reservation_id": "ac5d1b6231e2436ba83196db00e37530",
+      "round_consumed": true,
+      "scope": "impl:gh-125-menu-job-lines-that-stay-still-while-a.1",
+      "superseded_by": null,
+      "task": "gh-125-menu-job-lines-that-stay-still-while-a.1",
+      "timestamp": "2026-10-14T09:59:35.465321Z",
+      "tool_calls": 37,
+      "verdict": "NEEDS_WORK"
     }
   ],
   "review_hash_epoch": {
@@ -144,6 +199,7 @@
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-125-menu-job-lines-that-stay-still-while-a.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-125-menu-job-lines-that-stay-still-while-a.md",
@@ -161,5 +217,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nWhile a job runs, the menu changes under the mouse. The item under the pointer (for example \"All Transcriptions...\") loses its highlight or disappears, and an open job submenu closes. The job line shows the elapsed time in seconds, so the whole menu is rebuilt once per second.\n\n## NOTES\n\n- `PipelineQueue.startElapsedTimer()` writes `activeJobElapsed` every second. `MenuBarView.stageProgressText` reads it for the job line (`jobMenuTitle`) and inside the job submenu. The `MenuBarExtra` uses the menu style, so every change rebuilds the `NSMenu`. A label that changes once per minute would still close the menu once per minute.\n- The \"longer than usual\" hint compares the running stage with the average wall-clock time of all past runs of that stage (`averageSeconds(forJobID:stage:)`, `StageTimingStats.isSlowerThanUsual`). It ignores the length of the recording, and the average includes short test imports. On 2026-10-14 the WhisperKit average was 2:02, so a 16 minute meeting shows \"longer than usual\" after about 3 minutes even at normal speed. Normal for that length is about 3:18 (0.21 s per audio second over the last 30 days). The run took 4:41, so it was slower, but the hint would have shown anyway. The speed per audio second (`avgRTF`) is already computed.\n- The \"Processing\" header is above every job in the menu: running, waiting, waiting for speaker names, failed and the last three finished ones. So it often labels jobs that are not processing.\n- Owner ideas from 2026-10-14: remove finished jobs from the menu now that \"All Transcriptions...\" exists, and put \"All Transcriptions...\" next to \"Open Protocols Folder\".\n\n## TASKS\n\n- [ ] Stop rebuilding the menu while it is open\n- [ ] Compare the hint with the expected time for the length of the recording\n- [ ] Decide the menu layout: header text, finished jobs out of the menu, \"All Transcriptions...\" next to \"Open Protocols Folder\"",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/125"
   },
-  "updated_at": "2026-10-14T08:59:56.596435Z"
+  "updated_at": "2026-10-14T09:59:35.559151Z"
 }

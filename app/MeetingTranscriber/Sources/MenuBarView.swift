@@ -23,9 +23,12 @@ struct MenuBarView: View {
     let manualRecordingPendingOrActive: Bool
     /// Stops whatever is recording, a detected meeting included; set only while a recording runs.
     let onStopManualRecording: (() -> Void)?
-    /// Opens a job's protocol or transcript: a job line's Open, and "Open
-    /// Last Protocol".
+    /// A job line's Open: the job's protocol, else its transcript.
     let onOpenProtocol: (URL) -> Void
+    /// "Open Last Protocol": the newest finished job's protocol, else its
+    /// transcript. Separate from a job line's Open because a file that is
+    /// gone is reported here, as the Transcriptions window reports it.
+    let onOpenLastProtocol: (URL) -> Void
     let onOpenProtocolsFolder: () -> Void
     let onOpenSettings: () -> Void
     let onNameSpeakers: (() -> Void)?
@@ -323,7 +326,7 @@ struct MenuBarView: View {
     @ViewBuilder private var protocolActions: some View {
         if let url = TranscriptionList.lastFinished(transcriptionEntries)?.fileToOpen {
             Button {
-                onOpenProtocol(url)
+                onOpenLastProtocol(url)
             } label: {
                 Label("Open Last Protocol", systemImage: "doc.text")
             }
