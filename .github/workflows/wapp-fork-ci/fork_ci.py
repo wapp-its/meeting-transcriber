@@ -23,6 +23,7 @@ Talks to GitHub only through `gh api`, so test_fork_ci.py can stand in for it.
 """
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -58,11 +59,12 @@ def is_code_path(path):
     return not path.endswith(".md")
 
 
-def gh(method, path, **fields):
+def gh(method, path, token=None, **fields):
     args = ["gh", "api", "--method", method, path]
     for key, value in fields.items():
         args += ["-f", "%s=%s" % (key, value)]
-    proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    env = dict(os.environ, GH_TOKEN=token) if token else None
+    proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     if proc.returncode != 0:
         raise GhError((proc.stderr or proc.stdout).strip() or "gh api %s %s failed" % (method, path))
     return json.loads(proc.stdout) if proc.stdout.strip() else None
@@ -160,8 +162,15 @@ def request(args):
     if action == "skip":
         post_status(args.repo, head_sha, "success", reason[0].upper() + reason[1:], green["html_url"])
         return
+    # GitHub starts no workflow for a run started with the workflow's own token, so
+    # wapp-fork-ci-result.yml only fires for a ci.yml run started with a personal token.
+    dispatch_token = os.environ.get("DISPATCH_TOKEN")
+    if not dispatch_token:
+        print("warning: DISPATCH_TOKEN is not set, so wapp-fork-ci-result.yml will not fire for "
+              "this run; post its result by hand (see the top of wapp-fork-ci-result.yml)")
     try:
-        gh("POST", "repos/%s/actions/workflows/ci.yml/dispatches" % args.repo, ref=head_ref)
+        gh("POST", "repos/%s/actions/workflows/ci.yml/dispatches" % args.repo,
+           token=dispatch_token, ref=head_ref)
     except GhError as e:
         sys.exit("could not start ci.yml on %s: %s" % (head_ref, e))
     post_status(args.repo, head_sha, "pending", "ci.yml started: " + reason, args.self_url)

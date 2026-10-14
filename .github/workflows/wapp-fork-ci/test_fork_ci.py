@@ -92,18 +92,21 @@ class Harness:
         self.fixtures["GET repos/%s/actions/workflows/ci.yml/runs?status=success&per_page=100&page=%d"
                       % (REPO, page)] = {"json": {"workflow_runs": runs}}
 
-    def run(self, *args):
+    def run(self, *args, dispatch_token="personal-token"):
         with open(os.path.join(self.tmp, "fixtures.json"), "w") as f:
             json.dump(self.fixtures, f)
         env = dict(os.environ, **GIT_ENV)
+        env.pop("DISPATCH_TOKEN", None)
         env.update(PATH=self.path, FAKE_GH_FIXTURES=os.path.join(self.tmp, "fixtures.json"),
-                   FAKE_GH_LOG=self.log)
+                   FAKE_GH_LOG=self.log, GH_TOKEN="workflow-token")
+        if dispatch_token is not None:
+            env["DISPATCH_TOKEN"] = dispatch_token
         return subprocess.run([sys.executable, SCRIPT, *args], cwd=self.repo, env=env,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
-    def request(self, pr=7):
+    def request(self, pr=7, dispatch_token="personal-token"):
         return self.run("request", "--repo", REPO, "--pr", str(pr),
-                        "--self-url", "https://example.invalid/request")
+                        "--self-url", "https://example.invalid/request", dispatch_token=dispatch_token)
 
     def calls(self):
         if not os.path.exists(self.log):
@@ -218,6 +221,27 @@ class RequestSkipTests(unittest.TestCase):
         self.h.pr(head)
         self.h.green(self.green_sha)
         self.assert_started(self.h.request(), head, "code changed")
+
+    def test_ci_is_started_with_the_dispatch_token_and_nothing_else_is(self):
+        # a run started with the workflow token would not fire wapp-fork-ci-result.yml
+        head = self.h.commit({"app/Sources/Code.swift": "let a = 4\n"})
+        self.h.pr(head)
+        self.h.green(self.green_sha)
+        result = self.h.request()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for call in self.h.calls():
+            expected = "personal-token" if call["path"].endswith("/dispatches") else "workflow-token"
+            self.assertEqual(call["token"], expected, call["path"])
+
+    def test_missing_dispatch_token_still_starts_ci_and_warns(self):
+        head = self.h.commit({"app/Sources/Code.swift": "let a = 5\n"})
+        self.h.pr(head)
+        self.h.green(self.green_sha)
+        result = self.h.request(dispatch_token=None)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.h.dispatches(), [{"ref": "feat/x"}])
+        self.assertIn("DISPATCH_TOKEN", result.stdout)
+        self.assertIn("by hand", result.stdout)
 
     def test_scripts_workflows_and_dependencies_count_as_code(self):
         for path in ["scripts/new.sh", ".github/workflows/wapp-x.yml", "app/MeetingTranscriber/Package.resolved"]:

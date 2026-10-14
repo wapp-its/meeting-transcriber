@@ -33,7 +33,8 @@ def main(argv):
             sys.stderr.write("fake gh: unexpected argument %r\n" % arg)
             return 2
     with open(os.environ["FAKE_GH_LOG"], "a") as log:
-        log.write(json.dumps({"method": method, "path": path, "fields": fields}) + "\n")
+        log.write(json.dumps({"method": method, "path": path, "fields": fields,
+                              "token": os.environ.get("GH_TOKEN")}) + "\n")
     with open(os.environ["FAKE_GH_FIXTURES"]) as f:
         fixtures = json.load(f)
     answer = fixtures.get("%s %s" % (method, path))
