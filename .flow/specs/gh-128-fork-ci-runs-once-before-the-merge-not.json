@@ -1,0 +1,149 @@
+{
+  "branch_name": "local/gh-128-fork-ci-on-request",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-14T10:11:02.571751Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-128-fork-ci-runs-once-before-the-merge-not",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-14T10:17:39.588527Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "3393bf245b69a8496d24b4d9b90a53cbece52b81fe3b384225b6f43573dba97d",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-b8c76d464f3b33070992da261923a348",
+            "classification": "introduced",
+            "findingId": "finding-b8c76d464f3b33070992da261923a348",
+            "firstSeenThisRound": true,
+            "severity": "P0",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-f2354a2d7d175226954d8d874c0330df",
+            "classification": "introduced",
+            "findingId": "finding-f2354a2d7d175226954d8d874c0330df",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "8301601ea12002c4e05fbbf3bd335c46e9d5bf7a",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 300725,
+      "output_sha256": "c4490be78e12a62005fa45d1c1e59e271654919e573954c7b2543d313ad3c0bc",
+      "reservation_id": "f867182a42424681a250b94430f9aab1",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T10:15:29.279001Z",
+      "tool_calls": 17,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "e5837bdfcb53d4dcdf7e637df5c018acb03d6e0136f6f9d636ee176fb477e1bc",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-b8c76d464f3b33070992da261923a348",
+            "classification": "introduced",
+            "findingId": "finding-b8c76d464f3b33070992da261923a348",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-f2354a2d7d175226954d8d874c0330df",
+            "classification": "introduced",
+            "findingId": "finding-f2354a2d7d175226954d8d874c0330df",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "8301601ea12002c4e05fbbf3bd335c46e9d5bf7a",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 833,
+      "output_sha256": "828792e2c74fb8f3315e985104e8c5b4d9f65fc351da7e841e4fef3cbfa009ff",
+      "reservation_id": "58fc51e9a14d474da8e2250a96a77a1d",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T10:17:39.556135Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-128-fork-ci-runs-once-before-the-merge-not.md",
+  "status": "open",
+  "title": "Fork CI runs once before the merge, not on every push",
+  "tracker": {
+    "baseHashFlow": "666a90a8f56385750e205b267498876ac9340b969eca9c0032cae170579129d5",
+    "baseHashTracker": "90311cdbfb9db0a88d2f39d965f394c642c6a87a6b7eceed3d2c179add0aaaa9",
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABXFNZxw",
+    "identifier": "#128",
+    "lastSyncedAt": "2026-10-14T10:11:26.795931Z",
+    "linkState": "linked",
+    "mergeBaseFlow": "# Fork CI runs once before the merge, not on every push\n\n## Conversation Evidence\n\n> user (turn 1): \"Can we restrict the run trigger so that normal pushs dont trigger it, or how can we optimize it to avoid being disabled again?\"\n> user (turn 2, selected): \"C \u2014 Both (Recommended)\"\n> user (turn 3): \"Tell me when its merged o I can enable actions again\"\n\nTracker issue #128 (body: usage 2026-10-02 to 10-08, causes, proposal) and the owner-decision comment of 2026-10-14 (https://github.com/wapp-its/meeting-transcriber/issues/128#issuecomment-6165887690) are the written record of option C and its safety points.\n\n## Goal & Context\n\nGitHub paused every workflow in the fork on 2026-10-08 \"due to the scale of GitHub Actions usage\" [paraphrase]. Since then fork PRs get no CI and `wapp/main` gets no upstream changes. The owner re-enables Actions once this change is merged, and the usage must drop so that GitHub is less likely to pause the fork again. GitHub publishes no threshold, so no change guarantees it [paraphrase].\n\nMeasured 2026-10-02 to 10-08 [paraphrase]: 67 `ci.yml` runs on 31 branches, about 58 macOS job-minutes each, plus 61 waiting jobs that held an ubuntu runner for 19 h in total. Classified by what changed since the previous run on the same branch: app code 45 % of the run time, only `.flow/`, Markdown or `docs/` 33 %, nothing at all 9 %, a merge of `wapp/main` into the PR 14 %. 24 runs were cancelled midway by a newer push.\n\nThe owner picked option C over A (only skip pushes without code changes, the issue's original proposal) and B (only run CI on request before the merge) [paraphrase]: CI runs once per PR, right before the merge, on the commit that gets merged, and that run is skipped when no code changed since a run that passed.\n\n## Architecture & Data Models\n\nThree parts, all fork-only [inferred]:\n\n- **Request.** A manual start of the fork's CI workflow, naming the PR. It reads the PR's current head, decides between \"skip\" and \"run\", posts the commit status and, for \"run\", starts the original's `ci.yml` on the PR branch. It holds no runner after that.\n- **Result.** A workflow that starts when a `ci.yml` run completes. It turns that run's outcome into the commit status on the commit the run tested, including the one automatic retry.\n- **Working rules.** The fork's working rules say when to request CI and what a merge needs.\n\nState and ownership [inferred]: the commit status on a commit is the only result record, owned by GitHub per commit. The evidence for a skip is the `ci.yml` run history: commits whose run concluded `success`. Nothing new is stored.\n\n## API Contracts\n\n- **Request command** [inferred]: one command, runnable from any checkout with the fork's token: start the fork's CI workflow manually with input `pr=<PR number>`. Output: the run's log names the head it judged, the decision (skip with the green commit it compared against, or run), and the status it posted.\n- **Status** [inferred]: context `ci (upstream ci.yml)`, the name the check has today. States: `pending` (a run was started, or a retry is in progress), `success` (the run passed, or no code changed since a green commit; the description says which and names that commit), `failure` (failed twice, or failed with no retry left; the description names the first failing tests or points to the run). `target_url` links the run it describes.\n\n## Edge Cases & Constraints\n\n- ci.yml cancels its own run when a job fails. A cancelled run with a failed job is a failure; a cancelled run with no failed job was superseded by a newer request on the same branch and is neither retried nor reported as a failure [paraphrase].\n- `ci.yml` started on a branch tests the branch tip at start time, which can be newer than the head the request read. The result always lands on the commit the run actually tested, never on another one [inferred].\n- A push after the request leaves the new head without a status. That means \"not requested\", never \"passed\" [paraphrase].\n- A green commit that is no longer in the history (a deleted branch that never merged) is not evidence and is ignored [inferred].\n- When Actions is paused again, the request fails at start. The owner's rule of 2026-10-13 applies then: a local run replaces CI [inferred].\n- `ci.yml` itself stays byte-identical to `wapp/main`: every upstream change to it would otherwise conflict with the upstream sync [paraphrase].\n\n## Acceptance Criteria\n\n- **R1:** A push to a PR into `wapp/main` (opened, synchronize, reopened, ready_for_review) starts no `ci.yml` run and holds no runner waiting for one [paraphrase]. Errors: no error surface; the request (R2) is the only way CI starts for a fork PR.\n- **R2:** Requesting CI for a PR judges the PR's current head. When, compared directly (two-commit diff, not a merge base) against a commit whose `ci.yml` run passed, the head differs only in `.flow/**`, Markdown files or `docs/**`, or not at all, it posts a `success` status naming that commit and starts no `ci.yml` run. Otherwise it starts `ci.yml` on the PR branch and posts `pending` [paraphrase]. So a PR that only changes `.flow/` never starts `ci.yml` [paraphrase]. Errors: an unknown or closed PR, a PR whose base is not `wapp/main`, or a head from another repository \u2192 the request fails with a message naming the reason and posts no status [inferred]; missing history, an unreadable run list or a failed comparison \u2192 `ci.yml` runs, never a skip [paraphrase].\n- **R3:** Every path outside `.flow/**`, Markdown files and `docs/**` counts as code, including scripts, workflows, dependency manifests and tests. A merge of `wapp/main` into the PR that brings code therefore runs `ci.yml` [paraphrase]. Errors: no error surface beyond R2.\n- **R4:** When a `ci.yml` run completes, its outcome becomes the `ci (upstream ci.yml)` status on the commit that run tested, and no runner polls while it runs [paraphrase]. A first failure re-runs the failed jobs once while the status stays `pending`; a second failure sets `failure`. Errors: a run superseded by a newer request is not retried and posts no failure [paraphrase]; a run on a commit that is no longer the PR's head updates only that commit's status [inferred].\n- **R5:** The fork's working rules say: request CI once the head is final (after any catch-up merge and bookkeeping commits), and merge a fork PR only when its current head has a `success` status; a head without that status was not tested [paraphrase]. Errors: no error surface beyond the rule text.\n- **R6:** The original's workflows, `ci.yml` included, are unchanged, and every fork-only workflow file keeps the `wapp-` prefix, so the upstream sync keeps it switched on and a submission to the original never carries it [paraphrase]. Errors: no error surface beyond R2.\n\n## Boundaries\n\n- The upstream sync workflow (its six-hourly check and its macOS build on new upstream commits) stays as it is.\n- No branch protection or ruleset change; see A4.\n- No change to the build loop's own scripts outside this repository; the loop's merge step follows the working rules (R5).\n- The local-run rule for times when Actions is off stays as it is.\n\n## Decision Context\n\n- **D1 \u00b7 CI runs once per PR on request right before the merge, and that run is skipped when no code changed since a commit whose run passed (option C).** why: about 6 in 10 runs disappear (B removes runs replaced before merge, A removes plan-only runs); picked over A and B \u00b7 status: active [owner-stated 2026-10-14]\n- **D2 \u00b7 This change merges on the local check, and Actions is re-enabled after the merge.** why: \"Tell me when its merged o I can enable actions again\"; a local run replaces CI while Actions is off (owner rule 2026-10-13) \u00b7 status: active [owner-stated 2026-10-14]\n- **A1 \u00b7 The skip compares directly against a commit whose run passed, treats every path outside `.flow/**`, Markdown and `docs/**` as code, and runs CI on any missing history or comparison error.** flip at: the request's skip decision \u00b7 test: R2/R3 skip-decision tests \u00b7 alternatives: compare against the merge base or the base branch alone (proves nothing about the combination) \u00b7 status: active [agent-inferred 2026-10-14, Codex gpt-6-astra consult]\n- **A2 \u00b7 Requesting CI is a manual start of the fork's CI workflow with the PR number, not a label or the draft/ready switch.** flip at: the fork CI workflow's trigger \u00b7 test: R2 request for an unknown PR fails with a message \u00b7 alternatives: a `ci` label; opening PRs as drafts and starting CI on ready_for_review (a push after ready would need a second trigger anyway) \u00b7 status: active [agent-assumed 2026-10-14]\n- **A3 \u00b7 The status keeps the name `ci (upstream ci.yml)`, and the one automatic retry stays, now re-running only the failed jobs.** flip at: the result workflow \u00b7 test: R4 result-decision tests \u00b7 alternatives: drop the retry (hosted-runner flakes are still known) \u00b7 status: active [agent-assumed 2026-10-14]\n- **A4 \u00b7 No required status check in a ruleset; the merge gate stays the documented procedure (R5), as today.** flip at: the fork's rulesets \u00b7 test: none, procedure only \u00b7 alternatives: a required `ci (upstream ci.yml)` check (would block the local-run merges while Actions is off and the upstream sync's direct pushes unless bypassed) \u00b7 status: active [agent-assumed 2026-10-14]\n",
+    "mergeBaseTracker": "Seit 2026-10-08 23:24 startet GitHub im Fork keinen Workflow mehr: keine CI f\u00fcr Fork-PRs und keinen Upstream-Sync. Die Actions-Seite zeigt dazu:\n\n> Workflows are not currently being run on this fork due to the scale of GitHub Actions usage. A repository maintainer can choose to re-enable these.\n\nDie Repo-Einstellung zeigt Actions weiterhin als aktiv, `gh workflow run` antwortet mit HTTP 422 \"Actions has been disabled for this repository\". Ein Maintainer kann die Workflows \u00fcber diesen Hinweis auf https://github.com/wapp-its/meeting-transcriber/actions wieder einschalten. Ohne eine \u00c4nderung am Workflow ist aber zu erwarten, dass GitHub sie wieder pausiert.\n\n## Verbrauch vom 2026-10-02 bis 2026-10-08\n\nGemessen \u00fcber die Actions-API:\n\n- **67 L\u00e4ufe von `ci.yml`**, je rund 58 Job-Minuten: analyze etwa 12, test homebrew etwa 21, test appstore etwa 23, dazu lint und audiotap-coverage, alle auf `xcode-27`. 24 dieser L\u00e4ufe wurden mittendrin abgebrochen, weil ein neuerer Push kam.\n- **61 L\u00e4ufe des Warte-Jobs `wapp fork CI`** auf ubuntu, zusammen 19 Stunden. Der Job wartet fast die ganze Zeit nur auf `ci.yml`.\n- Die Spitze lag bei 5 Stunden CI-Laufzeit am 2026-10-06.\n\n## Warum es so viel ist\n\n1. **Jeder Push startet alle Jobs.** `wapp-fork-ci.yml` startet `ci.yml` per `workflow_dispatch`. Der Pfadfilter dort (Job `changes`) l\u00e4uft aber nur bei `pull_request`, sonst gilt `code: true`. Auch ein Push, der nur `.flow/` \u00e4ndert, kostet deshalb den vollen Lauf. Das betrifft Plan-PRs, Tracker-Sync und Review-Belege. `.flow/**` steht ausserdem nicht in `.github/filters.yml`.\n2. **Jeder neue Push bricht den laufenden Lauf ab und startet neu.** Die Commits, die der Build-Loop pro PR schreibt, kosten so mehrere volle L\u00e4ufe.\n3. **Ein fehlgeschlagener Lauf wird einmal ganz wiederholt**, wegen der bekannten Flakes auf den gehosteten Runnern.\n4. **Der Warte-Job h\u00e4lt einen Linux-Runner bis zu 90 Minuten**, nur um den Status abzufragen.\n\n## Vorschlag, nach Ertrag geordnet\n\n1. **Nur Plan- oder Doku-\u00c4nderungen l\u00f6sen keinen vollen Lauf aus**, wenn der vorherige Stand des PRs gr\u00fcn war. Gemeint sind Pushes, die nur `.flow/`, Markdown oder `docs/` \u00e4ndern. Ein PR, der nur `.flow/` \u00e4ndert (Plan-PR), endet ohne Dispatch gr\u00fcn.\n2. **Den Warte-Job ersetzen**, zum Beispiel durch einen `workflow_run`-Trigger, der das Ergebnis von `ci.yml` als Check an den PR-Head schreibt. Dann pollt kein Runner mehr.\n3. **Die automatische Wiederholung pr\u00fcfen**: behalten, wenn die Flakes noch auftreten, sonst entfernen.\n\n`wapp-*`-Workflows sind Fork-only und gehen nicht an das Original (submit.sh).",
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/128"
+  },
+  "updated_at": "2026-10-14T10:17:39.589647Z"
+}
