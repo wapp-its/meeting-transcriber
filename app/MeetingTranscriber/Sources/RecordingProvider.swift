@@ -164,9 +164,9 @@ extension RecordingProvider {
 
     func selectMicrophone(deviceUID _: String?) {}
 
-    func storePendingCut(cutAt _: Date, deadline _: Date, startedAt _: Date) {}
+    func storePendingCut(cutAt _: Date, deadline _: Date, startedAt _: Date) throws {}
 
-    func recordPendingCutResolution(keptSeconds _: TimeInterval, captureEndedAt _: Date) {}
+    func recordPendingCutResolution(keptSeconds _: TimeInterval, captureEndedAt _: Date) throws {}
 
     func clearPendingCut() -> PendingRecordingCut.RemoveOutcome {
         .removed
