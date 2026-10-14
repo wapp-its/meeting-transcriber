@@ -63,6 +63,18 @@ struct CapturePauseTimeline: Sendable, Equatable {
         return seconds - paused
     }
 
+    /// The paused time inside `[from, to)`: exactly 0 for an interval no
+    /// pause overlaps, rather than the rounding noise a difference of two
+    /// recording-clock readings would leave.
+    func pausedSeconds(from: Double, to: Double) -> Double {
+        var paused = 0.0
+        for pause in pauses {
+            let overlap = min(to, pause.end ?? to) - max(from, pause.start)
+            if overlap > 0 { paused += overlap }
+        }
+        return paused
+    }
+
     /// The frame ranges of a buffer, frame `i` captured at
     /// `bufferStartSeconds + i / sampleRate`, that lie outside every pause, in
     /// order: the whole buffer when no pause touches it, none when it lies

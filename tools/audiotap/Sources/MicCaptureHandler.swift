@@ -138,6 +138,8 @@ public class MicCaptureHandler: @unchecked Sendable {
     /// instead of an under-run (issue #379 follow-up — see `+Timeline`).
     /// `internal` for that cross-file extension; survives restarts (never reset).
     var timelineAnchor = TimelineAnchor(rate: Int(speechSampleRate))
+    /// Cuts the paused frames out of each buffer; kept across restarts, reset with the anchor.
+    var pauseCutter = CapturePauseCutter()
     /// The session's pauses, shared with the app track; see `+Write`.
     let pauseGate: CapturePauseGate
     public private(set) var firstFrameTime: UInt64 = 0
@@ -307,6 +309,7 @@ public class MicCaptureHandler: @unchecked Sendable {
             // belongs to this file's sample stream. Restarts keep the file
             // (and the anchor), so a restart gap is bridged with silence.
             timelineAnchor = TimelineAnchor(rate: Int(fileSampleRate))
+            pauseCutter = CapturePauseCutter()
         }
 
         // Locals, captured by value below. Sharing them across sessions loses

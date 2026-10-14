@@ -72,7 +72,9 @@ public extension AppAudioCapture {
     /// need gap-fill), writes the resampled samples to `fd`, and forwards those
     /// same samples to the live sink. A buffer no pause touches takes that path
     /// once, whole. Paused frames never enter the resampler, so its state
-    /// carries across the cut and its latency stays what it was. Caller
+    /// carries across the cut and its latency stays what it was. The pieces
+    /// come from `pauseCutter`, which also settles the fraction of a frame
+    /// each cut leaves, so repeated pauses do not move the track. Caller
     /// guarantees `resampler != nil`.
     internal func resampleForwardAndWrite(
         fd: Int32, interleaved: [Float], inputRate: Int, inputChannels: Int, hostTicks: UInt64,
@@ -81,30 +83,38 @@ public extension AppAudioCapture {
         let startSeconds = machTicksToSeconds(hostTicks)
         let channels = max(inputChannels, 1)
         let frameCount = interleaved.count / channels
-        let kept = timeline.keptFrameRanges(
-            bufferStartSeconds: startSeconds, frameCount: frameCount, sampleRate: Double(inputRate),
+        let pieces = pauseCutter.pieces(
+            of: timeline, bufferStartSeconds: startSeconds, frameCount: frameCount, sampleRate: Double(inputRate),
         )
-        guard !kept.isEmpty else {
+        guard !pieces.isEmpty else {
             // Nothing to write, but a first buffer still starts the track's timeline.
             timelineAnchor.anchorIfUnset(hostSeconds: timeline.recordingSeconds(atHostSeconds: startSeconds))
             return
         }
-        guard kept.first != 0 ..< frameCount else {
-            writeKeptFrames(
-                fd: fd, interleaved: interleaved, inputRate: inputRate, inputChannels: inputChannels,
-                recordingSeconds: timeline.recordingSeconds(atHostSeconds: startSeconds),
-            )
-            return
-        }
-        for range in kept {
-            let pieceStart = startSeconds + Double(range.lowerBound) / Double(inputRate)
+        for piece in pieces {
             writeKeptFrames(
                 fd: fd,
-                interleaved: Array(interleaved[range.lowerBound * channels ..< range.upperBound * channels]),
+                interleaved: piece.isWhole(of: frameCount)
+                    ? interleaved : Self.samples(of: piece, in: interleaved, channels: channels),
                 inputRate: inputRate, inputChannels: inputChannels,
-                recordingSeconds: timeline.recordingSeconds(atHostSeconds: pieceStart),
+                recordingSeconds: piece.recordingSeconds,
             )
         }
+    }
+
+    /// A piece's interleaved samples: its first frame `leadingRepeats` extra
+    /// times, then its frames.
+    private static func samples(
+        of piece: CapturePauseCutter.Piece, in interleaved: [Float], channels: Int,
+    ) -> [Float] {
+        let first = piece.frames.lowerBound * channels
+        var samples: [Float] = []
+        samples.reserveCapacity((piece.leadingRepeats + piece.frames.count) * channels)
+        for _ in 0 ..< piece.leadingRepeats {
+            samples += interleaved[first ..< first + channels]
+        }
+        samples += interleaved[first ..< piece.frames.upperBound * channels]
+        return samples
     }
 
     /// One run of unpaused frames through resample → gap fill → write → live

@@ -40,6 +40,8 @@ public class AppAudioCapture: @unchecked Sendable {
     /// #379 follow-up — see `writeCapturedBuffer` in `+Resampling`). `internal`
     /// for that cross-file extension; touched only on `writeQueue`.
     var timelineAnchor = TimelineAnchor(rate: Int(speechSampleRate))
+    /// Cuts the paused frames out of each buffer; touched only on `writeQueue`.
+    var pauseCutter = CapturePauseCutter()
     /// Measures the rate the tap is actually delivering, so a device that
     /// renegotiates in place is followed (issue #673). Touched only on
     /// `writeQueue`, like the anchor above.

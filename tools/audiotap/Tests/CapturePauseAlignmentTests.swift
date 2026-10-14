@@ -57,6 +57,66 @@ final class CapturePauseAlignmentTests: XCTestCase {
         }
     }
 
+    // MARK: - Repeated pauses on sub-frame boundaries
+
+    /// Twenty pauses in each case, every one with its boundaries at the same
+    /// phase between two frames, so whatever a single cut gets wrong by a
+    /// fraction of a frame it gets wrong the same way twenty times. At 48 kHz
+    /// the first two cases cut almost a whole frame less than the paused time
+    /// out of the app track at every pause, the third almost one more. Every
+    /// marker, each file and each live sink must stay within one 16 kHz frame
+    /// of the unpaused run minus the paused time, and the two tracks within
+    /// one frame of each other.
+    func testRepeatedPausesOnSubFrameBoundariesDoNotAddUp() throws {
+        let cases: [(name: String, pauses: [(start: Double, end: Double)])] = [
+            ("[0.520021, 0.530041) + n/10", Self.twentyPauses(start: 0.520021, end: 0.530041)),
+            ("[0.630001, 0.640019) + n/10", Self.twentyPauses(start: 0.630001, end: 0.640019)),
+            ("[0.520039, 0.530001) + n/10", Self.twentyPauses(start: 0.520039, end: 0.530001)),
+        ]
+        let unpaused = try run(pauses: [])
+        for (name, pauses) in cases {
+            let paused = try run(pauses: pauses)
+            let pausedSeconds = pauses.reduce(0) { $0 + $1.end - $1.start }
+            let kept = Self.markers.filter { marker in !pauses.contains { marker >= $0.start && marker < $0.end } }
+            var deviations: [String: [Double]] = [:]
+
+            for (track, whole, cut) in [("app", unpaused.app, paused.app), ("microphone", unpaused.mic, paused.mic)] {
+                let wholeMarkers = Self.markerPositions(in: whole.file)
+                let cutMarkers = Self.markerPositions(in: cut.file)
+                XCTAssertEqual(wholeMarkers.count, Self.markers.count, "\(name) \(track): every marker in the unpaused run")
+                XCTAssertEqual(cutMarkers.count, kept.count, "\(name) \(track): every marker outside a pause written")
+                guard wholeMarkers.count == Self.markers.count, cutMarkers.count == kept.count else { continue }
+
+                let unpausedAt = Dictionary(uniqueKeysWithValues: zip(Self.markers, wholeMarkers))
+                let markerDeviations = zip(kept, cutMarkers).map { marker, position in
+                    let pausedBefore = pauses.filter { $0.end <= marker }.reduce(0) { $0 + $1.end - $1.start }
+                    return position - ((unpausedAt[marker] ?? .nan) - pausedBefore * speechSampleRate)
+                }
+                for (marker, deviation) in zip(kept, markerDeviations) {
+                    XCTAssertEqual(deviation, 0, accuracy: Self.oneFrame, "\(name) \(track): marker at \(marker) s")
+                }
+                let lengthDeviation = Double(cut.file.count) - (Double(whole.file.count) - pausedSeconds * speechSampleRate)
+                XCTAssertEqual(lengthDeviation, 0, accuracy: Self.oneFrame, "\(name) \(track): file length")
+                let sinkDeviation = Double(cut.sink.count) - (Double(whole.sink.count) - pausedSeconds * speechSampleRate)
+                XCTAssertEqual(sinkDeviation, 0, accuracy: Self.oneFrame, "\(name) \(track): live sink length")
+                deviations[track] = markerDeviations
+
+                let worst = markerDeviations.map(abs).max() ?? 0
+                print("sub-frame pauses \(name) \(track): worst marker \(worst), file \(lengthDeviation), sink \(sinkDeviation) frames")
+            }
+
+            guard let app = deviations["app"], let mic = deviations["microphone"] else { continue }
+            for (marker, (onApp, onMic)) in zip(kept, zip(app, mic)) {
+                XCTAssertEqual(onApp, onMic, accuracy: Self.oneFrame, "\(name): the two tracks at the marker at \(marker) s")
+            }
+        }
+    }
+
+    /// Twenty pauses `[start, end)` a tenth of a second apart.
+    private static func twentyPauses(start: Double, end: Double) -> [(start: Double, end: Double)] {
+        (0 ..< 20).map { (start + 0.1 * Double($0), end + 0.1 * Double($0)) }
+    }
+
     // MARK: - A track first heard inside a pause
 
     /// Markers for `testATrackFirstHeardInsideAPauseKeepsTheGapAfterTheResume`,
