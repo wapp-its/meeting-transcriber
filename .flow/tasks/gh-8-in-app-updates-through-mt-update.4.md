@@ -91,7 +91,9 @@ Choices
 Follow-ups: none. No feature map exists (`.flow/features/` absent), so no route changed there.
 
 stage: plan-sync - skipped(config: planSync.enabled != true)
+Conductor fix after the task's SHIP, before the completion review (11a1c74e): About now names the running check as the reason Install Update is disabled (R4, rule 1), with the test row `checking` in `testInstallUpdateButtonIsDisabledWhileBlockedCheckingOrUnwired` expecting "Not available while checking for updates."; task 4's Choice 3 (the caption kept during a check) is withdrawn.
+
 ## Evidence
-- Commits: 260dcc1c508d53b11cbe902ab2e02628caa4bfda
+- Commits: 260dcc1c508d53b11cbe902ab2e02628caa4bfda, 11a1c74e7e65b82d56156b1c25d734c7a376ae28
 - Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh-8-test-home swift test --parallel --filter 'MtUpdate|UpdateInstall|UpdateChecker|AboutSettingsView|MenuBarView|SettingsViewTests' (229 tests, rc 0), cd app/MeetingTranscriber && swift build --build-tests -Xswiftc -DAPPSTORE (rc 0), ./scripts/pre-push.sh --all (rc 0), PATH=$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH ./scripts/lint.sh (0 violations, 0/812 need formatting)
 - PRs:
