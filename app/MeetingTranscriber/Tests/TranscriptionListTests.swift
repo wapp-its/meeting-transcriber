@@ -2,8 +2,8 @@
 import XCTest
 
 /// The one list the Transcriptions window and the menu both read: the live
-/// jobs merged with the finished-job history, in order, searched, and cut down
-/// to the menu's share. Plus the status wording and the file opener both
+/// jobs merged with the finished-job history, in order, searched, and split
+/// into the menu's share. Plus the status wording and the file opener both
 /// views use.
 final class TranscriptionListTests: XCTestCase {
     private static let start = Date(timeIntervalSinceReferenceDate: 780_000_000)
@@ -141,62 +141,78 @@ final class TranscriptionListTests: XCTestCase {
 
     // MARK: - The menu's share
 
-    /// Every unfinished job, and of the finished ones only the three that
-    /// finished last, shown in the order the jobs were added. The history's
-    /// order is the finish order, which here differs from the add order.
-    func testTheMenuKeepsUnfinishedJobsAndTheThreeThatFinishedLast() throws {
-        let finishedInOrder: [Double] = [0, 9, 1, 8, 3, 6, 5, 2, 7, 4]
-        let records = try finishedInOrder.map { try record("Done \(Int($0))", addedAt: $0) }
-        let unfinished = try [
-            job("Waiting", addedAt: 5.5),
-            job("Running", addedAt: 100, state: .transcribing),
+    /// Jobs waiting or running are in progress, jobs waiting for speaker names
+    /// or failed need the user, each group in the order the jobs were added.
+    /// Finished jobs, with or without warnings, are left out of the menu and
+    /// stay in the window's list.
+    func testTheMenuGroupsJobsInProgressAndJobsThatNeedYouAndLeavesFinishedOnesOut() throws {
+        var withWarnings = try job("Done with warnings", addedAt: 5, state: .done)
+        withWarnings.warnings = ["Diarization failed"]
+        let live = try [
+            job("Protocol", addedAt: 6, state: .generatingProtocol),
+            job("Naming", addedAt: 4, state: .speakerNamingPending),
+            job("Waiting", addedAt: 3),
+            job("Diarizing", addedAt: 2, state: .diarizing),
+            job("Transcribing", addedAt: 1, state: .transcribing),
+            withWarnings,
         ]
+        let records = try [record("Failed", addedAt: 0, state: .error), record("Done", addedAt: 7)]
+        let entries = TranscriptionList.entries(liveJobs: live, records: records)
 
-        let menu = TranscriptionList.menuEntries(TranscriptionList.entries(liveJobs: unfinished, records: records))
+        let sections = TranscriptionList.menuSections(entries)
 
-        XCTAssertEqual(titles(menu), ["Done 2", "Done 4", "Waiting", "Done 7", "Running"])
-
-        let none = TranscriptionList.menuEntries(TranscriptionList.entries(liveJobs: unfinished, records: []))
-
-        XCTAssertEqual(titles(none), ["Waiting", "Running"])
+        XCTAssertEqual(titles(sections.inProgress), ["Transcribing", "Diarizing", "Waiting", "Protocol"])
+        XCTAssertEqual(titles(sections.needsYou), ["Failed", "Naming"])
+        XCTAssertTrue(
+            Set(titles(entries)).isSuperset(of: ["Done", "Done with warnings"]),
+            "a finished job dropped out of the window's list",
+        )
+        XCTAssertEqual(TranscriptionList.menuSections([]), MenuJobSections(inProgress: [], needsYou: []))
     }
 
-    /// A failed job is retried and finishes after jobs added later than it.
-    /// Its record moves to the end of the history, so it has finished last
-    /// although it was added first.
-    func testARetriedJobThatFinishedLastIsAmongTheMenusFinishedJobs() throws {
-        let failed = try job("Flaky", addedAt: 0, state: .error)
-        var history = try [TerminalJobRecord(job: failed)]
-            + [record("A", addedAt: 1), record("B", addedAt: 2), record("C", addedAt: 3)]
-        var finished = failed
-        finished.state = .done
-        history = TerminalJobStore.upserting(history, with: TerminalJobRecord(job: finished), cap: 1000)
+    /// "Open Last Protocol" takes the job that finished last with a file, by
+    /// finish order: a retried job added first and finished last is it. A
+    /// later finish without a file and a later failure are passed over, and a
+    /// job with only a transcript opens that.
+    func testTheLastFinishedJobIsTheOneThatFinishedLastWithAFile() throws {
+        var retried = try job("Retried", addedAt: 0, state: .done)
+        retried.transcriptPath = URL(fileURLWithPath: "/out/retried.txt")
+        var earlier = try job("Earlier", addedAt: 1, state: .done)
+        earlier.protocolPath = URL(fileURLWithPath: "/out/earlier.md")
+        var failed = try job("Failed", addedAt: 3, state: .error)
+        failed.transcriptPath = URL(fileURLWithPath: "/out/failed.txt")
+        let history = try [earlier, retried, job("No file", addedAt: 2, state: .done), failed]
+            .map(TerminalJobRecord.init(job:))
 
-        let menu = TranscriptionList.menuEntries(TranscriptionList.entries(liveJobs: [finished], records: history))
+        let last = TranscriptionList.lastFinished(TranscriptionList.entries(liveJobs: [], records: history))
 
-        XCTAssertEqual(titles(menu), ["Flaky", "B", "C"])
+        XCTAssertEqual(last?.title, "Retried")
+        XCTAssertEqual(last?.fileToOpen, URL(fileURLWithPath: "/out/retried.txt"))
+        XCTAssertNil(TranscriptionList.lastFinished(TranscriptionList.entries(liveJobs: [], records: [
+            TerminalJobRecord(job: failed),
+        ])))
     }
 
-    /// The queue keeps a failed job until it is removed, while the history
-    /// drops its oldest records at the cap. Such a job finished before every
-    /// job still recorded, so it must not push those out of the menu; without
-    /// any history (a queue with no store) the jobs still rank by when they
-    /// were added.
-    func testFailedJobsWhoseRecordsWereEvictedDoNotCrowdOutRecentCompletions() throws {
-        let evicted = try (0 ..< 3).map { try job("Old failure \($0)", addedAt: Double($0), state: .error) }
-        let records = try (10 ..< 14).map { try record("Recent \($0)", addedAt: Double($0)) }
+    /// Right after it finished, after the queue dropped it a minute later, and
+    /// after a restart that reads the history from disk, the finished job is
+    /// the one "Open Last Protocol" opens.
+    @MainActor
+    func testTheLastFinishedJobOutlivesTheQueueAndARestart() throws {
+        let path = try makeTempDirectory(prefix: "last_finished").appendingPathComponent("terminal_jobs.json")
+        var finished = try job("Standup", addedAt: 0, state: .done)
+        finished.protocolPath = URL(fileURLWithPath: "/out/standup.md")
+        let store = TerminalJobStore(path: path)
+        store.record(TerminalJobRecord(job: finished))
 
-        let menu = TranscriptionList.menuEntries(TranscriptionList.entries(liveJobs: evicted, records: records))
-
-        XCTAssertEqual(titles(menu), ["Recent 11", "Recent 12", "Recent 13"])
-
-        let unrecorded = try (0 ..< 5).map { index in
-            try job("Finished \(index)", addedAt: Double(index), state: index.isMultiple(of: 2) ? .done : .error)
+        let views: [(String, [PipelineJob], [TerminalJobRecord])] = [
+            ("just finished", [finished], store.records),
+            ("left the queue", [], store.records),
+            ("after a restart", [], TerminalJobStore(path: path).records),
+        ]
+        for (moment, live, records) in views {
+            let last = TranscriptionList.lastFinished(TranscriptionList.entries(liveJobs: live, records: records))
+            XCTAssertEqual(last?.fileToOpen, URL(fileURLWithPath: "/out/standup.md"), moment)
         }
-
-        let noHistory = TranscriptionList.menuEntries(TranscriptionList.entries(liveJobs: unrecorded, records: []))
-
-        XCTAssertEqual(titles(noHistory), ["Finished 2", "Finished 3", "Finished 4"])
     }
 
     // MARK: - Opening a file

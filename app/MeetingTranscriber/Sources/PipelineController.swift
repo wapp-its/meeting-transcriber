@@ -440,6 +440,7 @@ final class PipelineController {
                 // captured elsewhere. Anchor the output basename on the sidecar's
                 // real meeting-start time, not this reprocessing moment.
                 meetingStartTime: sidecar?.startedAt,
+                pauses: sidecar?.pauses ?? [],
                 autoSkipNaming: autoSkipNaming,
             )
             ids.append(job.id)

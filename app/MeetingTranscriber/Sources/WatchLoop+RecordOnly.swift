@@ -9,11 +9,14 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "WatchLo
 /// Pure I/O: failures propagate to `enqueueRecording`, which owns the state
 /// mutation and the user-facing notification.
 extension WatchLoop {
-    func writeRecordOnlySidecar(
+    /// Takes `enqueueRecording`'s arguments one for one, so the call names
+    /// each of them; that puts it over the parameter-count limit.
+    func writeRecordOnlySidecar( // swiftlint:disable:this function_parameter_count
         title: String,
         appName: String,
         recording: RecordingResult,
         trigger: RecordingSidecar.Trigger,
+        pauses: [RecordingPause],
         participants: [String],
     ) throws {
         let startedAt = recording.recordingStartDate
@@ -57,6 +60,7 @@ extension WatchLoop {
             mixFilename: movedMix.lastPathComponent,
             appFilename: movedApp?.lastPathComponent,
             micFilename: movedMic?.lastPathComponent,
+            pauses: pauses,
         )
         try sidecar.write(toDirectory: destDir, basename: basename)
         logger.info("Record-only: wrote sidecar + WAVs to \(destDir.path) for \(title, privacy: .private)")

@@ -9,8 +9,8 @@ import Foundation
 /// the Transcriptions window and a job known only from the history read the
 /// same as the menu.
 enum JobMenuSummary {
-    /// `progress` is the running stage with its elapsed time, used while the
-    /// job is transcribing, diarizing or generating its protocol.
+    /// `progress` is the running stage's line (`stageProgress` in the menu),
+    /// used while the job is transcribing, diarizing or generating its protocol.
     static func status(state: JobState, hasWarnings: Bool, progress: String) -> String {
         switch state {
         case .waiting: state.label
@@ -31,6 +31,31 @@ enum JobMenuSummary {
         case .done: hasWarnings ? "exclamationmark.triangle" : "checkmark.circle"
         case .error: "xmark.octagon"
         }
+    }
+
+    /// A running stage's line, `Transcribing · since 09:17 · ready about
+    /// 09:21`, or without the last part while the stage has no expected
+    /// finish. Built from the clock's two fixed times and nothing else, so it
+    /// reads the same however much time passes; once the clock has passed the
+    /// expected finish, the stage is simply taking longer than usual. Times in
+    /// the system's short time format, which shows a finish on the next day as
+    /// its time only. Without a clock (a stage the queue did not see start),
+    /// the stage label alone.
+    static func stageProgress(
+        state: JobState, clock: StageClock?,
+        locale: Locale = .autoupdatingCurrent, timeZone: TimeZone = .autoupdatingCurrent,
+    ) -> String {
+        // The state's label without its trailing "...": the line goes on after it.
+        let label = state.label.hasSuffix("...") ? String(state.label.dropLast(3)) : state.label
+        guard let clock else { return label }
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.timeZone = timeZone
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        let since = "\(label) · since \(formatter.string(from: clock.startedAt))"
+        guard let finish = clock.expectedFinish else { return since }
+        return "\(since) · ready about \(formatter.string(from: finish))"
     }
 
     static func status(of job: PipelineJob, progress: String) -> String {

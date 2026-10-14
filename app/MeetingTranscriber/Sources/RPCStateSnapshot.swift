@@ -45,6 +45,11 @@
         /// for both, so this is the only wire signal that distinguishes the
         /// manual-recording path — letting a driver assert it took that path.
         let isManualRecording: Bool
+        /// True while the running recording is paused, whatever kind it is.
+        /// `watchState` and `badge` keep reading "recording" through a pause,
+        /// so this is the only wire signal that tells a paused recording from
+        /// one that captures.
+        let recordingPaused: Bool
         /// Recently-posted macOS notifications (capped ring buffer, oldest
         /// dropped), chronological — newest last. E2E drivers poll this to
         /// assert user-facing warning paths (meeting detected, silent recording,
@@ -467,6 +472,7 @@
             watchState: String? = nil,
             pendingConsentApp: String? = nil,
             isManualRecording: Bool = false,
+            recordingPaused: Bool = false,
             notifications: [Notification] = [],
             settings: Settings = .empty,
             badge: BadgeKind = .inactive,
@@ -484,6 +490,7 @@
             self.watchState = watchState
             self.pendingConsentApp = pendingConsentApp
             self.isManualRecording = isManualRecording
+            self.recordingPaused = recordingPaused
             self.notifications = notifications
             self.settings = settings
             self.badge = badge

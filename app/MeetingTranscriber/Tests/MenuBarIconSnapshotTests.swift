@@ -79,6 +79,14 @@ final class MenuBarIconSnapshotTests: XCTestCase {
         }
     }
 
+    /// The static pause symbol that replaces the waveform while a recording is
+    /// paused.
+    func testPausedSnapshot() throws {
+        try XCTSkipIf(isCI, "Snapshot tests are machine-dependent")
+        let image = MenuBarIcon.image(badge: .recording, pausedOverlay: true)
+        assertSnapshot(of: image, as: Self.icon, named: "recording")
+    }
+
     func testAllBadgesProduceNonEmptyImages() {
         for badge in BadgeKind.allCases {
             let frameCount = badge.isAnimated ? MenuBarIcon.frameCount : 1

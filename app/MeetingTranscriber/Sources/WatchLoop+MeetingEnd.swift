@@ -3,6 +3,9 @@ import os.log
 
 private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "WatchLoop")
 
+/// A stopped recording and its pauses, which a cut changes together.
+typealias StoppedRecording = (recording: RecordingResult, pauses: [RecordingPause])
+
 /// How a detected meeting's recording ends, split out of `WatchLoop.swift` to
 /// keep that file under the line cap.
 ///
@@ -132,11 +135,14 @@ extension WatchLoop {
     /// Cut the stopped recording back to `cutAt`, every track at the same
     /// point, and return it with `recordedUntil` saying where its audio now
     /// ends. `startedAt` and `stoppedAt` are when capture was running and when
-    /// it was stopped, on the loop's clock, which is how `cutAt` is placed on
-    /// the audio's own timeline (`RecordingCut.keptSeconds`). A failed cut
-    /// returns the recording uncut, never lost: as recorded, or, when an
-    /// original could not be put back on its path, pointing at it where it is.
-    /// A balanced mix is then made again from the cut tracks, since its gains
+    /// it was stopped, on the loop's clock, which with the recording's pauses
+    /// is how `cutAt` is placed on the audio's own timeline
+    /// (`RecordingCut.keptSeconds`). The pauses come back clipped at `cutAt`:
+    /// one that began at or after it is dropped, one spanning it ends there.
+    /// A failed cut returns the recording uncut, never lost, and its pauses
+    /// unclipped: the tracks as recorded, or, when an original could not be
+    /// put back on its path, pointing at it where it is. After a cut, a
+    /// balanced mix is made again from the cut tracks, since its gains
     /// were measured on the audio the cut threw away; a failed remix keeps the
     /// cut mix.
     ///
@@ -146,17 +152,19 @@ extension WatchLoop {
     /// value rather than place the cut again. A failed write is logged and the
     /// cut goes ahead.
     func cutBack(
-        _ recording: RecordingResult,
+        _ stopped: StoppedRecording,
         to cutAt: Date,
         startedAt: Date,
         stoppedAt: Date,
         recorder: any RecordingProvider,
-    ) -> RecordingResult {
+    ) -> StoppedRecording {
+        let recording = stopped.recording
         let seconds = RecordingCut.keptSeconds(
             cutAt: cutAt,
             startedAt: startedAt,
             stoppedAt: stoppedAt,
             mixDuration: RecordingCut.duration(of: recording.mixPath),
+            pauses: stopped.pauses,
         )
         do {
             try recorder.recordPendingCutResolution(keptSeconds: seconds, captureEndedAt: stoppedAt)
@@ -167,12 +175,12 @@ extension WatchLoop {
             try RecordingCut.apply(to: recording, keepingFirst: seconds)
         } catch let RecordingCut.CutError.rollbackIncomplete(uncut) {
             diagnostics.warning("recording_cut_failed rollback_incomplete tracks_moved=\(uncut.count)")
-            return RecordingCut.redirect(recording, to: uncut)
+            return (RecordingCut.redirect(recording, to: uncut), stopped.pauses)
         } catch {
             // Domain and code only: a file error's description names the path.
             let nsError = error as NSError
             diagnostics.warning("recording_cut_failed domain=\(nsError.domain) code=\(nsError.code)")
-            return recording
+            return stopped
         }
         diagnostics.notice("recording_cut kept_s=\(Int(seconds.rounded()))")
         if recording.levelBalanced {
@@ -185,10 +193,11 @@ extension WatchLoop {
         }
         // The cut point itself, moved onto the recorder's clock. Not the start
         // plus `seconds`: that is audio kept, which runs from the audio's first
-        // frame, and that frame can predate the recorder's start date.
+        // frame, and that frame can predate the recorder's start date. A
+        // wall-clock time, so the pauses do not shorten it.
         var cut = recording
         cut.recordedUntil = recording.recordingStartDate.addingTimeInterval(cutAt.timeIntervalSince(startedAt))
-        return cut
+        return (cut, stopped.pauses.clipped(at: cutAt))
     }
 
     /// Remove the cut `recorder` stored: when a question is settled without a

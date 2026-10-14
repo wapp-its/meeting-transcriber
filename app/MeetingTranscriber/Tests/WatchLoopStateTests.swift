@@ -2,7 +2,7 @@
 import XCTest
 
 /// Coverage for the `WatchLoopState` snapshot value type and the
-/// `WatchLoop.snapshot` getter that bundles the five observable fields.
+/// `WatchLoop.snapshot` getter that bundles the six observable fields.
 @MainActor
 final class WatchLoopStateTests: XCTestCase {
     // MARK: - Equatable / initial
@@ -18,6 +18,7 @@ final class WatchLoopStateTests: XCTestCase {
         XCTAssertNil(WatchLoopState.initial.lastError)
         XCTAssertEqual(WatchLoopState.initial.detail, "")
         XCTAssertNil(WatchLoopState.initial.manualRecordingInfo)
+        XCTAssertNil(WatchLoopState.initial.pausedSince)
     }
 
     func testEqualityRequiresAllFieldsToMatch() {
@@ -51,5 +52,17 @@ final class WatchLoopStateTests: XCTestCase {
         let info = try XCTUnwrap(loop.snapshot.manualRecordingInfo)
         XCTAssertEqual(info, ManualRecordingInfo(pid: 42, appName: "Chrome", title: "Sync"))
         XCTAssertEqual(loop.snapshot.phase, .recording)
+    }
+
+    func testSnapshotReflectsThePause() async throws {
+        let (loop, _) = makeTestWatchLoop()
+        try await loop.startManualRecording(pid: 42, appName: "Chrome", title: "Sync")
+        defer { loop.stop() }
+
+        XCTAssertEqual(loop.pauseRecording(), .changed)
+
+        let pausedSince = try XCTUnwrap(loop.snapshot.pausedSince)
+        XCTAssertEqual(pausedSince, loop.pausedSince)
+        XCTAssertEqual(loop.snapshot.detail, "Paused: Sync")
     }
 }

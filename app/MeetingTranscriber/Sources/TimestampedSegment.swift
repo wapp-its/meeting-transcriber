@@ -50,10 +50,25 @@ extension [TimestampedSegment] {
     /// rides here for that same reason, and `note` has no default so a site
     /// with nothing to add says `nil` rather than forgets: applying it at each
     /// *write* site instead missed the mid-pipeline draft.
-    func transcriptText(note: String?) -> String {
-        TranscriptNote.prepend(
-            note, to: filter { !$0.suppressed }.map(\.formattedLine).joined(separator: "\n"),
-        )
+    ///
+    /// The recording's pauses ride here for the same reason and have no
+    /// default either. Each becomes its own marker line, in offset order,
+    /// before the first rendered line starting at or after the pause's
+    /// offset; one past the last line goes at the end.
+    func transcriptText(
+        note: String?, pauses: [RecordingPause], timeZone: TimeZone = .autoupdatingCurrent,
+    ) -> String {
+        var pending = pauses.sorted { ($0.offsetSeconds, $0.startedAt) < ($1.offsetSeconds, $1.startedAt) }[...]
+        var lines: [String] = []
+        for segment in self where !segment.suppressed {
+            while let pause = pending.first, pause.offsetSeconds <= segment.start {
+                lines.append(pause.markerLine(in: timeZone))
+                pending.removeFirst()
+            }
+            lines.append(segment.formattedLine)
+        }
+        lines += pending.map { $0.markerLine(in: timeZone) }
+        return TranscriptNote.prepend(note, to: lines.joined(separator: "\n"))
     }
 }
 

@@ -27,7 +27,6 @@ final class NamingSessionMockDelegate: SpeakerNamingSessionDelegate {
     /// recorded order able to say which payload is newest.
     private(set) var recordedSidecarDirs: [URL?] = []
     private(set) var stageStartCount = 0
-    private(set) var stageEndCount = 0
 
     func job(withID id: UUID) -> PipelineJob? {
         jobs[id]
@@ -71,17 +70,13 @@ final class NamingSessionMockDelegate: SpeakerNamingSessionDelegate {
 
     func renderLabeledTranscript(
         run _: DiarizationRun, cachedSegments _: [TimestampedSegment],
-        isDualSource _: Bool, autoNames _: [String: String], note _: String?,
+        isDualSource _: Bool, autoNames _: [String: String], annotations _: (note: String?, pauses: [RecordingPause]),
     ) -> String? {
         nil
     }
 
-    func namingStageDidStart(jobID _: UUID) {
+    func startDiarizing(jobID _: UUID, mode _: DiarizerMode) {
         stageStartCount += 1
-    }
-
-    func namingStageDidEnd() {
-        stageEndCount += 1
     }
 }
 
