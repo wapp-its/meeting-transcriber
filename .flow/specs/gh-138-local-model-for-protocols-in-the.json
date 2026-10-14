@@ -6,13 +6,15 @@
   "default_impl": null,
   "default_review": null,
   "default_sync": null,
-  "depends_on_epics": [],
+  "depends_on_epics": [
+    "gh-2-protocol-templates-and-background-info"
+  ],
   "id": "gh-138-local-model-for-protocols-in-the",
   "impl_review_rounds": {},
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
-  "plan_reviewed_at": "2026-10-14T12:28:24.153021Z",
+  "plan_reviewed_at": "2026-10-14T12:52:46.550189Z",
   "review_attempts": [
     {
       "artifact_sha256": "e815dd799074f46e01a227f74209e154f61ebfb6d5ccc636b52b160a07849bd0",
@@ -150,10 +152,450 @@
       "task": null,
       "timestamp": "2026-10-14T12:28:24.135033Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "cc2f3038c5c30e8629bff82e9d908f8d2b3cd4d95dcb9be079b85f3317de00c4",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-b1b08c4b668d0c633c1d144b73fc758d",
+            "classification": "introduced",
+            "findingId": "finding-b1b08c4b668d0c633c1d144b73fc758d",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-bcd78442bd57e72fef5ade6e05b0eaff",
+            "classification": "introduced",
+            "findingId": "finding-bcd78442bd57e72fef5ade6e05b0eaff",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-d89badd41bec3ec57e80758e5990cb17",
+            "classification": "introduced",
+            "findingId": "finding-d89badd41bec3ec57e80758e5990cb17",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-fcf144e598159da6b6937dea1177cc92",
+            "classification": "introduced",
+            "findingId": "finding-fcf144e598159da6b6937dea1177cc92",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-3d3df96cf5ec821c0e4278b2d5d55974",
+            "classification": "introduced",
+            "findingId": "finding-3d3df96cf5ec821c0e4278b2d5d55974",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-457c24ad90203911b024c959a226c076",
+            "classification": "introduced",
+            "findingId": "finding-457c24ad90203911b024c959a226c076",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-47ba65a5b57ee1607d939e2dbbf73148",
+            "classification": "introduced",
+            "findingId": "finding-47ba65a5b57ee1607d939e2dbbf73148",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-ae427fd1780a09ef7420ce470472cdfc",
+            "classification": "introduced",
+            "findingId": "finding-ae427fd1780a09ef7420ce470472cdfc",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "19f56646a210ddb82620973753aa509b38cb3d22",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 3814,
+      "output_sha256": "a386b080e762a90a6c62a0aecc9c7f9a333ae8439f0aef6d8009805bab8eff5f",
+      "reservation_id": "7aa632e5ab10420ba307e6510af3db85",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T12:43:00.024745Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "5cc4cc08bc4b3dd5d587e6beb30fd39c6b186806bb31fa29eed9f4f8ee93e6d0",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-b1b08c4b668d0c633c1d144b73fc758d",
+            "classification": "introduced",
+            "findingId": "finding-b1b08c4b668d0c633c1d144b73fc758d",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-bcd78442bd57e72fef5ade6e05b0eaff",
+            "classification": "introduced",
+            "findingId": "finding-bcd78442bd57e72fef5ade6e05b0eaff",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-d89badd41bec3ec57e80758e5990cb17",
+            "classification": "introduced",
+            "findingId": "finding-d89badd41bec3ec57e80758e5990cb17",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-fcf144e598159da6b6937dea1177cc92",
+            "classification": "introduced",
+            "findingId": "finding-fcf144e598159da6b6937dea1177cc92",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-3d3df96cf5ec821c0e4278b2d5d55974",
+            "classification": "introduced",
+            "findingId": "finding-3d3df96cf5ec821c0e4278b2d5d55974",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-457c24ad90203911b024c959a226c076",
+            "classification": "introduced",
+            "findingId": "finding-457c24ad90203911b024c959a226c076",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "not_fixed"
+          },
+          {
+            "chainRoot": "finding-e4b61d8d5acd0f47370048a7a398f2fe",
+            "classification": "introduced",
+            "findingId": "finding-e4b61d8d5acd0f47370048a7a398f2fe",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-47ba65a5b57ee1607d939e2dbbf73148",
+            "classification": "introduced",
+            "findingId": "finding-47ba65a5b57ee1607d939e2dbbf73148",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-ae427fd1780a09ef7420ce470472cdfc",
+            "classification": "introduced",
+            "findingId": "finding-ae427fd1780a09ef7420ce470472cdfc",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "19f56646a210ddb82620973753aa509b38cb3d22",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1946,
+      "output_sha256": "b87a9ad4009175ac774f1977457f30dc81bee5e2e7a34c0d65ea1cce239fc283",
+      "reservation_id": "372188f0d24c4de19da0aae1980f6b18",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T12:49:05.565422Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "a39718d9626501b764fa33f0a67ef2a8d8029ea1448b60f758a20dd0f4df6f46",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-b1b08c4b668d0c633c1d144b73fc758d",
+            "classification": "introduced",
+            "findingId": "finding-b1b08c4b668d0c633c1d144b73fc758d",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-bcd78442bd57e72fef5ade6e05b0eaff",
+            "classification": "introduced",
+            "findingId": "finding-bcd78442bd57e72fef5ade6e05b0eaff",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-d89badd41bec3ec57e80758e5990cb17",
+            "classification": "introduced",
+            "findingId": "finding-d89badd41bec3ec57e80758e5990cb17",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-fcf144e598159da6b6937dea1177cc92",
+            "classification": "introduced",
+            "findingId": "finding-fcf144e598159da6b6937dea1177cc92",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-bfd0c8ac83c16de249f21706fce25ee7",
+            "classification": "introduced",
+            "findingId": "finding-bfd0c8ac83c16de249f21706fce25ee7",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-3d3df96cf5ec821c0e4278b2d5d55974",
+            "classification": "introduced",
+            "findingId": "finding-3d3df96cf5ec821c0e4278b2d5d55974",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-457c24ad90203911b024c959a226c076",
+            "classification": "introduced",
+            "findingId": "finding-457c24ad90203911b024c959a226c076",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "not_fixed"
+          },
+          {
+            "chainRoot": "finding-e4b61d8d5acd0f47370048a7a398f2fe",
+            "classification": "introduced",
+            "findingId": "finding-e4b61d8d5acd0f47370048a7a398f2fe",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-47ba65a5b57ee1607d939e2dbbf73148",
+            "classification": "introduced",
+            "findingId": "finding-47ba65a5b57ee1607d939e2dbbf73148",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-ae427fd1780a09ef7420ce470472cdfc",
+            "classification": "introduced",
+            "findingId": "finding-ae427fd1780a09ef7420ce470472cdfc",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "19f56646a210ddb82620973753aa509b38cb3d22",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1756,
+      "output_sha256": "62f88dec9b658c9718a15fcf8e3a7cb79470590b4216d2b84de580b5c42ccad8",
+      "reservation_id": "0870ddad04274307bafc399d9a203c7f",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T12:51:37.160291Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "419375a6fdfe4174fb8cb58b7b8b65cc7b31bac2e749b80b95dac4cbbb0f1589",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-b1b08c4b668d0c633c1d144b73fc758d",
+            "classification": "introduced",
+            "findingId": "finding-b1b08c4b668d0c633c1d144b73fc758d",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-bcd78442bd57e72fef5ade6e05b0eaff",
+            "classification": "introduced",
+            "findingId": "finding-bcd78442bd57e72fef5ade6e05b0eaff",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-d89badd41bec3ec57e80758e5990cb17",
+            "classification": "introduced",
+            "findingId": "finding-d89badd41bec3ec57e80758e5990cb17",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-fcf144e598159da6b6937dea1177cc92",
+            "classification": "introduced",
+            "findingId": "finding-fcf144e598159da6b6937dea1177cc92",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-bfd0c8ac83c16de249f21706fce25ee7",
+            "classification": "introduced",
+            "findingId": "finding-bfd0c8ac83c16de249f21706fce25ee7",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-3d3df96cf5ec821c0e4278b2d5d55974",
+            "classification": "introduced",
+            "findingId": "finding-3d3df96cf5ec821c0e4278b2d5d55974",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-457c24ad90203911b024c959a226c076",
+            "classification": "introduced",
+            "findingId": "finding-457c24ad90203911b024c959a226c076",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-e4b61d8d5acd0f47370048a7a398f2fe",
+            "classification": "introduced",
+            "findingId": "finding-e4b61d8d5acd0f47370048a7a398f2fe",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-47ba65a5b57ee1607d939e2dbbf73148",
+            "classification": "introduced",
+            "findingId": "finding-47ba65a5b57ee1607d939e2dbbf73148",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-ae427fd1780a09ef7420ce470472cdfc",
+            "classification": "introduced",
+            "findingId": "finding-ae427fd1780a09ef7420ce470472cdfc",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "19f56646a210ddb82620973753aa509b38cb3d22",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 632,
+      "output_sha256": "73be59d0285b753b363a3025d06193b902b81ff2ccf244342de39c85c774be03",
+      "reservation_id": "c0d7932bed1a4ee7a303b29add77b841",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T12:52:46.511833Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
-    "plan": 1,
+    "plan": 2,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
@@ -176,5 +618,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nDer Test in #112 zeigt: Qwen3.8-27B in 4-bit schreibt ohne Denken brauchbare Protokolle in etwa 3 min. \u00dcber LM Studio ist das aber umst\u00e4ndlich und fehleranf\u00e4llig. LM Studio ignoriert den Schalter f\u00fcrs Denken und die eingestellte Kontextl\u00e4nge. Sein Download blieb stundenlang h\u00e4ngen. Ausserdem muss man eine zweite App installieren, starten und einrichten. Die App k\u00f6nnte das Modell wie die Transkriptionsmodelle selbst von Hugging Face laden und mit `mlx-swift-lm` ausf\u00fchren. Das Paket kennt `qwen3_5`, `qwen3_8` und `gemma4`.\n\n## NOTES\n\n- Erst bauen, wenn der Test mit einem echten Meeting \u00fcber LM Studio (#112) gut ausf\u00e4llt.\n- Das Modell l\u00e4uft in einem eigenen Hilfsprozess der App (XPC-Dienst), nicht im App-Prozess. So beendet ein Absturz oder Speicherproblem des Modells keine laufende Aufnahme. Das geht auch in der App-Store-Variante.\n- Nur laufen lassen, wenn nicht aufgenommen wird, und das Modell danach sofort entladen. Kontext und Ausgabe begrenzen.\n- 27B in 4-bit braucht rund 20 GB und passt damit auf 64-GB-Macs. F\u00fcr 32-GB-Macs braucht es ein kleineres Modell, das separat getestet wird.\n- Die Transkriptions-Engines (`TranscribingEngine`) haben heute keine M\u00f6glichkeit, ihre Modelle zu entladen. Das wird gebraucht.\n- Der OpenAI-kompatible Provider bleibt f\u00fcr Server, zum Beispiel einen Hochschul-Server.\n\n## TASKS\n\n- [x] Ein Tag Spike: Qwen3.8-27B 4-bit \u00fcber `mlx-swift-lm` in einem XPC-Dienst, Speicher, Dauer und Abbruch messen (als eigener Prozess ohne XPC, Ergebnis in den Kommentaren)\n- [x] Danach entscheiden: als Spec bauen oder verwerfen (Pilot zuerst, nur Homebrew-Version)",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/138"
   },
-  "updated_at": "2026-10-14T12:28:24.154481Z"
+  "updated_at": "2026-10-14T12:52:46.552439Z"
 }
