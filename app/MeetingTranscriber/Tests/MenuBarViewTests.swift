@@ -34,6 +34,8 @@ final class MenuBarViewTests: XCTestCase {
         isWatching: Bool = false,
         pipelineQueue: PipelineQueue? = nil,
         updateChecker: UpdateChecker? = nil,
+        updateInstallBlockedReason: String? = nil,
+        onInstallUpdate: (() -> Void)? = nil,
         onNameSpeakers: (() -> Void)? = nil,
         onStopManualRecording: (() -> Void)? = nil,
         onRecordMicrophone: @escaping () -> Void = {},
@@ -51,6 +53,8 @@ final class MenuBarViewTests: XCTestCase {
             isWatching: isWatching,
             pipelineQueue: pipelineQueue ?? PipelineQueue(),
             updateChecker: updateChecker,
+            updateInstallBlockedReason: updateInstallBlockedReason,
+            onInstallUpdate: onInstallUpdate,
             history: history,
             onStartStop: {},
             onRecordApp: {},
@@ -796,6 +800,83 @@ final class MenuBarViewTests: XCTestCase {
         let sut = makeView(status: makeStatus())
         let body = try sut.inspect()
         XCTAssertThrowsError(try body.find(text: "Update Available:"))
+    }
+
+    // MARK: - mt-update install item
+
+    private static let buildSummary = "upstream 1a2b3c4 · wapp/main 5d6e7f8"
+    /// A wired install callback, for tests that only need the item enabled.
+    private static let wiredInstall: () -> Void = {}
+
+    /// A checker in mt-update mode offering `summary`. No process runs, and
+    /// the pending record would land in a throwaway defaults suite.
+    private func makeMtUpdateChecker(summary: String? = buildSummary) throws -> UpdateChecker {
+        let suite = "MenuBarViewTests-\(getpid())-\(UUID().uuidString)"
+        addTeardownBlock { DefaultsSuite.remove(suite) }
+        let checker = try UpdateChecker(
+            provider: MockUpdateProvider(),
+            installer: MockMtUpdateInstaller(),
+            pendingStore: PendingUpdateInstallStore(defaults: XCTUnwrap(UserDefaults(suiteName: suite))),
+        )
+        checker.availableBuildSummary = summary
+        return checker
+    }
+
+    private func installItem(in view: MenuBarView) throws -> InspectableView<ViewType.Button> {
+        try view.inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.menuInstallUpdateButton)
+            .find(ViewType.Button.self)
+    }
+
+    /// The one wiring test: found by its identifier, named after the build,
+    /// tapped, the callback ran.
+    func testInstallItemNamesTheBuildAndCallsTheInstallCallback() throws {
+        var installs = 0
+        // swiftlint:disable:next trailing_closure
+        let sut = try makeView(status: makeStatus(), updateChecker: makeMtUpdateChecker(), onInstallUpdate: { installs += 1 })
+
+        let item = try installItem(in: sut)
+        XCTAssertNoThrow(try item.find(text: "Install Update: \(Self.buildSummary)"))
+        XCTAssertFalse(item.isDisabled())
+        try item.tap()
+
+        XCTAssertEqual(installs, 1)
+    }
+
+    func testInstallItemIsDisabledWhileBlockedCheckingOrUnwired() throws {
+        let rows: [(name: String, reason: String?, checking: Bool, callback: (() -> Void)?)] = [
+            ("blocked", "Not available while meetings are being processed.", false, Self.wiredInstall),
+            ("checking", nil, true, Self.wiredInstall),
+            ("no callback", nil, false, nil),
+        ]
+        for row in rows {
+            let checker = try makeMtUpdateChecker()
+            checker.isChecking = row.checking
+            let sut = makeView(
+                status: makeStatus(), updateChecker: checker,
+                updateInstallBlockedReason: row.reason, onInstallUpdate: row.callback,
+            )
+
+            XCTAssertTrue(try installItem(in: sut).isDisabled(), row.name)
+        }
+    }
+
+    /// While mt-update runs the menu shows a line that cannot be clicked, and
+    /// without a build on offer there is nothing to install.
+    func testInstallingShowsAnInertLineAndNoBuildOffersNoItem() throws {
+        let installing = try makeMtUpdateChecker()
+        installing.installState = .installing(since: Date())
+        let rows: [(name: String, checker: UpdateChecker, showsInstalling: Bool)] = try [
+            ("installing", installing, true),
+            ("no build", makeMtUpdateChecker(summary: nil), false),
+        ]
+        for row in rows {
+            let body = try makeView(status: makeStatus(), updateChecker: row.checker, onInstallUpdate: Self.wiredInstall).inspect()
+
+            XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.menuInstallUpdateButton), row.name)
+            XCTAssertThrowsError(try body.find(button: "Installing Update…"), row.name)
+            XCTAssertEqual((try? body.find(text: "Installing Update…")) != nil, row.showsInstalling, row.name)
+        }
     }
 
     // MARK: - Process Files button

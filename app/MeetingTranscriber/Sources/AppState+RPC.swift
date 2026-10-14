@@ -239,12 +239,12 @@
         /// Snapshot the update-checker status. Extracted (like the other
         /// `*Snapshot` helpers) to keep `rpcStateSnapshot`'s literal under the
         /// type-check budget. Only the release identity + check status — no
-        /// download URLs.
+        /// download URLs. In mt-update mode the version is the build summary.
         private func updateStatusSnapshot() -> RPCStateSnapshot.UpdateStatus {
             let update = updateChecker.availableUpdate
             return RPCStateSnapshot.UpdateStatus(
-                available: update != nil,
-                availableVersion: update?.tagName,
+                available: updateChecker.hasAvailableUpdate,
+                availableVersion: update?.tagName ?? updateChecker.availableBuildSummary,
                 isPrerelease: update?.prerelease ?? false,
                 isChecking: updateChecker.isChecking,
                 lastError: updateChecker.lastError,

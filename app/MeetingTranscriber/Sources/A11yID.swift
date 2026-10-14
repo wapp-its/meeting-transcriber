@@ -78,6 +78,11 @@ enum A11yID {
     /// both labels, since it is one item whose label follows the state.
     static let pauseResumeRecording = "pauseResumeRecording"
 
+    /// The menu's "Install Update: <summary>" item (mt-update mode). No
+    /// summary in it, so the value stays fixed; kept off the `/ui/press`
+    /// allowlist like `updateInstallButton`.
+    static let menuInstallUpdateButton = "menuInstallUpdateButton"
+
     // Transcriptions window. Its rows show meeting titles and participants,
     // so the per-row buttons are addressed by ROW INDEX in the filtered list,
     // like `jobRetryButton`, and no identifier carries a title, participant or
@@ -193,6 +198,10 @@ enum A11yID {
 
     /// Same single-home pattern for the About tab.
     static let settingsTabAbout = settingsTab("about")
+
+    /// About → Updates "Install Update" (mt-update mode). Kept off the
+    /// `/ui/press` allowlist (`AboutSettingsViewTests`).
+    static let updateInstallButton = "updateInstallButton"
 
     // Speaker-naming dialog.
     static let confirmButton = "confirm-button"

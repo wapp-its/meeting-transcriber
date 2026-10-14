@@ -9,7 +9,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-8-in-app-updates-through-mt-update",
   "spec_path": ".flow/tasks/gh-8-in-app-updates-through-mt-update.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Pure mt-update contract, install bookkeeping and notices",
   "updated_at": "2026-10-06T20:29:47.089715Z"
 }
