@@ -133,6 +133,12 @@ FIT: GO · 2026-10-13 · base 557170da · engine flow-next 8.6.0 · nothing mate
   - gh-7 added the pipe-based `CLIProcessRunner`; task 2 keeps its own file-backed, process-group-bounded runner on purpose (the install child must never write to a pipe), as the plan review's maintainability note already accepts
   - `origin/tools:mt-update.sh` still has no `--porcelain`, so R3's message is what the app shows until the tools change lands, as the Boundaries say
 
+FIT: GO · 2026-10-14 · base 8def642b · engine flow-next 8.7.0 · nothing material moved since the GO of 2026-10-13; task 2 adds only new files
+  - the engine moved 8.6.0 → 8.7.0; the spec relies on no flow-next command, section or template
+  - `wapp/main` gained gh-46 (pause), gh-124 (mic probe) and gh-125 (menu job lines): their diff of `AppState.swift`, `AppState+RPC.swift`, `MeetingTranscriberApp.swift`, `MenuBarView.swift` and `A11yID.swift` carries no update or install line; the specs gh-124, gh-125 and gh-128 do not mention mt-update or update checks
+  - the sysctl start-time construct task 2 cites in `DualSourceRecorder.swift` is unchanged (line drift only on `wapp/main`)
+  - the spec branch stays at base 557170da for task 2 (new files only); tasks 3 and 4 touch the menu and app files that moved, so the branch takes `wapp/main` and their anchors are re-checked before task 3 starts
+
 Maintainability (plan review): duplication - task 2 keeps the bounded-run scaffolding of the Claude CLI help probe, with its own process-group cleanup; structure - `UpdateChecker.checkNow` gains a top-level mode dispatch, with the mt-update logic in its extension.
 
 ## Requirement coverage
