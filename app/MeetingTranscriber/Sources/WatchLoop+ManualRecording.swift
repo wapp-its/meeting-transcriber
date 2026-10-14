@@ -33,6 +33,11 @@ extension WatchLoop {
                 stopManualRecording()
                 return
             }
+            if let stop = stepSilencePrompt(held: false, trigger: .manual) {
+                diagnostics.notice(AutoStopReason.silenceStop.logLine(trigger: .manual, silentFor: stop.silentFor))
+                stopManualRecording(cutAt: stop.cutAt)
+                return
+            }
             try? await sleepProvider(pollInterval)
         }
     }

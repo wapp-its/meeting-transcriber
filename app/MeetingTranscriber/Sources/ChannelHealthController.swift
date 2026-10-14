@@ -113,6 +113,17 @@ final class ChannelHealthController {
     /// something; see `ChannelFaultMonitor.update(ages:elapsedSinceStart:corroborated:)`.
     @ObservationIgnored private var lastSpeechAt: [AudioChannel: Date] = [:]
 
+    /// The silence clock of the recording in progress, for the long-silence
+    /// question; nil before its first tick. Only the channels the
+    /// recording opened count. Built from the ignored storage above, so
+    /// reading it registers no observed dependency on a value that changes
+    /// ten times a second.
+    var speechActivity: SpeechActivity? {
+        guard let firstTickAt else { return nil }
+        let opened = lastSpeechAt.filter { channel, _ in channel == .mic ? channels.mic : channels.app }
+        return SpeechActivity(observedSince: firstTickAt, lastSpeechAt: opened.values.max())
+    }
+
     /// Red tint for the menu bar's **top** half. Composed here rather than at
     /// the call site so the topology that suppresses a phantom channel is
     /// applied in exactly one place, and so is the user's preference about the

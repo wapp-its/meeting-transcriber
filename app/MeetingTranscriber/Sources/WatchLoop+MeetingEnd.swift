@@ -30,7 +30,7 @@ extension WatchLoop {
     /// earlier version let the `CancellationError` escape and discarded the
     /// whole recording. Stopped while the question is open, the recording ends
     /// as an unanswered question would, cut back. Every way out of here takes
-    /// the open question back.
+    /// the open question back, and the long-silence question with it.
     ///
     /// `recording` is the meeting's recorder and when the loop saw its capture
     /// running, where the cut is measured from. With it, each question's cut
@@ -49,7 +49,10 @@ extension WatchLoop {
             countdown: meetingEndCountdown,
         )
         var phase = MeetingEndPhase.listening(signalLostAt: nil)
-        defer { withdrawMeetingEndQuestion() }
+        defer {
+            withdrawMeetingEndQuestion()
+            endSilencePrompt()
+        }
 
         do {
             while !Task.isCancelled {
@@ -70,6 +73,11 @@ extension WatchLoop {
                     answer: takeMeetingEndAnswer(),
                 )
                 let decision = WatchLoopEndPolicy.step(config: config, startTime: startTime, phase: phase, poll: poll)
+                if let stop = stepSilencePrompt(beside: decision, from: phase) {
+                    diagnostics.notice(AutoStopReason.silenceStop.logLine(trigger: .auto, silentFor: stop.silentFor))
+                    holdRedetection(of: meeting)
+                    return stop.cutAt
+                }
                 switch decision {
                 case let .continuePolling(next):
                     phase = next
@@ -93,6 +101,22 @@ extension WatchLoop {
         } catch is CancellationError {}
         logger.info("Watch cancelled mid-recording — finalizing in-flight recording")
         return WatchLoopEndPolicy.cutWhenWatchingStops(phase: phase, answer: takeMeetingEndAnswer())
+    }
+
+    /// The long-silence question's step in a poll of the wait, run after the
+    /// meeting-end decision and before it is carried out. None in a poll that
+    /// decision ends the recording in: that end stands as it is, and the way
+    /// out takes the silence question back. Held while the meeting-end
+    /// question is open, from the poll that asks it, before it goes up, to the
+    /// poll that settles it, so the silence count restarts where it closed.
+    private func stepSilencePrompt(beside decision: WatchLoopEndDecision, from phase: MeetingEndPhase) -> SilenceStop? {
+        let held: Bool
+        switch (phase, decision) {
+        case (_, .stop): return nil
+        case (.askingToEnd, _), (_, .askToEnd): held = true
+        default: held = false
+        }
+        return stepSilencePrompt(held: held, trigger: .auto)
     }
 
     /// Cut the stopped recording back to `cutAt`, every track at the same

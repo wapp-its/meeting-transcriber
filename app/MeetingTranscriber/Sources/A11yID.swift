@@ -21,6 +21,8 @@ enum A11yID {
     static let recordOnlyToggle = "recordOnlyToggle"
     static let watchBrowserToggle = "watchBrowserToggle"
     static let watchAtLaunchToggle = "watchAtLaunchToggle"
+    static let silencePromptToggle = "silencePromptToggle"
+    static let silencePromptMinutesStepper = "silencePromptMinutesStepper"
     static let browserConsentWarning = "browserConsentWarning"
     static let consentDenyListSection = "consentDenyListSection"
     /// Per-row Remove button in the never-record list, addressed by ROW INDEX,
