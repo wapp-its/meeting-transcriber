@@ -8,7 +8,7 @@
   ],
   "id": "gh-46-pause-and-resume-a-recording.5",
   "priority": null,
-  "review": "codex:gpt-5.6-sol:xhigh",
+  "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-46-pause-and-resume-a-recording",
   "spec_path": ".flow/tasks/gh-46-pause-and-resume-a-recording.5.md",
   "status": "todo",
