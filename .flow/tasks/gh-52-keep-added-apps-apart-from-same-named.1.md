@@ -77,6 +77,8 @@ Every meeting pattern now carries an identity key (`custom:<bundleID>` for an ap
 
 stage: implement - ran (model: claude-opus-5-5; worker in lane worktree, parallel-wave handover)
 stage: impl-review - ran [2026-10-13T14:45Z..15:02Z] (model: gpt-5.6-sol xhigh; round 1 three-draw fan-out: correctness NEEDS_WORK, contracts SHIP, integration SHIP; one P1 finding fixed in a4d2e4ac; round 2 SHIP, no surviving findings)
+stage: catch-up - ran [2026-10-14] (merge of wapp/main 8def642b, commit 193573df: the menu-answer work had replaced the stored `pendingConsentApp` with a stored `ConsentQuestion`; this task's `PendingConsent` was folded into it, so `ConsentQuestion.app` is the display name and the new `ConsentQuestion.identityKey` the key; the shared `ConsentLoopDoubles.ParkingNotifier` took over the menu work's prompt-id answering)
+stage: impl-review - ran [2026-10-14] (model: gpt-5.6-sol xhigh; catch-up round, three-draw fan-out on 193573df against wapp/main: correctness SHIP, contracts SHIP, integration SHIP; one P3 kept, this record not reconciled after the merge, fixed here)
 stage: plan-sync - skipped(config: planSync.enabled=false)
 
 Tier: implementer - opus (explicit invocation) (model: claude-opus-5-5)
@@ -109,15 +111,15 @@ baseline: green (task verification filter, 572 tests, rc 0, pre-edit at 1f4b14b3
 1. Rule 1 (task: keep `makeLoop` per suite or move it): per suite; the new suite has a two-parameter version.
 2. Rule 6: the existing loop suite reaches the shared doubles through private typealiases, so its body is untouched.
 3. Rule 1 (acceptance: every detector reset by identity key, proven by the loop suite): `ConsentLoopDoubles.ScriptedDetector` records each reset's key.
-4. Rule 1 (R8, A6): `PendingConsent.appName` holds `meeting.pattern.appName` exactly, so `pendingConsentApp` stays identical for built-ins.
+4. Rule 1 (R8, A6): the open question's display name holds `meeting.pattern.appName` exactly, so `pendingConsentApp` stays identical for built-ins. Since the catch-up merge that is `ConsentQuestion.app`, with the key in `ConsentQuestion.identityKey` (it was a separate `PendingConsent` before).
 5. Rule 1 (task: log lines may keep the key): consent and `redetect_hold_set` log lines log the identity key.
 6. Rule 6: `RedetectionHolds` added to the verification filter, since the stated filter does not match that suite.
 7. Rule 6 (conductor): the review's validator pass was not run for round 1; its single finding was confirmed by reading `MicInputDetector.checkOnce` (first-match helper-prefix selection) before the fix.
 8. Rule 1 (CI `unused_declaration`): `MicPattern.matches(bundleID:)` removed once the longest-match helper replaced its last caller; task .3's reference re-pointed to `matchLength(bundleID:)`.
 
 ### Open / follow-ups
-- Until task .2 lands, a legacy name entry on the deny list no longer suppresses an added app of that name (asks again: the safe direction); task .2's one-shot migration adds the key. Both ship in the same PR.
-- Open fork PR #109 edits `WatchLoop.swift`, `WatchLoop+Consent.swift` and `WatchLoopAskBeforeRecordingTests.swift`; whichever lands second must use the stored `pendingConsent` and `ConsentLoopDoubles`.
+- Resolved: task .2's one-shot migration (adds the key for a legacy name entry) is on this branch, so both ship together.
+- Resolved: fork PR #109 (the menu answer) landed first; the catch-up merge keys its stored `ConsentQuestion` by `identityKey` and moved its test-double additions into `ConsentLoopDoubles`.
 ## Evidence
 - Commits: 989607d35ce23ac0d3d44130b528e057d73d1e5d, 1220fbdf25c61932a622da8a36d5c7d677ff29f6, 94a34db6d6354b7365461202d59b66e5a0143655, a4d2e4ac4f38268cf6868460104862703cea65b7
 - Tests: swift test --parallel --skip WatchLoopE2ETests --filter "MicInputDetector|CustomWatchedApp|CompositeMeetingDetector|MeetingDetectorExclusion|WatchingController|WatchLoopAddedApp|WatchLoopAskBeforeRecording" (rc 0, 135 tests at a4d2e4ac); worker lane filter rc 0, 591 tests at 94a34db6; settings suites rc 0, 9 tests, PATH="/private/tmp/gh52-tick/lint-bin:$PATH" ./scripts/lint.sh (rc 0, 0 violations)
