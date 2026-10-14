@@ -51,8 +51,8 @@ The process layer: `MtUpdateProvider`, the real `MtUpdateInstalling` (task 1's p
 - [ ] No test touches the real `~/.local/bin`, `~/Library/Logs` or `UserDefaults.standard`.
 - [ ] `./scripts/pre-push.sh` and the App Store test build succeed; lint clean.
 ## Done summary
-TBD
-
+Blocked:
+Stale claim from a loop tick that a usage limit cut off on 2026-10-13 (no worker alive; its uncommitted changes are gone from the worktree, no commit). Released by the coordinating session on 2026-10-14 so the loop can restart the task.
 ## Evidence
 - Commits:
 - Tests:
