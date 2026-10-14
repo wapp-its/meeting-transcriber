@@ -8,6 +8,7 @@
   ],
   "id": "gh-138-local-model-for-protocols-in-the.6",
   "priority": null,
+  "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-138-local-model-for-protocols-in-the",
   "spec_path": ".flow/tasks/gh-138-local-model-for-protocols-in-the.6.md",
   "status": "todo",
