@@ -10,7 +10,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-125-menu-job-lines-that-stay-still-while-a",
   "spec_path": ".flow/tasks/gh-125-menu-job-lines-that-stay-still-while-a.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement Menu job lines that stay still while a job runs",
   "updated_at": "2026-10-14T09:13:15.082202Z"
 }

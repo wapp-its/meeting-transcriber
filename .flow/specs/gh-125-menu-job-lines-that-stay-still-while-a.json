@@ -293,7 +293,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-125-menu-job-lines-that-stay-still-while-a.md",
-  "status": "open",
+  "status": "done",
   "title": "Menu job lines that stay still while a job runs",
   "tracker": {
     "baseHashFlow": "53e0aac99ed37b7dd1f3de64f6ba2394d9399a3e75f2e9dfaabbeb32f171cd4f",
@@ -307,5 +307,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nWhile a job runs, the menu changes under the mouse. The item under the pointer (for example \"All Transcriptions...\") loses its highlight or disappears, and an open job submenu closes. The job line shows the elapsed time in seconds, so the whole menu is rebuilt once per second.\n\n## NOTES\n\n- `PipelineQueue.startElapsedTimer()` writes `activeJobElapsed` every second. `MenuBarView.stageProgressText` reads it for the job line (`jobMenuTitle`) and inside the job submenu. The `MenuBarExtra` uses the menu style, so every change rebuilds the `NSMenu`. A label that changes once per minute would still close the menu once per minute.\n- The \"longer than usual\" hint compares the running stage with the average wall-clock time of all past runs of that stage (`averageSeconds(forJobID:stage:)`, `StageTimingStats.isSlowerThanUsual`). It ignores the length of the recording, and the average includes short test imports. On 2026-10-14 the WhisperKit average was 2:02, so a 16 minute meeting shows \"longer than usual\" after about 3 minutes even at normal speed. Normal for that length is about 3:18 (0.21 s per audio second over the last 30 days). The run took 4:41, so it was slower, but the hint would have shown anyway. The speed per audio second (`avgRTF`) is already computed.\n- The \"Processing\" header is above every job in the menu: running, waiting, waiting for speaker names, failed and the last three finished ones. So it often labels jobs that are not processing.\n- Owner ideas from 2026-10-14: remove finished jobs from the menu now that \"All Transcriptions...\" exists, and put \"All Transcriptions...\" next to \"Open Protocols Folder\".\n\n## TASKS\n\n- [ ] Stop rebuilding the menu while it is open\n- [ ] Compare the hint with the expected time for the length of the recording\n- [ ] Decide the menu layout: header text, finished jobs out of the menu, \"All Transcriptions...\" next to \"Open Protocols Folder\"",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/125"
   },
-  "updated_at": "2026-10-14T10:24:28.959343Z"
+  "updated_at": "2026-10-14T10:25:22.965493Z"
 }
