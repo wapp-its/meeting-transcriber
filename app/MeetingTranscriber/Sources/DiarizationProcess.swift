@@ -244,15 +244,23 @@ enum DiarizationProcess {
     /// Merge consecutive segments from the same speaker into single blocks.
     /// Preserves the start timestamp of the first segment and end timestamp of the last.
     /// Text is joined with spaces. A silence gap > `mergeGapThreshold` forces a break.
+    ///
+    /// So does a recording pause: a block is never extended over one of
+    /// `offsets`, the pause positions on the transcript timeline. The pause
+    /// marker goes before the first line starting at or after its offset, so a
+    /// block that began before the pause and carried speech from after it would
+    /// put the marker below words spoken after the resume.
     static func mergeConsecutiveSpeakers(
         _ segments: [TimestampedSegment],
+        breakingAt offsets: [TimeInterval] = [],
     ) -> [TimestampedSegment] {
         guard var current = segments.first else { return [] }
 
         var merged: [TimestampedSegment] = []
         for seg in segments.dropFirst() {
             let silenceGap = seg.start - current.end
-            if seg.speaker == current.speaker, silenceGap <= mergeGapThreshold {
+            let pauseBetween = offsets.contains { current.start < $0 && $0 <= seg.start }
+            if seg.speaker == current.speaker, silenceGap <= mergeGapThreshold, !pauseBetween {
                 // Extends the running block in place rather than rebuilding it,
                 // so fields the merge has no business changing stay what they
                 // were. Callers must drop suppressed segments before merging:

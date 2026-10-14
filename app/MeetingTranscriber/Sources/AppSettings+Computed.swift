@@ -27,6 +27,13 @@ extension AppSettings {
         }
     }
 
+    /// How long no recorded track may carry speech before the app asks whether
+    /// to stop the recording, or nil when that question is switched off. The
+    /// one value the watch loop reads for it, on every poll.
+    var silencePromptAfter: TimeInterval? {
+        silencePromptEnabled ? TimeInterval(silencePromptMinutes * 60) : nil
+    }
+
     /// The meeting apps the user opted to watch. Drives auto-detection: the
     /// `WatchingController` default detector keeps only the assertion patterns
     /// whose app is listed here (`PowerAssertionDetector.patterns(watching:)`),

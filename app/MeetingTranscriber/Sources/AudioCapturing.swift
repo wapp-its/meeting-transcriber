@@ -18,6 +18,14 @@ import Foundation
 protocol AudioCapturing: AnyObject {
     func start() throws
     func stop() -> AudioCaptureResult
+
+    /// Stop writing either track until `resume()`, and write on directly
+    /// after it (`AudioCaptureSession.pause()`). Required for the same reason
+    /// as the members below: a session that picked up a default would keep
+    /// writing while the recorder reports it paused.
+    func pause()
+    func resume()
+
     var appLevelDBFS: Double { get }
     var micLevelDBFS: Double { get }
     var appCaptureGaveUp: Bool { get }
@@ -33,6 +41,17 @@ protocol AudioCapturing: AnyObject {
     /// protocol it sits behind.
     var appSignalAges: ChannelSignalAges { get }
     var micSignalAges: ChannelSignalAges { get }
+
+    /// The microphone the capture reports it records from, whether a
+    /// microphone is being captured at all, and the call that moves it to
+    /// another device. See `AudioCaptureSession`.
+    /// Required for the same reason: `RecordingProvider` defaults these to no
+    /// microphone and a switch that goes nowhere, and a session that picked up
+    /// such a default when the library's members changed would compile and
+    /// then silently drop every switch.
+    var micInputDevice: MicInputDevice? { get }
+    var microphoneTrackActive: Bool { get }
+    func selectMicrophone(deviceUID: String?)
 }
 
 @available(macOS 14.2, *)

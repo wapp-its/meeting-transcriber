@@ -154,19 +154,26 @@ class PipelineQueue {
     /// PipelineQueue+Stages.swift reads and writes it.
     var vad: FluidVAD?
 
-    /// Elapsed seconds since the current pipeline stage started.
-    private(set) var activeJobElapsed: TimeInterval = 0
     /// Internal setter (not `private(set)`) because `processNext` in
     /// PipelineQueue+Stages.swift clears this flag across the file boundary.
     var isProcessing = false
 
-    /// Historical average wall-clock seconds per (stage, engine, diarizer-mode)
-    /// config (last 30 days), used by the menu to show "live vs. typical".
-    /// Keyed by full config so the menu compares a Sortformer run against
-    /// Sortformer history, not a blended offline/Sortformer average. Refreshed
-    /// from `stageTimingLog` at launch and after each stage; empty until the log
-    /// has data. Read via `averageSeconds(forJobID:stage:)`.
-    private(set) var stageAverageByConfig: [StageConfig: Double] = [:]
+    /// Each job's running stage, as its menu line reads it. Changes only at a
+    /// job event: a stage starting or ending, and the audio length becoming
+    /// known. Never on a timer and never on a history reload, because the
+    /// menu is rebuilt under the pointer whenever a value it reads changes.
+    /// Read via `stageClock(forJobID:)`.
+    private(set) var stageClocks: [UUID: StageClock] = [:]
+
+    /// Historical wall-clock seconds per audio second per configuration (last
+    /// 30 days), read only when a running stage's expected finish is filled
+    /// in. Read from `stageTimingLog` when the queue is created and reloaded
+    /// after each stage; empty until the log has data. No view reads it, so a refresh redraws
+    /// nothing.
+    @ObservationIgnored private var stageSpeedByConfig: [StageConfig: Double] = [:]
+
+    /// How far back the speeds look.
+    private static let stageHistoryWindow: TimeInterval = 30 * 86400
 
     /// When the current `.transcribing`/`.diarizing`/`.generatingProtocol` state
     /// was entered, per job — so `updateJobState` can record the state's duration
@@ -177,7 +184,6 @@ class PipelineQueue {
     /// Internal (not private) because `transcribe` in PipelineQueue+Stages.swift stamps it.
     var jobAudioSeconds: [UUID: Double] = [:]
 
-    private var elapsedTimer: Task<Void, Never>?
     private var processTask: Task<Void, Never>?
     /// Internal (not private) because `processNext` in PipelineQueue+Stages.swift
     /// reads this to distinguish a cancellation from a real pipeline error.
@@ -457,7 +463,14 @@ class PipelineQueue {
             recognitionStatsLog: recognitionStatsLog,
         )
         naming.delegate = self
-        refreshStageAverages()
+        // Read here, not in a Task: a job the restore resumes enters its stage
+        // right at launch, and a finish missed when a stage starts is never
+        // filled in later. A small local file, read like the snapshot is.
+        if let stageTimingLog {
+            stageSpeedByConfig = StageTimingStats.speedByConfig(
+                events: stageTimingLog.loadRecentNow(within: Self.stageHistoryWindow),
+            )
+        }
     }
 
     /// May run off the main actor: the snapshot worker can hold the last
@@ -475,10 +488,6 @@ class PipelineQueue {
 
     var pendingJobs: [PipelineJob] {
         jobs.filter { $0.state == .waiting }
-    }
-
-    var completedJobs: [PipelineJob] {
-        jobs.filter { $0.state == .done }
     }
 
     func enqueue(_ inputJob: PipelineJob) {
@@ -591,6 +600,7 @@ class PipelineQueue {
             jobs.remove(at: index)
         }
         stageStartByJob.removeValue(forKey: id)
+        stageClocks.removeValue(forKey: id)
         jobAudioSeconds.removeValue(forKey: id)
         saveSnapshot()
     }
@@ -613,6 +623,7 @@ class PipelineQueue {
         // normal terminal transition, so reap the stage-timing bookkeeping here
         // too — otherwise a job cancelled mid-stage leaks these entries.
         stageStartByJob.removeValue(forKey: id)
+        stageClocks.removeValue(forKey: id)
         jobAudioSeconds.removeValue(forKey: id)
         if state != .done, state != .error {
             processedLedger.markProcessed(mixPath: jobs[index].mixPath)
@@ -642,6 +653,22 @@ class PipelineQueue {
     }
 
     func updateJobState(id: UUID, to newState: JobState, error: String? = nil) {
+        applyJobState(id: id, to: newState, error: error, diarizerMode: nil)
+    }
+
+    /// Enter `.diarizing` for a run that diarizes in `mode`. The mode picks the
+    /// history the stage's expected finish is read from. It is passed in, not
+    /// read from the job, because the job's mode describes the naming data an
+    /// earlier run left, which a late re-diarization in another mode is about
+    /// to replace, and which a first run has not written yet.
+    /// Internal (not private) because the diarize stage in
+    /// PipelineQueue+Stages.swift calls it, and it is the
+    /// `SpeakerNamingSessionDelegate` witness the late re-run calls.
+    func startDiarizing(jobID: UUID, mode: DiarizerMode) {
+        applyJobState(id: jobID, to: .diarizing, error: nil, diarizerMode: mode)
+    }
+
+    private func applyJobState(id: UUID, to newState: JobState, error: String?, diarizerMode: DiarizerMode?) {
         guard let index = jobs.firstIndex(where: { $0.id == id }) else { return }
         let oldState = jobs[index].state
         // Skip a true no-op: same state AND no error to record. Without this,
@@ -669,7 +696,7 @@ class PipelineQueue {
                 jobs[index].warnings.append(warning)
             }
         }
-        recordStageTransition(from: oldState, to: newState, jobID: id)
+        recordStageTransition(from: oldState, to: newState, jobID: id, diarizerMode: diarizerMode)
         eventLog.append(jobID: id, event: "state_change", from: oldState, to: newState)
         saveSnapshot()
         onJobStateChange?(jobs[index], oldState, newState)
@@ -690,7 +717,7 @@ class PipelineQueue {
     /// back a finished job's outcome even after `completedJobLifetime` removes
     /// it from the in-memory list. No-op when no store is wired.
     private func recordTerminalJob(_ job: PipelineJob) {
-        terminalJobStore?.record(JobStatusDTO(job: job))
+        terminalJobStore?.record(TerminalJobRecord(job: job))
     }
 
     /// Deletes raw transcript artifacts only after a successfully completed job
@@ -776,6 +803,22 @@ class PipelineQueue {
         jobs[index].echo = verdict
     }
 
+    /// Record the recording's length from its frame count at 16 kHz, as stage
+    /// 1 measured it. Zero frames (an empty recording, or audio that could not
+    /// be read) are not recorded, so nil keeps meaning "not measured". No
+    /// snapshot write of its own: the stage transition after stage 1 persists
+    /// it, the terminal one included.
+    ///
+    /// A fresh job learns its length only here, inside the transcription
+    /// stage, so this is where that stage's expected finish can first be
+    /// computed.
+    /// Internal (not private) because `PipelineQueue+Stages.swift` calls it.
+    func recordAudioDuration(jobID: UUID, frames: Int) {
+        guard frames > 0, let index = jobs.firstIndex(where: { $0.id == jobID }) else { return }
+        jobs[index].audioDuration = TimeInterval(frames) / TimeInterval(AudioConstants.targetSampleRate)
+        estimateStageFinish(jobID: jobID)
+    }
+
     /// Record how many microphone segments the merge left out of the transcript.
     /// Written after the verdict rather than with it: the count only exists once
     /// the segments are known, which is two stages later.
@@ -803,55 +846,75 @@ class PipelineQueue {
         jobs[index].echo?.removed = removed
     }
 
-    /// Reset the elapsed timer for a new pipeline stage.
-    /// Internal (not private) because the stage methods in PipelineQueue+Stages.swift call it.
-    func startElapsedTimer() {
-        elapsedTimer?.cancel()
-        activeJobElapsed = 0
-        elapsedTimer = Task { [weak self] in
-            let start = ContinuousClock.now
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1))
-                let elapsed = ContinuousClock.now - start
-                self?.activeJobElapsed = Double(elapsed.components.seconds)
-                    + Double(elapsed.components.attoseconds) / 1e18
-            }
-        }
-    }
-
-    /// Stop the elapsed timer.
-    /// Internal (not private) because the stage methods in PipelineQueue+Stages.swift call it.
-    func stopElapsedTimer() {
-        elapsedTimer?.cancel()
-        elapsedTimer = nil
-    }
-
     // MARK: - Stage timing metrics
 
     /// On every state change: if we left a timed stage, log its wall-clock
-    /// duration; if we entered one, stamp its start. Measuring per-state means
-    /// the recorded duration matches exactly what the menu's elapsed timer shows
-    /// and excludes the speaker-naming pause (see `StageKind(jobState:)`).
-    private func recordStageTransition(from oldState: JobState, to newState: JobState, jobID: UUID) {
+    /// duration; if we entered one, stamp its start and start its menu clock.
+    /// Measuring per-state means the recorded duration covers exactly the
+    /// stage the menu line names and excludes the speaker-naming pause (see
+    /// `StageKind(jobState:)`).
+    private func recordStageTransition(
+        from oldState: JobState, to newState: JobState, jobID: UUID, diarizerMode: DiarizerMode?,
+    ) {
         // A same-state "transition" (e.g. the confirm path re-enters
         // .generatingProtocol while already .generatingProtocol) is not a stage
         // boundary; ignore it so it neither logs a partial event nor resets the start.
         guard oldState != newState else { return }
+        stageClocks.removeValue(forKey: jobID)
         if let leaving = StageKind(jobState: oldState), let start = stageStartByJob.removeValue(forKey: jobID) {
             let elapsed = ContinuousClock.now - start
             let seconds = Double(elapsed.components.seconds)
                 + Double(elapsed.components.attoseconds) / 1e18
             logStageTiming(stage: leaving, wallClock: seconds, jobID: jobID)
         }
-        if StageKind(jobState: newState) != nil {
+        if let entering = StageKind(jobState: newState) {
             stageStartByJob[jobID] = ContinuousClock.now
+            startStageClock(entering, jobID: jobID, diarizerMode: diarizerMode)
         }
     }
 
-    /// Append one stage-timing event, then refresh the cached averages from the
-    /// log so the menu reflects the new data point. Append and reload run in one
-    /// Task so the reload is ordered strictly after the append (no race that
-    /// could miss the just-logged event).
+    /// The running stage of a job as its menu line reads it, nil while the
+    /// job is in no timed stage.
+    func stageClock(forJobID jobID: UUID) -> StageClock? {
+        stageClocks[jobID]
+    }
+
+    /// Start the menu clock for a stage just entered, keyed the way
+    /// `logStageTiming` stamps that stage's events: transcription by engine
+    /// alone, diarization by the mode this run diarizes with, protocol
+    /// generation by the mode the job's diarization ran in.
+    private func startStageClock(_ stage: StageKind, jobID: UUID, diarizerMode: DiarizerMode?) {
+        let mode: DiarizerMode? = switch stage {
+        case .transcribing: nil
+        case .diarizing: diarizerMode
+        case .generatingProtocol: usedDiarizerMode(forJobID: jobID)
+        }
+        stageClocks[jobID] = StageClock(
+            config: StageConfig(stage: stage, engine: activeEngineTag, diarizerMode: mode?.rawValue),
+            startedAt: Date(),
+        )
+        estimateStageFinish(jobID: jobID)
+    }
+
+    /// Fill in a running stage's expected finish the first time its audio
+    /// length and its history's speed are both there, and never change one
+    /// already filled in: the line it feeds may change only at a job event.
+    private func estimateStageFinish(jobID: UUID) {
+        guard var clock = stageClocks[jobID], clock.expectedFinish == nil,
+              let finish = StageTimingStats.expectedFinish(
+                  start: clock.startedAt,
+                  audioSeconds: job(withID: jobID)?.audioDuration,
+                  secondsPerAudioSecond: stageSpeedByConfig[clock.config],
+              )
+        else { return }
+        clock.expectedFinish = finish
+        stageClocks[jobID] = clock
+    }
+
+    /// Append one stage-timing event, then refresh the cached speeds from the
+    /// log so the next stage reads the new data point. Append and reload run in
+    /// one Task so the reload is ordered strictly after the append (no race
+    /// that could miss the just-logged event).
     private func logStageTiming(stage: StageKind, wallClock: Double, jobID: UUID) {
         guard let stageTimingLog else { return }
         // audioSeconds is 0 for stages with no known audio length (e.g. a late
@@ -865,40 +928,23 @@ class PipelineQueue {
         )
         Task { [weak self] in
             await stageTimingLog.append([event])
-            await self?.reloadStageAverages()
+            await self?.reloadStageSpeeds()
         }
     }
 
     /// Concrete transcription-engine type name, the comparability tag stamped on
-    /// logged events; also used to resolve the active config for the menu.
+    /// logged events; also used to resolve a running stage's config.
     private var activeEngineTag: String? {
         engine.map { String(describing: type(of: $0)) }
     }
 
-    /// The historical average for the config a job is running at a given stage —
-    /// built the same way `logStageTiming` stamps events (engine + the job's
-    /// diarizer mode), so the menu compares like-with-like. nil until that exact
-    /// config has logged data.
-    func averageSeconds(forJobID jobID: UUID, stage: StageKind) -> Double? {
-        let config = StageConfig(
-            stage: stage, engine: activeEngineTag,
-            diarizerMode: usedDiarizerMode(forJobID: jobID)?.rawValue,
-        )
-        return stageAverageByConfig[config]
-    }
-
-    /// Reload recent timings and recompute the per-config average wall-clock.
-    private func refreshStageAverages() {
-        Task { [weak self] in await self?.reloadStageAverages() }
-    }
-
-    private func reloadStageAverages() async {
+    /// Reload recent timings and recompute the per-config speeds. A clock that
+    /// already has its expected finish keeps it. Internal (not private) so a
+    /// test can reload the history the way the end of a stage does.
+    func reloadStageSpeeds() async {
         guard let stageTimingLog else { return }
-        let events = await stageTimingLog.loadRecent(within: 30 * 86400)
-        // Key by full config (stage + engine + diarizer-mode) so the menu
-        // resolves a like-with-like average per active job; see averageSeconds.
-        stageAverageByConfig = StageTimingStats.aggregateByConfig(events: events)
-            .mapValues(\.avgWallClockSeconds)
+        let events = await stageTimingLog.loadRecent(within: Self.stageHistoryWindow)
+        stageSpeedByConfig = StageTimingStats.speedByConfig(events: events)
     }
 
     // MARK: - Processing
@@ -1043,17 +1089,5 @@ extension PipelineQueue: SpeakerNamingSessionDelegate {
         // holds nothing would take the front of the queue. Records rather than
         // overwrites; see `previousSidecarOutputDirs`.
         if let wroteSidecarsIn { jobs[idx].recordSidecarOutputDir(wroteSidecarsIn) }
-    }
-
-    /// Enter the diarizing stage for a late re-run: transition + start the
-    /// menu's elapsed timer (in that order, matching the original inline flow).
-    func namingStageDidStart(jobID: UUID) {
-        updateJobState(id: jobID, to: .diarizing)
-        startElapsedTimer()
-    }
-
-    /// Leave a timed naming stage.
-    func namingStageDidEnd() {
-        stopElapsedTimer()
     }
 }

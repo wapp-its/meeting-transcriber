@@ -43,7 +43,7 @@ extension WatchLoop {
         // needs a prompt is not queued either: it waits out of detection until
         // this question is settled, and is asked about then if its call still
         // runs.
-        guard pendingConsent == nil else {
+        guard pendingConsentQuestion == nil else {
             appsWaitingForPrompt.insert(key)
             return true
         }
@@ -56,40 +56,44 @@ extension WatchLoop {
         }
 
         let app = meeting.pattern.appName
-        pendingConsent = PendingConsent(identityKey: key, appName: app)
         // `app` is the concrete app: a browser meeting is carried under the
         // process that held the assertion, so the debounce above and the name
         // below refer to the same one browser. `ownerName` is the fallback
         // because an empty identity would otherwise produce a prompt naming
         // nothing at all.
         let appLabel = app.isEmpty ? meeting.ownerName : app
+        // The reminder rides the prompt because the prompt is the moment
+        // the user decides to record: recording a conversation without
+        // everyone's agreement is an offence in Switzerland. One short
+        // sentence, since a notification body has room for little more.
+        let question = ConsentQuestion(
+            app: app,
+            title: "Record \(appLabel) meeting?",
+            body: "A meeting is active in \(appLabel). Everyone must agree to being recorded.",
+            identityKey: key,
+        )
+        pendingConsentQuestion = question
         consentTask = Task { [weak self] in
             guard let self else { return }
-            // The reminder rides the prompt because the prompt is the moment
-            // the user decides to record: recording a conversation without
-            // everyone's agreement is an offence in Switzerland. One short
-            // sentence, since a notification body has room for little more.
-            let answer = await notifier.askToRecord(
-                title: "Record \(appLabel) meeting?",
-                body: "A meeting is active in \(appLabel). Everyone must agree to being recorded.",
-            )
-            finishConsent(for: meeting, answer: answer)
+            let answer = await notifier.askToRecord(question)
+            finishConsent(question, for: meeting, answer: answer)
         }
         return true
     }
 
-    /// The app being asked about, by the name a person reads: what `/state`
-    /// and `/v1/watch` report. Nil while nothing is asked.
+    /// The app the open question asks about, by the name a person reads, nil
+    /// when none is open. Derived, so it can never disagree with the
+    /// question; `/state` and `/v1/watch` report it.
     var pendingConsentApp: String? {
-        pendingConsent?.appName
+        pendingConsentQuestion?.app
     }
 
     /// The apps detection passes over this poll, by identity key: the one
     /// being asked about and the ones waiting for that answer. Empty while
     /// nothing is asked.
     var appsExcludedFromDetection: Set<String> {
-        guard let pendingConsent else { return [] }
-        return appsWaitingForPrompt.union([pendingConsent.identityKey])
+        guard let pendingConsentQuestion else { return [] }
+        return appsWaitingForPrompt.union([pendingConsentQuestion.identityKey])
     }
 
     /// Take the approved meeting, if any, clearing it. The poll loop is the
@@ -104,7 +108,7 @@ extension WatchLoop {
     /// notifier so the real prompt's parked continuation completes; without it
     /// the question would linger for the rest of its timeout.
     func declineParkedConsent() {
-        guard pendingConsent != nil else { return }
+        guard pendingConsentQuestion != nil else { return }
         _ = notifier.resolveBrowserConsent(granted: false)
         // Cleared regardless of whether anything was waiting: a notifier with
         // no coordinator behind it never resolves, and a prompt stuck
@@ -112,11 +116,29 @@ extension WatchLoop {
         clearConsentState()
     }
 
+    /// The menu's Record / Ignore for `question`. Answered by the prompt's id,
+    /// as a tap on its notification is, so it can never resolve another
+    /// prompt; the answer then lands through `finishConsent` like any other.
+    /// False when `question` is not the open one (expired, answered elsewhere,
+    /// declined by Stop Watching or a manual start, or replaced, also by a new
+    /// prompt about the same app) or its prompt has not registered yet.
+    func answerParkedConsent(_ question: ConsentQuestion, granted: Bool) -> Bool {
+        guard pendingConsentQuestion == question else { return false }
+        return notifier.answerConsentPrompt(id: question.id, granted: granted)
+    }
+
     /// Land the user's answer. Main-actor isolated like the rest of
     /// `WatchLoop`, so it cannot race the poll loop's reads.
-    private func finishConsent(for meeting: DetectedMeeting, answer: ConsentAnswer) {
+    private func finishConsent(_ question: ConsentQuestion, for meeting: DetectedMeeting, answer: ConsentAnswer) {
         let key = meeting.pattern.identityKey
-        clearConsentState()
+        // Only this prompt's own question is cleared. `declineParkedConsent`
+        // clears at once and the declined prompt's completion lands here
+        // later, and a prompt can even register after Stop Watching, since
+        // registration runs off the main actor. A newer question may be open
+        // by then, and none of these may wipe it.
+        if pendingConsentQuestion == question {
+            clearConsentState()
+        }
 
         guard answer.isGranted else {
             // A refusal and a prompt nobody saw are different facts, and the
@@ -165,11 +187,4 @@ extension WatchLoop {
         }
         approvedConsentMeeting = meeting
     }
-}
-
-/// The app a parked consent prompt is about: the key the gate files it under
-/// and the name the person reads (`AppMeetingPattern.identityKey`, `appName`).
-struct PendingConsent {
-    let identityKey: String
-    let appName: String
 }

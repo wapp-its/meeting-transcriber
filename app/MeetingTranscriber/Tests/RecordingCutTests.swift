@@ -64,6 +64,29 @@ final class RecordingCutTests: XCTestCase { // swiftlint:disable:this balanced_x
 
     // MARK: - The cut
 
+    /// The cut copies take the originals' places on their paths, so each
+    /// keeps its original's creation date: the orphan scan ages a recording by
+    /// that date, and a cut must not make a two-day-old recording look new.
+    func testACutKeepsEachTracksCreationDate() throws {
+        let mix = try makeTrack("r_mix.wav", seconds: 10)
+        let mic = try makeTrack("r_mic.wav", seconds: 10)
+        let twoDaysAgo = Date(timeIntervalSinceNow: -2 * 86400)
+        for url in [mix, mic] {
+            try FileManager.default.setAttributes([.creationDate: twoDaysAgo], ofItemAtPath: url.path)
+        }
+
+        try RecordingCut.apply(to: recording(mix: mix, app: nil, mic: mic), keepingFirst: 4)
+
+        XCTAssertEqual(try AVAudioFile(forReading: mix).length, 64000, "the cut itself happened")
+        for url in [mix, mic] {
+            let created = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: url.path)[.creationDate] as? Date)
+            XCTAssertEqual(
+                created.timeIntervalSince1970, twoDaysAgo.timeIntervalSince1970, accuracy: 1,
+                "\(url.lastPathComponent) was made young again by the cut",
+            )
+        }
+    }
+
     /// Kept at 4 s with the microphone starting 0.5 s late: mix and app keep
     /// 4 s, the microphone 3.5 s, and every kept frame is the original's.
     func testEveryTrackEndsAtTheSamePointAndKeepsItsOwnAudio() throws {
@@ -147,7 +170,8 @@ final class RecordingCutTests: XCTestCase { // swiftlint:disable:this balanced_x
         let app = try makeTrack("r_app.wav", seconds: 10)
         let mic = try makeTrack("r_mic.wav", seconds: 10)
         let before = try contents([mix, app, mic])
-        let cut = recording(mix: mix, app: app, mic: mic)
+        var cut = recording(mix: mix, app: app, mic: mic)
+        cut.pauseOffsets = [2.5, 6]
 
         var uncut: [URL: URL] = [:]
         XCTAssertThrowsError(
@@ -160,6 +184,7 @@ final class RecordingCutTests: XCTestCase { // swiftlint:disable:this balanced_x
         let redirected = RecordingCut.redirect(cut, to: uncut)
         let paths = try [redirected.mixPath, XCTUnwrap(redirected.appPath), XCTUnwrap(redirected.micPath)]
         XCTAssertEqual(try contents(paths), before, "the recording is processed uncut")
+        XCTAssertEqual(redirected.pauseOffsets, [2.5, 6], "the pauses keep the positions the capture measured")
         XCTAssertFalse(FileManager.default.fileExists(atPath: mix.path), "the cut copy is not left posing as the mix")
     }
 
@@ -204,6 +229,37 @@ final class RecordingCutTests: XCTestCase { // swiftlint:disable:this balanced_x
                 ),
                 kept,
                 "mix \(mix.map(String.init(describing:)) ?? "unreadable")",
+            )
+        }
+    }
+
+    /// Paused time was not recorded, so each estimate leaves out the paused
+    /// time inside the interval it spans. Started at 0, cut at 10, stopped at
+    /// 130 (s); a mix that runs 10 s longer than the clock minus the pauses
+    /// began before capture reported running, so the end estimate wins.
+    func testTheCutPointLeavesOutThePausedTime() {
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        let rows: [(name: String, pauses: [(TimeInterval, TimeInterval)], mix: TimeInterval?, kept: TimeInterval)] = [
+            ("a pause before the cut shortens the start estimate", [(2, 5)], nil, 7),
+            ("a pause after the cut lengthens the end estimate", [(50, 80)], 110, 20),
+            ("a cut inside a pause lands at its position, from the start", [(5, 20)], nil, 5),
+            ("a cut inside a pause lands at its position, from the end", [(5, 20)], 115, 5),
+            ("a pause on either side of the cut", [(2, 5), (50, 80)], 107, 17),
+        ]
+        for (name, spans, mix, kept) in rows {
+            let pauses = spans.map { begin, end in
+                RecordingPause(startedAt: start + begin, endedAt: start + end, offsetSeconds: begin)
+            }
+            XCTAssertEqual(
+                RecordingCut.keptSeconds(
+                    cutAt: start.addingTimeInterval(10),
+                    startedAt: start,
+                    stoppedAt: start.addingTimeInterval(130),
+                    mixDuration: mix,
+                    pauses: pauses,
+                ),
+                kept,
+                name,
             )
         }
     }

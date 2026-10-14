@@ -43,9 +43,45 @@ Adds the "Long Silence" setting (R6): the stored switch and minutes, the derived
 
 
 ## Done summary
-TBD
+Settings > General now has a "Long Silence" section where a user switches the stop question on or off (default on) and picks after how many minutes without speech it is asked (1 to 60, default 5); both choices are stored in UserDefaults and survive a relaunch. Nothing reads them yet: `AppSettings.silencePromptAfter` (minutes x 60, or nil while switched off) is the one value task .3 wires into the watch loop.
 
+Tier: implementer - opus (explicit invocation) (model: claude-opus-5-5)
+
+stage: impl-review - skipped(policy: parallel-wave - conductor owns the gate)
+
+baseline: green via handoff (conductor at 77dc12cc: lint rc=0, focused tests rc=0, 219 tests). Lint was taken from that same-SHA run and not re-run before the first edit; it ran green after the change.
+
+What changed (commit e4538127, base 77dc12cc):
+- `AppSettings.silencePromptEnabled` (key `silencePromptEnabled`, default true) and `AppSettings.silencePromptMinutes` (key `silencePromptMinutes`, default 5), clamped to 1...60 in `didSet` by conditional reassignment and again in `init` when loaded, following `asymmetricSilenceWarningSeconds`.
+- `AppSettings.silencePromptAfter: TimeInterval?` in `AppSettings+Computed.swift`.
+- `SilencePromptSection` (private struct in `GeneralSettingsView.swift`, placed right after `Section("Detection")`): a `HelpfulToggle` "Ask to stop after a long silence" with `SettingsHelp.silencePrompt`, then an "Ask after" row with an "N min" label and a `Stepper` over 1...60; the row is `.disabled` while the switch is off. No `.recordOnlyDisabled`.
+- `A11yID.silencePromptToggle`, `A11yID.silencePromptMinutesStepper`.
+
+Tests (R6):
+- `AppSettingsSilencePromptTests`: defaults on / 5 / 300 s; both values survive a fresh `AppSettings` on the same suite; 0 -> 1 and 61 -> 60 on write (value and stored key) and on load of a stored out-of-range value; threshold nil when switched off.
+- `GeneralSettingsSilencePromptTests`: tapping the switch writes `silencePromptEnabled == false` and the stored key; incrementing the stepper writes `silencePromptMinutes == 6`, and the stepper reads disabled once the switch is off.
+- Red first: before the implementation both files failed to compile on the missing members (`/tmp/gh45-tick/t2-tests-red.log`). The disabled assertion was proven falsifiable by removing `.disabled(...)`: the test failed with its message, then the modifier was restored (`/tmp/gh45-tick/t2-falsify.log`).
+
+Gates (on the committed tree):
+- Focused tests `swift test --parallel --filter "SilencePrompt|GeneralSettings|AppSettings|SettingsView"`: rc=0, 199 tests, all 7 new ones ran (`/tmp/gh45-tick/t2-tests-verify.log`).
+- `./scripts/lint.sh` with the pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1: rc=0, 0/767 files need formatting, 0 violations.
+- `swift build`: rc=0, `GeneralSettingsView.swift` recompiled with no long-function-body diagnostic.
+- CI-parity `swiftlint analyze --strict` after a clean `xcodebuild build-for-testing`: rc=2 from 2 `unused_declaration` hits in `RecordingProvider.swift:144,146` (the non-throwing extension defaults of `storePendingCut` / `recordPendingCutResolution`, from gh-60, already on the base). No hit in the 7 changed files, all of which were analyzed. Left untouched (outside Touches); note in the run's flow-notes dir.
+
+Decisions:
+1. Rule 1 (task Approach): the section sits right after Detection, which also keeps the document-order stepper tests in `SettingsInteractionTests` (poll interval = first, grace = second) meaning what they say.
+2. Rule 1 (R6 "disabled while the switch is off"): the stepper wiring test also asserts the disabled state, so that clause of R6 has a test.
+3. Rule 4: `.disabled` covers the whole "Ask after" row (label, value, stepper), the way the echo-dedup switch disables its composite row. Switch point `GeneralSettingsView.swift:SilencePromptSection`; test `GeneralSettingsSilencePromptTests.testStepperWritesBackAndIsDisabledWhileSwitchedOff`.
+4. Rule 6: the stepper carries the hidden label "Ask after" and the visible "Ask after" text is hidden from accessibility, so VoiceOver names the control once (as `HelpfulToggle` does). No automated test; manual QA.
+5. Rule 6: stepper step 1 (the task names the range only); the value label is "N min" with monospaced digits.
+6. Rule 6: the stored properties sit after `asymmetricSilenceWarningSeconds` in the Recording group of `AppSettings`, next to the other silence setting.
+7. Rule 6: tests and implementation are one commit; a commit with tests that do not compile would break the build at that point. The red run is kept in the log above.
+8. Rule 1 (working rules: problems the change does not cause are reported, not fixed): the two pre-existing analyze hits stay as they are.
+
+Follow-ups: none from this task. The `/state` settings snapshot is not extended (spec Boundaries).
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 88216a3b668ec415fae575ff2ba943c6b4ddd21d
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/tmp/mt-gh45-home-t2 swift test --parallel --filter "SilencePrompt|GeneralSettings|AppSettings|SettingsView" > /tmp/gh45-tick/t2-tests-verify.log 2>&1 (rc=0, 199 tests, 7 new), PATH="/tmp/gh45-tick/lint-tools/bin:$PATH" ./scripts/lint.sh (rc=0, 0/767 files need formatting, 0 violations), cd app/MeetingTranscriber && swift build -v > /tmp/gh45-tick/t2-build.log 2>&1 (rc=0, GeneralSettingsView.swift recompiled, no long-function-body diagnostic), bash /tmp/gh45-tick/t2-analyze.sh: clean xcodebuild build-for-testing + swiftlint analyze --strict (rc=2: 2 pre-existing unused_declaration hits in RecordingProvider.swift:144,146, untouched by this task; none in the 7 changed files)
 - PRs:

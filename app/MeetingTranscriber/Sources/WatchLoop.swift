@@ -20,6 +20,8 @@ class WatchLoop {
     private(set) var currentMeeting: DetectedMeeting?
     private(set) var lastError: String?
     private(set) var detail: String = ""
+    /// When the recording in progress was paused (`WatchLoop+Pause.swift`).
+    private(set) var pausedSince: Date?
 
     // Manual recording
     private(set) var manualRecordingInfo: ManualRecordingInfo?
@@ -44,12 +46,19 @@ class WatchLoop {
     let pollInterval: TimeInterval
     let endGracePeriod: TimeInterval
     let maxDuration: TimeInterval
+    /// How long before `maxDuration` a recording is warned that it is about to
+    /// end (`RecordingCapWarningPolicy`). Fixed in the app; injectable so tests
+    /// can use a short maximum.
+    let capWarningLead: TimeInterval
     /// How long the "meeting seems to have ended" question stays open before
     /// the recording ends anyway. Fixed at `meetingEndQuestionCountdown` in the
     /// app; injectable so tests need not wait it out.
     let meetingEndCountdown: TimeInterval
     let noMic: Bool
-    let micDeviceUID: String?
+    /// Dynamic accessor — read at every recording start, like
+    /// `verboseDiagnostics` below, so a microphone chosen while watching is on
+    /// reaches the next recording without restarting watching.
+    let micDeviceUID: () -> String?
     /// Dynamic accessor — read at recording-start time so toggling the setting
     /// at runtime takes effect on the next recording without an app restart.
     let verboseDiagnostics: () -> Bool
@@ -71,13 +80,18 @@ class WatchLoop {
 
     /// The open "meeting seems to have ended" question and the answer parked
     /// for the next poll. Internal for `WatchLoop+MeetingEnd.swift`, which owns
-    /// both, the way the consent extension owns `pendingConsent`.
+    /// both, the way the consent extension owns `pendingConsentQuestion`. The
+    /// id is set exactly while the question's countdown runs, which is what
+    /// the menu bar icon's pulse reads (`AppState.meetingEndCountdownOverlay`).
     var meetingEndQuestionID: String?
     var meetingEndAnswer: ReceivedMeetingEndAnswer?
     /// When "Stop Recording" was chosen, parked for the wait's next poll (`WatchLoop+StopByHand.swift`).
     var stopByHandRequestedAt: Date?
     /// Apps kept out of detection until their signal has gone once (`WatchLoop+RedetectionHold.swift`).
     var redetectionHolds = RedetectionHolds()
+    var silencePrompt: SilencePromptRuntime
+    /// The recording's pauses, from its capture start to its stop (`WatchLoop+Pause.swift`).
+    var recordingPauses: RecordingPauseRecord?
 
     /// Wall-clock source. Defaults to `Date()`; tests inject a `TestClock`
     /// so timing-sensitive paths become deterministic instead of racing
@@ -102,14 +116,14 @@ class WatchLoop {
     /// watching. Empty by default: every detected meeting asks.
     let recordWithoutAskingApps: () -> [String]
 
-    /// The app whose consent prompt is currently parked, nil when no question
-    /// is open. The answer is awaited in `consentTask` rather than inline, so
-    /// this is what keeps a second prompt from going out on every poll while
-    /// the first one waits. Internal (not `private(set)`) because
-    /// `WatchLoop+Consent.swift` owns the transitions.
-    var pendingConsent: PendingConsent?
+    /// The consent prompt currently parked, nil when no question is open. The
+    /// answer is awaited in `consentTask` rather than inline, so this is what
+    /// keeps a second prompt from going out on every poll while the first one
+    /// waits. Internal (not `private(set)`) because `WatchLoop+Consent.swift`
+    /// owns the transitions; `pendingConsentApp` there is its app's name.
+    var pendingConsentQuestion: ConsentQuestion?
 
-    /// Apps that needed a prompt while `pendingConsent`'s was open. Not a
+    /// Apps (identity keys) that needed a prompt while that one was open. Not a
     /// queue: they are kept out of detection until that question settles, so
     /// none of them can hide a meeting that needs no prompt, and are detected
     /// and asked about afterwards if their call still runs.
@@ -126,7 +140,7 @@ class WatchLoop {
     /// Forget the open question. Not a decline: `WatchLoop+Consent` decides
     /// what an answer (or the lack of one) means.
     func clearConsentState() {
-        pendingConsent = nil
+        pendingConsentQuestion = nil
         appsWaitingForPrompt = []
         approvedConsentMeeting = nil
         consentTask = nil
@@ -144,15 +158,18 @@ class WatchLoop {
         pollInterval: TimeInterval = 3.0,
         endGracePeriod: TimeInterval = 15.0,
         maxDuration: TimeInterval = 14400,
+        capWarningLead: TimeInterval = RecordingCapWarningPolicy.defaultLead,
         meetingEndCountdown: TimeInterval = WatchLoop.meetingEndQuestionCountdown,
         noMic: Bool = false,
-        micDeviceUID: String? = nil,
+        micDeviceUID: @escaping () -> String? = { nil },
         verboseDiagnostics: @escaping () -> Bool = { false },
         recordOnly: @escaping () -> Bool = { false },
         recordOnlyDestination: @escaping () -> RecordOnlyDestination = {
             .unscoped(AppPaths.recordingsDir)
         },
         recordWithoutAskingApps: @escaping () -> [String] = { [] },
+        speechActivity: @escaping () -> SpeechActivity? = { nil },
+        silencePromptAfter: @escaping () -> TimeInterval? = { nil },
         notifier: any AppNotifying = SilentNotifier(),
         diagnostics: any DiagnosticsLogging = OSLogDiagnostics(category: "WatchLoop"),
         nowProvider: @escaping () -> Date = Date.init,
@@ -169,6 +186,7 @@ class WatchLoop {
         self.pollInterval = pollInterval
         self.endGracePeriod = endGracePeriod
         self.maxDuration = maxDuration
+        self.capWarningLead = capWarningLead
         self.meetingEndCountdown = meetingEndCountdown
         self.noMic = noMic
         self.micDeviceUID = micDeviceUID
@@ -183,6 +201,7 @@ class WatchLoop {
         self.consentPolicy = consentPolicy
         self.denyListStore = denyListStore
         self.recordWithoutAskingApps = recordWithoutAskingApps
+        self.silencePrompt = SilencePromptRuntime(speechActivity: speechActivity, after: silencePromptAfter)
     }
 
     nonisolated static var defaultOutputDir: URL {
@@ -278,9 +297,12 @@ class WatchLoop {
 
         let recorder = await recorderFactory()
         try recorder.start(
-            source: source, micDeviceUID: micDeviceUID,
+            source: source, micDeviceUID: micDeviceUID(),
             debugLogging: verboseDiagnostics(),
         )
+        let startedAt = nowProvider()
+        silencePrompt.manualStartedAt = startedAt
+        recordingPauses = RecordingPauseRecord(startedAt: startedAt)
 
         let pid = source.appPID
         activeRecorder = recorder
@@ -299,7 +321,7 @@ class WatchLoop {
         logger.info("Manual recording started for \(appName) (\(target)): \(title, privacy: .private)")
     }
 
-    func stopManualRecording() {
+    func stopManualRecording(cutAt: Date? = nil) {
         guard let recorder = activeRecorder, let info = manualRecordingInfo else { return }
 
         manualRecordingTask?.cancel()
@@ -307,9 +329,9 @@ class WatchLoop {
 
         var failureMessage: String?
         do {
-            let recording = try recorder.stop()
+            let (recording, pauses) = try stopManualCapture(recorder, cutAt: cutAt)
             enqueueRecording(
-                title: info.title, appName: info.appName, recording: recording, trigger: .manual,
+                title: info.title, appName: info.appName, recording: recording, trigger: .manual, pauses: pauses,
             )
         } catch {
             logger.error("Failed to stop manual recording: \(error.localizedDescription, privacy: .public)")
@@ -326,6 +348,7 @@ class WatchLoop {
     }
 
     private func cleanupManualRecording() {
+        endSilencePrompt()
         manualRecordingTask?.cancel()
         manualRecordingTask = nil
         activeRecorder = nil
@@ -412,13 +435,14 @@ class WatchLoop {
         let recorder = await recorderFactory()
         try recorder.start(
             source: source,
-            micDeviceUID: micDeviceUID,
+            micDeviceUID: micDeviceUID(),
             debugLogging: verboseDiagnostics(),
         )
         activeRecorder = recorder
         defer { activeRecorder = nil }
         // Where a cut is measured from, with the stop below (see `cutBack`).
         let recordingStartedAt = nowProvider()
+        recordingPauses = RecordingPauseRecord(startedAt: recordingStartedAt)
 
         // Read participants (Teams)
         var participants: [String] = []
@@ -436,21 +460,25 @@ class WatchLoop {
         // `enqueueRecording()` below are synchronous, so they run to completion
         // on the cancelled task, and nothing else can start a recording while
         // they do.
-        let cutAt = try await waitForMeetingEnd(meeting)
+        let cutAt = try await waitForMeetingEnd(meeting, storingCutsIn: (recorder, recordingStartedAt))
 
         // Stop recording
+        if cutAt == nil { clearStoredCut(of: recorder) }
         let stoppedAt = nowProvider()
-        var recording = try recorder.stop()
+        let recording = try recorder.stop()
+        var stopped = (recording: recording, pauses: takeRecordingPauses(endingAt: stoppedAt, capturedOffsets: recording.pauseOffsets))
         if let cutAt {
-            recording = cutBack(recording, to: cutAt, startedAt: recordingStartedAt, stoppedAt: stoppedAt)
+            stopped = cutBack(stopped, to: cutAt, startedAt: recordingStartedAt, stoppedAt: stoppedAt, recorder: recorder)
+            clearStoredCut(of: recorder)
         }
 
         // --- Enqueue for background processing ---
         enqueueRecording(
             title: title,
             appName: meeting.pattern.appName,
-            recording: recording,
+            recording: stopped.recording,
             trigger: .auto,
+            pauses: stopped.pauses,
             participants: participants,
         )
     }
@@ -462,6 +490,7 @@ class WatchLoop {
         appName: String,
         recording: RecordingResult,
         trigger: RecordingSidecar.Trigger,
+        pauses: [RecordingPause],
         participants: [String] = [],
     ) {
         if recordOnly() {
@@ -471,6 +500,7 @@ class WatchLoop {
                     appName: appName,
                     recording: recording,
                     trigger: trigger,
+                    pauses: pauses,
                     participants: participants,
                 )
             } catch {
@@ -502,6 +532,7 @@ class WatchLoop {
             micDelay: recording.micDelay,
             participants: participants,
             meetingStartTime: recording.recordingStartDate,
+            pauses: pauses,
         )
         pipelineQueue?.enqueue(job)
         logger.info("Enqueued pipeline job for: \(title, privacy: .private)")
@@ -513,9 +544,11 @@ class WatchLoop {
     /// on a phase transition. Co-located mutations stay coherent
     /// (a phase-change-plus-detail-update is one funnel call, not two
     /// separate property writes that consumers could observe mid-flight).
-    private func update(_ transform: (inout WatchLoopState) -> Void) {
+    /// Every way out of `.recording` also ends a pause.
+    func update(_ transform: (inout WatchLoopState) -> Void) {
         var next = snapshot
         transform(&next)
+        if next.phase != .recording { next.pausedSince = nil }
         apply(next)
     }
 
@@ -531,6 +564,7 @@ class WatchLoop {
         if manualRecordingInfo != next.manualRecordingInfo {
             manualRecordingInfo = next.manualRecordingInfo
         }
+        if pausedSince != next.pausedSince { pausedSince = next.pausedSince }
         if oldPhase != next.phase {
             onStateChange?(oldPhase, next.phase)
         }
@@ -553,37 +587,5 @@ class WatchLoop {
         case .recording: .recording
         case .error: .error
         }
-    }
-}
-
-/// Pair of URLs used by `WatchLoop` when persisting record-only output: the
-/// `scope` URL is what `startAccessingSecurityScopedResource()` is called on
-/// (the bookmark-resolved parent the user actually picked), and `writeDir` is
-/// the sub-path under that scope where the WAV + sidecar files land.
-///
-/// The split exists because Apple's security-scoped-bookmark API only grants
-/// access on the URL that resolved from the bookmark — calling start-access
-/// on a *child* path silently fails inside the App Store sandbox while
-/// appearing to work in the unsandboxed Homebrew build. The factory methods
-/// below make the two cases (real bookmark vs. transient app dir) explicit
-/// at every call site.
-struct RecordOnlyDestination: Equatable {
-    let scope: URL
-    let writeDir: URL
-
-    /// Production path: `parent` is the user-picked Output Folder (potentially
-    /// resolved from a security-scoped bookmark) and the WAVs land under
-    /// `parent/recordings/` so a Syncthing or rsync pair has a stable subtree.
-    static func production(parent: URL) -> Self {
-        Self(
-            scope: parent,
-            writeDir: parent.appendingPathComponent("recordings", isDirectory: true),
-        )
-    }
-
-    /// Test/default path: no security scope to manage — `scope == writeDir`,
-    /// so start-access is a harmless no-op and the writer hits `url` directly.
-    static func unscoped(_ url: URL) -> Self {
-        Self(scope: url, writeDir: url)
     }
 }

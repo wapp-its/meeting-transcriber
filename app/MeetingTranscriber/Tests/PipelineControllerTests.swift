@@ -304,6 +304,35 @@ final class PipelineControllerTests: XCTestCase {
         XCTAssertEqual(job.meetingTitle, "Weekly Sync")
     }
 
+    /// A paused record-only recording imported later carries its pauses into
+    /// the job, which renders them as markers in the transcript. A sidecar
+    /// without pauses reads as a recording without any.
+    func testPairedReimportCarriesTheSidecarsPauses() throws {
+        let start = try localDate(2026, 3, 4, 9, 15)
+        let paused = [
+            RecordingPause(startedAt: start + 600, endedAt: start + 900, offsetSeconds: 600),
+            RecordingPause(startedAt: start + 1200, endedAt: start + 1260, offsetSeconds: 899.5),
+        ]
+        let rows: [(stem: String, pauses: [RecordingPause])] = [("paused", paused), ("unpaused", [])]
+        let pc = makeWiredController()
+        for (stem, pauses) in rows {
+            let files = ["app", "mic"].map { tmpDir.appendingPathComponent("\(stem)_\($0).wav") }
+            for url in files {
+                FileManager.default.createFile(atPath: url.path, contents: Data("RIFF".utf8))
+            }
+            try RecordingSidecar(
+                title: "Weekly Sync", appName: "Teams", startedAt: start, stoppedAt: start + 1800,
+                participants: [], micDelaySeconds: 0, trigger: .auto,
+                mixFilename: "\(stem)_mix.wav", appFilename: "\(stem)_app.wav", micFilename: "\(stem)_mic.wav",
+                pauses: pauses,
+            ).write(toDirectory: tmpDir, basename: stem)
+
+            let id = try XCTUnwrap(pc.enqueueFiles(files).first)
+
+            XCTAssertEqual(try XCTUnwrap(pc.queue.jobs.first { $0.id == id }).pauses, pauses.isEmpty ? nil : pauses, stem)
+        }
+    }
+
     // MARK: - jobStatus
 
     func testJobStatusReturnsLiveJob() {

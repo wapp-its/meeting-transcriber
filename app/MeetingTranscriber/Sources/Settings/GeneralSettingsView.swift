@@ -121,6 +121,8 @@ struct GeneralSettingsView: View {
                     Text("seconds").foregroundStyle(.secondary)
                 }
             }
+
+            SilencePromptSection(settings: settings)
         }
         .formStyle(.grouped)
     }
@@ -323,5 +325,36 @@ struct GeneralSettingsView: View {
         .padding(8)
         .background(Color.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
         .accessibilityIdentifier(A11yID.recordOnlyBanner)
+    }
+}
+
+/// The question whether to stop a recording nobody is talking in any more.
+/// Not dimmed in record-only mode: a forgotten recording is asked about there
+/// too.
+private struct SilencePromptSection: View {
+    @Bindable var settings: AppSettings
+
+    var body: some View {
+        Section("Long Silence") {
+            HelpfulToggle(
+                title: "Ask to stop after a long silence",
+                help: SettingsHelp.silencePrompt,
+                isOn: $settings.silencePromptEnabled,
+            )
+            .accessibilityIdentifier(A11yID.silencePromptToggle)
+
+            HStack {
+                // The stepper's hidden label carries the accessibility name.
+                Text("Ask after")
+                    .accessibilityHidden(true)
+                Spacer()
+                Text("\(settings.silencePromptMinutes) min")
+                    .monospacedDigit()
+                Stepper("Ask after", value: $settings.silencePromptMinutes, in: 1 ... 60)
+                    .labelsHidden()
+                    .accessibilityIdentifier(A11yID.silencePromptMinutesStepper)
+            }
+            .disabled(!settings.silencePromptEnabled)
+        }
     }
 }

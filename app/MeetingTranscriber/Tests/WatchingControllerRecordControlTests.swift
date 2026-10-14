@@ -321,7 +321,96 @@ final class WatchingControllerRecordControlTests: XCTestCase {
         XCTAssertFalse(controller.isRecordingMicrophoneOnly)
     }
 
+    // MARK: - Pause and resume
+
+    /// The kinds of recording a pause reaches, unlike a plain `start` or `stop`.
+    private enum Kind: CaseIterable {
+        case microphone
+        case app
+        case detectedMeeting
+    }
+
+    func testPauseActsOnEveryKindOfRecordingAndARepeatIsUnchanged() async throws {
+        for kind in Kind.allCases {
+            let controller = makeWatchingController(logDir: tmpDir)
+            let loop = try await recording(kind, on: controller)
+
+            let paused = await controller.applyRecordAction(.pause)
+            let repeated = await controller.applyRecordAction(.pause)
+
+            XCTAssertEqual(paused, .changed, "\(kind)")
+            XCTAssertTrue(loop.isPaused, "\(kind)")
+            XCTAssertEqual(repeated, .unchanged, "\(kind)")
+            XCTAssertEqual(loop.state, .recording, "\(kind): a pause ends nothing")
+            XCTAssertIdentical(controller.watchLoop, loop, "\(kind)")
+        }
+    }
+
+    /// 409 rather than 200: nothing is paused, and nothing pretends to be.
+    func testWithNothingRecordingPauseIsRefusedAndResumeIsUnchanged() async {
+        let controller = makeWatchingController(logDir: tmpDir)
+
+        let paused = await controller.applyRecordAction(.pause)
+        let resumed = await controller.applyRecordAction(.resume)
+
+        XCTAssertEqual(paused, .blocked)
+        XCTAssertEqual(resumed, .unchanged)
+        XCTAssertNil(controller.watchLoop, "neither may start anything")
+    }
+
+    func testResumeChangesOnlyAPausedRecording() async throws {
+        let controller = makeWatchingController(logDir: tmpDir)
+        let loop = try await microphoneRecording(on: controller)
+
+        let whileRunning = await controller.applyRecordAction(.resume)
+        let paused = await controller.applyRecordAction(.pause)
+        let whilePaused = await controller.applyRecordAction(.resume)
+
+        XCTAssertEqual(whileRunning, .unchanged)
+        XCTAssertEqual(paused, .changed, "precondition")
+        XCTAssertEqual(whilePaused, .changed)
+        XCTAssertFalse(loop.isPaused)
+        XCTAssertTrue(controller.isRecordingMicrophoneOnly, "the same recording goes on")
+    }
+
+    /// The menu's item: offered only while a capture runs, and each choice
+    /// flips the pause.
+    func testTheMenuTogglePausesThenResumesTheRunningRecording() async throws {
+        let controller = makeWatchingController(logDir: tmpDir)
+        XCTAssertFalse(controller.canPauseRecording, "nothing to pause without a recording")
+        let loop = try await appRecording(on: controller)
+        XCTAssertTrue(controller.canPauseRecording)
+
+        controller.togglePause()
+        XCTAssertTrue(loop.isPaused)
+        XCTAssertTrue(controller.isRecordingPaused)
+        XCTAssertTrue(controller.canPauseRecording, "a paused recording is offered Resume")
+
+        controller.togglePause()
+        XCTAssertFalse(loop.isPaused)
+        XCTAssertFalse(controller.isRecordingPaused)
+    }
+
     // MARK: - Helpers
+
+    private func recording(_ kind: Kind, on controller: WatchingController) async throws -> WatchLoop {
+        switch kind {
+        case .microphone: try await microphoneRecording(on: controller)
+        case .app: try await appRecording(on: controller)
+        case .detectedMeeting: await detectedMeeting(on: controller)
+        }
+    }
+
+    /// An auto-detected meeting whose recorder is up, so its capture runs.
+    private func detectedMeeting(on controller: WatchingController) async -> WatchLoop {
+        let (loop, _) = makeTestWatchLoop(detector: FixedMeetingDetector(), notifier: RecordingNotifier(consentAnswer: .granted))
+        controller.watchLoop = loop
+        loop.start()
+        addTeardownBlock { await loop.stop() }
+        await waitFor(loop.canPause, timeout: .seconds(2))
+        XCTAssertFalse(loop.isManualRecording, "precondition: a detected meeting")
+        return loop
+    }
 
     /// A live microphone recording on a mock-recorder loop the controller owns.
     /// Injected rather than started for real, so what these tests measure is the

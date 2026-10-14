@@ -9,18 +9,21 @@ import XCTest
 @MainActor
 final class WatchLoopAskBeforeRecordingTests: XCTestCase {
     // The doubles live in `ConsentLoopDoubles`, shared with `WatchLoopAddedAppIdentityTests`.
-    private typealias ScriptedDetector = ConsentLoopDoubles.ScriptedDetector
+    // The helpers down to `severalPolls()` that are not private are shared with
+    // WatchLoopAskBeforeRecordingTests+Menu.swift, which a private one would not reach.
+    // swiftlint:disable test_case_accessibility
+    typealias ScriptedDetector = ConsentLoopDoubles.ScriptedDetector
     private typealias AnsweringNotifier = ConsentLoopDoubles.AnsweringNotifier
-    private typealias ParkingNotifier = ConsentLoopDoubles.ParkingNotifier
-    private typealias Recorders = ConsentLoopDoubles.Recorders
+    typealias ParkingNotifier = ConsentLoopDoubles.ParkingNotifier
+    typealias Recorders = ConsentLoopDoubles.Recorders
 
     // MARK: - Meetings
 
-    private func meeting(_ pattern: AppMeetingPattern, owner: String) -> DetectedMeeting {
+    func meeting(_ pattern: AppMeetingPattern, owner: String) -> DetectedMeeting {
         DetectedMeeting(pattern: pattern, windowTitle: "\(pattern.appName) Call", ownerName: owner, windowPID: 4321)
     }
 
-    private var teams: DetectedMeeting {
+    var teams: DetectedMeeting {
         meeting(.teams, owner: "MSTeams")
     }
 
@@ -47,7 +50,7 @@ final class WatchLoopAskBeforeRecordingTests: XCTestCase {
 
     // MARK: - Loop
 
-    private func makeLoop(
+    func makeLoop(
         detector: any MeetingDetecting,
         notifier: any AppNotifying,
         recordWithoutAsking: [String] = [],
@@ -77,9 +80,11 @@ final class WatchLoopAskBeforeRecordingTests: XCTestCase {
     }
 
     /// Long enough for several 0.05 s polls, for asserting that nothing happens.
-    private func severalPolls() async {
+    func severalPolls() async {
         try? await Task.sleep(nanoseconds: 300_000_000)
     }
+
+    // swiftlint:enable test_case_accessibility
 
     // MARK: - R1 / R5: every answer, for every kind of app
 

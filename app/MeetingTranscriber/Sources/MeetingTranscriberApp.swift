@@ -19,7 +19,10 @@ extension Notification.Name {
 /// every open Window.
 private struct AnimatedMenuBarIcon: View {
     let badge: BadgeKind
+    let pausedOverlay: Bool
     let watchingOverlay: Bool
+    let questionOverlay: Bool
+    let meetingEndCountdownOverlay: Bool
     let permissionOverlay: Bool
     let recordOnlyOverlay: Bool
     let micSilentOverlay: Bool
@@ -36,7 +39,10 @@ private struct AnimatedMenuBarIcon: View {
         Image(nsImage: MenuBarIcon.image(
             badge: badge,
             animationFrame: animationFrame,
+            pausedOverlay: pausedOverlay,
             watchingOverlay: watchingOverlay,
+            questionOverlay: questionOverlay,
+            meetingEndCountdownOverlay: meetingEndCountdownOverlay,
             permissionOverlay: permissionOverlay,
             recordOnlyOverlay: recordOnlyOverlay,
             micSilentOverlay: micSilentOverlay,
@@ -79,6 +85,12 @@ private struct WindowAccessor: NSViewRepresentable {
 struct MeetingTranscriberApp: App {
     @State private var appState = AppState(notifier: NotificationManager.shared)
     @State private var captionsWindow: LiveCaptionsWindowController?
+    // The Transcriptions window's search text, kept while the window is closed.
+    // Read only through `$transcriptionsQuery`. Built with Xcode 27, `swiftlint
+    // analyze` does not see a reference made through the projected value and
+    // reports the property as unused.
+    // swiftlint:disable:next unused_declaration
+    @State private var transcriptionsQuery = ""
     @Environment(\.openWindow)
     private var openWindow
 
@@ -127,6 +139,7 @@ struct MeetingTranscriberApp: App {
         speakerNamingWindow
         settingsWindow
         recordAppWindow
+        transcriptionsWindow
     }
 
     // MARK: - Menu Bar
@@ -137,6 +150,7 @@ struct MeetingTranscriberApp: App {
             isWatching: appState.isWatching,
             pipelineQueue: appState.pipelineQueue,
             updateChecker: appState.updateChecker,
+            history: appState.pipeline.terminalJobStore.records,
             onStartStop: { appState.watching.toggleWatching() },
             onRecordApp: { bringWindowToFront(id: "record-app") },
             onRecordMicrophone: { appState.watching.startMicrophoneRecording() },
@@ -145,8 +159,16 @@ struct MeetingTranscriberApp: App {
             onStopManualRecording: appState.canStopRecording ? {
                 appState.watching.stopRecording()
             } : nil,
-            onOpenLastProtocol: openLastProtocol,
-            onOpenProtocol: { url in NSWorkspace.shared.open(url) },
+            isRecordingPaused: appState.isRecordingPaused,
+            onTogglePause: appState.canPauseRecording ? {
+                appState.watching.togglePause()
+            } : nil,
+            onOpenProtocol: openJobFile,
+            onOpenLastProtocol: { url in
+                Self.openLastProtocol(
+                    url, scopeRoot: appState.settings.effectiveOutputDir, notifier: NotificationManager.shared,
+                )
+            },
             onOpenProtocolsFolder: openProtocolsFolder,
             onOpenSettings: {
                 bringWindowToFront(id: "settings")
@@ -155,8 +177,16 @@ struct MeetingTranscriberApp: App {
                 bringWindowToFront(id: "speaker-naming")
             } : nil,
             onProcessFiles: processAudioFiles,
+            onShowAllTranscriptions: { bringWindowToFront(id: TranscriptionsView.windowID) },
+            onRemoveFailedJob: { id in appState.pipeline.removeFailedJob(id: id) },
             onDismissJob: { id in appState.pipelineQueue.removeJob(id: id) },
+            consentQuestion: appState.pendingConsentQuestion,
+            onAnswerConsent: { question, granted in
+                appState.answerConsentQuestion(question, granted: granted)
+            },
             onQuit: quit,
+            onSelectMicrophone: { appState.settings.micDeviceUID = $0 },
+            microphoneMenu: appState.microphoneMenuState,
         )
     }
 
@@ -166,7 +196,10 @@ struct MeetingTranscriberApp: App {
         } icon: {
             AnimatedMenuBarIcon(
                 badge: appState.currentBadge,
+                pausedOverlay: appState.isRecordingPaused,
                 watchingOverlay: appState.isWatching,
+                questionOverlay: appState.awaitingUserAnswer,
+                meetingEndCountdownOverlay: appState.meetingEndCountdownOverlay,
                 permissionOverlay: appState.hasPermissionProblem,
                 recordOnlyOverlay: appState.settings.recordOnly,
                 // `recordingSilentActive` paints both halves; folded into the
@@ -195,6 +228,9 @@ struct MeetingTranscriberApp: App {
         }
         .task {
             appState.updateChecker.startPeriodicChecks(settings: appState.settings)
+        }
+        .task {
+            appState.remoteVocabulary.start()
         }
         .task {
             await appState.permissions.check()
@@ -260,6 +296,7 @@ struct MeetingTranscriberApp: App {
                 whisperKitEngine: appState.engines.whisperKit,
                 parakeetEngine: appState.engines.parakeetEngine,
                 updateChecker: appState.updateChecker,
+                remoteVocabulary: appState.remoteVocabulary,
                 notificationVisibility: appState.permissions.notificationVisibility,
                 // Share the pipeline's actor instance so both writers serialise on
                 // the same `recognition_log.jsonl` file. Fallback only fires in the
@@ -296,6 +333,25 @@ struct MeetingTranscriberApp: App {
             )
         }
         .windowResizability(.contentSize)
+    }
+
+    private var transcriptionsWindow: some Scene {
+        Window("Transcriptions", id: TranscriptionsView.windowID) {
+            TranscriptionsView(
+                entries: appState.pipeline.transcriptionEntries,
+                query: $transcriptionsQuery,
+                canRetry: { appState.pipeline.canRetryJob(id: $0) },
+                onOpen: openTranscriptionFile,
+                onReveal: revealTranscriptionFile,
+                onRetry: { appState.pipeline.retryJob(id: $0) },
+                onRemove: { appState.pipeline.removeFailedJob(id: $0) },
+            )
+            // Starts the pipeline the way an import does, so failed jobs from an
+            // earlier session are in the queue and can be retried. Also runs when
+            // macOS restores the window at launch.
+            .onAppear { appState.pipeline.prepareTranscriptionsWindow() }
+        }
+        .defaultSize(width: 760, height: 520)
     }
 
     // MARK: - Speaker Naming Window
@@ -376,13 +432,6 @@ struct MeetingTranscriberApp: App {
         appState.pipeline.enqueueFiles(panel.urls)
     }
 
-    private func openLastProtocol() {
-        if let job = appState.pipeline.queue.completedJobs.last,
-           let path = job.protocolPath ?? job.transcriptPath {
-            NSWorkspace.shared.open(path)
-        }
-    }
-
     private func bringWindowToFront(id: String) {
         openWindow(id: id)
         NSApp.activate(ignoringOtherApps: true)
@@ -406,6 +455,31 @@ struct MeetingTranscriberApp: App {
         defer { if accessing { protocols.stopAccessingSecurityScopedResource() } }
         try? FileManager.default.createDirectory(at: protocols, withIntermediateDirectories: true)
         NSWorkspace.shared.open(protocols)
+    }
+
+    /// A job line's Open, inside the output folder's security scope: after a
+    /// restart a history line can be opened before any queue holds that scope,
+    /// which the App Store build needs. A file that is gone opens nothing.
+    private func openJobFile(_ url: URL) {
+        _ = TranscriptionFileOpener.perform(url, scopeRoot: appState.settings.effectiveOutputDir) { file in
+            NSWorkspace.shared.open(file)
+        }
+    }
+
+    /// The Transcriptions window's Open, inside the output folder's security
+    /// scope like a job line's. False when the file is gone, so the window can
+    /// say so.
+    private func openTranscriptionFile(_ url: URL) -> Bool {
+        TranscriptionFileOpener.perform(url, scopeRoot: appState.settings.effectiveOutputDir) { file in
+            NSWorkspace.shared.open(file)
+        }
+    }
+
+    /// The Transcriptions window's Show in Finder, under the same rule as Open.
+    private func revealTranscriptionFile(_ url: URL) -> Bool {
+        TranscriptionFileOpener.perform(url, scopeRoot: appState.settings.effectiveOutputDir) { file in
+            NSWorkspace.shared.activateFileViewerSelecting([file])
+        }
     }
 
     private func quit() {
@@ -457,8 +531,15 @@ struct MeetingTranscriberApp: App {
         commandLineArgs.contains("--auto-watch") || autoWatchSetting
     }
 
-    /// Returns the protocol path from the last completed job, if any.
-    static func lastCompletedProtocolPath(completedJobs: [PipelineJob]) -> URL? {
-        completedJobs.last?.protocolPath
+    /// "Open Last Protocol": the file inside the output folder's security
+    /// scope, through the check the Transcriptions window's Open makes. When
+    /// the file is gone the window says "The file was moved or deleted."; the
+    /// menu has closed by then, so the same sentence arrives as a notification.
+    static func openLastProtocol(
+        _ url: URL, scopeRoot: URL, notifier: any AppNotifying,
+        open: (URL) -> Void = { NSWorkspace.shared.open($0) },
+    ) {
+        guard !TranscriptionFileOpener.perform(url, scopeRoot: scopeRoot, action: open) else { return }
+        notifier.notify(title: "Open Last Protocol", body: "The file was moved or deleted.", urgency: .standard)
     }
 }

@@ -87,6 +87,7 @@
                 watchState: watching.watchLoop?.state.rawValue,
                 pendingConsentApp: watching.watchLoop?.pendingConsentApp,
                 isManualRecording: watching.isManualRecording,
+                recordingPaused: watching.isRecordingPaused,
                 notifications: notificationsSnapshot(),
                 // Built inside AppSettings (single-hop `self.` reads) to stay
                 // under the type-check budget — see `rpcSettingsSnapshot`.
@@ -156,6 +157,7 @@
             let micHealthy = permissions.health?.recordingBlockers(for: .micOnly).isEmpty ?? true
             return RecordStatusDTO(
                 recording: watching.isRecordingMicrophoneOnly,
+                paused: watching.isRecordingPaused,
                 startPending: watching.isManualStartPending,
                 state: loop?.state.rawValue,
                 badge: currentBadge.rawValue,

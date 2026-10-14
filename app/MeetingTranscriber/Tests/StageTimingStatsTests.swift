@@ -33,21 +33,46 @@ final class StageTimingStatsTests: XCTestCase {
         )
     }
 
-    // MARK: - Slower-than-usual decision
+    // MARK: - Expected finish
 
-    func testIsSlowerThanUsualNeedsBothRatioAndAbsoluteFloor() {
-        // Ratio (>1.5x) and overrun (>=30s) both met.
-        XCTAssertTrue(StageTimingStats.isSlowerThanUsual(elapsed: 80, average: 40))
-        // Floor is inclusive at exactly +30s (still >1.5x: 70 > 60).
-        XCTAssertTrue(StageTimingStats.isSlowerThanUsual(elapsed: 70, average: 40))
-        // Ratio met but overrun 29s < 30s floor → not flagged (tiny-stage noise).
-        XCTAssertFalse(StageTimingStats.isSlowerThanUsual(elapsed: 69, average: 40))
-        // Overrun big but ratio not met (1.25x).
-        XCTAssertFalse(StageTimingStats.isSlowerThanUsual(elapsed: 500, average: 400))
-        // Exactly 1.5x is not "more than" 1.5x.
-        XCTAssertFalse(StageTimingStats.isSlowerThanUsual(elapsed: 60, average: 40))
-        // No norm yet.
-        XCTAssertFalse(StageTimingStats.isSlowerThanUsual(elapsed: 100, average: 0))
+    /// Speed is seconds of work per second of audio, so a long meeting is
+    /// expected to take longer than a short one. Transcription is keyed by
+    /// engine alone, whatever mode its events carry; diarization and protocol
+    /// generation by engine and mode. A config with no audio length has none.
+    func testSpeedByConfigKeysTranscriptionByEngineAndTheRestByMode() {
+        let speeds = StageTimingStats.speedByConfig(events: [
+            event(.transcribing, wall: 60, audio: 600, engine: "Parakeet", mode: "offline"),
+            event(.transcribing, wall: 140, audio: 400, engine: "Parakeet", mode: nil),
+            event(.diarizing, wall: 100, audio: 1000, engine: "Parakeet", mode: "offline"),
+            event(.diarizing, wall: 600, audio: 1000, engine: "Parakeet", mode: "sortformer"),
+            event(.generatingProtocol, wall: 30, audio: 0, engine: "Parakeet", mode: "offline"),
+        ])
+
+        XCTAssertEqual(speeds, [
+            StageConfig(stage: .transcribing, engine: "Parakeet", diarizerMode: nil): 0.2,
+            StageConfig(stage: .diarizing, engine: "Parakeet", diarizerMode: "offline"): 0.1,
+            StageConfig(stage: .diarizing, engine: "Parakeet", diarizerMode: "sortformer"): 0.6,
+        ])
+    }
+
+    /// Missing history, a zero or missing audio length and a non-positive
+    /// speed each give no expected finish, never one at or before the start.
+    func testExpectedFinishNeedsAPositiveAudioLengthAndSpeed() {
+        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let cases: [(audio: Double?, speed: Double?, finish: Date?)] = [
+            (960, 0.25, start.addingTimeInterval(240)),
+            (960, nil, nil),
+            (nil, 0.25, nil),
+            (0, 0.25, nil),
+            (960, 0, nil),
+            (960, -0.25, nil),
+        ]
+        for (audio, speed, finish) in cases {
+            XCTAssertEqual(
+                StageTimingStats.expectedFinish(start: start, audioSeconds: audio, secondsPerAudioSecond: speed),
+                finish, "audio \(String(describing: audio)), speed \(String(describing: speed))",
+            )
+        }
     }
 
     // MARK: - Aggregation

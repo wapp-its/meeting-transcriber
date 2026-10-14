@@ -1,10 +1,10 @@
 @testable import MeetingTranscriber
 import XCTest
 
-/// Indirect coverage for the `WatchLoop.update(_:)` mutation funnel.
-/// `update` is private, so the assertions exercise it through the
-/// public entry-points (`start`, `stop`, manual recording) and inspect
-/// the resulting `snapshot` + `onStateChange` callback log.
+/// Coverage for the `WatchLoop.update(_:)` mutation funnel, mostly
+/// through the entry-points that call it (`start`, `stop`, manual
+/// recording, pause), inspecting the resulting `snapshot` +
+/// `onStateChange` callback log.
 @MainActor
 final class WatchLoopUpdateFunnelTests: XCTestCase {
     /// A single funnel call carries co-located mutations atomically:
@@ -90,5 +90,26 @@ final class WatchLoopUpdateFunnelTests: XCTestCase {
         XCTAssertNil(snap.manualRecordingInfo, "Manual info cleared even when stop throws")
         XCTAssertEqual(snap.detail, "")
         XCTAssertNotNil(snap.lastError, "Recorder error must surface via funnel's lastError")
+    }
+
+    /// A pause is kept only while recording: a transform outside
+    /// `.recording` cannot set one, leaving `.recording` ends one, and
+    /// pausing is not a phase transition.
+    func testAPauseIsKeptOnlyWhileRecording() async throws {
+        let (loop, _) = makeTestWatchLoop()
+        loop.update { next in next.pausedSince = Date() }
+        XCTAssertNil(loop.pausedSince, "nothing records")
+
+        try await loop.startManualRecording(pid: 7, appName: "Webex", title: "Sync")
+        var phases: [WatchLoop.State] = []
+        loop.onStateChange = { _, new in phases.append(new) }
+        XCTAssertEqual(loop.pauseRecording(), .changed)
+        XCTAssertNotNil(loop.pausedSince)
+        XCTAssertTrue(phases.isEmpty, "pausing is not a phase transition")
+
+        loop.stopManualRecording()
+
+        XCTAssertEqual(phases, [.idle])
+        XCTAssertNil(loop.snapshot.pausedSince, "leaving .recording ends the pause")
     }
 }

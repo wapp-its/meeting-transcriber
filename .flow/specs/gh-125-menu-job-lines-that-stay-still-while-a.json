@@ -1,0 +1,346 @@
+{
+  "branch_name": "feat/gh-125-menu-job-lines",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-14T10:53:26.007254Z",
+  "created_at": "2026-10-14T08:54:19.803241Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-125-menu-job-lines-that-stay-still-while-a",
+  "impl_review_rounds": {
+    "gh-125-menu-job-lines-that-stay-still-while-a.1": 0
+  },
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-14T08:59:56.595122Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "2bfae5a2a00481ac9d71237beb12a67a942f1e36540a9f8f38e3a464a8d21e03",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-1ee82bdddf6333cd5fa594c6778f005d",
+            "classification": "pre_existing",
+            "findingId": "finding-1ee82bdddf6333cd5fa594c6778f005d",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-1e652aca4a347f0d4729d7d9005166b4",
+            "classification": "introduced",
+            "findingId": "finding-1e652aca4a347f0d4729d7d9005166b4",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-a6f25b9ffc9e7c5020637c1eaee4dc84",
+            "classification": "introduced",
+            "findingId": "finding-a6f25b9ffc9e7c5020637c1eaee4dc84",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "340ccf7377d85e73bb6a8b5bc140d96cbcdd2431",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 343678,
+      "output_sha256": "468a70bf0b9820efd5c669b4151e8389a13884029ed32d8a384eb2b44371d212",
+      "reservation_id": "73809fa2c4c046518ca3052e04777ef6",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T08:58:05.146344Z",
+      "tool_calls": 23,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "e6e5f8088d12987b1c2c8b9fb1ed2f83df8ff92e1215088f4655d6429f1879b8",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-1ee82bdddf6333cd5fa594c6778f005d",
+            "classification": "pre_existing",
+            "findingId": "finding-1ee82bdddf6333cd5fa594c6778f005d",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-1e652aca4a347f0d4729d7d9005166b4",
+            "classification": "introduced",
+            "findingId": "finding-1e652aca4a347f0d4729d7d9005166b4",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-a6f25b9ffc9e7c5020637c1eaee4dc84",
+            "classification": "introduced",
+            "findingId": "finding-a6f25b9ffc9e7c5020637c1eaee4dc84",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "4cc1164d31a0435f8d596cb002932966215022b8",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 955,
+      "output_sha256": "87f75635bafefe15e546246fa87b2fc93fcc4788c5c19cddc961808cee70097b",
+      "reservation_id": "6cdcdc064a4d4aeb8310a58a7df02436",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T08:59:56.573018Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "a1280e6a133c414371d68541d318eee41c6e75e52a7b35b04afbc7a622e9ba0f",
+      "backend": "codex",
+      "base_sha": "f9812570a0f9bcd9e4103a51b0735e14d279f0f4",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-5c7c7cab7652cdaf850f68a27a7fd6e2",
+            "classification": "introduced",
+            "findingId": "finding-5c7c7cab7652cdaf850f68a27a7fd6e2",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-3570cd5f8551a9300894762e70be3792",
+            "classification": "introduced",
+            "findingId": "finding-3570cd5f8551a9300894762e70be3792",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "3d113def8ae3cde645390828db7de8a044768c99",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 441757,
+      "output_sha256": "16c60f4ba975cefb964ae8d755934fba3c5c4c37079c83411a5c1e9cc3c323a7",
+      "reservation_id": "ac5d1b6231e2436ba83196db00e37530",
+      "round_consumed": true,
+      "scope": "impl:gh-125-menu-job-lines-that-stay-still-while-a.1",
+      "superseded_by": null,
+      "task": "gh-125-menu-job-lines-that-stay-still-while-a.1",
+      "timestamp": "2026-10-14T09:59:35.465321Z",
+      "tool_calls": 37,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "cebcbe56bf8cad03766bdaf84d48fd501d89610069a8065b21260f390db88b50",
+      "backend": "codex",
+      "base_sha": "f9812570a0f9bcd9e4103a51b0735e14d279f0f4",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-5c7c7cab7652cdaf850f68a27a7fd6e2",
+            "classification": "introduced",
+            "findingId": "finding-5c7c7cab7652cdaf850f68a27a7fd6e2",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-3570cd5f8551a9300894762e70be3792",
+            "classification": "introduced",
+            "findingId": "finding-3570cd5f8551a9300894762e70be3792",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "7ccbf66b8feee94ca6b142b12f953bd42b1ac319",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1057,
+      "output_sha256": "dbfc485924366f6591686ec782f3be2905e6871254e43661b799d5c2eaf65ec5",
+      "reservation_id": "bd412d691af74a1db18e28168db4a10d",
+      "round_consumed": true,
+      "scope": "impl:gh-125-menu-job-lines-that-stay-still-while-a.1",
+      "superseded_by": null,
+      "task": "gh-125-menu-job-lines-that-stay-still-while-a.1",
+      "timestamp": "2026-10-14T10:08:42.103394Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "125923ecbe0fb035c67f4cc51cfc8d3ca42f75f7be06eacb6c9552796df9621a",
+      "backend": "codex",
+      "base_sha": "a6aa37cd3c7081ee02b0f2edd1e4cc4f14763e83",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "90c9350525c1e5bc8aa2833290df09181238258c",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 520483,
+      "output_sha256": "4da8c0a15263246ebb51d5b9887dcb74c05e7119634db6105ff88cd481f90c9e",
+      "reservation_id": "1741d6a79c6a4f1f826b3cb016456ce6",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T10:24:28.937187Z",
+      "tool_calls": 23,
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "498bab02b0c8be73dd2b439cd2b13d601ad56f366f6ec4d8c3da6946436bc76d",
+      "backend": "codex",
+      "base_sha": "dd164fd1a58f819ea732bfe1e234f0b8c545cc10",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "8381c2f185489d0b8ff64ccf9a291abe64431130",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 5310,
+      "output_sha256": "4c2c59bf7256316ec21e4d8b179f015c35b9cc2b056501fb8fe211c7e660cabc",
+      "reservation_id": "bb8582fb446e44a9915a04958740ee09",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T10:53:25.935149Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "impl:gh-125-menu-job-lines-that-stay-still-while-a.1": 1,
+    "plan": 1,
+    "plan#completion": 2
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-125-menu-job-lines-that-stay-still-while-a.1": 0,
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-125-menu-job-lines-that-stay-still-while-a.md",
+  "status": "done",
+  "title": "Menu job lines that stay still while a job runs",
+  "tracker": {
+    "baseHashFlow": "53e0aac99ed37b7dd1f3de64f6ba2394d9399a3e75f2e9dfaabbeb32f171cd4f",
+    "baseHashTracker": "59e5361ee3fb650cad50a89b3925bdb7076386c5ecd33023e595c2861b7a2984",
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABXFD4YQ",
+    "identifier": "#125",
+    "lastSyncedAt": "2026-10-14T08:54:20.613180Z",
+    "linkState": "linked",
+    "mergeBaseFlow": "# Menu job lines that stay still while a job runs\n\n## Conversation Evidence\n\n> user (turn 1, paraphrased): \"While a transcription runs, the \"All Transcriptions\" menu item sometimes disappears while I hover over it. The menu also says \"longer than usual\". Why?\"\n> user (turn 3, paraphrased): \"Now that the Transcriptions window exists, maybe the finished jobs can leave the menu.\"\n> user (turn 4, paraphrased): \"The \"Processing\" header in the menu is misleading too.\"\n> user (turn 5, paraphrased): \"The Transcriptions window item and the protocol folder item could sit next to each other.\"\n> user (selected): \"A \u2014 mic + menu now (Recommended)\" (fix the menu now)\n> user (selected): \"Start + expected finish (Recommended)\" \u2014 option text: \"e.g. \"Transcribing \u00b7 since 09:17 \u00b7 ready about 09:21\". Never changes while the menu is open; expected time comes from this recording's length and past speed, so 'longer than usual' is simply when the clock passes it.\"\n> user (selected): \"Only active + needs you (Recommended)\" \u2014 option text: \"Running, waiting, speaker names needed, failed. Finished jobs only in the window; the newest protocol is still one click via \"Open Last Protocol\".\"\n> user (selected): \"\"In progress\" + \"Needs you\" (Recommended)\" \u2014 option text: \"Two small headers: running/waiting jobs under \"In progress\", speaker-names-needed and failed under \"Needs you\". Each header only when it has jobs.\"\n> diagnosis 2026-10-14 (code and stage timing log): the job line shows the running stage's elapsed seconds, refreshed once per second, and the menu is a menu-style menu bar extra, so each tick rebuilds the whole menu under the pointer. The \"longer than usual\" hint compares the elapsed time with the average wall-clock time of all past runs of that stage for the engine (2:02 for WhisperKit, short test imports included), ignoring the recording's length; a 16-minute recording took 4:41, about 3:18 would have been normal at the 30-day speed (0.21 s per audio second), and the hint would have shown after about 3 minutes even at normal speed. The \"Processing\" header stands above every job line: waiting, running, speaker names needed, failed and the last three finished.\n\n## Goal & Context\n\nThe menu bar menu is where the user starts recordings and opens results, and while a job runs it currently moves under the mouse: the item under the pointer loses its highlight or vanishes, and an open job submenu closes. [paraphrase] Its job section also says things that are not true: \"Processing\" above jobs that are finished or waiting on the user, and \"longer than usual\" for nearly every meeting longer than about a quarter of an hour. [paraphrase] Since the Transcriptions window (\"All Transcriptions...\") lists every job, the menu only needs the jobs that are under way or need the user. [paraphrase]\n\n## Architecture & Data Models\n\n- **The menu is redrawn only on job events.** No value the menu reads may change on a timer while a job runs; the menu content changes when a job is added or removed, or changes state (a stage starts or ends). [inferred] The per-second elapsed value has no other reader than the menu today. [paraphrase]\n- **A stage's expected finish is a fixed value per running stage.** It is the stage's start time plus the recording's audio length times the stage's historical speed (wall-clock seconds per audio second) for the same configuration (engine and diarizer mode), taken from the stage-timing history the app already records. It is computed once when the stage starts and is not recomputed while that stage runs, so a reload of the history during the stage does not change the line. [inferred]\n- **Which jobs the menu shows** is decided by the shared transcriptions list that also feeds the window; the menu takes waiting and running jobs, and jobs that need the user (speaker names needed, failed). The window keeps listing everything. [paraphrase]\n\n## API Contracts\n\nThe job line of a running stage, after the meeting title and the existing \" \u2014 \" separator, reads exactly:\n\n- with an expected finish: `<stage label> \u00b7 since <start> \u00b7 ready about <finish>`, e.g. `Transcribing \u00b7 since 09:17 \u00b7 ready about 09:21`\n- without one (no history for this configuration, or no audio length): `<stage label> \u00b7 since <start>`, e.g. `Transcribing \u00b7 since 09:17`\n\n`<stage label>` is the job state's existing label (Transcribing, Diarizing, Generating Protocol or their current wording); `<start>` and `<finish>` use the system's short time format (for example 09:17). [inferred] The same text appears inside the job's submenu where the progress line is shown today. [inferred]\n\n## Edge Cases & Constraints\n\n- When the clock passes the expected finish, the line does not change; the user reads \"longer than usual\" from the clock. [paraphrase]\n- A stage history with no usable speed (no events for this configuration, a zero or missing audio length, a non-positive speed) gives no expected finish, never a time in the past or a zero-length estimate. [inferred]\n- A finish time on the next day shows as its clock time only. [inferred]\n- A finished job with warnings counts as finished: it leaves the menu like any other finished job and keeps its warnings in the window. [inferred]\n- \"Open Last Protocol\" keeps working as today, so the newest protocol stays one click away with finished jobs gone from the menu. [paraphrase]\n- Tests that pin today's \"Processing\" header, the finished jobs in the menu or the elapsed text change with this requirement. [inferred]\n\n## Acceptance Criteria\n\n- **R1:** While a job runs, nothing in the menu changes on a timer: between two job events the title of every menu item and every item of the job submenus stay identical, however much time passes. Errors: no error surface beyond R2's fallback. [paraphrase]\n- **R2:** A running stage's job line reads as the API Contracts section shows, with the expected finish computed as the Architecture section says; without a usable speed or audio length it reads `<stage label> \u00b7 since <start>`. Errors: missing history, zero or missing audio length and a non-positive speed each give the line without the finish part. [paraphrase]\n- **R3:** The \"longer than usual\" hint and the live elapsed time no longer appear anywhere in the menu (no error surface beyond R1). [paraphrase]\n- **R4:** The menu lists waiting and running jobs under a header \"In progress\" and jobs with speaker names needed or failed under a header \"Needs you\"; each header shows only when it has at least one job; finished jobs, with or without warnings, are not in the menu and are still listed in the Transcriptions window. Errors: no jobs at all shows neither header (no error surface beyond that). [paraphrase]\n- **R5:** \"All Transcriptions...\" sits next to \"Open Protocols Folder\" in the same menu group and keeps its keyboard shortcut (no error surface beyond that). [paraphrase]\n\n## Boundaries\n\n- No change to the Transcriptions window. [inferred]\n- No change to how stage timings are measured or logged, or to the stage statistics shown in Settings. [inferred]\n- No change to the menu bar icon's animation. [inferred]\n- No live time elsewhere in the menu in place of the removed one. [inferred]\n\n## Decision Context\n\n- **D1 \u00b7 Fix the menu now, in its own spec.** why: owner picked \"A \u2014 mic + menu now (Recommended)\" after the diagnosis \u00b7 status: active [owner-ratified 2026-10-14]\n- **D2 \u00b7 A running job's line shows its start and an expected finish instead of ticking seconds.** why: owner picked \"Start + expected finish (Recommended)\" over \"Stage only\" and \"Timer, frozen while open\" \u00b7 status: active [owner-ratified 2026-10-14]\n- **D3 \u00b7 The menu keeps only active jobs and jobs that need the user; finished jobs live in the Transcriptions window.** why: owner, \"Maybe we should remove the finished sessions from the context menu now that we have the transcription overview\", then picked \"Only active + needs you (Recommended)\" \u00b7 status: active [owner-ratified 2026-10-14]\n- **D4 \u00b7 Two headers, \"In progress\" and \"Needs you\", each only when it has jobs.** why: owner, \"The \"Processing\" header in the menu is also misleading somehow\", then picked \"\"In progress\" + \"Needs you\" (Recommended)\" \u00b7 status: active [owner-ratified 2026-10-14]\n- **D5 \u00b7 \"All Transcriptions...\" moves next to \"Open Protocols Folder\".** why: owner, \"All Transcriptions overview and Protocol folder could be together next to each other...\" \u00b7 status: active [owner-stated 2026-10-14]\n- **A1 \u00b7 The expected finish is computed once at stage start and never updated during the stage.** flip at: where the running stage's expected finish is stored \u00b7 test: the R1 test (same text after time passes and after a history reload) \u00b7 alternatives: recompute on every history reload, which changes the line mid-stage and rebuilds the menu \u00b7 status: active [agent-assumed 2026-10-14]\n- **A2 \u00b7 The estimate uses speed per audio second for the same engine and diarizer mode, with no fallback to an average duration.** flip at: the expected-finish computation \u00b7 test: the R2 tests (with and without history) \u00b7 alternatives: fall back to the average wall-clock time, the measure that made \"longer than usual\" wrong \u00b7 status: active [agent-assumed 2026-10-14]\n- **A3 \u00b7 A finished job with warnings leaves the menu like any finished job.** flip at: the menu's job filter \u00b7 test: the R4 test \u00b7 alternatives: list it under \"Needs you\" \u00b7 status: active [agent-assumed 2026-10-14]\n- **A4 \u00b7 Times use the system's short time format.** flip at: the job line formatter \u00b7 test: the R2 test with a fixed locale \u00b7 status: active [agent-assumed 2026-10-14]\n\n## Quick commands\n\n```bash\ncd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh125-home swift test --parallel --filter 'MenuBarJobMenuTests|MenuBarViewTests|TranscriptionListTests|StageTimingStatsTests|PipelineQueueStageTimingTests' > /private/tmp/mt-gh125-focused.log 2>&1; rc=$?; tail -5 /private/tmp/mt-gh125-focused.log; test \"$rc\" = 0\n```\n\n<!-- Source: 25% user / 45% [paraphrase] / 30% [inferred] -->\n",
+    "mergeBaseTracker": "## BACKGROUND\n\nWhile a job runs, the menu changes under the mouse. The item under the pointer (for example \"All Transcriptions...\") loses its highlight or disappears, and an open job submenu closes. The job line shows the elapsed time in seconds, so the whole menu is rebuilt once per second.\n\n## NOTES\n\n- `PipelineQueue.startElapsedTimer()` writes `activeJobElapsed` every second. `MenuBarView.stageProgressText` reads it for the job line (`jobMenuTitle`) and inside the job submenu. The `MenuBarExtra` uses the menu style, so every change rebuilds the `NSMenu`. A label that changes once per minute would still close the menu once per minute.\n- The \"longer than usual\" hint compares the running stage with the average wall-clock time of all past runs of that stage (`averageSeconds(forJobID:stage:)`, `StageTimingStats.isSlowerThanUsual`). It ignores the length of the recording, and the average includes short test imports. On 2026-10-14 the WhisperKit average was 2:02, so a 16 minute meeting shows \"longer than usual\" after about 3 minutes even at normal speed. Normal for that length is about 3:18 (0.21 s per audio second over the last 30 days). The run took 4:41, so it was slower, but the hint would have shown anyway. The speed per audio second (`avgRTF`) is already computed.\n- The \"Processing\" header is above every job in the menu: running, waiting, waiting for speaker names, failed and the last three finished ones. So it often labels jobs that are not processing.\n- Owner ideas from 2026-10-14: remove finished jobs from the menu now that \"All Transcriptions...\" exists, and put \"All Transcriptions...\" next to \"Open Protocols Folder\".\n\n## TASKS\n\n- [ ] Stop rebuilding the menu while it is open\n- [ ] Compare the hint with the expected time for the length of the recording\n- [ ] Decide the menu layout: header text, finished jobs out of the menu, \"All Transcriptions...\" next to \"Open Protocols Folder\"",
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/125"
+  },
+  "updated_at": "2026-10-14T10:53:26.013761Z"
+}

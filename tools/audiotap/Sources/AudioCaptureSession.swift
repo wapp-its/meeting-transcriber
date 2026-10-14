@@ -35,6 +35,10 @@ public class AudioCaptureSession {
     private var appCapture: AppAudioCapture?
     private var micCapture: MicCaptureHandler?
 
+    /// The one pause timeline both tracks consult, so they cut the same span.
+    /// Outlives a handler restart: the restarted capture is the same handler.
+    private let pauseGate = CapturePauseGate()
+
     /// Set when a channel's capture was abandoned (issue #588), either because a
     /// restart attempt never returned or because the retry budget ran out.
     /// Terminal for the session, so the user needs to be told something more
@@ -212,6 +216,7 @@ public class AudioCaptureSession {
             // be collapsed the other way either, since a public init may not
             // name an internal protocol.
             sessionFactory: micSessionFactory ?? { MicEngineSession() },
+            pauseGate: pauseGate,
         )
         // Stored before the start rather than after it, so that both ways out of
         // here tear down through `discardMicCapture` instead of one of them
@@ -242,7 +247,9 @@ public class AudioCaptureSession {
     private func startAppCapture(writingTo handle: FileHandle?) throws {
         guard let handle else { return }
 
-        let capture = Self.makeAppCapture(config, fileDescriptor: handle.fileDescriptor, attemptBody: appAttemptBody)
+        let capture = Self.makeAppCapture(
+            config, fileDescriptor: handle.fileDescriptor, attemptBody: appAttemptBody, pauseGate: pauseGate,
+        )
         try capture.start()
         appFileHandle = handle
         capture.onGiveUp = { [weak self] in self?.appCaptureGaveUp = true }
@@ -259,6 +266,7 @@ public class AudioCaptureSession {
         _ config: AudioCaptureConfiguration,
         fileDescriptor: Int32,
         attemptBody: (() throws -> AppTapSession?)?,
+        pauseGate: CapturePauseGate,
     ) -> AppAudioCapture {
         AppAudioCapture(
             pids: config.pids,
@@ -269,6 +277,7 @@ public class AudioCaptureSession {
             liveSink: config.appLiveSink,
             attemptBody: attemptBody,
             silentTrackWatchdog: config.silentTrackWatchdog,
+            pauseGate: pauseGate,
         )
     }
 
@@ -339,6 +348,54 @@ public class AudioCaptureSession {
         micCapture?.currentSignalAges ?? .unknown
     }
 
+    /// The microphone the running capture reports it records from, nil
+    /// without a microphone capture. See `MicCaptureHandler.activeInputDevice`.
+    public var micInputDevice: MicInputDevice? {
+        micCapture?.activeInputDevice
+    }
+
+    /// Whether a microphone is being captured: one was requested, it started
+    /// and it has not given up. A requested microphone whose start failed
+    /// leaves the session running on the app track alone, so the
+    /// configuration cannot answer this.
+    public var microphoneTrackActive: Bool {
+        micCapture != nil && !micCaptureGaveUp
+    }
+
+    /// Move the running microphone capture to the device with `deviceUID`, nil
+    /// meaning the system default. Does nothing without a microphone capture.
+    /// See `MicCaptureHandler.selectDevice(uid:)`.
+    public func selectMicrophone(deviceUID: String?) {
+        micCapture?.selectDevice(uid: deviceUID)
+    }
+
+    /// Pause the recording: from this instant neither track writes anything,
+    /// to its file or its live sink, until `resume()`. Both devices stay open
+    /// and keep delivering, so levels and buffer ages keep reading the live
+    /// devices and nothing is reopened (no route change, no start-order race,
+    /// see `start()`); each buffer instead has the frames captured inside a
+    /// pause cut out before they reach the resampler or converter. Both tracks
+    /// cut the same host-time span, frame by frame, and write what is left
+    /// back to back, so they stay aligned however their buffers fall.
+    ///
+    /// Cannot fail, and does nothing while already paused. A capture that
+    /// restarts during the pause keeps it.
+    public func pause() {
+        pauseGate.pause()
+    }
+
+    /// End the pause: frames captured from this instant on are written again,
+    /// directly after the ones before the pause, with no silence for it. Does
+    /// nothing while not paused.
+    public func resume() {
+        pauseGate.resume()
+    }
+
+    /// Whether the recording is paused.
+    public var isPaused: Bool {
+        pauseGate.isPaused
+    }
+
     /// Stop all capture and return the result.
     public func stop() -> AudioCaptureResult {
         appCapture?.stop()
@@ -361,6 +418,7 @@ public class AudioCaptureSession {
                 recorded: micCapture != nil,
                 firstFrameTicks: micCapture?.firstFrameTime ?? 0,
             ),
+            pauses: pauseGate.timeline,
         )
 
         try? appFileHandle?.close()

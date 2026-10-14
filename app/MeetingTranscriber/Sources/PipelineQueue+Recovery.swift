@@ -244,7 +244,6 @@ extension PipelineQueue {
             jobID: job.id, transcript: transcript, title: job.meetingTitle,
             protocolsDir: transcriptPath.deletingLastPathComponent(),
         )
-        stopElapsedTimer()
         updateJobState(id: job.id, to: .done)
         return true
     }
@@ -432,7 +431,8 @@ extension PipelineQueue {
     /// Scan `recordingsDir` for `*_mix.wav` files not tracked by any loaded job.
     /// Creates recovery jobs for untracked recordings younger than `maxAge`.
     /// Skips files the pipeline is already finished with, successfully or not
-    /// (tracked in processed_recordings.json).
+    /// (tracked in processed_recordings.json), and recordings whose meeting-end
+    /// cut is not settled yet (`RecoveredCut.keepsFromOrphanScan`).
     ///
     /// The directory scan + per-file `attributesOfItem` calls run on a
     /// detached task — startup callers don't block the UI on a potentially
@@ -473,6 +473,9 @@ extension PipelineQueue {
                 guard !trackedPaths.contains(stdPath) else { return false }
                 guard !runningPaths.contains(stdPath) else { return false }
                 guard !processedPaths.contains(stdPath) else { return false }
+                // A recording whose meeting-end cut is still to come is the
+                // stop's, or the next recovery pass's, to queue once cut.
+                guard !RecoveredCut.keepsFromOrphanScan(stem: group.stem, in: recordingsDir) else { return false }
                 let attrs = try? fm.attributesOfItem(atPath: mixURL.path)
                 if let created = attrs?[.creationDate] as? Date,
                    now.timeIntervalSince(created) > maxAge {

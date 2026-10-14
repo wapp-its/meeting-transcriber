@@ -104,6 +104,130 @@ final class PermissionsControllerTests: XCTestCase {
         await controller.check()
         XCTAssertEqual(counter.count, 2, "A nil minimum interval must never debounce")
     }
+
+    // MARK: - check: microphone probe retry
+
+    /// The audio system can refuse the probe's engine start right after launch
+    /// ("try again") while the microphone works; a refusal that clears on the
+    /// retry, whichever way the first attempt failed, must post nothing.
+    func testMicProbeRecoveringOnRetryIsHealthyAndPostsNothing() async {
+        for failure in PermissionHealthCheck.MicProbeFailure.allCases {
+            let script = ScriptedMicProbe([.failed(failure), .delivered])
+            let notifier = RecordingNotifier()
+            let controller = makeMicrophoneController(script, notifier: notifier)
+            await controller.check()
+            XCTAssertEqual(controller.health?.microphone, .healthy, "\(failure)")
+            XCTAssertTrue(notifier.calls.isEmpty, "\(failure): \(notifier.calls)")
+            XCTAssertEqual(script.probeCount, 2, "\(failure)")
+            XCTAssertEqual(script.pauses, [PermissionHealthCheck.micProbeRetryPause], "\(failure)")
+        }
+    }
+
+    func testMicProbeFailingOnRetryTooIsBrokenAndNotifiesOnce() async {
+        let script = ScriptedMicProbe([.failed(.engineStartFailed), .failed(.engineStartFailed)])
+        let notifier = RecordingNotifier()
+        let controller = makeMicrophoneController(script, notifier: notifier)
+        await controller.check()
+        XCTAssertEqual(controller.health?.microphone, .broken)
+        XCTAssertEqual(script.probeCount, 2)
+        XCTAssertEqual(notifier.calls.count, 1)
+        XCTAssertEqual(notifier.calls.first?.title, "Permission Problem")
+        XCTAssertEqual(notifier.calls.first?.body, PermissionProblem.microphoneBroken.description)
+    }
+
+    func testMicProbeDeliveringFirstTimeIsNotRetried() async {
+        let script = ScriptedMicProbe([.delivered])
+        let controller = makeMicrophoneController(script, notifier: RecordingNotifier())
+        await controller.check()
+        XCTAssertEqual(controller.health?.microphone, .healthy)
+        XCTAssertEqual(script.probeCount, 1)
+        XCTAssertTrue(script.pauses.isEmpty)
+    }
+
+    /// Each failed attempt is logged with its own kind, so a refusal that cleared
+    /// (one line) reads apart from one that did not (two lines).
+    func testEachFailedMicProbeAttemptIsLoggedWithItsKind() async {
+        let kinds = PermissionHealthCheck.MicProbeFailure.allCases
+        for (index, first) in kinds.enumerated() {
+            let second = kinds[(index + 1) % kinds.count]
+
+            let transient = ScriptedMicProbe([.failed(first), .delivered])
+            await makeMicrophoneController(transient, notifier: RecordingNotifier()).check()
+            XCTAssertEqual(transient.loggedFailures, [LoggedMicProbeFailure(attempt: 1, failure: first)])
+
+            let persistent = ScriptedMicProbe([.failed(first), .failed(second)])
+            await makeMicrophoneController(persistent, notifier: RecordingNotifier()).check()
+            XCTAssertEqual(persistent.loggedFailures, [
+                LoggedMicProbeFailure(attempt: 1, failure: first),
+                LoggedMicProbeFailure(attempt: 2, failure: second),
+            ])
+        }
+        XCTAssertEqual(Set(kinds.map(\.logToken)).count, kinds.count, "log tokens must tell the kinds apart")
+    }
+
+    /// A controller whose check runs the real microphone check against `script`,
+    /// with the other two permissions healthy.
+    private func makeMicrophoneController(
+        _ script: ScriptedMicProbe,
+        notifier: RecordingNotifier,
+    ) -> PermissionsController {
+        PermissionsController(notifier: notifier) {
+            let microphone = await PermissionHealthCheck.checkMicrophoneLive(
+                authStatus: .authorized,
+                probe: { script.probe() },
+                sleep: { script.pause($0) },
+                logFailure: { script.log(attempt: $0, failure: $1) },
+            )
+            return HealthCheckResult(screenRecording: .healthy, microphone: microphone, accessibility: .healthy)
+        }
+    }
+}
+
+private struct LoggedMicProbeFailure: Equatable {
+    let attempt: Int
+    let failure: PermissionHealthCheck.MicProbeFailure
+}
+
+/// Plays back scripted microphone probe outcomes (the last one repeats) and
+/// records each pause and logged failure, so the retry runs on a virtual clock.
+/// Lock-guarded because the live check calls it off the main actor.
+private final class ScriptedMicProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private let outcomes: [PermissionHealthCheck.MicProbeOutcome]
+    private var probes = 0
+    private var recordedPauses: [TimeInterval] = []
+    private var recordedFailures: [LoggedMicProbeFailure] = []
+
+    init(_ outcomes: [PermissionHealthCheck.MicProbeOutcome]) {
+        self.outcomes = outcomes
+    }
+
+    var probeCount: Int {
+        lock.withLock { probes }
+    }
+
+    var pauses: [TimeInterval] {
+        lock.withLock { recordedPauses }
+    }
+
+    var loggedFailures: [LoggedMicProbeFailure] {
+        lock.withLock { recordedFailures }
+    }
+
+    func probe() -> PermissionHealthCheck.MicProbeOutcome {
+        lock.withLock {
+            defer { probes += 1 }
+            return outcomes[min(probes, outcomes.count - 1)]
+        }
+    }
+
+    func pause(_ duration: TimeInterval) {
+        lock.withLock { recordedPauses.append(duration) }
+    }
+
+    func log(attempt: Int, failure: PermissionHealthCheck.MicProbeFailure) {
+        lock.withLock { recordedFailures.append(LoggedMicProbeFailure(attempt: attempt, failure: failure)) }
+    }
 }
 
 /// Counts how many times the injected probe ran. `@MainActor` to match the

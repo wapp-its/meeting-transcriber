@@ -37,6 +37,9 @@ extension PipelineQueue {
         /// the same one. The job holds the fact it comes from; this is that
         /// fact's rendering for the length of one run.
         let note: String?
+        /// The recording's pauses, carried like `note` so the diarization stage
+        /// places the same markers and keeps its merged blocks from spanning one.
+        let pauses: [RecordingPause]
         /// Segments cached for diarization reuse (avoids double transcription).
         let cachedSegments: [TimestampedSegment]? // swiftlint:disable:this discouraged_optional_collection
         let isDualSource: Bool
@@ -198,12 +201,14 @@ extension PipelineQueue {
 
             let transcription = try await transcribe(ctx, engine: engine, workDir: workDir)
 
-            // The transcript WITHOUT its recording-level note. A dropped track
-            // renders that one line even when the surviving track produced no
-            // segments, and the rendered string would then pass a check meant
-            // to catch exactly that: a note-only transcript saved as a success,
-            // with a protocol generated from one sentence.
-            let body = transcription.cachedSegments?.transcriptText(note: nil) ?? transcription.transcript
+            // The transcript WITHOUT its recording-level note or its pause
+            // markers. A dropped track renders that one line even when the
+            // surviving track produced no segments, and the rendered string
+            // would then pass a check meant to catch exactly that: a note-only
+            // transcript saved as a success, with a protocol generated from one
+            // sentence. A pause marker is rendered whatever was said, so it
+            // would pass the same way.
+            let body = transcription.cachedSegments?.transcriptText(note: nil, pauses: []) ?? transcription.transcript
             guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 // Compute input RMS only on the failure path — loading the whole
                 // mix file is expensive (~MB-per-minute) and we only need it when
@@ -231,7 +236,6 @@ extension PipelineQueue {
                 ctx: ctx, workDir: workDir, outputDir: outputDir,
             )
         } catch is CancellationError {
-            stopElapsedTimer()
             // Cleared here too, not only in the branch below. The set is what
             // tells a later generic error apart from a cancellation, so an ID
             // left in it outlives the job it described for the rest of the
@@ -241,7 +245,6 @@ extension PipelineQueue {
             logger.info("Job \(ctx.jobID) cancelled")
             // Job already removed by cancelJob()
         } catch {
-            stopElapsedTimer()
             if cancelledJobIDs.remove(ctx.jobID) != nil {
                 logger.info("Job \(ctx.jobID) cancelled")
             } else {
@@ -284,6 +287,13 @@ extension PipelineQueue {
         job(withID: jobID)?.trackViability?.transcriptNote
     }
 
+    /// The pauses this job's transcript marks. Read from the job, which holds
+    /// them for the recording's whole life, so every rendering of it places
+    /// the same markers.
+    private func transcriptPauses(_ jobID: UUID) -> [RecordingPause] {
+        job(withID: jobID)?.pauses ?? []
+    }
+
     /// Which tracks of a dual-source recording carry audio, and the record of
     /// a dropped one on the job.
     ///
@@ -295,11 +305,11 @@ extension PipelineQueue {
     /// note for the person reading the file later and for the model that
     /// writes the protocol from it.
     private func resolveTrackViability(
-        _ ctx: JobContext, engine: any TranscribingEngine, app16k: URL, mic16k: URL,
+        _ ctx: JobContext, engine: any TranscribingEngine, appFrames: Int, micFrames: Int,
     ) -> DualTrackViability {
         let viability = DualTrackViability.resolve(
-            appFrames: AudioMixer.frameCount(of: app16k),
-            micFrames: AudioMixer.frameCount(of: mic16k),
+            appFrames: appFrames,
+            micFrames: micFrames,
             minimumFrames: engine.minimumAudioFrames,
         )
         // Recorded for every dual-source job, not only when a track was
@@ -333,9 +343,14 @@ extension PipelineQueue {
         await appResample
         await micResample
 
+        // The recording lasts as long as its longer track.
+        let appFrames = AudioMixer.frameCount(of: app16k)
+        let micFrames = AudioMixer.frameCount(of: mic16k)
+        recordAudioDuration(jobID: ctx.jobID, frames: max(appFrames, micFrames))
+
         // Which of the two tracks has anything to transcribe, answered before
         // any of the work below.
-        let viability = resolveTrackViability(ctx, engine: engine, app16k: app16k, mic16k: mic16k)
+        let viability = resolveTrackViability(ctx, engine: engine, appFrames: appFrames, micFrames: micFrames)
 
         // Both tracks now exist at 16 kHz. Measure here, before transcription
         // and before any remedy touches the audio, whether they carry the same
@@ -436,7 +451,6 @@ extension PipelineQueue {
         _ ctx: JobContext, engine: any TranscribingEngine, workDir: URL,
     ) async throws -> TranscriptionOutput {
         updateJobState(id: ctx.jobID, to: .transcribing)
-        startElapsedTimer()
         logger.info("[\(ctx.shortID, privacy: .public)] transcription_start title=\(ctx.title, privacy: .private)")
 
         // Snapshot terminology once per job. A user edit while either track is
@@ -454,7 +468,9 @@ extension PipelineQueue {
             )
             let normalizedSegments = normalize(segments, with: normalizer)
             cachedSegments = normalizedSegments
-            transcript = normalizedSegments.transcriptText(note: transcriptNote(ctx.jobID))
+            transcript = normalizedSegments.transcriptText(
+                note: transcriptNote(ctx.jobID), pauses: transcriptPauses(ctx.jobID),
+            )
         } else {
             // Single-source: resample mix to 16kHz
             guard let mixPath = ctx.mixPath else {
@@ -462,6 +478,8 @@ extension PipelineQueue {
             }
             let mix16k = workDir.appendingPathComponent("mix_16k.wav")
             try await AudioMixer.resampleFile(from: mixPath, to: mix16k)
+            // The recording's length, taken before VAD trims the silence out.
+            recordAudioDuration(jobID: ctx.jobID, frames: AudioMixer.frameCount(of: mix16k))
 
             // Optional VAD preprocessing: trim silence before transcription
             var vadMap: VadSegmentMap?
@@ -483,12 +501,9 @@ extension PipelineQueue {
             }
 
             cachedSegments = segments
-            // Single-source has one track and no viability verdict, so nothing
-            // to annotate.
-            transcript = segments.transcriptText(note: nil)
+            // Single-source has one track and no viability verdict, so no note.
+            transcript = segments.transcriptText(note: nil, pauses: transcriptPauses(ctx.jobID))
         }
-
-        stopElapsedTimer()
 
         let segCount = cachedSegments?.count ?? 0
         let totalSecs = cachedSegments?.last?.end ?? 0
@@ -502,6 +517,7 @@ extension PipelineQueue {
         return TranscriptionOutput(
             transcript: transcript,
             note: transcriptNote(ctx.jobID),
+            pauses: transcriptPauses(ctx.jobID),
             cachedSegments: cachedSegments,
             isDualSource: isDualSource,
             terminologyNormalizer: normalizer,
@@ -559,8 +575,7 @@ extension PipelineQueue {
             return finalTranscript
         }
 
-        updateJobState(id: ctx.jobID, to: .diarizing)
-        startElapsedTimer()
+        startDiarizing(jobID: ctx.jobID, mode: diarizeProcess.mode)
         do {
             // Inside the block on purpose: preparing the mix is part of
             // diarizing, and this catch is what keeps a diarization problem from
@@ -775,7 +790,7 @@ extension PipelineQueue {
         return renderLabeledTranscript(
             run: run, cachedSegments: cachedSegments,
             isDualSource: transcription.isDualSource, autoNames: autoNames,
-            note: transcription.note,
+            annotations: (note: transcription.note, pauses: transcription.pauses),
         )
     }
 
@@ -785,11 +800,12 @@ extension PipelineQueue {
     /// (`labeledTranscript`) and the late re-diarization rewrite
     /// (the session's `rewriteTranscriptFromLateRun`) so both re-segment
     /// identically. Returns nil when the run carries no usable diarization.
-    /// Internal (not private) because it is a `SpeakerNamingSessionDelegate`
-    /// witness.
+    /// `annotations` is what the job adds around the speech: the recording
+    /// note and the pauses. Internal (not private) because it is a
+    /// `SpeakerNamingSessionDelegate` witness.
     func renderLabeledTranscript(
         run: DiarizationRun, cachedSegments: [TimestampedSegment],
-        isDualSource: Bool, autoNames: [String: String], note: String?,
+        isDualSource: Bool, autoNames: [String: String], annotations: (note: String?, pauses: [RecordingPause]),
     ) -> String? {
         // Suppressed copies leave before anything gets a speaker. Left in,
         // they would be labeled like real speech and merged into adjacent
@@ -819,7 +835,8 @@ extension PipelineQueue {
         }
         guard let topology else { return nil }
         let labeled = DiarizationProcess.labelSegments(topology, autoNames: autoNames)
-        return DiarizationProcess.mergeConsecutiveSpeakers(labeled).transcriptText(note: note)
+        return DiarizationProcess.mergeConsecutiveSpeakers(labeled, breakingAt: annotations.pauses.map(\.offsetSeconds))
+            .transcriptText(note: annotations.note, pauses: annotations.pauses)
     }
 
     /// Stage 3 — persist the transcript + audio, run protocol generation
@@ -891,7 +908,6 @@ extension PipelineQueue {
             )
         }
 
-        stopElapsedTimer()
         if let namingData = naming.speakerNamingDataByJob[ctx.jobID] {
             updateJobState(id: ctx.jobID, to: .speakerNamingPending)
             // Auto-pop the dialog now that the job is in the right state.
@@ -935,8 +951,6 @@ extension PipelineQueue {
             ?? Self.namingSlug(title: title, jobID: jobID, startTime: Date())
         let meetingStartTime = job?.meetingStartTime
         updateJobState(id: jobID, to: .generatingProtocol)
-        startElapsedTimer()
-        defer { stopElapsedTimer() }
         let protocolMD: String
         do {
             let diarized = transcript.range(

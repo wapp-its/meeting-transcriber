@@ -17,7 +17,7 @@ Three automatic stops still happen without the person recording being told, or w
 
 This spec adds a warning before the 4-hour stop, a notice after it, a notice when a manual recording ends because its app quit, and a mark on the menu bar icon while a gh-54 countdown runs. The stops themselves keep their current rules. [paraphrase]
 
-It builds on spec gh-54 (issue #54), which is not merged yet: gh-54 introduces the countdown, the meeting-end notification category and one diagnostic log line per automatic stop (its R7). This spec relies on those and changes none of them. [inferred]
+It builds on spec gh-54 (issue #54), merged into `wapp/main` on 2026-10-07: gh-54 introduces the countdown, the meeting-end notification category and one diagnostic log line per automatic stop (its R7). This spec relies on those and changes none of them. [inferred]
 
 <!-- Source: 0% user / 70% [paraphrase] / 30% [inferred] -->
 
@@ -27,7 +27,7 @@ It builds on spec gh-54 (issue #54), which is not merged yet: gh-54 introduces t
 - **Notice texts, one pure builder.** The texts of the warning, the cap notice and the app-exit notice come from one pure builder (title and body as values), so tests pin the wording without a notification centre. Remaining minutes and the maximum length are formatted from the actual values, never hard-coded. [inferred]
 - **Posting.** All three go through the existing `AppNotifying.notify(title:body:urgency:)` seam; no new notification category, no actions. The warning is `.timeSensitive`, the two "recording ended" notices `.standard` (`NotificationUrgency`). [inferred]
 - **Where each notice is posted.** The cap notice is posted where the stop reason is known to be the maximum length: for detected meetings next to gh-54's R7 `max_duration` log line in the meeting-end wait, for manual recordings in `monitorManualRecording` after `stopManualRecording()`. The app-exit notice is posted in `monitorManualRecording` after `stopManualRecording()` on the `.stopPidExited` arm. A stop the person makes (menu, automation API, Stop Watching) and a meeting end decided by gh-54 post none of them. [inferred]
-- **Countdown state on the loop.** `WatchLoop` exposes, as observable read-only state, the deadline of a running gh-54 countdown (`meetingEndDeadline: Date?`, nil when none runs), written only by the meeting-end wait the way `pendingConsentApp` is written only by the consent extension. It is set on the poll that opens gh-54's question and cleared on every way out of it, including thrown errors and cancellation. If gh-54 merged an equivalent observable property, that one is used instead of adding a second. [inferred]
+- **Countdown state on the loop.** `WatchLoop` exposes, as observable read-only state, the deadline of a running gh-54 countdown (`meetingEndDeadline: Date?`, nil when none runs), written only by the meeting-end wait the way `pendingConsentApp` is written only by the consent extension. It is set on the poll that opens gh-54's question and cleared on every way out of it, including thrown errors and cancellation. If gh-54 merged an equivalent observable property, that one is used instead of adding a second; as merged, gh-54 publishes `WatchLoop.meetingEndQuestionID` (non-nil exactly while its question is open, cleared by the wait's `defer`), which is that property. [inferred]
 - **Countdown mark on the icon.** `MenuBarIcon.image(...)` gains one more overlay flag next to `watchingOverlay` and the red overlays. With it set, the whole icon is drawn faded on the second half of the 6-frame animation cycle (frames 3 to 5, 1.2 s of every 2.4 s), so the recording waveform pulses. It is an overlay on the `.recording` badge, not a new `BadgeKind` case, so the `badge` value the `/v1` automation API reports (`WatchStatusDTO`, `RecordStatusDTO`) keeps saying `recording` during a countdown. `AppState` hoists the flag into one named property for the menu-bar body's type-check budget (the `hasPermissionProblem` pattern), and `MeetingTranscriberApp.menuBarLabel` passes it to `AnimatedMenuBarIcon`. [inferred]
 - **Fit beside issue #49.** #49 marks a pending "Record … meeting?" prompt, which is usually open while the app watches without recording (it can stay parked while another app's meeting records); this mark appears only while a detected meeting records and its signal is gone. Both read as "the app waits for your answer", and this one never competes for the badge, since it does not touch `BadgeKind.compute`. Both specs touch the parameter list of `MenuBarIcon.image`, `AnimatedMenuBarIcon` and `menuBarLabel`; whichever lands second adds its flag next to the other's. [inferred]
 
@@ -65,7 +65,7 @@ Task gh-58-notices-for-the-remaining-automatic.1 validates the core approach (a 
 
 ## Dependencies
 
-- Spec gh-54-ask-before-auto-stopping-a-meeting (issue #54) must be merged first: this spec uses its countdown, its meeting-end decision and its R7 stop-reason log lines and changes none of them. [inferred]
+- Spec gh-54-ask-before-auto-stopping-a-meeting (issue #54) must be merged first (it is, since 2026-10-07): this spec uses its countdown, its meeting-end decision and its R7 stop-reason log lines and changes none of them. [inferred]
 - Issue #49 (pending "Record … meeting?" prompt on the icon) touches the same icon parameters; landing it first is recommended (A5). [inferred]
 
 ## Boundaries
@@ -94,6 +94,14 @@ mkdir -p /private/tmp/mt-gh58/home && cd app/MeetingTranscriber && CFFIXED_USER_
 - **A3 · The warning is time sensitive, the two "recording ended" notices are standard.** why: NotificationUrgency reserves time sensitive for something the person can still act on; the warning lets them split a long recording at a convenient moment, the ended notices report the past like PreviousExitNotice · flip at: the owner wants the ended notices to break through Focus too · test: RecordingNotifier urgency assertions · status: active [agent-assumed 2026-10-06]
 - **A4 · The warning lead is a fixed 10 minutes with no setting, and no warning is given when the maximum is not longer than the lead.** flip at: the owner asks for a setting · test: Settings gains no control; the pure warning test covers a cap at or below the lead · status: active [agent-assumed 2026-10-06]
 - **A5 · gh-49 should land before this spec.** why: gh-49 has no unmerged dependency while this spec waits for gh-54, and the shared icon-parameter conflict is small either way · flip at: gh-54 merges before gh-49 is built · test: none, an ordering note for the coordinator · status: active [agent-inferred 2026-10-06]
+FIT: GO · 2026-10-14 · base 48912ad6 · engine flow-next 8.6.0 · gh-54, gh-49, gh-45, gh-94 merged since the plan review; nothing owns R1-R4; premises hold
+  - scope: no open or merged spec posts a cap or app-quit notice or marks a countdown on the icon (WatchLoop+ManualRecording.swift:26-34 and WatchLoop+MeetingEnd.swift:95-97 still only log; gh-45 R7 and gh-105 R2 name the cap and the app quitting only as ways a recording ends)
+  - gh-54 as merged: `WatchLoop.meetingEndQuestionID` (WatchLoop.swift:78) is the observable countdown state the Architecture bullet anticipated; the R7 line in the meeting-end wait is one generic line for every stop reason (WatchLoop+MeetingEnd.swift:96), so the cap notice is conditional on `.maxDuration` there
+  - gh-45: both loops gained a silence-stop path (`AutoStopReason.silenceStop`; WatchLoop+ManualRecording.swift:36-40, WatchLoop+MeetingEnd.swift:76-80); its question has no countdown and is held while gh-54's is open, so R4 still reads right; R2's "any other way" covers the silence stop
+  - gh-94: stop by hand returns from the wait before the poll's decision (WatchLoop+MeetingEnd.swift:61-69); one more way out of the countdown, covered by R4's "by any path" and task .2's `defer`
+  - WatchLoop.swift and Tests/TestHelpers.swift sit at exactly 600 lines (`file_length` warning 600, `--strict`), so task .1's init parameter needs a helper moved out first, as the task already allows; task line anchors drifted (worker re-pins)
+  - follow-up, not in scope: whether gh-45's silence question (no deadline) deserves its own icon mark
+
 ## Requirement coverage
 
 | Req | Description | Task(s) | Gap justification |

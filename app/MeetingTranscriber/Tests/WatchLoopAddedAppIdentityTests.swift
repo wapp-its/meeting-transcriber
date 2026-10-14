@@ -77,7 +77,7 @@ final class WatchLoopAddedAppIdentityTests: XCTestCase {
         detector.running = [first.pattern.identityKey, second.pattern.identityKey]
         await waitFor(notifier.prompts.count == 2, timeout: .seconds(2))
         XCTAssertEqual(notifier.prompts.count, 2, "\(label): the same-named app is still asked about")
-        XCTAssertEqual(loop.pendingConsent?.identityKey, second.pattern.identityKey, label)
+        XCTAssertEqual(loop.pendingConsentQuestion?.identityKey, second.pattern.identityKey, label)
         XCTAssertEqual(notifier.prompts.map(\.title), ["Record Zoom meeting?", "Record Zoom meeting?"], label)
 
         notifier.answer(.declined)
@@ -121,7 +121,7 @@ final class WatchLoopAddedAppIdentityTests: XCTestCase {
 
         notifier.answer(.declined)
         await waitFor(notifier.prompts.count == 2, timeout: .seconds(2))
-        XCTAssertEqual(loop.pendingConsent?.identityKey, "Zoom", "then the built-in is asked about")
+        XCTAssertEqual(loop.pendingConsentQuestion?.identityKey, "Zoom", "then the built-in is asked about")
         XCTAssertEqual(Set(detector.resets), [addedKey], "the decline reset the detector by the added app's key")
 
         notifier.answer(.declined)

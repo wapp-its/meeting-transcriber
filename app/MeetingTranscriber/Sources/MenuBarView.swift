@@ -5,6 +5,10 @@ struct MenuBarView: View {
     let isWatching: Bool
     let pipelineQueue: PipelineQueue
     var updateChecker: UpdateChecker?
+    /// The finished-job history, read with the queue's jobs so a failed line
+    /// and "Open Last Protocol" outlive the queue's one-minute reap and a
+    /// restart.
+    var history: [TerminalJobRecord] = []
     let onStartStop: () -> Void
     let onRecordApp: () -> Void
     let onRecordMicrophone: () -> Void
@@ -19,14 +23,39 @@ struct MenuBarView: View {
     let manualRecordingPendingOrActive: Bool
     /// Stops whatever is recording, a detected meeting included; set only while a recording runs.
     let onStopManualRecording: (() -> Void)?
-    let onOpenLastProtocol: () -> Void
+    /// Whether the running recording is paused, which picks the label of the
+    /// item `onTogglePause` drives.
+    var isRecordingPaused = false
+    /// Pauses a running recording or resumes a paused one, whatever kind it is;
+    /// set only while a recording's capture is running.
+    var onTogglePause: (() -> Void)?
+    /// A job line's Open: the job's protocol, else its transcript.
     let onOpenProtocol: (URL) -> Void
+    /// "Open Last Protocol": the newest finished job's protocol, else its
+    /// transcript. Separate from a job line's Open because a file that is
+    /// gone is reported here, as the Transcriptions window reports it.
+    let onOpenLastProtocol: (URL) -> Void
     let onOpenProtocolsFolder: () -> Void
     let onOpenSettings: () -> Void
     let onNameSpeakers: (() -> Void)?
     let onProcessFiles: () -> Void
+    /// Opens the Transcriptions window.
+    var onShowAllTranscriptions: () -> Void = {}
+    /// Remove on a failed job: off the menu and out of the history for good.
+    var onRemoveFailedJob: (UUID) -> Void = { _ in }
+    /// Dismiss on a job waiting for speaker names.
     let onDismissJob: (UUID) -> Void
+    /// The open "Record <App> meeting?" prompt, nil when none is open.
+    var consentQuestion: ConsentQuestion?
+    /// Answers the question the menu displayed, true for Record. Handed the
+    /// question rather than reading the open one, so a click on a menu that
+    /// went stale answers nothing (`WatchLoop.answerParkedConsent`).
+    var onAnswerConsent: ((ConsentQuestion, Bool) -> Void)?
     let onQuit: () -> Void
+    /// Stores a chosen microphone's UID, empty for System Default.
+    var onSelectMicrophone: (String) -> Void = { _ in }
+    /// The Microphone entry; nil leaves it out.
+    var microphoneMenu: MicrophoneMenuState?
 
     private var state: TranscriberState {
         status?.state ?? .idle
@@ -55,6 +84,7 @@ struct MenuBarView: View {
     // -warnings-as-errors), failing the build on slower CI hardware. The view
     // order, dividers, and conditionals are unchanged.
     var body: some View {
+        consentPrompt
         statusHeader
         sessionControls
         meetingInfo
@@ -63,7 +93,8 @@ struct MenuBarView: View {
         Divider()
 
         watchControls
-        processingQueue
+        microphoneSection
+        jobSections
 
         Divider()
 
@@ -80,6 +111,39 @@ struct MenuBarView: View {
     }
 
     // MARK: - Body sections
+
+    /// The open recording prompt, worded exactly as its notification, for
+    /// whoever missed the banner or never got one. Its own section above the
+    /// status line, so the divider closing it leaves the status line and its
+    /// control together.
+    @ViewBuilder private var consentPrompt: some View {
+        if let question = consentQuestion {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(question.title)
+                    .font(.headline)
+                Text(question.body)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 4)
+
+            Button {
+                onAnswerConsent?(question, true)
+            } label: {
+                Label("Record", systemImage: "record.circle")
+            }
+            .accessibilityIdentifier(A11yID.consentPromptRecord)
+
+            Button {
+                onAnswerConsent?(question, false)
+            } label: {
+                Label("Ignore", systemImage: "xmark.circle")
+            }
+            .accessibilityIdentifier(A11yID.consentPromptIgnore)
+
+            Divider()
+        }
+    }
 
     private var statusHeader: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -136,6 +200,23 @@ struct MenuBarView: View {
         } else {
             watchToggle
         }
+        pauseResumeItem
+    }
+
+    /// The line under "Stop Recording", for every kind of recording.
+    @ViewBuilder private var pauseResumeItem: some View {
+        if let onTogglePause {
+            Button {
+                onTogglePause()
+            } label: {
+                if isRecordingPaused {
+                    Label("Resume Recording", systemImage: "record.circle")
+                } else {
+                    Label("Pause Recording", systemImage: "pause.circle")
+                }
+            }
+            .accessibilityIdentifier(A11yID.pauseResumeRecording)
+        }
     }
 
     @ViewBuilder private var watchControls: some View {
@@ -178,29 +259,104 @@ struct MenuBarView: View {
         .keyboardShortcut("p")
     }
 
-    @ViewBuilder private var processingQueue: some View {
-        if !pipelineQueue.jobs.isEmpty {
-            Divider()
-            Label("Processing", systemImage: "gearshape.2.fill")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            ForEach(Array(pipelineQueue.jobs.enumerated()), id: \.element.id) { index, job in
-                jobRow(job, index: index)
+    /// Which microphone recordings use, switchable in a submenu; with "No
+    /// Microphone" on, one disabled line. Every string comes from
+    /// `MicrophoneMenuState`, so nothing is assembled here (see the note on
+    /// `body`).
+    @ViewBuilder private var microphoneSection: some View {
+        if let microphoneMenu {
+            if microphoneMenu.isEnabled {
+                Menu {
+                    microphonePicker(microphoneMenu)
+                    if let hint = microphoneMenu.hint {
+                        Text(hint)
+                    }
+                } label: {
+                    Label(microphoneMenu.title, systemImage: "mic")
+                }
+            } else {
+                Label(microphoneMenu.title, systemImage: "mic.slash")
             }
         }
     }
 
+    /// An inline picker, so the menu shows each device as an item with the
+    /// checkmark on the current choice. Choosing one only stores it; nothing
+    /// here touches the macOS default input.
+    private func microphonePicker(_ menu: MicrophoneMenuState) -> some View {
+        Picker("Microphone", selection: Binding(get: { menu.checkedUID }, set: { onSelectMicrophone($0) })) {
+            ForEach(menu.items, id: \.uid) { item in
+                Text(item.label)
+                    .disabled(!item.isEnabled)
+                    .tag(item.uid)
+            }
+        }
+        .pickerStyle(.inline)
+        .labelsHidden()
+        .accessibilityIdentifier(A11yID.menuMicrophonePicker)
+    }
+
+    /// The jobs under way and the jobs waiting on the user, each group under
+    /// its own header and only when it has a job. Row indexes run on across
+    /// both groups, so every row's identifiers stay unique.
+    @ViewBuilder private var jobSections: some View {
+        let sections = TranscriptionList.menuSections(transcriptionEntries)
+        jobSection("In progress", systemImage: "gearshape.2.fill", entries: sections.inProgress, firstIndex: 0)
+        jobSection(
+            "Needs you", systemImage: "exclamationmark.circle",
+            entries: sections.needsYou, firstIndex: sections.inProgress.count,
+        )
+    }
+
+    @ViewBuilder
+    private func jobSection(
+        _ title: String, systemImage: String, entries: [TranscriptionEntry], firstIndex: Int,
+    ) -> some View {
+        if !entries.isEmpty {
+            Divider()
+            Label(title, systemImage: systemImage)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            ForEach(Array(entries.enumerated()), id: \.element.id) { offset, entry in
+                jobRow(entry, index: firstIndex + offset)
+            }
+        }
+    }
+
+    /// The same list as the Transcriptions window, so the two cannot disagree
+    /// about which jobs exist or what state they are in.
+    private var transcriptionEntries: [TranscriptionEntry] {
+        TranscriptionList.entries(liveJobs: pipelineQueue.jobs, records: history)
+    }
+
+    /// Shown at all times, next to the protocols folder: finished jobs are
+    /// listed in the window, not in the menu.
+    private var allTranscriptionsItem: some View {
+        Button {
+            onShowAllTranscriptions()
+        } label: {
+            Label("All Transcriptions...", systemImage: "list.bullet.rectangle")
+        }
+        .keyboardShortcut("t")
+        .accessibilityIdentifier(A11yID.allTranscriptionsMenuItem)
+    }
+
+    /// The way to the results: the newest one, every job, and the folder they
+    /// are written to. "Open Last Protocol" is the menu's one click to the
+    /// newest result now that finished jobs are not listed, shown while the
+    /// history holds a finished job with a file.
     @ViewBuilder private var protocolActions: some View {
-        if let protocolPath = status?.protocolPath {
+        if let url = TranscriptionList.lastFinished(transcriptionEntries)?.fileToOpen {
             Button {
-                onOpenLastProtocol()
+                onOpenLastProtocol(url)
             } label: {
                 Label("Open Last Protocol", systemImage: "doc.text")
             }
             .keyboardShortcut("o")
-            .disabled(protocolPath.isEmpty)
         }
+
+        allTranscriptionsItem
 
         Button {
             onOpenProtocolsFolder()
@@ -268,87 +424,86 @@ struct MenuBarView: View {
     /// `MenuBarExtra` cannot lay anything out side by side: an `HStack` row
     /// came out as one menu item per part, so the status dot and the spacer
     /// became empty lines and the buttons stood one below the other.
-    private func jobRow(_ job: PipelineJob, index: Int) -> some View {
+    private func jobRow(_ entry: TranscriptionEntry, index: Int) -> some View {
         Menu {
-            Text(job.meetingTitle)
-            jobStateLabel(job)
+            Text(entry.title)
+            jobStateLabel(entry)
             Divider()
-            jobActions(job, index: index)
+            jobActions(entry, index: index)
         } label: {
-            Label(jobMenuTitle(job), systemImage: JobMenuSummary.symbol(of: job))
+            Label(jobMenuTitle(entry), systemImage: jobSymbol(entry))
         }
     }
 
     /// Hoisted out of the `ViewBuilder` for the type-check budget (see the
     /// note on `body`).
-    private func jobMenuTitle(_ job: PipelineJob) -> String {
-        let status = JobMenuSummary.status(of: job, progress: stageProgressText(job))
-        return "\(job.meetingTitle) — \(status)"
+    private func jobMenuTitle(_ entry: TranscriptionEntry) -> String {
+        let status = JobMenuSummary.status(
+            state: entry.state, hasWarnings: !entry.warnings.isEmpty, progress: stageProgress(entry),
+        )
+        return "\(entry.title) — \(status)"
     }
 
+    private func jobSymbol(_ entry: TranscriptionEntry) -> String {
+        JobMenuSummary.symbol(state: entry.state, hasWarnings: !entry.warnings.isEmpty)
+    }
+
+    /// A failed line is taken off for good by Remove; Dismiss is left to a
+    /// job waiting for speaker names.
     @ViewBuilder
-    private func jobActions(_ job: PipelineJob, index: Int) -> some View {
-        if job.state == .done, let path = job.protocolPath ?? job.transcriptPath {
-            Button("Open") { onOpenProtocol(path) }
+    private func jobActions(_ entry: TranscriptionEntry, index: Int) -> some View {
+        if entry.state.isTerminal, let url = entry.fileToOpen {
+            Button("Open") { onOpenProtocol(url) }
         }
-        if job.state == .speakerNamingPending {
+        if entry.state == .speakerNamingPending {
             Button("Name Speakers") { onNameSpeakers?() }
         }
-        if job.state == .waiting || job.state == .transcribing
-            || job.state == .diarizing || job.state == .generatingProtocol {
-            Button("Cancel") { pipelineQueue.cancelJob(id: job.id) }
+        if entry.state == .waiting || entry.state == .transcribing
+            || entry.state == .diarizing || entry.state == .generatingProtocol {
+            Button("Cancel") { pipelineQueue.cancelJob(id: entry.id) }
         }
-        retryButton(job, index: index)
-        if job.state == .done || job.state == .error || job.state == .speakerNamingPending {
-            Button("Dismiss") { onDismissJob(job.id) }
+        retryButton(entry, index: index)
+        if entry.state == .error {
+            Button("Remove") { onRemoveFailedJob(entry.id) }
+                .accessibilityIdentifier(A11yID.jobRemoveButton(index))
+        }
+        if entry.state == .speakerNamingPending {
+            Button("Dismiss") { onDismissJob(entry.id) }
         }
     }
 
     /// Runs a failed job again from its audio, instead of the user having to
-    /// find the staged recording and import it by hand.
+    /// find the staged recording and import it by hand. A failed job known
+    /// only from the history is not in the queue, so the queue refuses it
+    /// until the pipeline has loaded it.
     @ViewBuilder
-    private func retryButton(_ job: PipelineJob, index: Int) -> some View {
-        if pipelineQueue.canRetryJob(id: job.id) {
-            Button("Retry") { pipelineQueue.retryJob(id: job.id) }
+    private func retryButton(_ entry: TranscriptionEntry, index: Int) -> some View {
+        if pipelineQueue.canRetryJob(id: entry.id) {
+            Button("Retry") { pipelineQueue.retryJob(id: entry.id) }
                 .accessibilityIdentifier(A11yID.jobRetryButton(index))
         }
     }
 
-    private func jobStateLabel(_ job: PipelineJob) -> some View {
+    private func jobStateLabel(_ entry: TranscriptionEntry) -> some View {
         Group {
-            if [.transcribing, .diarizing, .generatingProtocol].contains(job.state) {
-                Text(stageProgressText(job))
+            if [.transcribing, .diarizing, .generatingProtocol].contains(entry.state) {
+                Text(stageProgress(entry))
                     .foregroundStyle(.secondary)
-            } else if job.state == .error, let msg = job.error {
+            } else if entry.state == .error, let msg = entry.error {
                 Text(msg)
                     .foregroundStyle(.red)
-            } else if job.state == .done, !job.warnings.isEmpty {
-                Text(job.warnings.joined(separator: "; "))
-                    .foregroundStyle(.orange)
             } else {
-                Text(job.state.label)
+                Text(entry.state.label)
                     .foregroundStyle(.secondary)
             }
         }
         .font(.caption2)
     }
 
-    /// Live elapsed for the active stage, plus the historical average ("· Ø
-    /// m:ss") when one exists, and a "longer than usual" hint once the live run
-    /// runs meaningfully past that average — so the user can tell at a glance
-    /// whether the current run is normal. Purely informational.
-    private func stageProgressText(_ job: PipelineJob) -> String {
-        let elapsed = pipelineQueue.activeJobElapsed
-        let base = "\(job.state.label) \(formattedElapsed(elapsed))"
-        guard let stage = StageKind(jobState: job.state),
-              let avg = pipelineQueue.averageSeconds(forJobID: job.id, stage: stage), avg > 0 else { return base }
-        let suffix = StageTimingStats.isSlowerThanUsual(elapsed: elapsed, average: avg)
-            ? " · longer than usual (Ø \(formattedElapsed(avg)))"
-            : " · Ø \(formattedElapsed(avg))"
-        return base + suffix
-    }
-
-    private func formattedElapsed(_ seconds: TimeInterval) -> String {
-        formattedTime(seconds)
+    /// The running stage's start and expected finish, read from the queue's
+    /// clock for the job. Nothing here reads the time, so the line changes
+    /// only when the clock does, at a job event.
+    private func stageProgress(_ entry: TranscriptionEntry) -> String {
+        JobMenuSummary.stageProgress(state: entry.state, clock: pipelineQueue.stageClock(forJobID: entry.id))
     }
 }

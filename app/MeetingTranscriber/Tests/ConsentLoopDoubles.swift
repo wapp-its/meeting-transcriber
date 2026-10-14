@@ -75,6 +75,8 @@ enum ConsentLoopDoubles {
     /// notification does for up to `NotificationManager.consentPromptTimeout`.
     final class ParkingNotifier: AppNotifying {
         private(set) var prompts: [(title: String, body: String)] = []
+        /// The id the parked prompt was asked under, as the real coordinator keys it.
+        private(set) var parkedID: UUID?
         private var continuation: CheckedContinuation<ConsentAnswer, Never>?
 
         var isParked: Bool {
@@ -89,14 +91,28 @@ enum ConsentLoopDoubles {
             return await withCheckedContinuation { self.continuation = $0 }
         }
 
+        @MainActor
+        func askToRecord(_ question: ConsentQuestion) async -> ConsentAnswer {
+            parkedID = question.id
+            return await askToRecord(title: question.title, body: question.body)
+        }
+
         func answer(_ answer: ConsentAnswer) {
             let parked = continuation
             continuation = nil
+            parkedID = nil
             parked?.resume(returning: answer)
         }
 
         func resolveBrowserConsent(granted: Bool) -> Bool {
             guard isParked else { return false }
+            answer(granted ? .granted : .declined)
+            return true
+        }
+
+        /// Answers only the prompt parked under `id`, like the real coordinator.
+        func answerConsentPrompt(id: UUID, granted: Bool) -> Bool {
+            guard isParked, parkedID == id else { return false }
             answer(granted ? .granted : .declined)
             return true
         }

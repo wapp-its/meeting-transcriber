@@ -38,7 +38,10 @@ final class RecordOnlyE2ETests: XCTestCase { // swiftlint:disable:this balanced_
         try await loop.handleMeeting(makeMeeting())
 
         XCTAssertTrue(queue.jobs.isEmpty, "record-only must not enqueue a pipeline job")
-        XCTAssertTrue(notifier.calls.isEmpty, "no failure notification on the happy path")
+        XCTAssertFalse(
+            notifier.calls.contains { $0.title == "Record-only output failed" },
+            "no failure notification on the happy path",
+        )
 
         let sidecarURL = outputDir.appendingPathComponent("\(Self.basename)_meta.json")
         XCTAssertTrue(
@@ -77,8 +80,11 @@ final class RecordOnlyE2ETests: XCTestCase { // swiftlint:disable:this balanced_
         try await loop.handleMeeting(makeMeeting())
 
         XCTAssertTrue(queue.jobs.isEmpty, "still no enqueue when sidecar write fails")
-        XCTAssertEqual(notifier.calls.count, 1, "user must be notified about lost record-only output")
-        XCTAssertEqual(notifier.calls.first?.title, "Record-only output failed")
+        XCTAssertEqual(
+            notifier.calls.filter { $0.title == "Record-only output failed" }.count,
+            1,
+            "user must be notified about lost record-only output",
+        )
     }
 
     /// A meeting ended through the "seems to have ended" question is cut back
