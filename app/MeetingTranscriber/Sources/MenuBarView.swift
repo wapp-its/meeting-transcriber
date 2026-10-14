@@ -56,6 +56,10 @@ struct MenuBarView: View {
     var onSelectMicrophone: (String) -> Void = { _ in }
     /// The Microphone entry; nil leaves it out.
     var microphoneMenu: MicrophoneMenuState?
+    /// Makes a chosen output the Mac's default output.
+    var onSelectOutput: (String) -> Void = { _ in }
+    /// The Output entry; nil leaves it out.
+    var outputMenu: OutputMenuState?
 
     private var state: TranscriberState {
         status?.state ?? .idle
@@ -94,6 +98,7 @@ struct MenuBarView: View {
 
         watchControls
         microphoneSection
+        outputSection
         jobSections
 
         Divider()
@@ -294,6 +299,40 @@ struct MenuBarView: View {
         .pickerStyle(.inline)
         .labelsHidden()
         .accessibilityIdentifier(A11yID.menuMicrophonePicker)
+    }
+
+    /// The Mac's sound output, switchable in a submenu; with no output found,
+    /// one disabled line. Every string comes from `OutputMenuState`.
+    @ViewBuilder private var outputSection: some View {
+        if let outputMenu {
+            if outputMenu.isEnabled {
+                Menu {
+                    outputPicker(outputMenu)
+                    if let hint = outputMenu.hint {
+                        Text(hint)
+                    }
+                } label: {
+                    Label(outputMenu.title, systemImage: outputMenu.warning ? "exclamationmark.triangle" : "speaker.wave.2")
+                }
+            } else {
+                Label(outputMenu.title, systemImage: "speaker.slash")
+            }
+        }
+    }
+
+    /// An inline picker, like the microphone's. Unlike that one, choosing an
+    /// item changes the Mac's default output, system-wide.
+    private func outputPicker(_ menu: OutputMenuState) -> some View {
+        Picker("Output", selection: Binding(get: { menu.checkedUID }, set: { onSelectOutput($0) })) {
+            ForEach(menu.items, id: \.uid) { item in
+                Text(item.label)
+                    .disabled(!item.isEnabled)
+                    .tag(item.uid)
+            }
+        }
+        .pickerStyle(.inline)
+        .labelsHidden()
+        .accessibilityIdentifier(A11yID.menuOutputPicker)
     }
 
     /// The jobs under way and the jobs waiting on the user, each group under

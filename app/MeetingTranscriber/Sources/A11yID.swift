@@ -65,6 +65,9 @@ enum A11yID {
     /// value: no device UID or name in it, for the reason the job rows give.
     static let menuMicrophonePicker = "menuMicrophonePicker"
 
+    /// The device picker in the menu bar's Output submenu, for the same reason.
+    static let menuOutputPicker = "menuOutputPicker"
+
     /// Menu bar job row's Remove button on a failed job, addressed by ROW
     /// INDEX for the same reason as `jobRetryButton`.
     static func jobRemoveButton(_ index: Int) -> String {

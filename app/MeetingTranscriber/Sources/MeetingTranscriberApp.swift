@@ -187,6 +187,8 @@ struct MeetingTranscriberApp: App {
             onQuit: quit,
             onSelectMicrophone: { appState.settings.micDeviceUID = $0 },
             microphoneMenu: appState.microphoneMenuState,
+            onSelectOutput: { appState.output.select(uid: $0) },
+            outputMenu: appState.outputMenuState,
         )
     }
 
