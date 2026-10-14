@@ -95,6 +95,7 @@ cd app/MeetingTranscriber && CFFIXED_USER_HOME=/tmp/gh46-home swift test --paral
 - **Follow-up:** releasing the microphone while paused (the macOS microphone indicator stays on during a pause in this spec). [inferred]
 - **Follow-up:** a live-caption pause lifecycle (finish the caption being formed at the pause and keep the feeds for the resume), and the overlay showing "Paused" or clearing during a pause. [inferred]
 - **Follow-up:** pause markers surviving a crash; `mt-cli record pause/resume`; pauses on `GET /v1/jobs/<id>`; `paused` on `/v1/watch`; a live e2e lane for pause; a protocol-prompt sentence about pause lines; README and docs menu-bar images for the paused icon. [inferred]
+- **Follow-up (filed 2026-10-14):** the small items the per-task and completion reviews found outside this spec (the two sidecar descriptions still at version 2, a lenient `pauses` decode, a stale doc comment, two pre-existing `unused_declaration` findings, the raw app-track path without the sub-frame cut) and the owner checks in the installed app: https://github.com/wapp-its/meeting-transcriber/issues/137
 - Not part of this: a start dialog (issue #2) or profiles (issue #6); a pause toggle verb on the API (separate `pause`/`resume` keys, as for start/stop); a setting for any of this. [inferred]
 - No change to `CLAUDE.md` or `AGENTS.md` in this spec's PRs. [inferred]
 

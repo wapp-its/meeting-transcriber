@@ -1,7 +1,7 @@
 {
   "branch_name": "feat/gh-46-pause-recording",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-14T09:56:01.920457Z",
   "created_at": "2026-10-06T20:28:05.930565Z",
   "default_impl": null,
   "default_review": null,
@@ -509,6 +509,42 @@
       "task": "gh-46-pause-and-resume-a-recording.5",
       "timestamp": "2026-10-14T09:30:11.450321Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "6478c0f7a2b2bd7ae3fadab17383d5244c952aca6536af353af610e5c2ea1800",
+      "backend": "codex",
+      "base_sha": "69e42de9481a7b557dfcf693a46a0781228ed062",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65d8f1b0591dd8ae76608bad9cf8c0a9438bb4e4",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 946453,
+      "output_sha256": "30d916e75601a6940103331992ddf22c53f1dc5ed8add088821ea57aa5659182",
+      "reservation_id": "2491d9bd80b142478438fb1ad08a6737",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T09:56:01.880540Z",
+      "tool_calls": 45,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -519,12 +555,13 @@
     "impl:gh-46-pause-and-resume-a-recording.5": 1,
     "impl:gh-46-pause-and-resume-a-recording.6": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-46-pause-and-resume-a-recording.1": 0,
     "impl:gh-46-pause-and-resume-a-recording.2": 0,
     "impl:gh-46-pause-and-resume-a-recording.3": 0,
@@ -548,5 +585,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/46"
   },
-  "updated_at": "2026-10-14T09:30:11.753718Z"
+  "updated_at": "2026-10-14T09:56:01.924974Z"
 }
