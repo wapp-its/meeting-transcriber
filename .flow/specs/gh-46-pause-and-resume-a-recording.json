@@ -11,7 +11,9 @@
     "gh-54-ask-before-auto-stopping-a-meeting"
   ],
   "id": "gh-46-pause-and-resume-a-recording",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-46-pause-and-resume-a-recording.1": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -154,15 +156,122 @@
       "task": null,
       "timestamp": "2026-10-06T20:59:14.194110Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "6759ee29930a8e078f8530d210a827e7f4ee0b464e681e1ed57542b92e29abdc",
+      "backend": "codex",
+      "base_sha": "5d62cea103054fd36f0cca317a18f634192ae219",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-e0b02151b736f3e3ce798239a9dc66b4",
+            "classification": "introduced",
+            "findingId": "finding-e0b02151b736f3e3ce798239a9dc66b4",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-2fa96207bfca4548f5da5e6acd67187b",
+            "classification": "introduced",
+            "findingId": "finding-2fa96207bfca4548f5da5e6acd67187b",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "7efa8c6025596660c6120d12fb7713b2053d716b",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 2120,
+      "output_sha256": "748daf82e925df2427dc9a25dc51d6d0fc0de6e5f331339b45744f79bf8e863b",
+      "reservation_id": "9739145f69db4704a8dc9a7dd77e8381",
+      "round_consumed": true,
+      "scope": "impl:gh-46-pause-and-resume-a-recording.1",
+      "superseded_by": null,
+      "task": "gh-46-pause-and-resume-a-recording.1",
+      "timestamp": "2026-10-14T06:58:08.662152Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "3706bcde8ec5107fb6fecc97e238e83a97fa9b07bcf591943ff1129e0a6ca3c4",
+      "backend": "codex",
+      "base_sha": "5d62cea103054fd36f0cca317a18f634192ae219",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-e0b02151b736f3e3ce798239a9dc66b4",
+            "classification": "introduced",
+            "findingId": "finding-e0b02151b736f3e3ce798239a9dc66b4",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-2fa96207bfca4548f5da5e6acd67187b",
+            "classification": "introduced",
+            "findingId": "finding-2fa96207bfca4548f5da5e6acd67187b",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "d3ec7c818a0ff84614e0e42585399060023668de",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1299,
+      "output_sha256": "8ca21c6664bcabf952e0c1b5f3f20d63842b26f465f986be5d35c49e58105806",
+      "reservation_id": "e61f67ca55b246759b82973c2b679855",
+      "round_consumed": true,
+      "scope": "impl:gh-46-pause-and-resume-a-recording.1",
+      "superseded_by": null,
+      "task": "gh-46-pause-and-resume-a-recording.1",
+      "timestamp": "2026-10-14T07:23:15.067175Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-46-pause-and-resume-a-recording.1": 1,
     "plan": 1,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-46-pause-and-resume-a-recording.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-46-pause-and-resume-a-recording.md",
@@ -180,5 +289,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/46"
   },
-  "updated_at": "2026-10-06T21:00:53.520824Z"
+  "updated_at": "2026-10-14T07:23:15.092872Z"
 }
