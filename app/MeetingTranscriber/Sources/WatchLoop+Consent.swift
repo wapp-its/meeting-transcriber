@@ -15,6 +15,12 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "WatchLo
 /// looking, during which a call that needs no prompt went unnoticed. Google
 /// Meet raises the same WebRTC assertion on a page you cannot even join, so a
 /// stale link was enough to freeze detection for a minute.
+///
+/// Everything the gate remembers about an app (the deny list, both
+/// cooldowns, the open question, the apps waiting for it, the detector reset)
+/// is filed under `AppMeetingPattern.identityKey`, so an app added through
+/// "Add App…" never shares any of it with a same-named app. What the person
+/// reads is `appName`.
 extension WatchLoop {
     /// Whether this meeting has to wait for the user instead of recording now.
     /// Returns immediately in every case.
@@ -23,8 +29,8 @@ extension WatchLoop {
     /// decline still suppresses the question" and "the user said never for
     /// this app" — all reasons to skip the meeting, none a reason to ask again.
     func requestConsentIfNeeded(for meeting: DetectedMeeting) -> Bool {
-        let app = meeting.pattern.appName
-        let isDenied = denyListStore.isDenied(app)
+        let key = meeting.pattern.identityKey
+        let isDenied = denyListStore.isDenied(key)
         // A denial outranks "record without asking": Never is the user's word
         // about the app, so it is checked by the policy below even for an app
         // that would otherwise record at once.
@@ -37,18 +43,19 @@ extension WatchLoop {
         // needs a prompt is not queued either: it waits out of detection until
         // this question is settled, and is asked about then if its call still
         // runs.
-        guard pendingConsentApp == nil else {
-            appsWaitingForPrompt.insert(app)
+        guard pendingConsentQuestion == nil else {
+            appsWaitingForPrompt.insert(key)
             return true
         }
 
         guard case .ask = consentPolicy.decision(
-            app: app, now: nowProvider(), isDenied: isDenied,
+            app: key, now: nowProvider(), isDenied: isDenied,
         ) else {
-            detector.reset(appName: app) // re-detect after the debounce
+            detector.reset(appName: key) // re-detect after the debounce
             return true
         }
 
+        let app = meeting.pattern.appName
         // `app` is the concrete app: a browser meeting is carried under the
         // process that held the assertion, so the debounce above and the name
         // below refer to the same one browser. `ownerName` is the fallback
@@ -63,6 +70,7 @@ extension WatchLoop {
             app: app,
             title: "Record \(appLabel) meeting?",
             body: "A meeting is active in \(appLabel). Everyone must agree to being recorded.",
+            identityKey: key,
         )
         pendingConsentQuestion = question
         consentTask = Task { [weak self] in
@@ -73,18 +81,19 @@ extension WatchLoop {
         return true
     }
 
-    /// The app the open question asks about, nil when none is open. Derived,
-    /// so it can never disagree with the question; detection exclusion, the
-    /// gate above, `/state` and `/v1/watch` read it.
+    /// The app the open question asks about, by the name a person reads, nil
+    /// when none is open. Derived, so it can never disagree with the
+    /// question; `/state` and `/v1/watch` report it.
     var pendingConsentApp: String? {
         pendingConsentQuestion?.app
     }
 
-    /// The apps detection passes over this poll: the one being asked about
-    /// and the ones waiting for that answer. Empty while nothing is asked.
+    /// The apps detection passes over this poll, by identity key: the one
+    /// being asked about and the ones waiting for that answer. Empty while
+    /// nothing is asked.
     var appsExcludedFromDetection: Set<String> {
-        guard let pendingConsentApp else { return [] }
-        return appsWaitingForPrompt.union([pendingConsentApp])
+        guard let pendingConsentQuestion else { return [] }
+        return appsWaitingForPrompt.union([pendingConsentQuestion.identityKey])
     }
 
     /// Take the approved meeting, if any, clearing it. The poll loop is the
@@ -99,7 +108,7 @@ extension WatchLoop {
     /// notifier so the real prompt's parked continuation completes; without it
     /// the question would linger for the rest of its timeout.
     func declineParkedConsent() {
-        guard pendingConsentApp != nil else { return }
+        guard pendingConsentQuestion != nil else { return }
         _ = notifier.resolveBrowserConsent(granted: false)
         // Cleared regardless of whether anything was waiting: a notifier with
         // no coordinator behind it never resolves, and a prompt stuck
@@ -121,7 +130,7 @@ extension WatchLoop {
     /// Land the user's answer. Main-actor isolated like the rest of
     /// `WatchLoop`, so it cannot race the poll loop's reads.
     private func finishConsent(_ question: ConsentQuestion, for meeting: DetectedMeeting, answer: ConsentAnswer) {
-        let app = meeting.pattern.appName
+        let key = meeting.pattern.identityKey
         // Only this prompt's own question is cleared. `declineParkedConsent`
         // clears at once and the declined prompt's completion lands here
         // later, and a prompt can even register after Stop Watching, since
@@ -138,26 +147,26 @@ extension WatchLoop {
             // both, and takes no cooldown of its own.
             switch answer {
             case .expired:
-                consentPolicy.recordExpiry(app: app, now: nowProvider())
+                consentPolicy.recordExpiry(app: key, now: nowProvider())
 
             case .never:
                 // No decline cooldown alongside it. The denial already
                 // suppresses, and a cooldown would outlive a Settings "Remove"
                 // by up to ten minutes, so undoing a mistaken Never would
                 // silently keep doing nothing.
-                denyListStore.deny(app)
+                denyListStore.deny(key)
 
             default:
-                consentPolicy.recordDecline(app: app, now: nowProvider())
+                consentPolicy.recordDecline(app: key, now: nowProvider())
             }
-            detector.reset(appName: app)
+            detector.reset(appName: key)
             return
         }
         // Minutes can pass between prompt and click, and watching may have been
         // switched off in between — recording then would be recording without
         // having been asked to watch at all.
         guard isActive else {
-            logger.info("Consent granted for \(app, privacy: .public) after watching stopped — ignoring")
+            logger.info("Consent granted for \(key, privacy: .public) after watching stopped — ignoring")
             return
         }
         // An approval is not a reservation. Another app's call may have
@@ -168,12 +177,12 @@ extension WatchLoop {
         // passed. Drop it: if this call is still running once the recorder is
         // free, it is detected and asked about again.
         guard state != .recording else {
-            logger.info("Consent granted for \(app, privacy: .public) while another meeting is recording — dropped")
+            logger.info("Consent granted for \(key, privacy: .public) while another meeting is recording — dropped")
             return
         }
         // The call itself may also have ended while the question sat there.
         guard detector.isMeetingActive(meeting) else {
-            detector.reset(appName: app)
+            detector.reset(appName: key)
             return
         }
         approvedConsentMeeting = meeting

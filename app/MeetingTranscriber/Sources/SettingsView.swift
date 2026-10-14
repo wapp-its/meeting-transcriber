@@ -6,6 +6,9 @@ struct SettingsView: View {
     var whisperKitEngine: WhisperKitEngine
     var parakeetEngine: ParakeetEngine
     var updateChecker: UpdateChecker?
+    /// Forwarded to the About tab's "Install Update" (mt-update mode).
+    var updateInstallBlockedReason: String?
+    var onInstallUpdate: (() -> Void)?
     /// The URL vocabulary source's controller, forwarded to the Transcription
     /// tab. Nil hides its status line and disables "Update now".
     var remoteVocabulary: RemoteVocabularyController?
@@ -30,6 +33,9 @@ struct SettingsView: View {
     var onSpeakerMutate: (() -> Void)?
 
     @State private var selection: SettingsTab = .general
+    /// Owned here rather than by the Transcription tab, so a pending load offer
+    /// survives that tab being re-created.
+    @State private var whisperKitModelChoice = WhisperKitModelChoice()
 
     var body: some View {
         splitView
@@ -75,6 +81,7 @@ struct SettingsView: View {
                 whisperKitEngine: whisperKitEngine,
                 parakeetEngine: parakeetEngine,
                 remoteVocabulary: remoteVocabulary,
+                modelChoice: whisperKitModelChoice,
             )
 
         case .speakers:
@@ -95,7 +102,12 @@ struct SettingsView: View {
             AdvancedSettingsView(settings: settings)
 
         case .about:
-            AboutSettingsView(settings: settings, updateChecker: updateChecker)
+            AboutSettingsView(
+                settings: settings,
+                updateChecker: updateChecker,
+                updateInstallBlockedReason: updateInstallBlockedReason,
+                onInstallUpdate: onInstallUpdate,
+            )
         }
     }
 }

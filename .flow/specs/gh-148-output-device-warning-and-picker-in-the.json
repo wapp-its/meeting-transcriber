@@ -1,0 +1,312 @@
+{
+  "branch_name": "gh-148-output-device-warning-and-picker-in-the",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-14T17:03:13.515037Z",
+  "created_at": "2026-10-14T15:58:06.770150Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-148-output-device-warning-and-picker-in-the",
+  "impl_review_rounds": {
+    "gh-148-output-device-warning-and-picker-in-the.1": 0
+  },
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-14T16:23:45.788119Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "1cbfb0604af196702f94404693bc59d1115e6dea01cebaa64ab33bea9f3f8454",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-d00e3c4a9fb74a0486017a88b7a55c32",
+            "classification": "introduced",
+            "findingId": "finding-d00e3c4a9fb74a0486017a88b7a55c32",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-34b6182335db29278adaff64c29fb3ab",
+            "classification": "introduced",
+            "findingId": "finding-34b6182335db29278adaff64c29fb3ab",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "852b322825b9c79dc1594a9ebb271a08b71f6496",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 335092,
+      "output_sha256": "e092240fd511796f6ebe8575559b69436a1310f19623606cc528aa6d1e4e44ae",
+      "reservation_id": "5e20cdfca3b941b8a16065a6e1a074a3",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T16:02:29.718761Z",
+      "tool_calls": 19,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "830ce539b78cd4e240e0b97e397718e7d4cfbdc8c4a33bd883d22624f33e0529",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-d00e3c4a9fb74a0486017a88b7a55c32",
+            "classification": "introduced",
+            "findingId": "finding-d00e3c4a9fb74a0486017a88b7a55c32",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-34b6182335db29278adaff64c29fb3ab",
+            "classification": "introduced",
+            "findingId": "finding-34b6182335db29278adaff64c29fb3ab",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "852b322825b9c79dc1594a9ebb271a08b71f6496",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 504,
+      "output_sha256": "dad4757bad6ad495f81b47cd8eb55263d392867a35863a2f60cdb23ce532ce87",
+      "reservation_id": "bbf04a4d0a0e4020b94d8037272bb16c",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T16:03:33.591900Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "c5034da9cdd3c7c0f44848df9929dbcbc27537673f4346c03cc910fe7cdd24e7",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-d00e3c4a9fb74a0486017a88b7a55c32",
+            "classification": "introduced",
+            "findingId": "finding-d00e3c4a9fb74a0486017a88b7a55c32",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-34b6182335db29278adaff64c29fb3ab",
+            "classification": "introduced",
+            "findingId": "finding-34b6182335db29278adaff64c29fb3ab",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "61ea6384a20b55f01fdb23718997f29ee8d94b1b",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 592,
+      "output_sha256": "c1815278a72375910efc1ae1b3bced47b4b8ed89b96ba0c443c1077e8da607e4",
+      "reservation_id": "f12b9654c4db40f89f6b28f5d87de2c1",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T16:23:45.760613Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "5246ecffa165795fc3293af26c9842fed1d844124a5233f4f1ce1e15b155d101",
+      "backend": "codex",
+      "base_sha": "61ea6384a20b55f01fdb23718997f29ee8d94b1b",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "d4273838339cc8bbfe29044286506caa19ad5d2a",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 165,
+      "output_sha256": "921640c49580b8e37c2a3f0b764426128cd3fed4bc702ecf45fc0228bc5c50c3",
+      "reservation_id": "9a9cb606cd674040b95f695f358cbf9a",
+      "round_consumed": true,
+      "scope": "impl:gh-148-output-device-warning-and-picker-in-the.1",
+      "superseded_by": null,
+      "task": "gh-148-output-device-warning-and-picker-in-the.1",
+      "timestamp": "2026-10-14T16:47:27.943552Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "dce2e78fd7960760413934186f1b0a621efb98ef1066a430b0920b5dfd9df70d",
+      "backend": "codex",
+      "base_sha": "8b6aca129f3381c2bf380ce1b7d657c4b7fe45e2",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "799b13ee627c0a17e2f07d979895e34075c8506c",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 345701,
+      "output_sha256": "f737458dcaecf0cb7aff3877f50a60c4cbf5028e8b11def7c5b109b3888e6b0f",
+      "reservation_id": "e6678aa0dc7b498aababee489b4f2157",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T16:51:58.976937Z",
+      "tool_calls": 14,
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "56401f7aa7063acdf45f367d8a47d4bcbd02dff1b518aa97b866852f7e828f5d",
+      "backend": "codex",
+      "base_sha": "8b6aca129f3381c2bf380ce1b7d657c4b7fe45e2",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "897f5cb732804a418c5d1d2875a67459a125e44b",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 8054,
+      "output_sha256": "446a0b52d4598ce12215a2967e6bd72bb2e7832aa39c4bd2ecd2e0c1b7d95795",
+      "reservation_id": "94798ce17229460a9dd6ab4d6eb2c5c9",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T17:03:13.480741Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "impl:gh-148-output-device-warning-and-picker-in-the.1": 1,
+    "plan": 2,
+    "plan#completion": 2
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-148-output-device-warning-and-picker-in-the.1": 0,
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-148-output-device-warning-and-picker-in-the.md",
+  "status": "done",
+  "title": "Output device warning and picker in the menu",
+  "tracker": {
+    "baseHashFlow": "75d384db3ebd2db0558609fec50a306c63a4616ad9d2325569258a19438e335a",
+    "baseHashTracker": "1acecea0c48b5fb5bead202f6f1969e538e3c1f1f953bbc277f39c20d541d913",
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABXJ60HQ",
+    "identifier": "#148",
+    "lastSyncedAt": "2026-10-14T15:58:07.750361Z",
+    "linkState": "linked",
+    "mergeBaseFlow": "# Output device warning and picker in the menu\n\n## Conversation Evidence\n\n> user (turn 1, paraphrased): asked why a Teams meeting they had just recorded came out empty, with not even the app sound audible and no warning shown, and whether switching audio devices in the Teams meeting had caused it. [paraphrase]\n> user (turn 2, selected): \"A \u2014 Start warning (Recommended)\"\n> user (turn 3, paraphrased): wished the menu showed the output device being recorded next to the microphone and allowed changing it; asked for the silence message to stay on screen, for a level indicator per device to find the right one, and whether switching during a recording still records into the same file. [paraphrase]\n> user (turn 3, selected): \"A \u2014 Warning + output picker\"\n> user (turn 4, paraphrased): the current banner can stay, as long as the menu-bar icon shows that something is wrong. [paraphrase]\n\n## Goal & Context\n\nA meeting was recorded with an empty app track, and the user found out only after the meeting. [paraphrase] The diagnosis showed that Teams had set the Mac's default output to its own virtual device \"Microsoft Teams Audio\" (device UID `MSLoopbackDriverDevice_UID`) a few minutes before the meeting, while it kept playing the call through another device. With that routing the app-audio tap delivers digital silence for the whole recording. [inferred] The same routing is reported upstream as pasrom/meeting-transcriber#712, which has no merged fix. [inferred]\n\nThe user should learn about this routing at the moment it can still be fixed, which is the start of the recording, and should be able to fix it from the app's menu instead of hunting for the setting. [paraphrase] The fix is to switch the Mac's sound output to the real device; the app-audio capture follows the Mac's default output, and a change of it during a recording already rebuilds the capture and keeps writing into the same file, with the gap filled by silence. [inferred]\n\n## Architecture & Data Models\n\n- One pure decision function answers \"should the user be warned about the output routing now?\" from: the default output device's UID, whether the recording captures an app track, and whether this recording already warned for the current routing. It owns no state and touches no Core Audio API, so it is unit-testable. [inferred]\n- The recording side already reads the default output device when it creates the app-audio tap, and already observes default-output changes during a recording (it rebuilds the tap on them). The warning hooks into those two existing points rather than adding a new poll or listener. [inferred]\n- The once-per-routing memory belongs to the recording in progress and is reset when a recording starts. [inferred]\n- The warning is posted through the existing notification path and logged unconditionally in the existing app-audio diagnostics. [inferred]\n- While the routing warning holds, the menu-bar icon shows it with the existing app-channel problem signal (the red tint of the waveform's bottom half that a silent app channel already uses), from the moment the routing is seen and not after a silence window. The flag that drives it belongs to the recording in progress and clears when the routing changes away from the Teams device or the recording stops. [inferred]\n- The menu's Output entry is described by one pure value, built the same way as the existing Microphone entry's value: title, items, the checked item and an optional hint line, all strings decided there, so the dropdown itself stays manual QA and every arm is unit-tested. Its inputs are the current default output device and the list of output devices. [inferred]\n- Choosing an item sets the Mac's default output device (system-wide, the same effect as choosing it in Control Center). The app stores no output choice of its own: the Mac's setting is the single owner of that state. [inferred]\n\n## API Contracts\n\n- Notification, posted while recording (shape; wording may be polished, the facts may not change): [inferred]\n  - title: `Meeting Audio May Not Be Recorded`\n  - body: names \"Microsoft Teams Audio\" as the Mac's current sound output, says the meeting's audio may not reach the recording, and tells the user to pick their speakers or headset under Output in the app's menu (or in Control Center).\n  - urgency: the app's level for a failure in progress (the same level the capture-fault alerts use).\n- Diagnostic log line, not behind the verbose toggle, on each warning: names the trigger (`start` or `output change`) and the device UID. [inferred]\n- Menu, directly below the Microphone entry: [inferred]\n  - an `Output: <device name>` entry that opens a submenu listing the Mac's output devices, with a checkmark on the current default output.\n  - when the current default output is the Teams loopback device, the entry's title carries a warning mark and the submenu shows a disabled hint line: the meeting audio may not be recorded, pick your speakers or headset.\n- Menu-bar icon: while a recording with an app track runs and the default output is the Teams loopback device, the waveform's bottom half is tinted red, the same signal a silent app channel shows; it follows the existing per-channel indicator setting. [inferred]\n- No other new settings, endpoints or `/state` fields. [inferred]\n\n## Edge Cases & Constraints\n\n- Matching is on the device UID `MSLoopbackDriverDevice_UID`, never on the display name: the name is localisable and user-visible, the UID is the driver's identity. [inferred]\n- A virtual default output in general is not a fault (#712 measured working recordings into other virtual devices), so no other virtual device triggers the warning or the warning mark. [inferred]\n- A recording without an app track (microphone-only) never warns: the routing cannot affect it. [inferred]\n- The routing check never blocks or delays the start of the recording, and a failed device read (UID unavailable) produces no warning and no error. [inferred]\n- Record-only mode warns the same way: it still captures the app track. [inferred]\n- The Output submenu lists only devices the Mac offers as sound outputs: the app's own private capture aggregates and other private aggregate devices never appear. [inferred]\n- The Output entry reflects changes made elsewhere (Control Center, Teams, a device plugged in or removed) the next time the menu opens, without an app restart. [inferred]\n\n## Acceptance Criteria\n\n- **R1:** When a recording with an app track starts while the Mac's default output device has UID `MSLoopbackDriverDevice_UID`, the user gets the notification described in API Contracts within the first seconds of the recording. Errors: default output UID unreadable \u2192 no notification, recording starts normally; any other default output (including other virtual devices) \u2192 no notification. [paraphrase]\n- **R2:** When the default output changes to the Teams loopback device during a recording with an app track, the user gets the same notification once for that change. Errors: a change between two non-Teams devices \u2192 no notification; a change away from the Teams device and back again \u2192 one more notification for the new change. [inferred]\n- **R3:** A recording warns at most once for an unchanged routing: tap rebuilds, retries or other restarts while the default output stays the Teams loopback device post no further notifications. No error surface beyond R1 and R2. [inferred]\n- **R4:** A recording without an app track never posts this notification, whatever the default output is. No error surface beyond this. [inferred]\n- **R5:** Each warning writes one unconditional diagnostic log line naming the trigger and the device UID. No error surface beyond R1. [inferred]\n- **R6:** The menu shows an `Output: <device name>` entry below the Microphone entry, naming the Mac's current default output, with a submenu of the Mac's output devices and a checkmark on the current one. Errors: default output unreadable \u2192 the entry reads `Output: Unknown` with no checkmark and the submenu still lists the devices; no output devices found \u2192 the entry is one disabled line. [paraphrase]\n- **R7:** Choosing a device in the Output submenu makes it the Mac's default output; during a recording the app track then continues in the same file through the existing output-change path. Errors: the system refuses the change \u2192 the default output stays as it was, the entry keeps showing the actual current device, and one unconditional diagnostic line records the refusal with its status. [paraphrase]\n- **R8:** While the Mac's default output is the Teams loopback device, the Output entry's title carries a warning mark and its submenu shows the hint line from API Contracts; with any other output neither appears. No error surface beyond R6. [inferred]\n- **R9:** While a recording with an app track runs and the Mac's default output is the Teams loopback device, the menu-bar icon shows the app-channel problem signal; it clears once the default output changes to another device or the recording stops. Errors: per-channel indicator turned off in Settings \u2192 no tint, notification and menu entry unchanged; microphone-only recording \u2192 no tint. [paraphrase]\n\n## Boundaries\n\n- No automatic fix: the app never changes the Mac's default output on its own and does not re-anchor the tap on another device (that is option B, not chosen); the output changes only when the user picks it in the menu. [paraphrase]\n- No live level indicators per device in the menu: filed as a separate follow-up. [paraphrase]\n- No change to how long notifications stay on screen: that is the user's macOS notification setting for the app. [paraphrase]\n- No warning while the app is only watching and not recording. [inferred]\n- No change to the existing \"Recording Appears Silent\", \"Capture Channel Silent\" or silence-question notifications. [inferred]\n- No new setting to turn the warning off. [inferred]\n\n## Decision Context\n\n- **D1 \u00b7 Warn at recording start instead of fixing the capture automatically or waiting for upstream.** why: cheap, usable within about a day, fits exactly the observed case; an automatic fix needs a live Teams test first and upstream has no date \u00b7 alternatives: B automatic re-anchoring, C wait for pasrom/meeting-transcriber#712 \u00b7 status: active [owner-ratified 2026-10-14]\n- **D2 \u00b7 Add the Output entry with a switch to the menu in the same build; level meters per device go to a later build.** why: one place to notice and fix the routing, without the costly capture work level meters need \u00b7 alternatives: warning only, everything including level meters \u00b7 status: active [owner-ratified 2026-10-14]\n- **A1 \u00b7 Match only the Teams loopback UID, not every virtual output device.** flip at: the routing decision function \u00b7 test: unit test that another virtual device UID does not warn \u00b7 status: active [agent-inferred 2026-10-14]\n- **A2 \u00b7 Also warn when the routing changes to the Teams device mid-recording.** flip at: the output-change hook \u00b7 test: unit test for the change transition \u00b7 status: active [agent-inferred 2026-10-14]\n- **A3 \u00b7 The warning reaches the user as a notification, the Output entry's warning mark and the menu-bar icon; no /state field.** flip at: the warning's post site and the Output entry's value \u00b7 test: wiring test that the notifier receives the post; unit test of the Output entry value \u00b7 status: active [agent-assumed 2026-10-14]\n- **D3 \u00b7 Keep the current temporary banner, provided the menu-bar icon shows that something is wrong.** why: the icon stays visible for the whole recording, a banner does not \u00b7 status: active [owner-stated 2026-10-14]\n- **A5 \u00b7 The icon reuses the red bottom-half tint of a silent app channel instead of a new badge.** flip at: the icon overlay inputs \u00b7 test: unit test of the overlay flag for the routing state \u00b7 status: active [agent-assumed 2026-10-14]\n- **A4 \u00b7 The Output switch changes the Mac's default output system-wide instead of an app-only capture device.** flip at: the Output entry's selection handler \u00b7 test: unit test that a choice is forwarded to the default-output setter \u00b7 status: active [agent-inferred 2026-10-14]\n",
+    "mergeBaseTracker": "## BACKGROUND\n\nTeams can set the Mac's default output to its own virtual device \"Microsoft Teams Audio\" (`MSLoopbackDriverDevice_UID`) and keep playing the call through another device. If a recording starts in this state, the app track is exact zeros for the whole meeting. The tap is anchored on the default output. In this routing it probably follows the virtual device, not the device that plays the call. The app posts \"Recording Appears Silent\", but it doesn't say why. Also the more specific \"Capture Channel Silent\" alert doesn't fire when the microphone is muted at the same time.\n\nSeen here with a Teams meeting on the current fork build. The unified log shows that the Teams ModuleHost process set the default output itself, a few minutes before the meeting. The setting then stays like this after the call.\n\nUpstream reports the same case as https://github.com/pasrom/meeting-transcriber/issues/712 (with a re-anchoring fix on a contributor fork) and a related one as https://github.com/pasrom/meeting-transcriber/issues/699.\n\n## NOTES\n\n- Not a permission problem: two short system sounds that went into the virtual device were captured, the call audio was not.\n- A virtual default output alone is not the fault (see upstream 712), so we should not reject virtual devices in general.\n\n## TASKS\n\n- [ ] Warn at recording start when the default output is the Teams loopback device, with the fix (switch the output in Control Center)\n- [ ] Find out if anchoring the tap on the device Teams plays to restores the app track, or wait for the upstream fix",
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/148"
+  },
+  "updated_at": "2026-10-14T17:03:51.228957Z"
+}

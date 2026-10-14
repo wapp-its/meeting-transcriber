@@ -20,8 +20,10 @@
 name: wapp upstream sync
 
 on:
+  # Once a night (02:17 UTC): the original changes rarely, and mt-update merges
+  # upstream/main itself, so a faster sync only moves conflict reports earlier.
   schedule:
-    - cron: "17 */6 * * *"
+    - cron: "17 2 * * *"
   workflow_dispatch:
     inputs:
       dry_run:

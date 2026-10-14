@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import IOKit.pwr_mgt
 import os.log
 
@@ -210,6 +210,26 @@ class PowerAssertionDetector: MeetingDetecting {
     /// meeting if it never confirms.
     var isIdentityDenied: (String) -> Bool = { _ in false }
 
+    /// Bundle IDs of the apps added through "Add App…" (`watchCustomApps`),
+    /// whose processes a process-open (browser) pattern leaves alone.
+    ///
+    /// An added app is watched through `MicInputDetector` and keyed there by
+    /// its bundle ID (`AddedAppIdentity`), while the browser path would key
+    /// the same call by its process name. One call in an added Electron app
+    /// would then raise two prompts, and answering one would leave the other
+    /// asking. Matched as the app itself or a `<bundleID>.*` helper, the rule
+    /// the app's microphone pattern applies.
+    ///
+    /// The same idea as `claimedProcesses`, which keeps native clients out of
+    /// the browser path, but by bundle ID rather than process name, and from
+    /// the user's list rather than a fixed one: removing an app from the list
+    /// hands its process back to the browser path.
+    var addedAppBundleIDs: [String] = []
+
+    /// Resolves an assertion's PID to its app's bundle ID, nil when the
+    /// process has none (a daemon). Override in tests to inject mock data.
+    var bundleIDForPID: (pid_t) -> String? = { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }
+
     /// Compiled title matcher per watched app, so the window-title lookup
     /// classifies titles the same way `MeetingDetector` does (idle-tab titles
     /// skipped, meeting-pattern titles preferred).
@@ -275,6 +295,7 @@ class PowerAssertionDetector: MeetingDetecting {
                     guard !hitsThisRound.contains(key) else { continue }
 
                     if matchAssertion(processName: processName, assertName: assertName, assertType: assertType, pattern: pattern) {
+                        if isAddedAppHit(pid: pid, pattern: pattern) { continue }
                         hitsThisRound.insert(key)
                         firstMatch[key] = (pid, processName, pattern)
                         consecutiveHits[key, default: 0] += 1
@@ -354,7 +375,7 @@ class PowerAssertionDetector: MeetingDetecting {
 
     func isMeetingActive(_ meeting: DetectedMeeting) -> Bool {
         let assertions = assertionProvider()
-        for (_, pidAssertions) in assertions {
+        for (pid, pidAssertions) in assertions {
             for assertion in pidAssertions {
                 guard let processName = assertion["Process Name"] as? String,
                       let assertName = assertion["AssertName"] as? String else {
@@ -366,9 +387,12 @@ class PowerAssertionDetector: MeetingDetecting {
                 // `pattern.appName` would compare a category token against a
                 // process name for `.perProcess` patterns, so nothing would ever
                 // match and every browser recording would stop at the end grace.
+                // The meeting's identity key equals its name for every meeting
+                // this detector reports; an added app's key matches no pattern.
                 for pattern in patterns
-                    where pattern.identifies(meetingAppName: meeting.pattern.appName, processName: processName) {
-                    if matchAssertion(processName: processName, assertName: assertName, assertType: assertType, pattern: pattern) {
+                    where pattern.identifies(meetingAppName: meeting.pattern.identityKey, processName: processName) {
+                    if matchAssertion(processName: processName, assertName: assertName, assertType: assertType, pattern: pattern),
+                       !isAddedAppHit(pid: pid, pattern: pattern) {
                         return true
                     }
                 }
@@ -474,6 +498,19 @@ class PowerAssertionDetector: MeetingDetecting {
 
     private func matchAssertion(processName: String, assertName: String, assertType: String, pattern: AssertionPattern) -> Bool {
         Self.matches(pattern: pattern, processName: processName, assertName: assertName, assertType: assertType)
+    }
+
+    /// Whether a matched assertion is an added app's own, which a process-open
+    /// pattern leaves to the microphone path (see `addedAppBundleIDs`). Called
+    /// only after a match, so nothing is looked up unless an assertion already
+    /// carried the keyword and the user has added an app. The bundle rule is
+    /// borrowed from an added app's microphone pattern, so both detectors agree
+    /// on which processes are the app's.
+    private func isAddedAppHit(pid: pid_t, pattern: AssertionPattern) -> Bool {
+        guard pattern.processNames.isEmpty, !addedAppBundleIDs.isEmpty,
+              let bundleID = bundleIDForPID(pid) else { return false }
+        let addedApps = MicInputDetector.MicPattern(appName: "", bundleIDs: addedAppBundleIDs, matchesHelpers: true)
+        return addedApps.matchLength(bundleID: bundleID) != nil
     }
 
     private func logUnmatchedWatchedAssertions(_ assertions: [Int32: [[String: Any]]], hits: Set<String>) {

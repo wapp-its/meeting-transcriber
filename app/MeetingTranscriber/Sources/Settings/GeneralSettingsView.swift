@@ -236,7 +236,7 @@ struct GeneralSettingsView: View {
                     .foregroundStyle(.secondary)
                 ForEach(Array(settings.consentDeniedApps.enumerated()), id: \.element) { index, app in
                     HStack {
-                        Text(app)
+                        Text(ConsentDenyList.displayName(for: app))
                             .font(.caption)
                         Spacer()
                         Button("Remove") {

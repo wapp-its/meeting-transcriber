@@ -8,8 +8,10 @@
 # newer ci.yml run on the same branch replaced posts nothing. Details and the rules:
 # wapp-fork-ci/fork_ci.py.
 #
-# workflow_run only fires from the workflow file on the default branch (wapp/main).
-# If a finished run left its status pending, post the result by hand:
+# workflow_run only fires from the workflow file on the default branch (wapp/main),
+# and only for a ci.yml run that a personal token started (wapp-fork-ci.yml uses
+# WAPP_SYNC_TOKEN for that). If a finished run left its status pending, post the
+# result by hand:
 #   GH_TOKEN=$(gh auth token --user wapp-its) python3 .github/workflows/wapp-fork-ci/fork_ci.py \
 #     result --repo wapp-its/meeting-transcriber --run-id <id> --attempt <n>
 name: wapp fork CI result

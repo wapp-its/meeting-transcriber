@@ -5,6 +5,11 @@ struct MenuBarView: View {
     let isWatching: Bool
     let pipelineQueue: PipelineQueue
     var updateChecker: UpdateChecker?
+    /// Why "Install Update" is not possible right now (`UpdateInstallGate`);
+    /// set, it disables the menu's install item.
+    var updateInstallBlockedReason: String?
+    /// Starts an mt-update install; nil disables the menu's install item.
+    var onInstallUpdate: (() -> Void)?
     /// The finished-job history, read with the queue's jobs so a failed line
     /// and "Open Last Protocol" outlive the queue's one-minute reap and a
     /// restart.
@@ -56,6 +61,10 @@ struct MenuBarView: View {
     var onSelectMicrophone: (String) -> Void = { _ in }
     /// The Microphone entry; nil leaves it out.
     var microphoneMenu: MicrophoneMenuState?
+    /// Makes a chosen output the Mac's default output.
+    var onSelectOutput: (String) -> Void = { _ in }
+    /// The Output entry; nil leaves it out.
+    var outputMenu: OutputMenuState?
 
     private var state: TranscriberState {
         status?.state ?? .idle
@@ -94,6 +103,7 @@ struct MenuBarView: View {
 
         watchControls
         microphoneSection
+        outputSection
         jobSections
 
         Divider()
@@ -259,43 +269,6 @@ struct MenuBarView: View {
         .keyboardShortcut("p")
     }
 
-    /// Which microphone recordings use, switchable in a submenu; with "No
-    /// Microphone" on, one disabled line. Every string comes from
-    /// `MicrophoneMenuState`, so nothing is assembled here (see the note on
-    /// `body`).
-    @ViewBuilder private var microphoneSection: some View {
-        if let microphoneMenu {
-            if microphoneMenu.isEnabled {
-                Menu {
-                    microphonePicker(microphoneMenu)
-                    if let hint = microphoneMenu.hint {
-                        Text(hint)
-                    }
-                } label: {
-                    Label(microphoneMenu.title, systemImage: "mic")
-                }
-            } else {
-                Label(microphoneMenu.title, systemImage: "mic.slash")
-            }
-        }
-    }
-
-    /// An inline picker, so the menu shows each device as an item with the
-    /// checkmark on the current choice. Choosing one only stores it; nothing
-    /// here touches the macOS default input.
-    private func microphonePicker(_ menu: MicrophoneMenuState) -> some View {
-        Picker("Microphone", selection: Binding(get: { menu.checkedUID }, set: { onSelectMicrophone($0) })) {
-            ForEach(menu.items, id: \.uid) { item in
-                Text(item.label)
-                    .disabled(!item.isEnabled)
-                    .tag(item.uid)
-            }
-        }
-        .pickerStyle(.inline)
-        .labelsHidden()
-        .accessibilityIdentifier(A11yID.menuMicrophonePicker)
-    }
-
     /// The jobs under way and the jobs waiting on the user, each group under
     /// its own header and only when it has a job. Row indexes run on across
     /// both groups, so every row's identifiers stay unique.
@@ -366,7 +339,9 @@ struct MenuBarView: View {
     }
 
     @ViewBuilder private var updateSection: some View {
-        if let update = updateChecker?.availableUpdate {
+        if let updateChecker, updateChecker.isMtUpdateMode {
+            mtUpdateItem(updateChecker)
+        } else if let update = updateChecker?.availableUpdate {
             Divider()
             Button {
                 NSWorkspace.shared.open(update.dmgURL ?? update.htmlURL)
@@ -376,6 +351,26 @@ struct MenuBarView: View {
                     systemImage: "arrow.down.circle.fill",
                 )
             }
+        }
+    }
+
+    /// mt-update mode: a running install as a line of its own, else the item
+    /// that starts one for the build on offer. A check holds mt-update's
+    /// checkout too, so it disables the item like a blocking reason does.
+    @ViewBuilder
+    private func mtUpdateItem(_ updateChecker: UpdateChecker) -> some View {
+        if updateChecker.isInstalling {
+            Divider()
+            Label("Installing Update…", systemImage: "arrow.triangle.2.circlepath")
+        } else if let summary = updateChecker.availableBuildSummary {
+            Divider()
+            Button {
+                onInstallUpdate?()
+            } label: {
+                Label("Install Update: \(summary)", systemImage: "arrow.down.circle.fill")
+            }
+            .disabled(updateInstallBlockedReason != nil || updateChecker.isChecking || onInstallUpdate == nil)
+            .accessibilityIdentifier(A11yID.menuInstallUpdateButton)
         }
     }
 

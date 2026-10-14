@@ -1,14 +1,19 @@
 {
   "branch_name": "local/gh-8-self-update",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-14T13:14:52.272489Z",
   "created_at": "2026-10-06T20:23:38.220779Z",
   "default_impl": null,
   "default_review": null,
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-8-in-app-updates-through-mt-update",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-8-in-app-updates-through-mt-update.1": 0,
+    "gh-8-in-app-updates-through-mt-update.2": 0,
+    "gh-8-in-app-updates-through-mt-update.3": 0,
+    "gh-8-in-app-updates-through-mt-update.4": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -119,19 +124,258 @@
       "task": null,
       "timestamp": "2026-10-06T20:38:53.179355Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "4f49d6d3aaa389e73513479def27f9f5830874f04307ff3940ff6e6147ae5dae",
+      "backend": "codex",
+      "base_sha": "e2f2caea39cab1097b1719e8b202d5086b24f080",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "4264ba3228c71e838a4d9681a0e346c808ffb411",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1162,
+      "output_sha256": "8ef949a4577d79374d68698fbd5fc3e22057cab333bee3e90278b0585f8f8600",
+      "reservation_id": "eca1471ba8144068bfabadd5110393af",
+      "round_consumed": true,
+      "scope": "impl:gh-8-in-app-updates-through-mt-update.1",
+      "superseded_by": null,
+      "task": "gh-8-in-app-updates-through-mt-update.1",
+      "timestamp": "2026-10-13T16:50:09.372208Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "f0a110458e074702f64d6d38ec4ff4c0ab8347c328cfdaacd1ffef326b132907",
+      "backend": "codex",
+      "base_sha": "22e105d6d01281b1951f586225db6e2ce7ee1eb1",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "a16a01d933e3432ef9d811332897699c2fbf621d",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "f854acc6a10841bbba8f8cb73fa30db6",
+      "round_consumed": true,
+      "scope": "impl:gh-8-in-app-updates-through-mt-update.2",
+      "superseded_by": null,
+      "task": "gh-8-in-app-updates-through-mt-update.2",
+      "timestamp": "2026-10-14T11:53:12.599178Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "a092ec31fc6751b96994921c3940215088ecfeb65cf6b336c5105e4fc7d71e16",
+      "backend": "codex",
+      "base_sha": "f6bce12eef19f75c53ce2cc4f1673c61fad6bb84",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-fe152f7cb623db3410ece4510f01ed40",
+            "classification": "introduced",
+            "findingId": "finding-fe152f7cb623db3410ece4510f01ed40",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "06ebe2860eb41e083f5e70ffcfbaa6fc09d65ac1",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1245,
+      "output_sha256": "4d62b68c0b57401201b7523c47ae6901c3d904eda7d23be2d6289dd4302b2067",
+      "reservation_id": "491a2aaee3324f92acec1f6b6ec877da",
+      "round_consumed": true,
+      "scope": "impl:gh-8-in-app-updates-through-mt-update.3",
+      "superseded_by": null,
+      "task": "gh-8-in-app-updates-through-mt-update.3",
+      "timestamp": "2026-10-14T12:22:25.175726Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "75945c731a2beec74e61a1dc9003c9cbaffff6e04c51bfe33d0a91d6d1c309cb",
+      "backend": "codex",
+      "base_sha": "f6bce12eef19f75c53ce2cc4f1673c61fad6bb84",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-fe152f7cb623db3410ece4510f01ed40",
+            "classification": "introduced",
+            "findingId": "finding-fe152f7cb623db3410ece4510f01ed40",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "832d711fbe510a5231dce7be94aab49a9650541f",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1235,
+      "output_sha256": "fcaab6b8d87184b5998dbf837a9e17718a673fe0426998c9b8346b798d287b17",
+      "reservation_id": "0c105016bc144f6086b89238adbb702f",
+      "round_consumed": true,
+      "scope": "impl:gh-8-in-app-updates-through-mt-update.3",
+      "superseded_by": null,
+      "task": "gh-8-in-app-updates-through-mt-update.3",
+      "timestamp": "2026-10-14T12:26:13.508076Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "d27ea175bfaa0d6eaa13fa103afd7af44020255f628d62c03c13d15bf5cbe4af",
+      "backend": "codex",
+      "base_sha": "aa9cd67e5b7fe68ea5a85e8cbc4013295a3036a3",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "260dcc1c508d53b11cbe902ab2e02628caa4bfda",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "b7cf0e6fbbae45c19f0aa55fe5bae289",
+      "round_consumed": true,
+      "scope": "impl:gh-8-in-app-updates-through-mt-update.4",
+      "superseded_by": null,
+      "task": "gh-8-in-app-updates-through-mt-update.4",
+      "timestamp": "2026-10-14T12:50:40.214444Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "867c2b087cb1cb2bdc9b4e01c810b84c084ce1f2427bc5debaff560aac41ce12",
+      "backend": "codex",
+      "base_sha": "8def642b12039a7014770a156c2d5c60ba7438bf",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "7f1d821d463612464030d9172147f07877c67022",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 633044,
+      "output_sha256": "b7c66d0a315afaa39a527c73e31f500a0111ec2913324281799e7651df026305",
+      "reservation_id": "64a7a8565b4e4002a716f604174f06a8",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T13:14:52.243880Z",
+      "tool_calls": 34,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-8-in-app-updates-through-mt-update.1": 1,
+    "impl:gh-8-in-app-updates-through-mt-update.2": 1,
+    "impl:gh-8-in-app-updates-through-mt-update.3": 1,
+    "impl:gh-8-in-app-updates-through-mt-update.4": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-8-in-app-updates-through-mt-update.1": 0,
+    "impl:gh-8-in-app-updates-through-mt-update.2": 0,
+    "impl:gh-8-in-app-updates-through-mt-update.3": 0,
+    "impl:gh-8-in-app-updates-through-mt-update.4": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-8-in-app-updates-through-mt-update.md",
-  "status": "open",
+  "status": "done",
   "title": "In-app updates through mt-update",
   "tracker": {
     "baseHashFlow": null,
@@ -145,5 +389,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/8"
   },
-  "updated_at": "2026-10-06T20:54:54.038504Z"
+  "updated_at": "2026-10-14T15:02:02.821878Z"
 }

@@ -33,9 +33,9 @@ Write the tests first from the spec's contract table and R-IDs, see them fail, t
 
 ### Investigation targets
 **Required** (read before coding):
-- `app/MeetingTranscriber/Sources/ClaudeCLIProtocolGenerator.swift:427-450` — environment builder pattern to mirror
+- `app/MeetingTranscriber/Sources/ClaudeCLIProtocolGenerator.swift:364-375` — environment builder pattern to mirror
 - `app/MeetingTranscriber/Sources/PreviousExitNotice.swift` — pure notice-text type pattern
-- `app/MeetingTranscriber/Sources/UpdateChecker.swift:1-104` — existing models and error type; do not change them
+- `app/MeetingTranscriber/Sources/UpdateChecker.swift:1-106` — existing models and error type; do not change them
 
 **Optional** (reference as needed):
 - `app/MeetingTranscriber/Tests/DefaultsSuite.swift` — throwaway UserDefaults suites for the store tests
@@ -62,9 +62,52 @@ Write the tests first from the spec's contract table and R-IDs, see them fail, t
 - [ ] Both source files compile in the App Store variant; lint clean.
 
 ## Done summary
-TBD
+Added the pure core of the mt-update integration in two plain-Foundation files, `MtUpdateContract.swift` (source selection, the `--check --porcelain` parser, the child environment, the `MtUpdateInstalling` seam) and `UpdateInstallOutcome.swift` (pending-install record and store, live-exit outcome, launch-time evaluation, notice texts, install gate). Today's `mt-update --check` output (exit 0, German text in ANSI bold) parses as `.failed(.unsupported)`, so the app never reports it as up to date. Nothing here starts a process, and both variants compile it.
 
+stage: impl-review - ran [2026-10-13T16:42:57Z..2026-10-13T16:50:16Z]
+
+Tier: explicit implementer opus at xhigh (project routing block), spawned natively on this host (model: claude-opus-5-5)
+
+Review: codex:gpt-5.6-sol:xhigh, three-draw fan-out (correctness, contracts, integration), all SHIP with no findings; receipt effort xhigh. Receipt /tmp/impl-review-receipt-cfaadf991a4c-gh-8-in-app-updates-through-mt-update.1.json (copy in .flow/tmp/gh-8-in-app-updates-through-mt-update.1-impl-review-receipt.json). The validator pass (FLOW_VALIDATE_REVIEW=1) was not dispatched because it runs only on NEEDS_WORK. The reviewer sandbox was workspace-write as instructed; git status after the round showed only flowctl's own bookkeeping.
+
+Verification
+- baseline: green (spec Quick command filter, 101 tests, rc 0; lint 0 violations), before any edit
+- red first: the new tests failed to compile against the missing types before the implementation
+- mutation check: six deliberate defects (summary cut at 79, MT_ kept, first key not winning, undecodable record kept, liveness before build identity, active jobs ignored by the gate) each turned a test red; sources restored afterwards
+- `swift test --parallel --filter 'MtUpdateContractTests|UpdateInstallOutcomeTests'`: 16 tests, rc 0
+- spec Quick command `--filter 'MtUpdate|UpdateInstall|UpdateChecker|AboutSettingsView|MenuBarView'`: 117 tests, rc 0
+- `swift build --build-tests -Xswiftc -DAPPSTORE`: rc 0, no diagnostics from the new files
+- `./scripts/lint.sh` with the cached pinned SwiftFormat 0.63.0 / SwiftLint 0.65.1: 0 violations in 769 files
+- not run: CI's `swiftlint analyze` (`unused_declaration`), see Choices 15
+
+Error-case tests (R-IDs this task satisfies)
+- R1 absent or unreadable mt-update means today's behaviour: `MtUpdateContractTests.testOnlyTheInstalledDevBuildWithMtUpdateUsesIt` ("no mt-update" row)
+- R2 other exit code, signal, missing or contradicting status: `MtUpdateContractTests.testAnythingButAnAgreeingAnswerIsAFailedCheck`; wording `testFailedCheckMessagesNameTheCause`
+- R3 today's `--check` output: `MtUpdateContractTests.testTodaysHumanCheckOutputIsUnsupported`
+- R6 unknown exit status reported with its number: `UpdateInstallOutcomeTests.testALiveExitMapsToItsOutcome`, `testEveryOutcomeHasItsNotice`
+- R7 mt-update gone without a new build: `UpdateInstallOutcomeTests.testTheSameBuildIsStillRunningOrDidNotFinish` (the start-time match itself is task 2's `isRunning`)
+
+Choices (open in the spec and task, smallest default taken)
+1. Failed-check wording beyond the pinned R3 sentence: `contradicting` reads "mt-update's answer was incomplete or did not match its exit status", `exitStatus` names the exit code or the signal number, `timedOut` says "did not answer within 5 minutes"; all three end with " Details: <checkLogPath>". Pinned verbatim in `testFailedCheckMessagesNameTheCause`.
+2. `notStartable` (check message and install notice) puts the reason in parentheses and carries no log path, because mt-update never ran and its log holds nothing. The notice adds "The installed app is unchanged."
+3. Every notice body is pinned verbatim in `testEveryOutcomeHasItsNotice`. "Update installed" reads "Now running the new build: <summary>."; the verbatim pins also prove that no text carries a date or time.
+4. An empty `PATH` counts as absent and falls back to `/usr/bin:/bin:/usr/sbin:/sbin`, because an empty `PATH` entry means the working directory.
+5. `GIT_TERMINAL_PROMPT=0` overrides a value already in the app's environment. The `MT_` prefix match is case-sensitive.
+6. Bundle paths are compared through `URL(fileURLWithPath:).standardizedFileURL.path` (SwiftLint `legacy_objc_type` refuses the `NSString` form), and `~/.local/bin` is built with `URL.appending(path:)`, so a trailing slash on the home folder does not double.
+7. The summary is read only with `status=update-available`. Whitespace left at the 80-character cut is kept as cut. A value keeps any later `=` signs.
+8. `PendingUpdateInstallStore` stores JSON `Data`. A stored value of any other type also counts as undecodable and is removed. `save(_:)` keeps the task's non-throwing signature and drops a record that fails to encode, which only a non-finite `Date` can cause.
+9. `PendingUpdateInstallStore(defaults:)` has no default argument, so no caller reaches `UserDefaults.standard` by accident.
+10. "5 minutes" is a literal in the `timedOut` message; task 2 owns the limit value.
+11. `MtUpdateContract.swift` carries `// swiftlint:disable:this file_name` with its reason, following `PermissionAccessRequest.swift`, because the task names that file and none of its types.
+12. Test rows with more than four fields use nested tuples to satisfy `large_tuple`.
+13. `UpdateInstallGate` takes the four inputs the task names; "a check is running" (R4) is left to task 3.
+14. The round was finalized with `--merged-file` because the contracts draw printed no findings heading and `--merge-plan` refused it; all three draws were SHIP with zero findings.
+15. `MtUpdateInstalling` and `MtUpdateSource.executablePathInHome` have no user until tasks 2 and 3 land, so CI's `swiftlint analyze` (`unused_declaration`) may report them on this commit alone. That check needs a clean xcodebuild and was not run here.
+
+Follow-ups: none.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 4264ba3228c71e838a4d9681a0e346c808ffb411
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh-8-test-home swift test --parallel --filter 'MtUpdateContractTests|UpdateInstallOutcomeTests' (16 tests, rc 0), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh-8-test-home swift test --parallel --filter 'MtUpdate|UpdateInstall|UpdateChecker|AboutSettingsView|MenuBarView' (117 tests, rc 0), cd app/MeetingTranscriber && swift build --build-tests -Xswiftc -DAPPSTORE (rc 0), PATH=$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH ./scripts/lint.sh (0 violations)
 - PRs:

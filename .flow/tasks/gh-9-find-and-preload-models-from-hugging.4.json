@@ -12,7 +12,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-9-find-and-preload-models-from-hugging",
   "spec_path": ".flow/tasks/gh-9-find-and-preload-models-from-hugging.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "Wire the browser into the model picker, use a variant, docs",
   "updated_at": "2026-10-06T20:32:54.579557Z"
 }

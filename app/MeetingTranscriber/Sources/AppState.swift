@@ -70,6 +70,11 @@ final class AppState {
     /// `WatchingController` attaches it on the same transitions as `channelHealth`.
     let microphone: MicrophoneController
 
+    /// The Mac's sound output: the menu bar's Output entry and the warning
+    /// about a routing that keeps the meeting out of the app track.
+    /// `WatchingController` attaches it on the same transitions as `microphone`.
+    let output: OutputDeviceController
+
     /// Observable state for the live caption overlay. Always present (the
     /// `LiveCaptionsOverlay` window observes this); content is only populated
     /// when live transcription is on AND a recording is active. Owned here (read
@@ -118,8 +123,16 @@ final class AppState {
         return settings
     }
 
-    private static func makeUpdateChecker() -> UpdateChecker {
-        UpdateChecker()
+    /// mt-update mode when `MtUpdateProvider.detect()` finds this is the
+    /// installed development build with mt-update present; otherwise the
+    /// GitHub release check, and always in the App Store build.
+    private static func makeUpdateChecker(notifier: any AppNotifying) -> UpdateChecker {
+        #if !APPSTORE
+            if let provider = MtUpdateProvider.detect() {
+                return UpdateChecker(installer: provider, notifier: notifier, pendingStore: PendingUpdateInstallStore(defaults: .standard))
+            }
+        #endif
+        return UpdateChecker()
     }
 
     private static func makeRemoteVocabulary(settings: AppSettings) -> RemoteVocabularyController {
@@ -152,7 +165,7 @@ final class AppState {
         self.engines = EngineController(settings: settings, warmupQueue: warmupQueue)
         self.remoteVocabulary = Self.makeRemoteVocabulary(settings: settings)
         self.permissions = PermissionsController(notifier: notifier)
-        self.updateChecker = updateChecker ?? Self.makeUpdateChecker()
+        self.updateChecker = updateChecker ?? Self.makeUpdateChecker(notifier: notifier)
         self.pipeline = PipelineController(settings: settings, notifier: notifier, queueEnvironment: pipelineEnvironment)
         self.channelHealth = ChannelHealthController(
             notifier: notifier,
@@ -168,10 +181,13 @@ final class AppState {
             warmupQueue: warmupQueue,
         )
         self.microphone = MicrophoneController(settings: settings, notifier: notifier)
+        // Labelled: as a trailing closure it would read as a change handler.
+        // swiftlint:disable:next trailing_closure
+        self.output = OutputDeviceController(notifier: notifier, indicatorEnabled: { [settings] in settings.perChannelIndicatorEnabled })
         self.watching = WatchingController(
             settings: settings, notifier: notifier, pipeline: pipeline,
             channelHealth: channelHealth, permissions: permissions,
-            liveTranscription: liveTranscription, microphone: microphone,
+            liveTranscription: liveTranscription, microphone: microphone, output: output,
         )
 
         #if !APPSTORE
@@ -389,7 +405,7 @@ final class AppState {
             watchLoopState: loop?.state ?? .idle,
             transcriberState: loop?.transcriberState ?? .idle,
             activeJobState: pipeline.queue.activeJobs.first?.state,
-            updateAvailable: updateChecker.availableUpdate != nil,
+            updateAvailable: updateChecker.hasAvailableUpdate,
             permissionProblem: permissions.health?.isHealthy == false,
         )
     }
@@ -454,6 +470,34 @@ final class AppState {
     /// moment before its recorder is up, and nothing pretends to pause then.
     var canPauseRecording: Bool {
         watching.canPauseRecording
+    }
+
+    // MARK: - Updates (mt-update mode)
+
+    /// Why "Install Update" is not possible right now, or nil: what mt-update
+    /// itself waits for. The manual-recording predicate is the controller's
+    /// wide one, so a manual start that has not built its loop yet counts.
+    var updateInstallBlockedReason: String? {
+        UpdateInstallGate.blockedReason(
+            isRecording: watching.isRecording,
+            manualRecordingStarting: watching.isManualRecording,
+            waitingJobs: pipeline.queue.pendingJobs.count,
+            activeJobs: pipeline.queue.activeJobs.count,
+        )
+    }
+
+    func installUpdate() {
+        updateChecker.installNow(blockedReason: updateInstallBlockedReason, isWatching: watching.isWatching)
+    }
+
+    /// Reports an install the previous instance started, and turns meeting
+    /// watching back on through the auto-watch path when it was on then.
+    /// The auto-watch start posted at launch also checks "not already
+    /// watching", so whichever of the two runs second does nothing.
+    func resumeUpdateAfterLaunch() {
+        if updateChecker.resumeAfterLaunch(), !watching.isWatching {
+            watching.toggleWatching(userInitiated: false)
+        }
     }
 
     // Internal (not private): also formats `postedAt` in the RPC snapshot
