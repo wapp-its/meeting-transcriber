@@ -8,7 +8,9 @@
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-148-output-device-warning-and-picker-in-the",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-148-output-device-warning-and-picker-in-the.1": 0
+  },
   "next_task": 1,
   "no_plan": true,
   "plan_review_rounds": 0,
@@ -171,15 +173,52 @@
       "task": null,
       "timestamp": "2026-10-14T16:23:45.760613Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "5246ecffa165795fc3293af26c9842fed1d844124a5233f4f1ce1e15b155d101",
+      "backend": "codex",
+      "base_sha": "61ea6384a20b55f01fdb23718997f29ee8d94b1b",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "d4273838339cc8bbfe29044286506caa19ad5d2a",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 165,
+      "output_sha256": "921640c49580b8e37c2a3f0b764426128cd3fed4bc702ecf45fc0228bc5c50c3",
+      "reservation_id": "9a9cb606cd674040b95f695f358cbf9a",
+      "round_consumed": true,
+      "scope": "impl:gh-148-output-device-warning-and-picker-in-the.1",
+      "superseded_by": null,
+      "task": "gh-148-output-device-warning-and-picker-in-the.1",
+      "timestamp": "2026-10-14T16:47:27.943552Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-148-output-device-warning-and-picker-in-the.1": 1,
     "plan": 2,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-148-output-device-warning-and-picker-in-the.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-148-output-device-warning-and-picker-in-the.md",
@@ -197,5 +236,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nTeams can set the Mac's default output to its own virtual device \"Microsoft Teams Audio\" (`MSLoopbackDriverDevice_UID`) and keep playing the call through another device. If a recording starts in this state, the app track is exact zeros for the whole meeting. The tap is anchored on the default output. In this routing it probably follows the virtual device, not the device that plays the call. The app posts \"Recording Appears Silent\", but it doesn't say why. Also the more specific \"Capture Channel Silent\" alert doesn't fire when the microphone is muted at the same time.\n\nSeen here with a Teams meeting on the current fork build. The unified log shows that the Teams ModuleHost process set the default output itself, a few minutes before the meeting. The setting then stays like this after the call.\n\nUpstream reports the same case as https://github.com/pasrom/meeting-transcriber/issues/712 (with a re-anchoring fix on a contributor fork) and a related one as https://github.com/pasrom/meeting-transcriber/issues/699.\n\n## NOTES\n\n- Not a permission problem: two short system sounds that went into the virtual device were captured, the call audio was not.\n- A virtual default output alone is not the fault (see upstream 712), so we should not reject virtual devices in general.\n\n## TASKS\n\n- [ ] Warn at recording start when the default output is the Teams loopback device, with the fix (switch the output in Control Center)\n- [ ] Find out if anchoring the tap on the device Teams plays to restores the app track, or wait for the upstream fix",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/148"
   },
-  "updated_at": "2026-10-14T16:23:45.789444Z"
+  "updated_at": "2026-10-14T16:47:27.972836Z"
 }
