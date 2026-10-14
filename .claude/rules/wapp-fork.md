@@ -15,7 +15,7 @@ untouched by fork work.
   No direct commits of app code.
 - Each improvement is its own branch: `feat/*` may go to the original later,
   `local/*` stays in the fork. Spec work (flow-next) branches from `wapp/main`.
-- **Never wait for the original's maintainer** (owner, 2026-10-02: not very active).
+- **Never wait for the original's maintainer** (owner, 2026-10-02).
   A feature is done for us when it is merged into `wapp/main` and installed via
   `mt-update`; a PR to the original is optional and fire-and-forget, never a
   dependency and never a reason to park work.
@@ -42,6 +42,16 @@ untouched by fork work.
   push to a branch that is the head of an open PR there (e.g. `feat/custom-whisperkit-model`
   for #759, `feat/nemotron-diarization` for #760) — **only after the owner's explicit "go".**
 - No AI attribution in commits, PRs or issues.
+- **The fork is public, `.flow/` included:** issues, PRs, comments and committed files
+  are read by outsiders. Paraphrase the owner's chat instead of quoting it, and mark
+  it as paraphrased. Leave out personal details: when the Mac was off or in focus
+  mode, clock times of real calls, which apps or devices the owner uses (unless a bug
+  needs the device), machine specs, and the owner's private agent setup (skills,
+  memory notes, sandbox settings). No remarks about the original's maintainer or other
+  people. The flow-next bookkeeping (decision entries, `/answer` lines, review
+  receipts) stays as the tools write it. (Owner, 2026-10-14, after an audit of the
+  public fork; an edited post keeps its old text in GitHub's edit history until the
+  revision is deleted by hand.)
 - No real meeting recordings or transcripts in an agent's context (confidential).
   Logs without content are fine.
 
