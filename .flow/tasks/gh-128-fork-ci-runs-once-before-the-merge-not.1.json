@@ -10,7 +10,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-128-fork-ci-runs-once-before-the-merge-not",
   "spec_path": ".flow/tasks/gh-128-fork-ci-runs-once-before-the-merge-not.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement Fork CI runs once before the merge, not on every push",
   "updated_at": "2026-10-14T10:18:21.875040Z"
 }
