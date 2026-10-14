@@ -2,7 +2,7 @@
 
 ## Conversation Evidence
 
-> user (turn 1): "Can you check the current auto stop feature of a meeting recording? So it seems like it stops auto recording after a while. It should ask for m maybe before it stops the recording, not automatically. Because otherwise maybe it stops recording and then parts get lost."
+> user (turn 1, paraphrased): "Check the automatic stop of a meeting recording. It seems to stop after a while. It should ask before it stops the recording, because otherwise parts of a meeting can get lost."
 > user (turn 2, selected): "B — 2-min countdown (Recommended)"
 > issue #54 (owner decision comment, 2026-10-06): "Entscheidung (Owner, 2026-10-06): **B** – Rückfrage mit 2-Minuten-Countdown, ohne Antwort endet die Aufnahme. A und C verworfen (A: Raum wird nach übersehener Mitteilung weiter aufgenommen; C: bleibt still, Aussetzer über 2 min teilen das Meeting weiterhin)."
 
@@ -10,7 +10,7 @@
 
 Today an automatically detected meeting is stopped silently once the app has seen no sign of the call for the end-grace period (15 s by default): no "call in progress" signal from the meeting app, no microphone held by it, no meeting window. When that signal drops while the call is still going (hold, device switch, a hand-off to the phone), the recording is finished and processed, and a call that comes back becomes a second recording with a gap in between; if it never comes back, the rest of the meeting is lost. The person recording wants to be asked before the app stops, so a wrong stop can be prevented and no part of a meeting is lost. [paraphrase]
 
-The diagnostic logs of the last nine days show eight Teams recordings that ended on their own, each about 15 s after Teams stopped all audio output, which fits real hang-ups; whether any of them cut a live call cannot be told from the logs, partly because the stop itself is not logged. [paraphrase]
+The diagnostic logs show Teams recordings that ended on their own, each about 15 s after Teams stopped all audio output, which fits real hang-ups; whether any of them cut a live call cannot be told from the logs, partly because the stop itself is not logged. [paraphrase]
 
 Recording people after a meeting has ended is not free in Switzerland (everyone recorded must agree, see the fork's consent reminder), so the fix must not leave the room being recorded because a notification went unseen. [paraphrase]
 
