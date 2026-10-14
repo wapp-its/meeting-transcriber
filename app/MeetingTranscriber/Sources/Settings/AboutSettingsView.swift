@@ -154,7 +154,7 @@ struct AboutSettingsView: View {
                 .disabled(updateInstallBlockedReason != nil || updateChecker.isChecking || onInstallUpdate == nil)
                 .accessibilityIdentifier(A11yID.updateInstallButton)
 
-                Text(updateInstallBlockedReason ?? "Builds the new version (about 5–10 minutes), then restarts Meeting Transcriber.")
+                Text(installCaption(updateChecker: updateChecker))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -165,5 +165,18 @@ struct AboutSettingsView: View {
                 .foregroundStyle(.red)
                 .font(.caption)
         }
+    }
+
+    /// Why the button is disabled, so About names it (R4), else what pressing
+    /// it does. A gate reason outranks the running check: both work on
+    /// mt-update's checkout, and the recording or job is the one that lasts.
+    private func installCaption(updateChecker: UpdateChecker) -> String {
+        if let reason = updateInstallBlockedReason {
+            return reason
+        }
+        if updateChecker.isChecking {
+            return "Not available while checking for updates."
+        }
+        return "Builds the new version (about 5–10 minutes), then restarts Meeting Transcriber."
     }
 }

@@ -172,24 +172,28 @@ final class AboutSettingsViewTests: XCTestCase {
     }
 
     /// A blocking reason, a running check or a missing callback each disable
-    /// the button; a reason replaces the caption, so About names it.
+    /// the button; a reason or the running check replaces the caption, so
+    /// About names why (R4). A gate reason outranks the check.
     func testInstallUpdateButtonIsDisabledWhileBlockedCheckingOrUnwired() throws {
         let reason = "Not available while recording."
-        let rows: [(name: String, reason: String?, checking: Bool, callback: (() -> Void)?)] = [
-            ("blocked", reason, false, Self.wiredInstall),
-            ("checking", nil, true, Self.wiredInstall),
-            ("no callback", nil, false, nil),
+        let checking = "Not available while checking for updates."
+        let rows: [(name: String, state: (reason: String?, checking: Bool), callback: (() -> Void)?, caption: String)] = [
+            ("blocked", (reason, false), Self.wiredInstall, reason),
+            ("checking", (nil, true), Self.wiredInstall, checking),
+            ("blocked and checking", (reason, true), Self.wiredInstall, reason),
+            ("no callback", (nil, false), nil, Self.installCaption),
         ]
         for row in rows {
             let checker = makeMtUpdateChecker()
-            checker.isChecking = row.checking
-            let view = makeAbout(updateChecker: checker, updateInstallBlockedReason: row.reason, onInstallUpdate: row.callback)
+            checker.isChecking = row.state.checking
+            let view = makeAbout(updateChecker: checker, updateInstallBlockedReason: row.state.reason, onInstallUpdate: row.callback)
 
             XCTAssertTrue(try installButton(in: view).isDisabled(), row.name)
-            XCTAssertNoThrow(try view.inspect().find(text: row.reason ?? Self.installCaption), row.name)
+            XCTAssertNoThrow(try view.inspect().find(text: row.caption), row.name)
+            if row.caption != Self.installCaption {
+                XCTAssertThrowsError(try view.inspect().find(text: Self.installCaption), row.name)
+            }
         }
-        let blocked = makeAbout(updateChecker: makeMtUpdateChecker(), updateInstallBlockedReason: reason, onInstallUpdate: Self.wiredInstall)
-        XCTAssertThrowsError(try blocked.inspect().find(text: Self.installCaption))
     }
 
     /// mt-update builds whatever its branches hold, so the pre-release switch
