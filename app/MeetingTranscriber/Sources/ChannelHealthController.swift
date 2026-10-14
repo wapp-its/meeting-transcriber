@@ -113,6 +113,9 @@ final class ChannelHealthController {
     /// something; see `ChannelFaultMonitor.update(ages:elapsedSinceStart:corroborated:)`.
     @ObservationIgnored private var lastSpeechAt: [AudioChannel: Date] = [:]
 
+    /// Whether the last tick found the recording paused; see `holdWhilePaused`.
+    @ObservationIgnored private var heldForPause = false
+
     /// The silence clock of the recording in progress, for the long-silence
     /// question; nil before its first tick. Only the channels the
     /// recording opened count. Built from the ignored storage above, so
@@ -277,6 +280,34 @@ final class ChannelHealthController {
         appLevelDBFS = nil
         firstTickAt = nil
         lastSpeechAt.removeAll()
+        heldForPause = false
+    }
+
+    /// While the recording is paused nothing it captures is saved, so nothing
+    /// is judged either: no tint, no "Recording Appears Silent", no capture
+    /// fault. True while paused, and the tick then stops here.
+    ///
+    /// At the pause the tint and silence monitors start over and their flags
+    /// clear. At the first tick after it, the fault monitors' since-start
+    /// clock and the speech record restart, so every window runs from the
+    /// resume. The fault monitors themselves keep their latches: a fault
+    /// already reported is not reported again, and a give-up that happened
+    /// during the pause is reported on that first tick, since the give-up
+    /// check does not wait for the window.
+    private func holdWhilePaused(_ paused: Bool, now: Date) -> Bool {
+        if paused, !heldForPause {
+            heldForPause = true
+            channelHealthMonitor.reset()
+            silentRecordingMonitor.reset()
+            micSilentActive = false
+            appSilentActive = false
+            recordingSilentActive = false
+        } else if !paused, heldForPause {
+            heldForPause = false
+            firstTickAt = now
+            lastSpeechAt.removeAll()
+        }
+        return paused
     }
 
     /// Internal test seam: drives one polling tick against an arbitrary
@@ -298,6 +329,7 @@ final class ChannelHealthController {
         }
         micLevelDBFS = mic
         appLevelDBFS = app
+        if holdWhilePaused(recorder.isPaused, now: now) { return nil }
         // The monitor's own threshold, not a copy of its default: the init
         // allows a different one, and a second constant could then disagree
         // with the episode the tint is drawn from.
