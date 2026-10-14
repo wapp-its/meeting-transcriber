@@ -150,6 +150,8 @@ struct MeetingTranscriberApp: App {
             isWatching: appState.isWatching,
             pipelineQueue: appState.pipelineQueue,
             updateChecker: appState.updateChecker,
+            updateInstallBlockedReason: appState.updateInstallBlockedReason,
+            onInstallUpdate: { appState.installUpdate() },
             history: appState.pipeline.terminalJobStore.records,
             onStartStop: { appState.watching.toggleWatching() },
             onRecordApp: { bringWindowToFront(id: "record-app") },
@@ -297,6 +299,8 @@ struct MeetingTranscriberApp: App {
                 whisperKitEngine: appState.engines.whisperKit,
                 parakeetEngine: appState.engines.parakeetEngine,
                 updateChecker: appState.updateChecker,
+                updateInstallBlockedReason: appState.updateInstallBlockedReason,
+                onInstallUpdate: { appState.installUpdate() },
                 remoteVocabulary: appState.remoteVocabulary,
                 notificationVisibility: appState.permissions.notificationVisibility,
                 // Share the pipeline's actor instance so both writers serialise on

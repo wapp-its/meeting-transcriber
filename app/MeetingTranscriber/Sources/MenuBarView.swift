@@ -5,6 +5,11 @@ struct MenuBarView: View {
     let isWatching: Bool
     let pipelineQueue: PipelineQueue
     var updateChecker: UpdateChecker?
+    /// Why "Install Update" is not possible right now (`UpdateInstallGate`);
+    /// set, it disables the menu's install item.
+    var updateInstallBlockedReason: String?
+    /// Starts an mt-update install; nil disables the menu's install item.
+    var onInstallUpdate: (() -> Void)?
     /// The finished-job history, read with the queue's jobs so a failed line
     /// and "Open Last Protocol" outlive the queue's one-minute reap and a
     /// restart.
@@ -366,7 +371,9 @@ struct MenuBarView: View {
     }
 
     @ViewBuilder private var updateSection: some View {
-        if let update = updateChecker?.availableUpdate {
+        if let updateChecker, updateChecker.isMtUpdateMode {
+            mtUpdateItem(updateChecker)
+        } else if let update = updateChecker?.availableUpdate {
             Divider()
             Button {
                 NSWorkspace.shared.open(update.dmgURL ?? update.htmlURL)
@@ -376,6 +383,26 @@ struct MenuBarView: View {
                     systemImage: "arrow.down.circle.fill",
                 )
             }
+        }
+    }
+
+    /// mt-update mode: a running install as a line of its own, else the item
+    /// that starts one for the build on offer. A check holds mt-update's
+    /// checkout too, so it disables the item like a blocking reason does.
+    @ViewBuilder
+    private func mtUpdateItem(_ updateChecker: UpdateChecker) -> some View {
+        if updateChecker.isInstalling {
+            Divider()
+            Label("Installing Update…", systemImage: "arrow.triangle.2.circlepath")
+        } else if let summary = updateChecker.availableBuildSummary {
+            Divider()
+            Button {
+                onInstallUpdate?()
+            } label: {
+                Label("Install Update: \(summary)", systemImage: "arrow.down.circle.fill")
+            }
+            .disabled(updateInstallBlockedReason != nil || updateChecker.isChecking || onInstallUpdate == nil)
+            .accessibilityIdentifier(A11yID.menuInstallUpdateButton)
         }
     }
 
