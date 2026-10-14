@@ -322,6 +322,27 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         }
     }
 
+    /// Ask whether to stop a recording once no recorded track has carried
+    /// speech for `silencePromptMinutes`. Default: on. The loop reads the
+    /// derived `silencePromptAfter`, not this switch.
+    var silencePromptEnabled: Bool {
+        didSet { defaults.set(silencePromptEnabled, forKey: "silencePromptEnabled") }
+    }
+
+    /// Minutes without speech before the stop question is asked. Clamped to
+    /// [1, 60] on write and on load. Default: 5.
+    var silencePromptMinutes: Int {
+        didSet {
+            // Conditional reassignment to avoid infinite didSet recursion under @Observable.
+            if silencePromptMinutes < 1 {
+                silencePromptMinutes = 1
+            } else if silencePromptMinutes > 60 {
+                silencePromptMinutes = 60
+            }
+            defaults.set(silencePromptMinutes, forKey: "silencePromptMinutes")
+        }
+    }
+
     /// Label for the local mic speaker in dual-source mode.
     /// Default "Me". Empty string = diarize mic track (multi-person room).
     var micName: String {
@@ -767,6 +788,8 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         liveCaptionsSize = defaults.string(forKey: "liveCaptionsSize")
             .flatMap(LiveCaptionsSize.init(rawValue:)) ?? .medium
         asymmetricSilenceWarningSeconds = max(30, min(300, defaults.object(forKey: "asymmetricSilenceWarningSeconds") as? Double ?? 90))
+        silencePromptEnabled = defaults.object(forKey: "silencePromptEnabled") as? Bool ?? true
+        silencePromptMinutes = max(1, min(60, defaults.object(forKey: "silencePromptMinutes") as? Int ?? 5))
 
         transcriptionEngine = (defaults.string(forKey: "transcriptionEngine")
             .flatMap(TranscriptionEngineSetting.init(rawValue:))) ?? .whisperKit

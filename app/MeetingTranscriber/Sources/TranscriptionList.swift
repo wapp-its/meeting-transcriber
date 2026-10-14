@@ -145,20 +145,15 @@ enum TranscriptionList {
         }
     }
 
-    /// The menu's share: every unfinished entry, plus the `finishedLimit`
-    /// finished ones that finished last, in the order the jobs were added
-    /// (oldest first), so the menu reads top to bottom as it always has.
-    /// Entries without an enqueue time predate every other and come first,
-    /// in the order they were stored.
-    static func menuEntries(_ entries: [TranscriptionEntry], finishedLimit: Int = 3) -> [TranscriptionEntry] {
-        let lastFinished = Set(
-            entries.filter(\.state.isTerminal)
-                .sorted { ($0.finishOrder ?? .min) > ($1.finishOrder ?? .min) }
-                .prefix(finishedLimit)
-                .map(\.id),
-        )
-        return entries.filter { !$0.state.isTerminal || lastFinished.contains($0.id) }
-            .enumerated()
+    /// The menu's share, in two groups: jobs waiting or running ("In
+    /// progress") and jobs waiting on the user, for speaker names or because
+    /// they failed ("Needs you"). Finished jobs, with or without warnings, are
+    /// left to the Transcriptions window. Each group lists its jobs in the
+    /// order they were added (oldest first), so the menu reads top to bottom
+    /// as it always has; entries without an enqueue time predate every other
+    /// and come first, in the order they were stored.
+    static func menuSections(_ entries: [TranscriptionEntry]) -> MenuJobSections {
+        let oldestFirst = entries.enumerated()
             .sorted { lhs, rhs in
                 let left = lhs.element.enqueuedAt ?? .distantPast
                 let right = rhs.element.enqueuedAt ?? .distantPast
@@ -166,5 +161,25 @@ enum TranscriptionList {
                 return (lhs.element.finishOrder ?? .min, lhs.offset) < (rhs.element.finishOrder ?? .min, rhs.offset)
             }
             .map(\.element)
+        return MenuJobSections(
+            inProgress: oldestFirst.filter { [.waiting, .transcribing, .diarizing, .generatingProtocol].contains($0.state) },
+            needsYou: oldestFirst.filter { $0.state == .speakerNamingPending || $0.state == .error },
+        )
     }
+
+    /// What "Open Last Protocol" opens: of the jobs that finished with a
+    /// protocol or a transcript, the one that finished last, by the history's
+    /// finish order rather than by when it was added, since a retry keeps its
+    /// enqueue time. Nil when none has. A failed job does not count: it is
+    /// listed under "Needs you" with its own Open.
+    static func lastFinished(_ entries: [TranscriptionEntry]) -> TranscriptionEntry? {
+        entries.filter { $0.state == .done && $0.fileToOpen != nil }
+            .max { ($0.finishOrder ?? .min) < ($1.finishOrder ?? .min) }
+    }
+}
+
+/// The menu's two job groups; see `TranscriptionList.menuSections`.
+struct MenuJobSections: Equatable {
+    let inProgress: [TranscriptionEntry]
+    let needsYou: [TranscriptionEntry]
 }

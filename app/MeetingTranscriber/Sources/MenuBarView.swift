@@ -5,8 +5,9 @@ struct MenuBarView: View {
     let isWatching: Bool
     let pipelineQueue: PipelineQueue
     var updateChecker: UpdateChecker?
-    /// The finished-job history, read with the queue's jobs so a finished
-    /// line outlives the queue's one-minute reap and a restart.
+    /// The finished-job history, read with the queue's jobs so a failed line
+    /// and "Open Last Protocol" outlive the queue's one-minute reap and a
+    /// restart.
     var history: [TerminalJobRecord] = []
     let onStartStop: () -> Void
     let onRecordApp: () -> Void
@@ -22,8 +23,18 @@ struct MenuBarView: View {
     let manualRecordingPendingOrActive: Bool
     /// Stops whatever is recording, a detected meeting included; set only while a recording runs.
     let onStopManualRecording: (() -> Void)?
-    let onOpenLastProtocol: () -> Void
+    /// Whether the running recording is paused, which picks the label of the
+    /// item `onTogglePause` drives.
+    var isRecordingPaused = false
+    /// Pauses a running recording or resumes a paused one, whatever kind it is;
+    /// set only while a recording's capture is running.
+    var onTogglePause: (() -> Void)?
+    /// A job line's Open: the job's protocol, else its transcript.
     let onOpenProtocol: (URL) -> Void
+    /// "Open Last Protocol": the newest finished job's protocol, else its
+    /// transcript. Separate from a job line's Open because a file that is
+    /// gone is reported here, as the Transcriptions window reports it.
+    let onOpenLastProtocol: (URL) -> Void
     let onOpenProtocolsFolder: () -> Void
     let onOpenSettings: () -> Void
     let onNameSpeakers: (() -> Void)?
@@ -83,8 +94,7 @@ struct MenuBarView: View {
 
         watchControls
         microphoneSection
-        processingQueue
-        allTranscriptionsItem
+        jobSections
 
         Divider()
 
@@ -190,6 +200,23 @@ struct MenuBarView: View {
         } else {
             watchToggle
         }
+        pauseResumeItem
+    }
+
+    /// The line under "Stop Recording", for every kind of recording.
+    @ViewBuilder private var pauseResumeItem: some View {
+        if let onTogglePause {
+            Button {
+                onTogglePause()
+            } label: {
+                if isRecordingPaused {
+                    Label("Resume Recording", systemImage: "record.circle")
+                } else {
+                    Label("Pause Recording", systemImage: "pause.circle")
+                }
+            }
+            .accessibilityIdentifier(A11yID.pauseResumeRecording)
+        }
     }
 
     @ViewBuilder private var watchControls: some View {
@@ -269,29 +296,42 @@ struct MenuBarView: View {
         .accessibilityIdentifier(A11yID.menuMicrophonePicker)
     }
 
-    @ViewBuilder private var processingQueue: some View {
-        let entries = jobEntries
+    /// The jobs under way and the jobs waiting on the user, each group under
+    /// its own header and only when it has a job. Row indexes run on across
+    /// both groups, so every row's identifiers stay unique.
+    @ViewBuilder private var jobSections: some View {
+        let sections = TranscriptionList.menuSections(transcriptionEntries)
+        jobSection("In progress", systemImage: "gearshape.2.fill", entries: sections.inProgress, firstIndex: 0)
+        jobSection(
+            "Needs you", systemImage: "exclamationmark.circle",
+            entries: sections.needsYou, firstIndex: sections.inProgress.count,
+        )
+    }
+
+    @ViewBuilder
+    private func jobSection(
+        _ title: String, systemImage: String, entries: [TranscriptionEntry], firstIndex: Int,
+    ) -> some View {
         if !entries.isEmpty {
             Divider()
-            Label("Processing", systemImage: "gearshape.2.fill")
+            Label(title, systemImage: systemImage)
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                jobRow(entry, index: index)
+            ForEach(Array(entries.enumerated()), id: \.element.id) { offset, entry in
+                jobRow(entry, index: firstIndex + offset)
             }
         }
     }
 
-    /// Every unfinished job and the three that finished last, from the same
-    /// list as the Transcriptions window, so the menu's length follows the
-    /// work in flight rather than the number of finished jobs.
-    private var jobEntries: [TranscriptionEntry] {
-        TranscriptionList.menuEntries(TranscriptionList.entries(liveJobs: pipelineQueue.jobs, records: history))
+    /// The same list as the Transcriptions window, so the two cannot disagree
+    /// about which jobs exist or what state they are in.
+    private var transcriptionEntries: [TranscriptionEntry] {
+        TranscriptionList.entries(liveJobs: pipelineQueue.jobs, records: history)
     }
 
-    /// Shown at all times, after the job lines: the menu keeps only a few
-    /// finished jobs, and every other one is in the window.
+    /// Shown at all times, next to the protocols folder: finished jobs are
+    /// listed in the window, not in the menu.
     private var allTranscriptionsItem: some View {
         Button {
             onShowAllTranscriptions()
@@ -302,16 +342,21 @@ struct MenuBarView: View {
         .accessibilityIdentifier(A11yID.allTranscriptionsMenuItem)
     }
 
+    /// The way to the results: the newest one, every job, and the folder they
+    /// are written to. "Open Last Protocol" is the menu's one click to the
+    /// newest result now that finished jobs are not listed, shown while the
+    /// history holds a finished job with a file.
     @ViewBuilder private var protocolActions: some View {
-        if let protocolPath = status?.protocolPath {
+        if let url = TranscriptionList.lastFinished(transcriptionEntries)?.fileToOpen {
             Button {
-                onOpenLastProtocol()
+                onOpenLastProtocol(url)
             } label: {
                 Label("Open Last Protocol", systemImage: "doc.text")
             }
             .keyboardShortcut("o")
-            .disabled(protocolPath.isEmpty)
         }
+
+        allTranscriptionsItem
 
         Button {
             onOpenProtocolsFolder()
@@ -394,7 +439,7 @@ struct MenuBarView: View {
     /// note on `body`).
     private func jobMenuTitle(_ entry: TranscriptionEntry) -> String {
         let status = JobMenuSummary.status(
-            state: entry.state, hasWarnings: !entry.warnings.isEmpty, progress: stageProgressText(entry),
+            state: entry.state, hasWarnings: !entry.warnings.isEmpty, progress: stageProgress(entry),
         )
         return "\(entry.title) — \(status)"
     }
@@ -403,8 +448,8 @@ struct MenuBarView: View {
         JobMenuSummary.symbol(state: entry.state, hasWarnings: !entry.warnings.isEmpty)
     }
 
-    /// A finished line has no Dismiss: it leaves the menu once three later
-    /// jobs have finished, and a failed one is taken off for good by Remove.
+    /// A failed line is taken off for good by Remove; Dismiss is left to a
+    /// job waiting for speaker names.
     @ViewBuilder
     private func jobActions(_ entry: TranscriptionEntry, index: Int) -> some View {
         if entry.state.isTerminal, let url = entry.fileToOpen {
@@ -442,14 +487,11 @@ struct MenuBarView: View {
     private func jobStateLabel(_ entry: TranscriptionEntry) -> some View {
         Group {
             if [.transcribing, .diarizing, .generatingProtocol].contains(entry.state) {
-                Text(stageProgressText(entry))
+                Text(stageProgress(entry))
                     .foregroundStyle(.secondary)
             } else if entry.state == .error, let msg = entry.error {
                 Text(msg)
                     .foregroundStyle(.red)
-            } else if entry.state == .done, !entry.warnings.isEmpty {
-                Text(entry.warnings.joined(separator: "; "))
-                    .foregroundStyle(.orange)
             } else {
                 Text(entry.state.label)
                     .foregroundStyle(.secondary)
@@ -458,22 +500,10 @@ struct MenuBarView: View {
         .font(.caption2)
     }
 
-    /// Live elapsed for the active stage, plus the historical average ("· Ø
-    /// m:ss") when one exists, and a "longer than usual" hint once the live run
-    /// runs meaningfully past that average — so the user can tell at a glance
-    /// whether the current run is normal. Purely informational.
-    private func stageProgressText(_ entry: TranscriptionEntry) -> String {
-        let elapsed = pipelineQueue.activeJobElapsed
-        let base = "\(entry.state.label) \(formattedElapsed(elapsed))"
-        guard let stage = StageKind(jobState: entry.state),
-              let avg = pipelineQueue.averageSeconds(forJobID: entry.id, stage: stage), avg > 0 else { return base }
-        let suffix = StageTimingStats.isSlowerThanUsual(elapsed: elapsed, average: avg)
-            ? " · longer than usual (Ø \(formattedElapsed(avg)))"
-            : " · Ø \(formattedElapsed(avg))"
-        return base + suffix
-    }
-
-    private func formattedElapsed(_ seconds: TimeInterval) -> String {
-        formattedTime(seconds)
+    /// The running stage's start and expected finish, read from the queue's
+    /// clock for the job. Nothing here reads the time, so the line changes
+    /// only when the clock does, at a job event.
+    private func stageProgress(_ entry: TranscriptionEntry) -> String {
+        JobMenuSummary.stageProgress(state: entry.state, clock: pipelineQueue.stageClock(forJobID: entry.id))
     }
 }

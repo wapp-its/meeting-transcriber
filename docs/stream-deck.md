@@ -166,6 +166,25 @@ again until its call has really ended. A detected meeting stops at the app's nex
 check for meetings, so the key can take a few seconds to answer. `mt-cli` has no
 flag for this yet.
 
+### Pausing a recording
+
+`pause` and `resume` work on whatever is recording, a detected meeting included,
+so one pair of keys covers every recording. While paused nothing is captured;
+`resume` carries on with the same recording, and its transcript gets one
+`[Pause HH:MM–HH:MM]` line where the pause was.
+
+```bash
+curl -sS --fail-with-body -X POST http://127.0.0.1:9876/v1/record \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"pause"}'
+```
+
+Bind the second key to `{"action":"resume"}`. There is no pause toggle, for the
+reason in the next section. To show the state on a key, read `paused` from the
+response: `badge` stays `recording` during a pause. A `pause` with nothing
+recording answers `409`. `mt-cli` has no pause verb yet.
+
 ## Start and stop beat toggle
 
 `toggle` is the obvious binding and the worst one, because a button press is a
@@ -218,7 +237,7 @@ told.
 | `401` | Token rotated, or the API was toggled off and on. Re-read the file — do not cache it. |
 | Connection refused | App not running, or **Settings → Advanced → Local Automation API** is off. |
 | Token file missing | Same — the file is written when the API starts. |
-| `409` | A recording already owns the loop: from the app picker, or a detected meeting. Stop it first. |
+| `409` | A recording already owns the loop: from the app picker, or a detected meeting. Stop it first. On a `pause`: nothing is recording. |
 | `412` | `/v1/record` only. "No Microphone" is set, or the mic permission is denied. Pressing again will not help. |
 | Browser opens on every press | "Access in background" is unticked on the Website action. |
 | Nothing happens, no error | The Shortcut name in the URL does not match, or is not URL-encoded. |

@@ -3,6 +3,9 @@ import os.log
 
 private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "WatchLoop")
 
+/// A stopped recording and its pauses, which a cut changes together.
+typealias StoppedRecording = (recording: RecordingResult, pauses: [RecordingPause])
+
 /// How a detected meeting's recording ends, split out of `WatchLoop.swift` to
 /// keep that file under the line cap.
 ///
@@ -30,7 +33,9 @@ extension WatchLoop {
     /// earlier version let the `CancellationError` escape and discarded the
     /// whole recording. Stopped while the question is open, the recording ends
     /// as an unanswered question would, cut back. Every way out of here takes
-    /// the open question back.
+    /// the open question back, and the long-silence question with it. A
+    /// recording that nears its maximum length is warned once, and one the
+    /// maximum ends is told so (`WatchLoop+StopNotices.swift`).
     ///
     /// `recording` is the meeting's recorder and when the loop saw its capture
     /// running, where the cut is measured from. With it, each question's cut
@@ -49,7 +54,12 @@ extension WatchLoop {
             countdown: meetingEndCountdown,
         )
         var phase = MeetingEndPhase.listening(signalLostAt: nil)
-        defer { withdrawMeetingEndQuestion() }
+        var capWarned = false
+        let title = Self.cleanTitle(meeting.windowTitle)
+        defer {
+            withdrawMeetingEndQuestion()
+            endSilencePrompt()
+        }
 
         do {
             while !Task.isCancelled {
@@ -70,6 +80,11 @@ extension WatchLoop {
                     answer: takeMeetingEndAnswer(),
                 )
                 let decision = WatchLoopEndPolicy.step(config: config, startTime: startTime, phase: phase, poll: poll)
+                if let stop = stepSilencePrompt(beside: decision, from: phase) {
+                    diagnostics.notice(AutoStopReason.silenceStop.logLine(trigger: .auto, silentFor: stop.silentFor))
+                    holdRedetection(of: meeting)
+                    return stop.cutAt
+                }
                 switch decision {
                 case let .continuePolling(next):
                     phase = next
@@ -86,8 +101,14 @@ extension WatchLoop {
 
                 case let .stop(stop):
                     diagnostics.notice(stop.reason.logLine(trigger: .auto, signalAbsentFor: stop.signalAbsentFor))
+                    if stop.reason == .maxDuration {
+                        postStopNotice(RecordingStopNotices.capReached(recordingTitle: title, maxDuration: maxDuration))
+                    }
                     return stop.cutAt
                 }
+                warnBeforeMaximumIfDue(
+                    elapsed: poll.now.timeIntervalSince(startTime), recordingTitle: title, trigger: .auto, warned: &capWarned,
+                )
                 try await sleepProvider(pollInterval)
             }
         } catch is CancellationError {}
@@ -95,14 +116,33 @@ extension WatchLoop {
         return WatchLoopEndPolicy.cutWhenWatchingStops(phase: phase, answer: takeMeetingEndAnswer())
     }
 
+    /// The long-silence question's step in a poll of the wait, run after the
+    /// meeting-end decision and before it is carried out. None in a poll that
+    /// decision ends the recording in: that end stands as it is, and the way
+    /// out takes the silence question back. Held while the meeting-end
+    /// question is open, from the poll that asks it, before it goes up, to the
+    /// poll that settles it, so the silence count restarts where it closed.
+    private func stepSilencePrompt(beside decision: WatchLoopEndDecision, from phase: MeetingEndPhase) -> SilenceStop? {
+        let held: Bool
+        switch (phase, decision) {
+        case (_, .stop): return nil
+        case (.askingToEnd, _), (_, .askToEnd): held = true
+        default: held = false
+        }
+        return stepSilencePrompt(held: held, trigger: .auto)
+    }
+
     /// Cut the stopped recording back to `cutAt`, every track at the same
     /// point, and return it with `recordedUntil` saying where its audio now
     /// ends. `startedAt` and `stoppedAt` are when capture was running and when
-    /// it was stopped, on the loop's clock, which is how `cutAt` is placed on
-    /// the audio's own timeline (`RecordingCut.keptSeconds`). A failed cut
-    /// returns the recording uncut, never lost: as recorded, or, when an
-    /// original could not be put back on its path, pointing at it where it is.
-    /// A balanced mix is then made again from the cut tracks, since its gains
+    /// it was stopped, on the loop's clock, which with the recording's pauses
+    /// is how `cutAt` is placed on the audio's own timeline
+    /// (`RecordingCut.keptSeconds`). The pauses come back clipped at `cutAt`:
+    /// one that began at or after it is dropped, one spanning it ends there.
+    /// A failed cut returns the recording uncut, never lost, and its pauses
+    /// unclipped: the tracks as recorded, or, when an original could not be
+    /// put back on its path, pointing at it where it is. After a cut, a
+    /// balanced mix is made again from the cut tracks, since its gains
     /// were measured on the audio the cut threw away; a failed remix keeps the
     /// cut mix.
     ///
@@ -112,17 +152,19 @@ extension WatchLoop {
     /// value rather than place the cut again. A failed write is logged and the
     /// cut goes ahead.
     func cutBack(
-        _ recording: RecordingResult,
+        _ stopped: StoppedRecording,
         to cutAt: Date,
         startedAt: Date,
         stoppedAt: Date,
         recorder: any RecordingProvider,
-    ) -> RecordingResult {
+    ) -> StoppedRecording {
+        let recording = stopped.recording
         let seconds = RecordingCut.keptSeconds(
             cutAt: cutAt,
             startedAt: startedAt,
             stoppedAt: stoppedAt,
             mixDuration: RecordingCut.duration(of: recording.mixPath),
+            pauses: stopped.pauses,
         )
         do {
             try recorder.recordPendingCutResolution(keptSeconds: seconds, captureEndedAt: stoppedAt)
@@ -133,12 +175,12 @@ extension WatchLoop {
             try RecordingCut.apply(to: recording, keepingFirst: seconds)
         } catch let RecordingCut.CutError.rollbackIncomplete(uncut) {
             diagnostics.warning("recording_cut_failed rollback_incomplete tracks_moved=\(uncut.count)")
-            return RecordingCut.redirect(recording, to: uncut)
+            return (RecordingCut.redirect(recording, to: uncut), stopped.pauses)
         } catch {
             // Domain and code only: a file error's description names the path.
             let nsError = error as NSError
             diagnostics.warning("recording_cut_failed domain=\(nsError.domain) code=\(nsError.code)")
-            return recording
+            return stopped
         }
         diagnostics.notice("recording_cut kept_s=\(Int(seconds.rounded()))")
         if recording.levelBalanced {
@@ -151,10 +193,11 @@ extension WatchLoop {
         }
         // The cut point itself, moved onto the recorder's clock. Not the start
         // plus `seconds`: that is audio kept, which runs from the audio's first
-        // frame, and that frame can predate the recorder's start date.
+        // frame, and that frame can predate the recorder's start date. A
+        // wall-clock time, so the pauses do not shorten it.
         var cut = recording
         cut.recordedUntil = recording.recordingStartDate.addingTimeInterval(cutAt.timeIntervalSince(startedAt))
-        return cut
+        return (cut, stopped.pauses.clipped(at: cutAt))
     }
 
     /// Remove the cut `recorder` stored: when a question is settled without a

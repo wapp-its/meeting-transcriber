@@ -75,6 +75,11 @@ enum SettingsHelp {
         a report about a silent app track needs.
         """
 
+    static let silencePrompt =
+        "When nothing has been heard on any recorded track for this long, a notification asks " +
+        "whether to stop the recording. Stop now ends it, cuts off the silence at the end and " +
+        "processes it. Without an answer it keeps recording and asks again after the same time."
+
     static let asymmetricSilenceWarning =
         "How long the condition must last before the indicator turns red and, for a channel " +
         "that has stopped delivering, before you are notified. Lower reacts faster to a dead " +

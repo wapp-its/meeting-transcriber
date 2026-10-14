@@ -19,8 +19,10 @@ extension Notification.Name {
 /// every open Window.
 private struct AnimatedMenuBarIcon: View {
     let badge: BadgeKind
+    let pausedOverlay: Bool
     let watchingOverlay: Bool
     let questionOverlay: Bool
+    let meetingEndCountdownOverlay: Bool
     let permissionOverlay: Bool
     let recordOnlyOverlay: Bool
     let micSilentOverlay: Bool
@@ -37,8 +39,10 @@ private struct AnimatedMenuBarIcon: View {
         Image(nsImage: MenuBarIcon.image(
             badge: badge,
             animationFrame: animationFrame,
+            pausedOverlay: pausedOverlay,
             watchingOverlay: watchingOverlay,
             questionOverlay: questionOverlay,
+            meetingEndCountdownOverlay: meetingEndCountdownOverlay,
             permissionOverlay: permissionOverlay,
             recordOnlyOverlay: recordOnlyOverlay,
             micSilentOverlay: micSilentOverlay,
@@ -155,8 +159,16 @@ struct MeetingTranscriberApp: App {
             onStopManualRecording: appState.canStopRecording ? {
                 appState.watching.stopRecording()
             } : nil,
-            onOpenLastProtocol: openLastProtocol,
+            isRecordingPaused: appState.isRecordingPaused,
+            onTogglePause: appState.canPauseRecording ? {
+                appState.watching.togglePause()
+            } : nil,
             onOpenProtocol: openJobFile,
+            onOpenLastProtocol: { url in
+                Self.openLastProtocol(
+                    url, scopeRoot: appState.settings.effectiveOutputDir, notifier: NotificationManager.shared,
+                )
+            },
             onOpenProtocolsFolder: openProtocolsFolder,
             onOpenSettings: {
                 bringWindowToFront(id: "settings")
@@ -184,8 +196,10 @@ struct MeetingTranscriberApp: App {
         } icon: {
             AnimatedMenuBarIcon(
                 badge: appState.currentBadge,
+                pausedOverlay: appState.isRecordingPaused,
                 watchingOverlay: appState.isWatching,
                 questionOverlay: appState.awaitingUserAnswer,
+                meetingEndCountdownOverlay: appState.meetingEndCountdownOverlay,
                 permissionOverlay: appState.hasPermissionProblem,
                 recordOnlyOverlay: appState.settings.recordOnly,
                 // `recordingSilentActive` paints both halves; folded into the
@@ -418,13 +432,6 @@ struct MeetingTranscriberApp: App {
         appState.pipeline.enqueueFiles(panel.urls)
     }
 
-    private func openLastProtocol() {
-        if let job = appState.pipeline.queue.completedJobs.last,
-           let path = job.protocolPath ?? job.transcriptPath {
-            NSWorkspace.shared.open(path)
-        }
-    }
-
     private func bringWindowToFront(id: String) {
         openWindow(id: id)
         NSApp.activate(ignoringOtherApps: true)
@@ -524,8 +531,15 @@ struct MeetingTranscriberApp: App {
         commandLineArgs.contains("--auto-watch") || autoWatchSetting
     }
 
-    /// Returns the protocol path from the last completed job, if any.
-    static func lastCompletedProtocolPath(completedJobs: [PipelineJob]) -> URL? {
-        completedJobs.last?.protocolPath
+    /// "Open Last Protocol": the file inside the output folder's security
+    /// scope, through the check the Transcriptions window's Open makes. When
+    /// the file is gone the window says "The file was moved or deleted."; the
+    /// menu has closed by then, so the same sentence arrives as a notification.
+    static func openLastProtocol(
+        _ url: URL, scopeRoot: URL, notifier: any AppNotifying,
+        open: (URL) -> Void = { NSWorkspace.shared.open($0) },
+    ) {
+        guard !TranscriptionFileOpener.perform(url, scopeRoot: scopeRoot, action: open) else { return }
+        notifier.notify(title: "Open Last Protocol", body: "The file was moved or deleted.", urgency: .standard)
     }
 }

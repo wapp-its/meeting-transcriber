@@ -10,7 +10,7 @@
 #     the original in mt-update's order;
 #   - once a run is clean, an open `upstream-sync` issue closes itself.
 # It also keeps the original's workflows switched off in the fork, except ci.yml
-# (started per fork PR by wapp-fork-ci.yml) and our own wapp-* workflows: the rest
+# (started on request by wapp-fork-ci.yml) and our own wapp-* workflows: the rest
 # needs the original's self-hosted runner, publishes its site or cuts releases.
 #
 # Pushing a merge that changes .github/workflows needs a token with the workflows
@@ -20,8 +20,10 @@
 name: wapp upstream sync
 
 on:
+  # Once a night (02:17 UTC): the original changes rarely, and mt-update merges
+  # upstream/main itself, so a faster sync only moves conflict reports earlier.
   schedule:
-    - cron: "17 */6 * * *"
+    - cron: "17 2 * * *"
   workflow_dispatch:
     inputs:
       dry_run:

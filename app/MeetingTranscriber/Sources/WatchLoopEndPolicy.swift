@@ -57,20 +57,26 @@ enum AutoStopReason: String {
     case stopNow = "stop_now"
     case maxDuration = "max_duration"
     case appExited = "app_exited"
+    /// "Stop now" to the long-silence question.
+    case silenceStop = "silence_stop"
 
     /// The diagnostic line for an automatic stop. Carries no meeting title,
     /// participant or transcript, because the line is unconditional and lands
     /// in the log file the user exports: the trigger, the reason, how long the
-    /// signal had been missing (whole seconds) and, for an app that quit, its
-    /// process id.
+    /// signal had been missing and how long nothing had been heard (whole
+    /// seconds) and, for an app that quit, its process id.
     func logLine(
         trigger: RecordingSidecar.Trigger,
         signalAbsentFor: TimeInterval? = nil,
+        silentFor: TimeInterval? = nil,
         pid: pid_t? = nil,
     ) -> String {
         var line = "recording_auto_stop trigger=\(trigger.rawValue) reason=\(rawValue)"
         if let signalAbsentFor {
             line += " signal_absent_s=\(Int(signalAbsentFor.rounded()))"
+        }
+        if let silentFor {
+            line += " silent_s=\(Int(silentFor.rounded()))"
         }
         if let pid {
             line += " pid=\(pid)"

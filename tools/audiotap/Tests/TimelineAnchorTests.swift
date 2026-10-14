@@ -45,6 +45,24 @@ final class TimelineAnchorTests: XCTestCase {
         )
     }
 
+    /// A track whose first buffer writes nothing (every frame of it inside a
+    /// pause) is anchored there all the same, so the gap before its next
+    /// buffer is filled; a second call before anything is written changes nothing.
+    func testAnchoringWithoutWritingFillsTheGapToTheNextBuffer() {
+        var anchor = TimelineAnchor(rate: 16000)
+        anchor.anchorIfUnset(hostSeconds: 100.0)
+        anchor.anchorIfUnset(hostSeconds: 100.5)
+        XCTAssertEqual(anchor.silenceFramesBefore(hostSeconds: 101.0, frameCount: 1600), 16000)
+    }
+
+    /// Once a buffer has been written, anchoring without writing is a no-op.
+    func testAnchoringWithoutWritingLeavesAnAnchoredTrackAlone() {
+        var anchor = TimelineAnchor(rate: 16000)
+        _ = anchor.silenceFramesBefore(hostSeconds: 100.0, frameCount: 1600)
+        anchor.anchorIfUnset(hostSeconds: 105.0)
+        XCTAssertEqual(anchor.silenceFramesBefore(hostSeconds: 100.1, frameCount: 1600), 0)
+    }
+
     /// A timestamp slightly behind the write head (clock jitter / converter
     /// latency wobble) must never produce negative silence — we pad, never drop.
     func testEarlyBufferNeverNegative() {

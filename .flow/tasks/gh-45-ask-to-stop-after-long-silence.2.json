@@ -6,10 +6,10 @@
   "depends_on": [],
   "id": "gh-45-ask-to-stop-after-long-silence.2",
   "priority": null,
-  "review": "codex:gpt-5.6-sol:xhigh",
+  "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-45-ask-to-stop-after-long-silence",
   "spec_path": ".flow/tasks/gh-45-ask-to-stop-after-long-silence.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Long Silence setting in Settings > General",
   "updated_at": "2026-10-06T20:27:10.949593Z"
 }

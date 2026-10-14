@@ -65,8 +65,8 @@ per connection; exceeding it closes the connection without sending a response.
 | `POST` | `/v1/jobs/<id>/naming/skip` | Skip naming for a job (accept auto-assigned names). |
 | `GET`  | `/v1/watch` | Read whether the app is watching for meetings. |
 | `POST` | `/v1/watch` | Start, stop or toggle meeting watching. |
-| `GET`  | `/v1/record` | Read whether a microphone-only recording is running. |
-| `POST` | `/v1/record` | Start, stop or toggle a microphone-only recording; with `"scope":"any"`, stop any recording. |
+| `GET`  | `/v1/record` | Read whether a microphone-only recording is running, and whether the running recording is paused. |
+| `POST` | `/v1/record` | Start, stop or toggle a microphone-only recording; pause or resume any recording; with `"scope":"any"`, stop any recording. |
 
 A query string is stripped before routing, so `/v1/jobs/<id>?foo=bar` still
 resolves the id. The one query parameter with meaning is `include=transcript`
@@ -277,7 +277,8 @@ Responses:
 
 ### GET /v1/record
 
-Read whether a microphone-only recording is running. Returns a
+Read whether a microphone-only recording is running, and whether the recording
+in progress, of any kind, is paused. Returns a
 [`RecordStatusDTO`](#recordstatusdto).
 
 ```bash
@@ -301,9 +302,29 @@ curl -sS -X POST "$BASE/v1/record" \
   -d '{"action":"start"}'
 ```
 
-`action` is `start`, `stop`, or `toggle`. Prefer `start`/`stop` for anything
-that fires from a button, key or schedule, for the reason spelled out under
-`POST /v1/watch`.
+`action` is `start`, `stop`, `toggle`, `pause`, or `resume`. Prefer
+`start`/`stop` for anything that fires from a button, key or schedule, for the
+reason spelled out under `POST /v1/watch`.
+
+**Pausing a recording.** `pause` and `resume` act on whichever recording runs:
+a microphone-only recording, an app-picker recording or an auto-detected
+meeting. Unlike a plain `stop` they need no `scope`, because a pause ends
+nothing. While a recording is paused nothing is captured, on either track.
+`resume` carries on with the same recording, so the meeting still ends up as one
+transcript and one protocol, with a `[Pause HH:MM–HH:MM]` line where the pause
+was. A paused recording ends like a running one: its meeting ending, *Stop
+Recording*, stopping watching and the maximum length all end it. There is no
+pause toggle; send the verb you mean.
+
+```bash
+curl -sS -X POST "$BASE/v1/record" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"pause"}'
+```
+
+`paused` in the body says whether the recording is paused. `badge` keeps reading
+`recording` during a pause, so a client that shows the pause reads `paused`.
 
 **Ending any recording.** A `stop` may carry `"scope": "any"`, its only value:
 
@@ -334,21 +355,27 @@ Responses:
   asked for, and that other recording is deliberately left alone. A plain `stop`
   only ever stops the recording it could have started. With `scope: "any"`,
   `200` means the recording was stopped and handed to processing, or that
-  nothing was recording.
+  nothing was recording. A `pause` answers `200` when it paused the recording
+  and when the recording was already paused; a `resume` answers `200` when it
+  resumed the recording, and also when nothing was paused or nothing records.
 - `409 Conflict` — refused because another recording owns the watch loop: an
   auto-detected meeting, or an app-picker recording. Starting would clobber it.
   Stop that recording first, or use `POST /v1/watch` if it is a detected
   meeting. `otherRecordingActive` is normally `true` in the body; it can read
   `false` when the conflict is a start that registered moments earlier and has
   not reached `recording` yet, in which case `startPending` is the one that is
-  set. Only `start` and a `toggle` that resolves to a start can return this.
+  set. A `pause` also answers `409` when no recording's capture is running:
+  nothing is recording, or a detected meeting has just reached `recording` and
+  its capture is not up yet, which takes a moment; nothing pretends to pause.
+  Only `start`, a `toggle` that resolves to a start, and `pause` can return
+  this.
 - `412 Precondition Failed` — refused because nothing would be captured. Either
   "No Microphone (app audio only)" is set in Settings, or the microphone
   permission is denied or broken. Read `noMic` and `microphoneHealthy` in the
   body to tell the two apart. **Retrying does not help**: unlike `503` this
   answer is stable until someone changes a setting, so a retry loop should stop
   on it.
-- `400 Bad Request` — the body is undecodable, `action` is not one of the three
+- `400 Bad Request` — the body is undecodable, `action` is not one of the five
   verbs, or `scope` is anything but `any` or comes with an action other than
   `stop`. Unlike the codes above this one carries an **empty** body, not a
   `RecordStatusDTO`, because nothing was applied and there is no resulting state
@@ -362,7 +389,9 @@ Responses:
   `scope: "any"` that holds for every kind of recording, including a
   record-only one whose files could not be written. A detected meeting whose
   stop has not taken effect within 20 seconds also answers `503`; the stop stays
-  requested, so the meeting still ends at the next detection poll.
+  requested, so the meeting still ends at the next detection poll. A `pause` or
+  `resume` answers `503` only when a start already in flight did not settle
+  within those 20 seconds.
 
 Retrying is right for `503` and pointless for `412`. That is the whole reason
 they are separate codes.
@@ -550,6 +579,8 @@ as `null` when they have no value. Read them as "absent means none".
   `transcribing`, `diarizing`, `processing`, `userAction`, `done`, `error`, or
   `updateAvailable`. This is the single richest field for a physical button or
   status display, since it folds the whole pipeline into one glanceable value.
+  A paused recording still reads `recording`; `GET /v1/record` reports the
+  pause.
 - `manualRecording`: an app-picker recording owns the loop. Watch control is
   refused (`409`) while this is true.
 - `pendingConsentApp`: the app name awaiting a recording consent answer (any app
@@ -564,6 +595,7 @@ as `null` when they have no value. Read them as "absent means none".
 ```json
 {
   "recording": true,
+  "paused": false,
   "startPending": false,
   "state": "recording",
   "badge": "recording",
@@ -573,8 +605,8 @@ as `null` when they have no value. Read them as "absent means none".
 }
 ```
 
-`recording`, `startPending`, `badge`, `otherRecordingActive`, `noMic` and
-`microphoneHealthy` are always present. `state` is nullable and its key is **omitted** rather than sent
+`recording`, `paused`, `startPending`, `badge`, `otherRecordingActive`, `noMic`
+and `microphoneHealthy` are always present. `state` is nullable and its key is **omitted** rather than sent
 as `null`, following the same convention as the other DTOs.
 
 - `recording`: whether a **microphone-only** recording is in progress.
@@ -583,6 +615,10 @@ as `null`, following the same convention as the other DTOs.
   so a client is never invited to `stop` a recording it did not start. A client
   that does mean to end one asks for that by name, with `"scope": "any"` on a
   `stop`.
+- `paused`: whether the recording in progress is paused, whatever kind it is.
+  Wider than `recording` on purpose, because `pause` and `resume` act on any
+  recording: a paused detected meeting reads `recording: false` and
+  `paused: true`. `false` when nothing records.
 - `startPending`: a start has been accepted but is not recording yet. It waits
   on the microphone permission gate, which on a first run means an OS dialog
   somebody has to answer, so this window is not always short. Without this field
@@ -590,7 +626,9 @@ as `null`, following the same convention as the other DTOs.
 - `state`: `idle`, `watching`, `recording`, or `error`. Absent when no watch loop
   exists at all.
 - `badge`: what the menu bar icon is showing. Same values as in
-  [`WatchStatusDTO`](#watchstatusdto).
+  [`WatchStatusDTO`](#watchstatusdto). It stays `recording` while the recording
+  is paused, so the values a client renders keep their meaning; read `paused`
+  for the pause.
 - `otherRecordingActive`: some other capture owns the watch loop. A `start` is
   refused with `409` while this is true.
 - `noMic`: the "No Microphone (app audio only)" setting is on. A `start` is
@@ -611,7 +649,7 @@ as `null`, following the same convention as the other DTOs.
 | `401` | Missing or wrong bearer token. |
 | `403` | Rejected by the Origin or Host guard. |
 | `404` | Unknown job id. Also `GET /v1/jobs/<id>/naming` when the job is not awaiting naming (the GET folds wrong-state into `404`; the POST naming routes use `409` instead). |
-| `409` | Confirm/skip naming on a job that exists but is not awaiting naming. Also `POST /v1/watch` while a manual recording owns the watch loop, and `POST /v1/record` while any other recording owns it. |
+| `409` | Confirm/skip naming on a job that exists but is not awaiting naming. Also `POST /v1/watch` while a manual recording owns the watch loop, and `POST /v1/record` while any other recording owns it, or on a `pause` with no recording's capture running. |
 | `412` | `POST /v1/record` only: nothing would be captured ("No Microphone" is set, or the mic permission is denied/broken). Stable until a setting changes, so do not retry. |
 | `503` | `POST /v1/watch` and `POST /v1/record`: the action was attempted and did not take. On `/v1/watch` that means the state did not settle within 20 seconds; on `/v1/record` also a recorder that would not start, a stop whose audio could not be handed to the pipeline, or a `"scope":"any"` stop of a detected meeting that did not take effect within 20 seconds. Retryable, unlike `412`. On `/v1/watch` a *denied* microphone gives `200`, not this; on `/v1/record` it gives `412`. |
 
