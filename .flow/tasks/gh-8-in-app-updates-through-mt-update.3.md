@@ -51,9 +51,54 @@ Puts mt-update mode into `UpdateChecker` and wires it into the app: the check br
 - [ ] `AppState` picks mt-update mode only through `MtUpdateProvider.detect()` (non-App-Store), exposes the install reason from the gate, restores watching through the auto-watch path, and the badge and `/state.updateStatus` report an mt-update build (one RPC test).
 - [ ] `./scripts/pre-push.sh` and the App Store test build succeed; lint clean.
 ## Done summary
-TBD
+The installed Dev build with mt-update present now checks for updates through `mt-update --check --porcelain`, can start an install in the background, and reports how the install ended. The report arrives as a notification while the app runs, or at the next launch after mt-update replaced the app. `UpdateChecker` gained mt-update mode in `UpdateChecker+MtUpdate.swift`. `AppState` picks the mode through `MtUpdateProvider.detect()` outside the App Store build, exposes the install gate, and turns watching back on through the auto-watch path. The badge and `/state.updateStatus` report an mt-update build. No view changed (task 4 adds the About and menu controls).
 
+stage: impl-review - ran [2026-10-14T12:15:22Z..2026-10-14T12:26:13Z]
+
+Tier: implementer - opus at xhigh (explicit invocation) (model: claude-opus-5-5)
+
+Review: codex:gpt-6-astra:xhigh, receipt effort xhigh, receipt /tmp/impl-review-receipt-cfaadf991a4c-gh-8-in-app-updates-through-mt-update.3.json, terminal verdict SHIP.
+- Round 1 used three lenses. Correctness and integration returned NEEDS_WORK with the same P2 finding: after a relaunch, "Update did not finish" cleared the record without its summary, so Install stayed refused until a check ran (R7). Contracts returned SHIP. The round was finalized with `--merged-file`, because the contracts draw had no findings container and `--merge-plan` refused it.
+- Fix 832d711f puts the record's summary back on offer for a failed or unfinished install. Both recovery tests failed for that reason before the fix (summary nil, 0 launches).
+- Round 2 used one reviewer, which returned SHIP ("Prior finding #1: fixed"). No finding was declined.
+- Commit 86901b1f landed after the SHIP and was not reviewed again. It adds one assertion to an existing test and changes no production code (Choices 3).
+- The reviewer sandbox was workspace-write. After each round `git status` showed only flowctl's ledger (`.flow/specs/gh-8-in-app-updates-through-mt-update.json`, `.flow/review-runs/`), so nothing needed reverting.
+- Memory captured: `bug/runtime-errors/relaunch-after-an-unfinished-install-2026-10-14`.
+
+Verification
+- baseline: green before any edit. `--filter 'MtUpdate|UpdateInstall|UpdateChecker|AboutSettingsView|MenuBarView|RPCUpdateStatus|RPCBadgeState|AppStateTests'` ran 195 tests, rc 0. Lint found 0 violations in 809 files.
+- mutation check: nine deliberate defects each turned their target test red, and the sources were restored afterwards (cmp against backups). The defects were a failed check dropping the earlier build, `installNow` ignoring a running check, `resumeAfterLaunch` running twice, the recheck stopping after one look, the record always saying watching was on, AppState forwarding no blocked reason, `/state` dropping the summary, the finish path not returning to idle, and the next launch not turning watching on.
+- the same filter on 832d711f ran 208 tests, rc 0. `--filter UpdateCheckerMtUpdateTests` on 86901b1f ran 12 tests, rc 0.
+- `swift build --build-tests -Xswiftc -DAPPSTORE`: rc 0.
+- `./scripts/pre-push.sh`: rc 0, "OK — pre-push parity check passed" (release build and the 300 ms type-check limit).
+- `./scripts/lint.sh` with the cached pinned tools: 0 files need formatting, 0 violations in 812 files.
+- not run: the app as a user meets it. mt-update mode is active only in `/Applications/MeetingTranscriber-Dev.app`, which only mt-update installs. This branch is not in `branches.txt`, and the fork rules forbid quitting the installed app any other way. The real install is the owner's check (spec Verification). Until task 4 nothing in the UI calls `installUpdate()`.
+- not run: CI's `swiftlint analyze` (`unused_declaration`) needs a clean xcodebuild. `isMtUpdateMode` and `AppState.installUpdate()` have no production caller until task 4, and `lastInstallError` has no production reader until then, so that check may report them on this commit. `MtUpdateProvider.detect()` now has its production caller.
+
+Error-case tests (R-IDs this task satisfies)
+- R1, the App Store build has no code that starts mt-update: the factory branch is `#if !APPSTORE` and the App Store build succeeded. A path that cannot be read counts as absent: task 2's `testDetectNeedsAnExecutableMtUpdateAndTheInstalledBundle`.
+- R2, other exit codes, a missing or contradicting status, a timeout or no launch give a failed-check message and never an update, and an earlier update stays shown: `UpdateCheckerMtUpdateTests.testACheckMapsEachOutcomeAndAFailureKeepsAnEarlierBuild`.
+- R4, mt-update cannot be started: `testALaunchThatThrowsPostsNotStartableAndSavesNothing`. The guards (no build, installing, checking, blocked): `testInstallNowRefusesWithoutABuildWhileBusyAndWhenBlocked`, `testAppStateRefusesAnInstallWhileAJobWaits`, `testACheckIsRefusedWhileInstalling`.
+- R5, the record is cleared so the message never repeats: `testANewBuildAtLaunchReportsInstalledOnceAndReturnsTheWatchingFlag`. Watching comes back on: `testAnInstallRecordsWatchingAndTheNextLaunchTurnsItBackOn`.
+- R6, an unknown exit status is reported with its number: `testEachLiveExitPostsOneNoticeClearsTheRecordAndReturnsToIdle` (exit 9, signal 15).
+- R7, mt-update gone without a new build: `testTheSameBuildWithMtUpdateGoneAtLaunchDidNotFinish`, `testAnInstallStillRunningAtLaunchIsRecheckedUntilItHasGone`. A recorded PID whose start time differs counts as gone: task 2's `isRunning` tests.
+
+Choices
+1. Rule 1 (spec Edge Cases, "About keeps a live failure on screen until the next check or install"). A check that starts clears `lastInstallError` together with `lastError`, as GitHub mode clears `lastError`. A successful install launch also clears it. Tests: `testACheckMapsEachOutcomeAndAFailureKeepsAnEarlierBuild`, `testInstallNowStartsTheInstallerAndSavesTheRecord`.
+2. Rule 1 (R7, "so checks and Install Update are available again", the review round 1 finding). A failed or unfinished install puts the summary of the build it tried back into `availableBuildSummary`. The live exit passes the summary it started with, and the launch paths pass the record's. Right after a "did not finish" launch, Install is offered and the menu-bar badge shows an update, before any check. Tests: `testTheSameBuildWithMtUpdateGoneAtLaunchDidNotFinish`, `testAnInstallStillRunningAtLaunchIsRecheckedUntilItHasGone`.
+3. Rule 4 (About text, visible once task 4 reads it). An install that did not finish (at launch or after the recheck) also keeps its notice text in `lastInstallError`, like a failure that ends while the app runs. About can then show it until the next check or install. flip at: `UpdateChecker+MtUpdate.swift: finishInstall(_:installing:)`, the `.didNotFinish` case. test: `testTheSameBuildWithMtUpdateGoneAtLaunchDidNotFinish`.
+4. Rule 1 (spec Edge Cases, "a build that starts without mt-update leaves it alone"). `resumeAfterLaunch` in GitHub mode returns false and leaves the record in place. Test: `testNothingIsReportedWithoutARecordOrOutsideMtUpdateMode`.
+5. Rule 6. The mt-update check refuses on `isChecking` and `isInstalling` and runs in its own `Task`. The GitHub path's private `checkTask` and its body stay untouched. Tests: `testACheckIsRefusedWhileInstalling`, `testACheckMapsEachOutcomeAndAFailureKeepsAnEarlierBuild` (asserts `isChecking` during the check).
+6. Rule 6. The recheck is a `Task` that holds the checker weakly. Nothing stores or cancels it, and it ends once the evaluation is no longer "still running" or the checker is gone. A recheck that finds the record gone (it no longer decodes) returns to idle without a notice. That branch has no test, because only a damaged record reaches it.
+7. Rule 6. While a launch finds the install still running, the summary is not restored. It comes back only if the install ends as a failure (Choices 2).
+8. Rule 6. A launch that throws reports `error.localizedDescription` in the not-startable notice (for the provider's log error, "cannot open <path>: <reason>"). `lastInstallError` holds the whole notice body, as for live failures. Test: `testALaunchThatThrowsPostsNotStartableAndSavesNothing`.
+9. Rule 6. The `AppState` wiring tests (an install refused while a job waits, and watching restored on the next launch) live in `UpdateCheckerMtUpdateTests.swift`, because `AppStateTests.swift` is outside this task's Touches.
+10. Rule 6. The record's `startedAt` is taken just before the launch, and the record is saved right after it returns, on the main actor. A test fires the exit by hand after the save.
+
+Follow-ups: none. No feature-map route changed (no view or menu change in this task).
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 06ebe2860eb41e083f5e70ffcfbaa6fc09d65ac1, 832d711fbe510a5231dce7be94aab49a9650541f, 86901b1f260876bdf311573b35c346833f9b6b3a
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/gh-8-test-home swift test --parallel --filter 'MtUpdate|UpdateInstall|UpdateChecker|AboutSettingsView|MenuBarView|RPCUpdateStatus|RPCBadgeState|AppStateTests' (208 tests, rc 0), cd app/MeetingTranscriber && swift build --build-tests -Xswiftc -DAPPSTORE (rc 0), ./scripts/pre-push.sh (rc 0), ./scripts/lint.sh with the cached pinned tools (0 violations, 812 files)
 - PRs:
