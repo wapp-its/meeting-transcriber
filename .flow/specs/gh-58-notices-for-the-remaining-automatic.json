@@ -300,7 +300,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-58-notices-for-the-remaining-automatic.md",
-  "status": "open",
+  "status": "done",
   "title": "Notices for the remaining automatic stops",
   "tracker": {
     "baseHashFlow": null,
@@ -314,5 +314,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/58"
   },
-  "updated_at": "2026-10-14T05:28:44.798137Z"
+  "updated_at": "2026-10-14T05:44:51.487255Z"
 }
