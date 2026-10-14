@@ -34,7 +34,7 @@ CI_PATH = ".github/workflows/ci.yml"
 # Runs that test the commit they name. A pull_request run tests GitHub's merge commit
 # with the PR base instead, and ci.yml skips its tests there for some paths.
 DIRECT_EVENTS = ("workflow_dispatch", "push")
-GREEN_CANDIDATES = 50
+PAGE_SIZE = 100
 ANNOTATION_PAGES = 10
 CULPRIT = re.compile(r"'(.+?)' failed and cancelled this run")
 
@@ -44,6 +44,10 @@ class GhError(Exception):
 
 
 class GitError(Exception):
+    pass
+
+
+class RunListError(Exception):
     pass
 
 
@@ -78,35 +82,55 @@ class Git:
                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
 
     def changed_paths(self, a, b):
-        # --no-renames: a move out of the app into docs/ must still show its source path
-        proc = subprocess.run(["git", "diff", "--no-renames", "--name-only", a, b],
+        # --no-renames: a move out of the app into docs/ must still show its source path.
+        # -z: names come unquoted, so a non-ASCII name still matches the exclusions.
+        proc = subprocess.run(["git", "diff", "--no-renames", "--name-only", "-z", a, b],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if proc.returncode != 0:
             raise GitError(proc.stderr.strip())
-        return [line for line in proc.stdout.splitlines() if line]
+        return [name for name in proc.stdout.split("\0") if name]
+
+
+def green_runs(repo):
+    """Successful ci.yml runs, newest first, a page at a time until the history ends."""
+    page = 1
+    while True:
+        try:
+            runs = gh("GET", "repos/%s/actions/workflows/ci.yml/runs?status=success&per_page=%d&page=%d"
+                      % (repo, PAGE_SIZE, page))["workflow_runs"]
+        except (GhError, KeyError, TypeError) as e:
+            raise RunListError(str(e))
+        for run in runs:
+            yield run
+        if len(runs) < PAGE_SIZE:
+            return
+        page += 1
 
 
 def decide_skip(head_sha, green_runs, git):
-    """Returns ("skip", run, reason) or ("run", None, reason). Doubt always runs."""
-    if green_runs is None:
-        return "run", None, "the run list of passing ci.yml runs was unreadable"
+    """Returns ("skip", run, reason) or ("run", None, reason). Doubt always runs.
+
+    green_runs is any iterable of runs; reading it may raise RunListError."""
     if not git.has_commit(head_sha):
         return "run", None, "the head %s is not in the history" % head_sha[:8]
     compared = None
     seen = set()
-    for run in green_runs:
-        sha = run.get("head_sha") or ""
-        if run.get("event") not in DIRECT_EVENTS or not sha or sha in seen or not git.has_commit(sha):
-            continue
-        seen.add(sha)
-        try:
-            paths = git.changed_paths(sha, head_sha)
-        except GitError as e:
-            return "run", None, "the comparison failed against %s: %s" % (sha[:8], e)
-        if not any(is_code_path(p) for p in paths):
-            return "skip", run, "no code change since %s, whose ci.yml run passed" % sha[:8]
-        if compared is None:
-            compared = (sha, [p for p in paths if is_code_path(p)])
+    try:
+        for run in green_runs:
+            sha = run.get("head_sha") or ""
+            if run.get("event") not in DIRECT_EVENTS or not sha or sha in seen or not git.has_commit(sha):
+                continue
+            seen.add(sha)
+            try:
+                paths = git.changed_paths(sha, head_sha)
+            except GitError as e:
+                return "run", None, "the comparison failed against %s: %s" % (sha[:8], e)
+            if not any(is_code_path(p) for p in paths):
+                return "skip", run, "no code change since %s, whose ci.yml run passed" % sha[:8]
+            if compared is None:
+                compared = (sha, [p for p in paths if is_code_path(p)])
+    except RunListError as e:
+        return "run", None, "the run list of passing ci.yml runs was unreadable: %s" % e
     if compared is None:
         return "run", None, "no passing ci.yml run on a commit in the history"
     sha, code = compared
@@ -131,14 +155,7 @@ def request(args):
 
     if args.fetch:
         subprocess.run(["git", "fetch", "--quiet", "origin", "+refs/pull/%d/head" % args.pr])
-    try:
-        runs = gh("GET", "repos/%s/actions/workflows/ci.yml/runs?status=success&per_page=%d"
-                  % (args.repo, GREEN_CANDIDATES))["workflow_runs"]
-    except (GhError, KeyError, TypeError) as e:
-        print("passing runs unreadable: %s" % e)
-        runs = None
-
-    action, green, reason = decide_skip(head_sha, runs, Git())
+    action, green, reason = decide_skip(head_sha, green_runs(args.repo), Git())
     print("PR #%d head %s: %s, %s" % (args.pr, head_sha[:8], action, reason))
     if action == "skip":
         post_status(args.repo, head_sha, "success", reason[0].upper() + reason[1:], green["html_url"])

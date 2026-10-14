@@ -85,12 +85,12 @@ class Harness:
             "head": {"sha": head_sha, "ref": ref, "repo": repo},
         }}
 
-    def green(self, *shas, event="workflow_dispatch"):
-        runs = [{"id": 100 + i, "head_sha": sha, "event": event,
-                 "html_url": "https://example.invalid/runs/%d" % (100 + i)}
+    def green(self, *shas, event="workflow_dispatch", page=1, first_id=100):
+        runs = [{"id": first_id + i, "head_sha": sha, "event": event,
+                 "html_url": "https://example.invalid/runs/%d" % (first_id + i)}
                 for i, sha in enumerate(shas)]
-        self.fixtures["GET repos/%s/actions/workflows/ci.yml/runs?status=success&per_page=50" % REPO] = {
-            "json": {"workflow_runs": runs}}
+        self.fixtures["GET repos/%s/actions/workflows/ci.yml/runs?status=success&per_page=100&page=%d"
+                      % (REPO, page)] = {"json": {"workflow_runs": runs}}
 
     def run(self, *args):
         with open(os.path.join(self.tmp, "fixtures.json"), "w") as f:
@@ -263,6 +263,24 @@ class RequestSkipTests(unittest.TestCase):
         self.h.pr(head)
         self.green_sha = feature
         self.h.green(feature)
+        self.assert_skipped(self.h.request(), head)
+
+    def test_excluded_paths_that_git_quotes_still_skip(self):
+        # git quotes non-ASCII names in its plain output; they must still match the exclusions
+        head = self.h.commit({"docs/überblick.png": "p\n", ".flow/specs/überblick.json": "{}\n",
+                              "app/Überblick.md": "m\n"})
+        self.h.pr(head)
+        self.h.green(self.green_sha)
+        self.assert_skipped(self.h.request(), head)
+
+    def test_passing_commit_beyond_the_first_page_is_found(self):
+        # the 100 newest passing runs tested other code; the matching commit is on page 2
+        other = self.h.commit({"app/Sources/Elsewhere.swift": "e\n"}, "other code")
+        self.h.git("reset", "-q", "--hard", self.green_sha)
+        head = self.h.commit({".flow/specs/x.json": "{}{}\n"})
+        self.h.pr(head)
+        self.h.green(*([other] * 100))
+        self.h.green(self.green_sha, page=2)
         self.assert_skipped(self.h.request(), head)
 
     def test_pull_request_runs_are_not_evidence(self):
