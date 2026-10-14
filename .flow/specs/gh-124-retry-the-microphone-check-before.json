@@ -147,7 +147,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-124-retry-the-microphone-check-before.md",
-  "status": "open",
+  "status": "done",
   "title": "Retry the microphone check before calling it broken",
   "tracker": {
     "baseHashFlow": "ca659b362d4b8617a508c5fa2b1e997631c4654b0079a3457719ff0a67fcb9fe",
@@ -161,5 +161,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nAfter an app start the permission check sometimes reports the microphone as broken. It then posts \"Microphone looks enabled but isn't working - toggle it off and on in System Settings\". The microphone works. On 2026-10-14 it happened after both mt-update restarts (06:00 and 08:03), and the Teams call at 09:01 recorded a normal microphone track.\n\n## NOTES\n\n- The system log shows the same cause both times, about 3 s after launch: `HALC_ProxyIOContext::_StartIO(): Start failed - StartAndWaitForState returned error 35`, then `AVAudioEngineGraph ... kAUStartIO ... error 35`. Error 35 is \"resource temporarily unavailable\", so the audio system was busy and a second try would probably work.\n- `probeMicrophone()` in `PermissionHealthCheck.swift` returns false when `engine.start()` throws, and `checkMicrophone` turns that into `.broken`. There is no retry. The startup check runs right away from the `.task` in `MeetingTranscriberApp`.\n- All later checks in the same run passed (6 checks between 09:02 and 09:23).\n- The notification dedup in `PermissionsController` only lives for one process, so every launch can notify again.\n- The Accessibility probe already treats an inconclusive answer as healthy. The microphone probe has nothing like it.\n- `/tmp/mt-permission.log` would have the reason line, but every process that writes it truncates it (also `xctest` runs), so the launch lines were gone.\n\n## TASKS\n\n- [ ] Retry the probe after a short delay when the engine start fails, and report broken only when the retry fails too\n- [ ] Add a test with an injected probe that fails once and then works, and check that no notification is posted",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/124"
   },
-  "updated_at": "2026-10-14T09:48:41.422625Z"
+  "updated_at": "2026-10-14T09:50:11.519991Z"
 }

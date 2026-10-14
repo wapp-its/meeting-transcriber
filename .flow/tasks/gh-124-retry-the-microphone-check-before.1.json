@@ -10,7 +10,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-124-retry-the-microphone-check-before",
   "spec_path": ".flow/tasks/gh-124-retry-the-microphone-check-before.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement Retry the microphone check before calling it broken",
   "updated_at": "2026-10-14T09:11:41.570280Z"
 }
