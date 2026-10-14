@@ -227,6 +227,7 @@ struct MeetingTranscriberApp: App {
             await appState.engines.preloadActiveModel()
         }
         .task {
+            appState.resumeUpdateAfterLaunch()
             appState.updateChecker.startPeriodicChecks(settings: appState.settings)
         }
         .task {
