@@ -1,14 +1,16 @@
 {
   "branch_name": "local/gh-128-fork-ci-on-request",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-14T10:55:48.160887Z",
   "created_at": "2026-10-14T10:11:02.571751Z",
   "default_impl": null,
   "default_review": null,
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-128-fork-ci-runs-once-before-the-merge-not",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-128-fork-ci-runs-once-before-the-merge-not.1": 0
+  },
   "next_task": 1,
   "no_plan": true,
   "plan_review_rounds": 0,
@@ -119,15 +121,276 @@
       "task": null,
       "timestamp": "2026-10-14T10:17:39.556135Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "3a952687868729bab8477271dd74b8f413355f47c42930daedf3b990c63bc8a6",
+      "backend": "codex",
+      "base_sha": "13b227c04c3efbb018a319b5cdfeb1f1a8f9bd76",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-d037c21e280c9a7e9a7bbdcd4becfa05",
+            "classification": "introduced",
+            "findingId": "finding-d037c21e280c9a7e9a7bbdcd4becfa05",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-cea84639e790a35d1b9d1a0d11b58fcc",
+            "classification": "introduced",
+            "findingId": "finding-cea84639e790a35d1b9d1a0d11b58fcc",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-a2196f2f197c99021192fb1d56ba91bf",
+            "classification": "introduced",
+            "findingId": "finding-a2196f2f197c99021192fb1d56ba91bf",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-4fb3e6a13dc1f447e891726832fa2a84",
+            "classification": "introduced",
+            "findingId": "finding-4fb3e6a13dc1f447e891726832fa2a84",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-6ddc3ab8c63be34c5003c354bcd34028",
+            "classification": "introduced",
+            "findingId": "finding-6ddc3ab8c63be34c5003c354bcd34028",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "a8368667d964b97311ad019c0eaa29686c0bea57",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 4654,
+      "output_sha256": "7b9086ab3ab332ebbd70fd59efec92d4bf1a410a6c0103b7e798a5b3cb90c25b",
+      "reservation_id": "bcc87a43284340ee8211059566151b78",
+      "round_consumed": true,
+      "scope": "impl:gh-128-fork-ci-runs-once-before-the-merge-not.1",
+      "superseded_by": null,
+      "task": "gh-128-fork-ci-runs-once-before-the-merge-not.1",
+      "timestamp": "2026-10-14T10:34:23.911435Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "419eeb09679fae46084b6113e0abc18395938577142c26cfba96e7d2b571fd53",
+      "backend": "codex",
+      "base_sha": "13b227c04c3efbb018a319b5cdfeb1f1a8f9bd76",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-d037c21e280c9a7e9a7bbdcd4becfa05",
+            "classification": "introduced",
+            "findingId": "finding-d037c21e280c9a7e9a7bbdcd4becfa05",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-cea84639e790a35d1b9d1a0d11b58fcc",
+            "classification": "introduced",
+            "findingId": "finding-cea84639e790a35d1b9d1a0d11b58fcc",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-a2196f2f197c99021192fb1d56ba91bf",
+            "classification": "introduced",
+            "findingId": "finding-a2196f2f197c99021192fb1d56ba91bf",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-4fb3e6a13dc1f447e891726832fa2a84",
+            "classification": "introduced",
+            "findingId": "finding-4fb3e6a13dc1f447e891726832fa2a84",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-6ddc3ab8c63be34c5003c354bcd34028",
+            "classification": "introduced",
+            "findingId": "finding-6ddc3ab8c63be34c5003c354bcd34028",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65c8c8f56a57ac6231263965bb7627e5098322e5",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1198,
+      "output_sha256": "d1b7530fbaf8f71bdd86f3686c36e48d09cca8af0073360032e92df64de0b2c0",
+      "reservation_id": "9659b0c041bc4e61ae54a8f8f420e447",
+      "round_consumed": true,
+      "scope": "impl:gh-128-fork-ci-runs-once-before-the-merge-not.1",
+      "superseded_by": null,
+      "task": "gh-128-fork-ci-runs-once-before-the-merge-not.1",
+      "timestamp": "2026-10-14T10:41:02.497502Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "e8274c9ef141e64059574faf96c4e35934b4758926f9d76f45928385b3dc56f7",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-61ddd079dd4d339c4da98dcde4369e42",
+            "classification": "introduced",
+            "findingId": "finding-61ddd079dd4d339c4da98dcde4369e42",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-c695b51c7eeb04f2e9797cf6a9e70a2c",
+            "classification": "introduced",
+            "findingId": "finding-c695b51c7eeb04f2e9797cf6a9e70a2c",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "65c8c8f56a57ac6231263965bb7627e5098322e5",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 510802,
+      "output_sha256": "4161ff029ce91ba2cb78282ba92677632589bbdebe610e8abc5436ba5de87e42",
+      "reservation_id": "47e8a13e528549c198181f7f0e6dbe4b",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T10:51:30.031334Z",
+      "tool_calls": 25,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "5bbf761b75ff5b5207448e861b0a1726d7a8180f2a42da3d27390e680b136e45",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-61ddd079dd4d339c4da98dcde4369e42",
+            "classification": "introduced",
+            "findingId": "finding-61ddd079dd4d339c4da98dcde4369e42",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-c695b51c7eeb04f2e9797cf6a9e70a2c",
+            "classification": "introduced",
+            "findingId": "finding-c695b51c7eeb04f2e9797cf6a9e70a2c",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "c7bf29ef5de47ffcf6ddd867546dce139437e700",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 4198,
+      "output_sha256": "e3c915a12ffe7c041cbd35d22b519246b835e11f7235d01ebfb810a365a498ec",
+      "reservation_id": "76b6a81fce8f4cfba288c590a166ba20",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-14T10:55:48.123864Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-128-fork-ci-runs-once-before-the-merge-not.1": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-128-fork-ci-runs-once-before-the-merge-not.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-128-fork-ci-runs-once-before-the-merge-not.md",
@@ -145,5 +408,5 @@
     "mergeBaseTracker": "Seit 2026-10-08 23:24 startet GitHub im Fork keinen Workflow mehr: keine CI f\u00fcr Fork-PRs und keinen Upstream-Sync. Die Actions-Seite zeigt dazu:\n\n> Workflows are not currently being run on this fork due to the scale of GitHub Actions usage. A repository maintainer can choose to re-enable these.\n\nDie Repo-Einstellung zeigt Actions weiterhin als aktiv, `gh workflow run` antwortet mit HTTP 422 \"Actions has been disabled for this repository\". Ein Maintainer kann die Workflows \u00fcber diesen Hinweis auf https://github.com/wapp-its/meeting-transcriber/actions wieder einschalten. Ohne eine \u00c4nderung am Workflow ist aber zu erwarten, dass GitHub sie wieder pausiert.\n\n## Verbrauch vom 2026-10-02 bis 2026-10-08\n\nGemessen \u00fcber die Actions-API:\n\n- **67 L\u00e4ufe von `ci.yml`**, je rund 58 Job-Minuten: analyze etwa 12, test homebrew etwa 21, test appstore etwa 23, dazu lint und audiotap-coverage, alle auf `xcode-27`. 24 dieser L\u00e4ufe wurden mittendrin abgebrochen, weil ein neuerer Push kam.\n- **61 L\u00e4ufe des Warte-Jobs `wapp fork CI`** auf ubuntu, zusammen 19 Stunden. Der Job wartet fast die ganze Zeit nur auf `ci.yml`.\n- Die Spitze lag bei 5 Stunden CI-Laufzeit am 2026-10-06.\n\n## Warum es so viel ist\n\n1. **Jeder Push startet alle Jobs.** `wapp-fork-ci.yml` startet `ci.yml` per `workflow_dispatch`. Der Pfadfilter dort (Job `changes`) l\u00e4uft aber nur bei `pull_request`, sonst gilt `code: true`. Auch ein Push, der nur `.flow/` \u00e4ndert, kostet deshalb den vollen Lauf. Das betrifft Plan-PRs, Tracker-Sync und Review-Belege. `.flow/**` steht ausserdem nicht in `.github/filters.yml`.\n2. **Jeder neue Push bricht den laufenden Lauf ab und startet neu.** Die Commits, die der Build-Loop pro PR schreibt, kosten so mehrere volle L\u00e4ufe.\n3. **Ein fehlgeschlagener Lauf wird einmal ganz wiederholt**, wegen der bekannten Flakes auf den gehosteten Runnern.\n4. **Der Warte-Job h\u00e4lt einen Linux-Runner bis zu 90 Minuten**, nur um den Status abzufragen.\n\n## Vorschlag, nach Ertrag geordnet\n\n1. **Nur Plan- oder Doku-\u00c4nderungen l\u00f6sen keinen vollen Lauf aus**, wenn der vorherige Stand des PRs gr\u00fcn war. Gemeint sind Pushes, die nur `.flow/`, Markdown oder `docs/` \u00e4ndern. Ein PR, der nur `.flow/` \u00e4ndert (Plan-PR), endet ohne Dispatch gr\u00fcn.\n2. **Den Warte-Job ersetzen**, zum Beispiel durch einen `workflow_run`-Trigger, der das Ergebnis von `ci.yml` als Check an den PR-Head schreibt. Dann pollt kein Runner mehr.\n3. **Die automatische Wiederholung pr\u00fcfen**: behalten, wenn die Flakes noch auftreten, sonst entfernen.\n\n`wapp-*`-Workflows sind Fork-only und gehen nicht an das Original (submit.sh).",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/128"
   },
-  "updated_at": "2026-10-14T10:17:39.589647Z"
+  "updated_at": "2026-10-14T10:55:48.162319Z"
 }
