@@ -6,7 +6,8 @@ Meeting Transcriber itself is MIT licensed (see `LICENSE`).
 shipped application, whether statically linked into the app binary or bundled as
 a data resource. The licence text of each ships inside the app at
 `Contents/Resources/licenses/`, and the same files are kept in this repository
-under `licenses/`.
+under `licenses/`, except those of the local model helper, which come from its
+build (see its section).
 
 Not covered, because they are not redistributed: dependencies used only to build
 the app (`swift-syntax`, which runs as a compiler macro plugin) and dependencies
@@ -183,6 +184,61 @@ linked archive, where ggml accounts for most of them.
 - **License:** MIT. The full text ships as
   `Contents/Resources/licenses/ggml-LICENSE.txt`.
 
+## Local model helper (Homebrew build only)
+
+The Homebrew app carries a second executable, `Contents/Helpers/local-llm-helper`,
+which writes protocols with a local MLX model in its own process. It is built
+from `tools/local-llm-helper`, a package of its own, and its dependencies are
+statically linked into it. The App Store build neither builds nor contains it,
+so none of the components below ship there. Versions are the ones pinned in
+`tools/local-llm-helper/Package.resolved`.
+
+- **mlx-swift** 0.32.3 (<https://github.com/ml-explore/mlx-swift>), MIT,
+  Copyright (c) 2023 ml-explore: the Swift API of MLX. Shipped as
+  `mlx-swift-LICENSE.txt`.
+- **MLX** (<https://github.com/ml-explore/mlx>), MIT, Copyright © 2023 Apple
+  Inc.: the array library and its Metal kernels, vendored in mlx-swift and
+  compiled into the helper, together with its shader library
+  `Contents/Helpers/mlx-swift_Cmlx.bundle`. Shipped as `mlx-swift-mlx-LICENSE.txt`.
+- **mlx-c** (<https://github.com/ml-explore/mlx-c>), MIT, Copyright (c) 2023
+  ml-explore, vendored in mlx-swift. Shipped as `mlx-swift-mlx-c-LICENSE.txt`.
+- **JSON for Modern C++** (<https://github.com/nlohmann/json>), MIT, Copyright (c)
+  2013-2022 Niels Lohmann, vendored in mlx-swift. Shipped as
+  `mlx-swift-json-LICENSE.txt`.
+- **metal-cpp** (<https://developer.apple.com/metal/cpp/>), Apache License 2.0,
+  Copyright © 2024 Apple Inc., vendored in mlx-swift. Shipped as
+  `mlx-swift-metal-cpp-LICENSE.txt`; no NOTICE file travels with it.
+- **mlx-swift-lm** 3.32.3 (<https://github.com/ml-explore/mlx-swift-lm>), MIT,
+  Copyright (c) 2024 ml-explore: the language model code. Shipped as
+  `mlx-swift-lm-LICENSE.txt`.
+- **swift-transformers** 1.3.5 (<https://github.com/huggingface/swift-transformers>),
+  Apache License 2.0, Copyright 2022 Hugging Face SAS: the tokenizer. Shipped as
+  `swift-transformers-LICENSE.txt`; upstream carries no NOTICE file.
+- **swift-jinja** 2.5.1 (<https://github.com/huggingface/swift-jinja>), Apache
+  License 2.0, Copyright 2022 Hugging Face SAS: renders the model's chat
+  template. Shipped as `swift-jinja-LICENSE.txt`.
+- **swift-huggingface** 1.0.0 (<https://github.com/huggingface/swift-huggingface>),
+  Apache License 2.0, Copyright 2025 Hugging Face SAS, a dependency of
+  swift-transformers. Shipped as `swift-huggingface-LICENSE.txt`.
+- **EventSource** 1.5.1 (<https://github.com/mattt/EventSource>), MIT, Copyright
+  2025 Mattt, a dependency of swift-huggingface. Shipped as
+  `EventSource-LICENSE.txt`.
+- **yyjson** 0.12.0 (<https://github.com/ibireme/yyjson>), MIT, Copyright (c)
+  2020 YaoYuan, a dependency of swift-transformers. Shipped as
+  `yyjson-LICENSE.txt`.
+- **swift-crypto** 4.5.2 (<https://github.com/apple/swift-crypto>), Apache
+  License 2.0, Copyright 2019 The SwiftCrypto Project, a dependency of
+  swift-transformers. Upstream carries a NOTICE file, so section 4(d) applies:
+  shipped as `swift-crypto-LICENSE.txt` and `swift-crypto-NOTICE.txt`.
+
+Linked but needing no notice: **swift-collections** 1.7.3 and
+**swift-numerics** 1.1.1 are Apache-2.0 with the Swift runtime library
+exception, which waives attribution for code compiled into a binary, and
+**{fmt}**, vendored in mlx-swift, carries the same kind of exception for object
+code. Resolved but not shipped: **swift-syntax** 603.0.2, which mlx-swift-lm
+needs only for a compiler macro plugin of a product the helper does not use,
+and **swift-asn1** 1.7.3, which nothing in the helper links.
+
 ## How these files get into the bundle
 
 `scripts/lib/bundle-licenses.sh` copies everything in `licenses/` into
@@ -190,3 +246,12 @@ linked archive, where ggml accounts for most of them.
 `scripts/run_app.sh` call it. It loops over the directory rather than naming
 components, so attributing a new dependency means adding its licence file to
 `licenses/` and nothing else.
+
+The local model helper's texts are the exception, because only the Homebrew
+bundle carries the helper while every bundle gets `licenses/`. They are copied
+by the same file's `install_local_llm_helper_licenses` from the helper's
+resolved package checkouts, so they always belong to the version that was
+built. That function names the components, so it also refuses to build when
+`tools/local-llm-helper/Package.resolved` pins a package it neither attributes
+nor lists as needing no notice: a dependency update cannot drop out of this
+file unnoticed.
