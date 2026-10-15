@@ -53,16 +53,22 @@ final class MeetingProtocolOptionsTests: XCTestCase {
         settings.protocolProvider = .none
         settings.recordOnly = true
 
-        let context = ProtocolOptionsContext(
-            choices: ProtocolTemplateChoices(settings: settings, store: store),
-            use: ProtocolOptionsUse(settings: settings),
-        )
+        let choices = ProtocolTemplateChoices(settings: settings, store: store)
+        let context = ProtocolOptionsContext(choices: choices, use: ProtocolOptionsUse(settings: settings))
 
+        // The default a window's draft starts from: a listed file named in
+        // the settings is that file, not the first one in the list.
+        XCTAssertEqual(
+            choices,
+            ProtocolTemplateChoices(
+                templates: [.builtIn, .file(name: "Board"), .file(name: "Retro")],
+                defaultTemplate: .file(name: "Retro"),
+            ),
+        )
         XCTAssertEqual(
             context,
             ProtocolOptionsContext(
                 templates: [.builtIn, .file(name: "Board"), .file(name: "Retro")],
-                defaultTemplate: .file(name: "Retro"),
                 destination: .off,
                 recordOnly: true,
             ),

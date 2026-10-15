@@ -102,12 +102,12 @@ enum ProtocolDestination: Equatable {
     }
 }
 
-/// Everything an options form shows besides the draft.
+/// Everything an options form shows besides the draft. The default template
+/// is not part of it: the form only lists the templates, and each window
+/// starts its draft from `ProtocolTemplateChoices.defaultTemplate`.
 struct ProtocolOptionsContext: Equatable {
     /// The built-in first, then the folder's templates in Finder's order.
     let templates: [ProtocolTemplateID]
-    /// The effective default, spelt as the folder lists it.
-    let defaultTemplate: ProtocolTemplateID
     let destination: ProtocolDestination
     let recordOnly: Bool
 }
@@ -116,18 +116,18 @@ extension ProtocolOptionsContext {
     init(choices: ProtocolTemplateChoices, use: ProtocolOptionsUse) {
         self.init(
             templates: choices.templates,
-            defaultTemplate: choices.defaultTemplate,
             destination: use.destination,
             recordOnly: use.recordOnly,
         )
     }
 }
 
-/// The part of the context a window reads once, when it opens: every opening
-/// starts from the effective default, and the folder is not listed again on
-/// every redraw.
+/// What a window reads once, when it opens: the templates its form lists and
+/// the default its draft starts from. Every opening starts from the effective
+/// default, and the folder is not listed again on every redraw.
 struct ProtocolTemplateChoices: Equatable {
     let templates: [ProtocolTemplateID]
+    /// The effective default, spelt as the folder lists it.
     let defaultTemplate: ProtocolTemplateID
 }
 

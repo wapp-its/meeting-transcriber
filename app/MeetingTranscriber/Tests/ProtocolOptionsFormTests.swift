@@ -13,7 +13,6 @@ final class ProtocolOptionsFormTests: XCTestCase {
     ) -> ProtocolOptionsContext {
         ProtocolOptionsContext(
             templates: [.builtIn, .file(name: "Board"), .file(name: "Retro")],
-            defaultTemplate: .builtIn,
             destination: destination,
             recordOnly: recordOnly,
         )
