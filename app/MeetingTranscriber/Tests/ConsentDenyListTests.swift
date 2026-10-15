@@ -60,4 +60,56 @@ final class ConsentDenyListTests: XCTestCase {
         }
         XCTAssertEqual(list.denied, ["Slack", "Discord", "Aside"])
     }
+
+    func testAnAddedAppsKeyReadsAsItsNameMarkedAsAdded() {
+        let resolve = { (bundleID: String) in ["com.example.zoom": "Zoom"][bundleID] ?? "unresolved \(bundleID)" }
+        XCTAssertEqual(
+            ConsentDenyList.displayName(for: AddedAppIdentity.key(bundleID: "com.example.zoom"), resolveAppName: resolve),
+            "Zoom (added app)",
+        )
+        // The production resolver falls back to the bundle ID for an app that
+        // is not installed.
+        XCTAssertEqual(
+            ConsentDenyList.displayName(for: AddedAppIdentity.key(bundleID: "com.example.not-installed")),
+            "com.example.not-installed (added app)",
+        )
+    }
+
+    func testABuiltInOrBrowserEntryReadsAsStored() {
+        for entry in ["Zoom", "Microsoft Teams", "Google Chrome"] {
+            XCTAssertEqual(ConsentDenyList.displayName(for: entry) { _ in "resolved" }, entry)
+        }
+    }
+
+    /// The carry-over to added-app keys. The resolver stands in for
+    /// `MicInputDetector.appDisplayName(bundleID:)`, which answers the bundle
+    /// ID for an app that is not installed.
+    func testMigrationAddsTheKeyOfEveryAddedAppItsEntriesNameAndRemovesNothing() {
+        let installed = ["com.example.zoom": "Zoom", "com.a.meet": "Meet", "com.b.meet": "Meet", "com.example.slack": "Slack"]
+        let zoomKey = AddedAppIdentity.key(bundleID: "com.example.zoom")
+        let cases: [(String, denied: [String], added: [String], expected: [String])] = [
+            ("a name entry gains the same-named added app's key", ["Zoom"], ["com.example.zoom"], ["Zoom", zoomKey]),
+            ("no added app named on the list", ["Zoom"], ["com.example.slack"], ["Zoom"]),
+            ("an entry equal to the bundle ID", ["com.example.zoom"], ["com.example.zoom"], ["com.example.zoom", zoomKey]),
+            (
+                "two added apps with the same name",
+                ["Meet"], ["com.a.meet", "com.b.meet"],
+                ["Meet", AddedAppIdentity.key(bundleID: "com.a.meet"), AddedAppIdentity.key(bundleID: "com.b.meet")],
+            ),
+            ("a key already listed", ["Zoom", zoomKey], ["com.example.zoom"], ["Zoom", zoomKey]),
+            (
+                "built-in and browser entries keep their order",
+                ["Google Chrome", "Zoom", "WeChat"], ["com.example.zoom"],
+                ["Google Chrome", "Zoom", "WeChat", zoomKey],
+            ),
+        ]
+        for (label, denied, added, expected) in cases {
+            let migrated = ConsentDenyList.migratingAddedAppNames(denied, addedBundleIDs: added) { installed[$0] ?? $0 }
+            XCTAssertEqual(migrated, expected, label)
+        }
+
+        // The first case's added Zoom, not installed while the migration runs:
+        // its name resolves to the bundle ID, so the name entry cannot match.
+        XCTAssertEqual(ConsentDenyList.migratingAddedAppNames(["Zoom"], addedBundleIDs: ["com.example.zoom"]) { $0 }, ["Zoom"])
+    }
 }

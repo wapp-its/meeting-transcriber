@@ -65,6 +65,9 @@ enum A11yID {
     /// value: no device UID or name in it, for the reason the job rows give.
     static let menuMicrophonePicker = "menuMicrophonePicker"
 
+    /// The device picker in the menu bar's Output submenu, for the same reason.
+    static let menuOutputPicker = "menuOutputPicker"
+
     /// Menu bar job row's Remove button on a failed job, addressed by ROW
     /// INDEX for the same reason as `jobRetryButton`.
     static func jobRemoveButton(_ index: Int) -> String {
@@ -77,6 +80,11 @@ enum A11yID {
     /// The menu's Pause Recording / Resume Recording item: one identifier for
     /// both labels, since it is one item whose label follows the state.
     static let pauseResumeRecording = "pauseResumeRecording"
+
+    /// The menu's "Install Update: <summary>" item (mt-update mode). No
+    /// summary in it, so the value stays fixed; kept off the `/ui/press`
+    /// allowlist like `updateInstallButton`.
+    static let menuInstallUpdateButton = "menuInstallUpdateButton"
 
     // Transcriptions window. Its rows show meeting titles and participants,
     // so the per-row buttons are addressed by ROW INDEX in the filtered list,
@@ -190,6 +198,26 @@ enum A11yID {
     static let huggingFaceTokenSaveButton = "huggingFaceTokenSaveButton"
     static let huggingFaceTokenRemoveButton = "huggingFaceTokenRemoveButton"
     static let huggingFaceTokenProblem = "huggingFaceTokenProblem"
+
+    // Hugging Face model browser, a sheet over Settings. `/ui/tree` prunes
+    // sheets, so the repository ids and variant names in the row identifiers
+    // below never reach it; they are the names the rows already show.
+    static let huggingFaceSearchField = "huggingFaceSearchField"
+
+    /// One search result, addressed by its repository id.
+    static func huggingFaceResult(_ repoID: String) -> String {
+        "huggingFaceResult.\(repoID)"
+    }
+
+    static let huggingFaceBackButton = "huggingFaceBackButton"
+    static let huggingFaceModelCardLink = "huggingFaceModelCardLink"
+
+    /// One variant's "Use" button, addressed by the variant's folder name.
+    static func huggingFaceUseVariant(_ name: String) -> String {
+        "huggingFaceUseVariant.\(name)"
+    }
+
+    static let huggingFaceCancelButton = "huggingFaceCancelButton"
     static let whisperKitLoadFailureMessage = "whisperKitLoadFailureMessage"
     static let terminologyRulesEditor = "terminologyRulesEditor"
 
@@ -207,6 +235,10 @@ enum A11yID {
 
     /// Same single-home pattern for the About tab.
     static let settingsTabAbout = settingsTab("about")
+
+    /// About → Updates "Install Update" (mt-update mode). Kept off the
+    /// `/ui/press` allowlist (`AboutSettingsViewTests`).
+    static let updateInstallButton = "updateInstallButton"
 
     // Speaker-naming dialog.
     static let confirmButton = "confirm-button"

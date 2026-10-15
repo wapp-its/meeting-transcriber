@@ -120,10 +120,10 @@ class WatchLoop {
     /// answer is awaited in `consentTask` rather than inline, so this is what
     /// keeps a second prompt from going out on every poll while the first one
     /// waits. Internal (not `private(set)`) because `WatchLoop+Consent.swift`
-    /// owns the transitions; `pendingConsentApp` there is its app.
+    /// owns the transitions; `pendingConsentApp` there is its app's name.
     var pendingConsentQuestion: ConsentQuestion?
 
-    /// Apps that needed a prompt while `pendingConsentApp`'s was open. Not a
+    /// Apps (identity keys) that needed a prompt while that one was open. Not a
     /// queue: they are kept out of detection until that question settles, so
     /// none of them can hide a meeting that needs no prompt, and are detected
     /// and asked about afterwards if their call still runs.
@@ -374,7 +374,7 @@ class WatchLoop {
             // Re-checked because up to a poll interval has passed since the
             // answer, and the call may have ended in it.
             if let approved = takeApprovedConsent(), detector.isMeetingActive(approved.meeting),
-               !appsHeldFromDetection.contains(approved.meeting.pattern.appName) {
+               !appsHeldFromDetection.contains(approved.meeting.pattern.identityKey) {
                 if await runMeeting(approved.meeting, protocolOptions: approved.protocolOptions) { return }
             } else if let meeting = detector.checkOnce(excluding: appsExcludedFromDetection.union(appsHeldFromDetection)) {
                 // A detected meeting asks before recording unless its app
@@ -415,7 +415,7 @@ class WatchLoop {
             try? await sleepProvider(10)
         }
 
-        detector.reset(appName: meeting.pattern.appName)
+        detector.reset(appName: meeting.pattern.identityKey)
 
         if !Task.isCancelled {
             update { next in

@@ -48,11 +48,12 @@ final class WatchingController {
     let settings: AppSettings
     private let notifier: any AppNotifying
     private let pipeline: PipelineController
-    private let channelHealth: ChannelHealthController
+    let channelHealth: ChannelHealthController
     private let permissions: PermissionsController
     let liveTranscription: LiveTranscriptionCoordinator
-    /// Nil where the caller supplies none, as most tests do.
-    private let microphone: MicrophoneController?
+    /// Nil where the caller supplies none, as most tests do; so is `output`.
+    let microphone: MicrophoneController?
+    let output: OutputDeviceController?
 
     /// Microphone-access gate. Injectable so tests skip the real TCC prompt; the
     /// return value is intentionally ignored (the loop is created regardless, and
@@ -132,6 +133,7 @@ final class WatchingController {
         permissions: PermissionsController,
         liveTranscription: LiveTranscriptionCoordinator,
         microphone: MicrophoneController? = nil,
+        output: OutputDeviceController? = nil,
         ensureMicAccess: @escaping () async -> Bool = { await Permissions.ensureMicrophoneAccess() },
         requestScreenRecording: @escaping () -> Void = { Permissions.ensureScreenRecordingAccess() },
         requestAccessibility: @escaping () -> Void = {
@@ -150,6 +152,7 @@ final class WatchingController {
         self.permissions = permissions
         self.liveTranscription = liveTranscription
         self.microphone = microphone
+        self.output = output
         self.ensureMicAccess = ensureMicAccess
         self.requestScreenRecording = requestScreenRecording
         self.requestAccessibility = requestAccessibility
@@ -572,25 +575,18 @@ final class WatchingController {
                 // No source means no live recording, so there are no channels to
                 // watch and starting the monitor would only assume a topology.
                 if let source = self?.watchLoop?.activeRecordingSource {
-                    self?.channelHealth.start(source: source) { [weak self] in
-                        self?.watchLoop?.activeRecorder
-                    }
                     let appName = loop?.manualRecordingInfo?.appName ?? loop?.currentMeeting?.pattern.appName
-                    self?.microphone?.recordingStarted(source: source, meetingAppName: appName) { [weak self] in
-                        self?.watchLoop?.activeRecorder
-                    }
+                    self?.attachRecordingObservers(source: source, meetingAppName: appName)
                 }
 
             case .error:
                 if let err = loop?.lastError {
                     notifier.notify(title: "Error", body: err)
                 }
-                self?.channelHealth.stop()
-                self?.microphone?.recordingStopped()
+                self?.detachRecordingObservers()
 
             default:
-                self?.channelHealth.stop()
-                self?.microphone?.recordingStopped()
+                self?.detachRecordingObservers()
             }
         }
     }

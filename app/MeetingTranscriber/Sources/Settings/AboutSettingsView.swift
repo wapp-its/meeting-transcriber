@@ -4,6 +4,11 @@ import SwiftUI
 struct AboutSettingsView: View {
     @Bindable var settings: AppSettings
     var updateChecker: UpdateChecker?
+    /// Why "Install Update" is not possible right now (`UpdateInstallGate`),
+    /// shown under the disabled button; nil when nothing blocks it.
+    var updateInstallBlockedReason: String?
+    /// Starts an mt-update install; nil leaves "Install Update" disabled.
+    var onInstallUpdate: (() -> Void)?
 
     var body: some View {
         Form {
@@ -61,7 +66,13 @@ struct AboutSettingsView: View {
         Section("Updates") {
             Toggle("Check for Updates", isOn: $settings.checkForUpdates)
 
-            if settings.checkForUpdates {
+            // mt-update builds whatever its branches hold, so a release
+            // channel means nothing to it.
+            if updateChecker.isMtUpdateMode {
+                Text("Updates are built on this Mac by mt-update.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if settings.checkForUpdates {
                 Toggle("Include Pre-Releases", isOn: $settings.includePreReleases)
             }
 
@@ -79,15 +90,15 @@ struct AboutSettingsView: View {
                         Text("Check Now")
                     }
                 }
-                .disabled(updateChecker.isChecking)
+                .disabled(updateChecker.isChecking || updateChecker.isInstalling)
 
                 if let error = updateChecker.lastError {
                     Label(error, systemImage: "xmark.circle.fill")
                         .foregroundStyle(.red)
                         .font(.caption)
-                } else if let update = updateChecker.availableUpdate {
+                } else if let name = availableUpdateName(updateChecker) {
                     Label(
-                        "Update available: \(update.tagName)",
+                        "Update available: \(name)",
                         systemImage: "arrow.down.circle.fill",
                     )
                     .foregroundStyle(.blue)
@@ -99,7 +110,9 @@ struct AboutSettingsView: View {
                 }
             }
 
-            if let update = updateChecker.availableUpdate {
+            if updateChecker.isMtUpdateMode {
+                mtUpdateInstallRows(updateChecker: updateChecker)
+            } else if let update = updateChecker.availableUpdate {
                 Button {
                     NSWorkspace.shared.open(update.dmgURL ?? update.htmlURL)
                 } label: {
@@ -110,5 +123,60 @@ struct AboutSettingsView: View {
                 }
             }
         }
+    }
+
+    /// What the status line offers: a newer GitHub release's tag, or what a
+    /// newer mt-update build brings. Each mode sets only its own.
+    private func availableUpdateName(_ updateChecker: UpdateChecker) -> String? {
+        updateChecker.availableUpdate?.tagName ?? updateChecker.availableBuildSummary
+    }
+
+    /// mt-update mode under the status line: the install that runs, or the
+    /// button that starts one, then why the last install failed. No
+    /// confirmation dialog; the caption says what pressing it does.
+    @ViewBuilder
+    private func mtUpdateInstallRows(updateChecker: UpdateChecker) -> some View {
+        if updateChecker.isInstalling {
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Installing update… Meeting Transcriber restarts when the build is done and nothing is recording or processing.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } else if updateChecker.availableBuildSummary != nil {
+            VStack(alignment: .leading, spacing: 4) {
+                Button {
+                    onInstallUpdate?()
+                } label: {
+                    Label("Install Update", systemImage: "arrow.down.to.line")
+                }
+                .disabled(updateInstallBlockedReason != nil || updateChecker.isChecking || onInstallUpdate == nil)
+                .accessibilityIdentifier(A11yID.updateInstallButton)
+
+                Text(installCaption(updateChecker: updateChecker))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+
+        if let installError = updateChecker.lastInstallError {
+            Label(installError, systemImage: "xmark.circle.fill")
+                .foregroundStyle(.red)
+                .font(.caption)
+        }
+    }
+
+    /// Why the button is disabled, so About names it (R4), else what pressing
+    /// it does. A gate reason outranks the running check: both work on
+    /// mt-update's checkout, and the recording or job is the one that lasts.
+    private func installCaption(updateChecker: UpdateChecker) -> String {
+        if let reason = updateInstallBlockedReason {
+            return reason
+        }
+        if updateChecker.isChecking {
+            return "Not available while checking for updates."
+        }
+        return "Builds the new version (about 5–10 minutes), then restarts Meeting Transcriber."
     }
 }
