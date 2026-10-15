@@ -28,8 +28,9 @@ import Observation
 @Observable
 @MainActor
 final class WatchingController {
+    @ObservationIgnored var detectedCapturesRunning = 0
     var watchLoop: WatchLoop? {
-        didSet { recordingActivityChanged() }
+        didSet { watchLoopChanged() }
     }
 
     /// Non-nil while `toggleWatching`'s async start is in flight — it awaits mic

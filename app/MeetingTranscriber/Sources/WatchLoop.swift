@@ -155,6 +155,8 @@ class WatchLoop {
 
     /// Hook called when state changes (for UI updates, notifications, etc.)
     var onStateChange: ((State, State) -> Void)?
+    /// Told true as a detected meeting's capture begins and false once its recorder stopped, also after `stop()` left `.recording`.
+    var onMeetingCapture: ((Bool) -> Void)?
 
     init(
         detector: any MeetingDetecting = WatchLoop.defaultDetector(),
@@ -430,6 +432,8 @@ class WatchLoop {
 
     func handleMeeting(_ meeting: DetectedMeeting, protocolOptions: MeetingProtocolOptions? = nil) async throws {
         defer { stopByHandRequestedAt = nil }
+        onMeetingCapture?(true)
+        defer { onMeetingCapture?(false) }
         let title = Self.cleanTitle(meeting.windowTitle)
 
         // --- Recording ---

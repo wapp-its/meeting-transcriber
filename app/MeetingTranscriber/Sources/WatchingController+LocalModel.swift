@@ -8,8 +8,9 @@ import Foundation
 /// (`PipelineQueue.generateWaitingOutRecordings`).
 ///
 /// Pushed, not polled: every input changes on the main actor at a point this
-/// controller already sees (`watchLoop` and `manualStartTask` are set here, and
-/// the loop reports each phase change to the state-change handler), so the
+/// controller already sees (`watchLoop` and `manualStartTask` are set here, the
+/// loop reports each phase change to the state-change handler, and each
+/// detected meeting's capture start and end to `onMeetingCapture`), so the
 /// gate hears of a recording in the same turn it starts, and a recording
 /// never waits for the model. Its own file because `WatchingController.swift`
 /// sits at the line cap.
@@ -17,17 +18,27 @@ import Foundation
 extension WatchingController {
     /// Whether a recording runs: from the start of any recording (a detected
     /// meeting, a manual one, a microphone-only one through `/v1/record`)
-    /// until it has stopped, paused included. A manual start counts from its
-    /// registration, before its recorder is up, because it awaits the
-    /// microphone gate first; a detected meeting is `.recording` before its
-    /// recorder starts. A pause keeps the phase at `.recording`.
-    ///
-    /// Accepted gap: Stop Watching during a detected meeting leaves
-    /// `.recording` at once, while the cancelled loop still stops the recorder
-    /// and enqueues the recording in its next turn. A deferred helper may be
-    /// admitted in that turn; it only starts loading the model by then.
+    /// until its recorder has stopped, paused included. A manual start counts
+    /// from its registration, before its recorder is up, because it awaits the
+    /// microphone gate first, and a manual stop stops the recorder before the
+    /// loop leaves `.recording`. A detected meeting counts from the start of
+    /// its capture until the recorder has stopped (`detectedCapturesRunning`),
+    /// not by the loop's phase: Stop Watching wipes that phase at once, while
+    /// the cancelled loop stops the recorder in a later turn.
     var isRecordingActivity: Bool {
-        manualStartTask != nil || watchLoop?.state == .recording
+        manualStartTask != nil || watchLoop?.state == .recording || detectedCapturesRunning > 0
+    }
+
+    /// Hooks a newly assigned loop's captures into the signal, then pushes it.
+    /// The count of running captures lives on the controller rather than on the
+    /// loop: Stop Watching drops the loop while its capture still finalizes,
+    /// and a loop assigned meanwhile (Start Watching again) must not clear it.
+    func watchLoopChanged() {
+        watchLoop?.onMeetingCapture = { [weak self] capturing in
+            self?.detectedCapturesRunning += capturing ? 1 : -1
+            self?.recordingActivityChanged()
+        }
+        recordingActivityChanged()
     }
 
     /// Tells the gate whether to hold: while a recording runs, and in
