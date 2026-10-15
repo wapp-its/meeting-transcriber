@@ -37,8 +37,8 @@ Turn each local outcome into the job result, warning and notification R11 lists,
 - [ ] Regeneration with the local provider reports local outcomes, not the generic failure.
 - [ ] Three queued jobs failing on low memory in one episode raise one notification, not three.
 ## Done summary
-TBD
-
+Blocked:
+Released by the attended session that babysits loop run 20261015T181628Z-39446-5158: the tick that claimed this task was stopped at its 18000 s limit (loop log 2026-10-15T23:16:45Z, TICK protocol=timeout) and no process of it is alive, so the claim belonged to an ended invocation. The next tick starts the task fresh.
 ## Evidence
 - Commits:
 - Tests:
