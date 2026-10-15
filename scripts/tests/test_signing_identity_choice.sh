@@ -107,9 +107,13 @@ _make_bundle() {
 # in production. It fails --verify, reports an entitlement on
 # `--entitlements :-`, and logs every call when asked to.
 #
-# The harness stand-ins: `swift` builds nothing, `pgrep` finds no running app,
-# `open` exits 42 so a script that reaches its launch stops there with a
-# status no earlier failure produces, and the model fetch names a dummy file.
+# The harness stand-ins: `swift` builds nothing and answers `--show-bin-path`
+# with the products _stage_dev_bundle_scripts lays out, `xcodebuild` reports
+# the Metal Toolchain installed, `pgrep` finds no running app, `open` exits 42
+# so a script that reaches its launch stops there with a status no earlier
+# failure produces, and the model fetch names a dummy file. The codesign
+# stand-in lets `--verify` pass on the local model helper's items, which the
+# scripts check right after signing them; every other `--verify` still fails.
 _write_stubs() {
     mkdir -p "$STUB_SECURITY" "$STUB_CODESIGN" "$STUB_HARNESS" "$STUB_ROOT/model"
     cat > "$STUB_SECURITY/security" <<STUB
@@ -146,12 +150,20 @@ case "$*" in
             && { [ -z "${STUB_EXECUTABLE:-}" ] || grep -q 'previous build' "$STUB_EXECUTABLE" 2>/dev/null; }; then
             cp "$STUB_LEAF_DER" ./codesign0
         fi ;;
+    *--verify*/Contents/Helpers/*) exit 0 ;;
     *--verify*) exit 1 ;;
     *"--entitlements :-"*) printf '<key>stand-in</key>' ;;
 esac
 exit 0
 STUB
-    printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB_HARNESS/swift"
+    cat > "$STUB_HARNESS/swift" <<'STUB'
+#!/usr/bin/env bash
+for arg in "$@"; do
+    [ "$arg" = --show-bin-path ] && printf '%s\n' "$PWD/.build/release"
+done
+exit 0
+STUB
+    printf '#!/usr/bin/env bash\nprintf "Status: installed\\n"\n' > "$STUB_HARNESS/xcodebuild"
     printf '#!/usr/bin/env bash\nexit 1\n' > "$STUB_HARNESS/pgrep"
     printf '#!/usr/bin/env bash\nexit 42\n' > "$STUB_HARNESS/open"
     printf 'stand-in model\n' > "$STUB_ROOT/model/localvqe-test.gguf"
@@ -223,7 +235,7 @@ _expect() {
 # executable and the freshly built binary carry the markers the codesign
 # stand-in reads. Echoes nothing; non-zero when the fixture cannot be built.
 _stage_dev_bundle_scripts() {
-    local workdir="$1" root="$1/repo" spm bundle
+    local workdir="$1" root="$1/repo" spm bundle helper
     spm="$root/app/MeetingTranscriber"
     bundle="$spm/.build/MeetingTranscriber-Dev.app"
     mkdir -p "$root/scripts/lib" "$root/licenses" "$root/tools/mt-cli" \
@@ -238,6 +250,24 @@ _stage_dev_bundle_scripts() {
     printf 'previous build\n' > "$bundle/Contents/MacOS/MeetingTranscriber"
     printf 'fresh build\n' > "$spm/.build/release/MeetingTranscriber"
     chmod +x "$bundle/Contents/MacOS/MeetingTranscriber" "$spm/.build/release/MeetingTranscriber"
+
+    # The local model helper as its build leaves it: the two products, the real
+    # Package.resolved (so the licence coverage check runs on the real pins) and
+    # a stand-in for every licence text the bundle gets.
+    helper="$root/tools/local-llm-helper"
+    mkdir -p "$helper/.build/release/mlx-swift_Cmlx.bundle" || return 1
+    printf 'helper build\n' > "$helper/.build/release/local-llm-helper"
+    chmod +x "$helper/.build/release/local-llm-helper"
+    cp "$REPO_ROOT/tools/local-llm-helper/Package.resolved" "$helper/" || return 1
+    (
+        # shellcheck source=../lib/bundle-licenses.sh
+        source "$REPO_ROOT/scripts/lib/bundle-licenses.sh"
+        while read -r path _; do
+            [ -n "$path" ] || continue
+            mkdir -p "$helper/.build/checkouts/$(dirname "$path")" || exit 1
+            printf 'stand-in licence\n' > "$helper/.build/checkouts/$path" || exit 1
+        done <<< "$LOCAL_LLM_HELPER_LICENSES"
+    ) || return 1
 }
 
 # Runs one of the staged scripts with the stand-ins first on PATH; its output

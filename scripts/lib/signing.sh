@@ -847,3 +847,29 @@ resign_deployed_bundle() {
     fi
     return "$status"
 }
+
+# sign_local_llm_helper <app-bundle> <identity> [extra codesign flags...]
+#
+# Signs the local model helper that lib/local-llm-helper.sh installed (source
+# that first, it names the layout): the shader bundle, then the executable,
+# always with the Hardened Runtime on the executable. Call it BEFORE the outer
+# bundle is signed, because the outer signature seals the nested ones as they
+# are at that moment. The Hardened Runtime is on in every build that calls
+# this, not only the notarized one, so the dev bundle's selftest
+# (scripts/local-llm-bundle-check.sh) shows MLX runs under it before a notarized
+# build ever tries. Extra flags (the notarized branch passes --timestamp) go to
+# both signatures.
+#
+# Not for a branch that signs the outer bundle with `--deep --force`: that
+# re-signs both items with the outer bundle's options and entitlements
+# (measured: the runtime flag is dropped and the helper gets the app's
+# entitlements).
+#
+# shellcheck disable=SC2154  # LOCAL_LLM_* come from lib/local-llm-helper.sh
+sign_local_llm_helper() {
+    local bundle="$1" identity="$2" dir
+    shift 2
+    dir="$bundle/${LOCAL_LLM_HELPER_DIR:?source lib/local-llm-helper.sh first}"
+    codesign --force --sign "$identity" "$@" "$dir/$LOCAL_LLM_SHADER_BUNDLE" || return 1
+    codesign --force --sign "$identity" --options runtime "$@" "$dir/$LOCAL_LLM_HELPER_NAME" || return 1
+}

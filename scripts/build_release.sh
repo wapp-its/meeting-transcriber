@@ -10,6 +10,8 @@
 # Requirements:
 #   - macOS 14+ (Sonoma) on Apple Silicon
 #   - Xcode Command Line Tools (swift, codesign, hdiutil)
+#   - Homebrew variant only: Xcode's Metal Toolchain, for the local model
+#     helper (xcodebuild -downloadComponent MetalToolchain)
 
 set -euo pipefail
 
@@ -79,6 +81,16 @@ mkdir -p "$MACOS_DIR" "$RESOURCES"
 echo ""
 echo "Step 1: Building Swift menu bar app..."
 
+# The local model helper, Homebrew variant only: the App Store build neither
+# builds nor contains it. Built before the app so a machine without Xcode's
+# Metal Toolchain stops here with the install command, not after the app's
+# compile. Installed into the bundle after the main binary below.
+if [ "$APPSTORE" = false ]; then
+    # shellcheck source=lib/local-llm-helper.sh
+    source "$SCRIPT_DIR/lib/local-llm-helper.sh"
+    build_local_llm_helper --disable-sandbox
+fi
+
 SPM_DIR="$PROJECT_ROOT/app/MeetingTranscriber"
 SWIFT_BUILD_FLAGS=(-c release --disable-sandbox)
 if [ "$APPSTORE" = true ]; then
@@ -87,6 +99,9 @@ fi
 (cd "$SPM_DIR" && swift build "${SWIFT_BUILD_FLAGS[@]}")
 
 cp "$SPM_DIR/.build/release/MeetingTranscriber" "$MACOS_DIR/MeetingTranscriber"
+if [ "$APPSTORE" = false ]; then
+    install_local_llm_helper "$APP_BUNDLE"
+fi
 
 # ── Step 2: Assemble app bundle ──────────────────────────────────────────────
 
@@ -165,6 +180,11 @@ if [ "$NOTARIZE" = true ]; then
         exit 1
     fi
 
+    # shellcheck source=lib/signing.sh
+    source "$SCRIPT_DIR/lib/signing.sh"
+    # shellcheck source=lib/bundle-ids.sh
+    source "$SCRIPT_DIR/lib/bundle-ids.sh"
+
     # Sign all dylibs/shared objects (one at a time to avoid xargs arg length limits)
     echo "  Signing embedded libraries..."
     find "$APP_BUNDLE" -type f \( -name "*.dylib" -o -name "*.so" \) -print0 | \
@@ -172,13 +192,17 @@ if [ "$NOTARIZE" = true ]; then
             codesign --force --sign "$DEVELOPER_ID" --options runtime --timestamp "$lib"
         done
 
+    # The local model helper and its shader bundle: the loop above matches
+    # neither a bare executable nor a resource bundle. Hardened Runtime and a
+    # timestamp, as notarization requires, before the outer bundle seals them.
+    if [ "$APPSTORE" = false ]; then
+        echo "  Signing the local model helper..."
+        sign_local_llm_helper "$APP_BUNDLE" "$DEVELOPER_ID" --timestamp
+    fi
+
     # Embed the provisioning profile (when available) and derive the
     # entitlements it authorises — see scripts/lib/signing.sh for why the
     # time-sensitive key must never be added without one.
-    # shellcheck source=lib/signing.sh
-    source "$SCRIPT_DIR/lib/signing.sh"
-    # shellcheck source=lib/bundle-ids.sh
-    source "$SCRIPT_DIR/lib/bundle-ids.sh"
     prepare_signing "$APP_BUNDLE" "$ENTITLEMENTS" "$RELEASE_BUNDLE_ID" "$DEVELOPER_ID"
 
     # Sign the main app binary with entitlements. The identity comes from
@@ -189,6 +213,9 @@ if [ "$NOTARIZE" = true ]; then
         "$APP_BUNDLE"
     echo "  Signed with Developer ID for notarization"
     verify_signing "$APP_BUNDLE"
+    if [ "$APPSTORE" = false ]; then
+        verify_local_llm_helper "$APP_BUNDLE"
+    fi
 
     # When --staple is set, notarize and staple the .app itself so Gatekeeper
     # does not need to contact Apple online when the app is launched (cask
@@ -215,6 +242,11 @@ if [ "$NOTARIZE" = true ]; then
         xcrun stapler validate "$APP_BUNDLE"
     fi
 else
+    # `--deep` also signs the local model helper and its shader bundle, with
+    # this identity and the app's entitlements and without the Hardened
+    # Runtime, replacing any signature they had (measured). That is why this
+    # branch does not sign them first; the notarized branch and run_app.sh do.
+    #
     # Use local development certificate if available (extract 40-char hex SHA-1 hash)
     SIGN_HASH=$(detect_sign_hash)
     if [ -n "$SIGN_HASH" ]; then
@@ -223,6 +255,9 @@ else
     else
         codesign --deep --force --sign - --entitlements "$ENTITLEMENTS" "$APP_BUNDLE"
         echo "  Ad-hoc signed (install via right-click → Open)"
+    fi
+    if [ "$APPSTORE" = false ]; then
+        verify_local_llm_helper "$APP_BUNDLE"
     fi
 fi
 
