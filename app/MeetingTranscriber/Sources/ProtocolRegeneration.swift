@@ -328,12 +328,9 @@ final class ProtocolRegenerator {
         )
         let protocolMarkdown: String
         do {
-            protocolMarkdown = try await generator.generate(
-                transcript: transcript.text,
-                title: target.title,
-                diarized: ProtocolGenerator.looksDiarized(transcript.text),
-                meetingStartTime: target.meetingStartTime,
-                instructions: instructions,
+            protocolMarkdown = try await Self.generate(
+                with: generator, asJob: target.jobID.flatMap(UUID.init(uuidString:)),
+                request: (transcript: transcript.text, title: target.title, meetingStartTime: target.meetingStartTime, instructions: instructions),
             )
         } catch {
             logger.warning("protocol_regeneration_provider_failed type=\(String(describing: type(of: error)), privacy: .public)")
@@ -351,6 +348,31 @@ final class ProtocolRegenerator {
         )
         let trashWarning = try replaceProtocol(of: target, with: Data(document.utf8), replacing: files.protocolFile != nil)
         return [templateWarning, trashWarning].compactMap(\.self)
+    }
+
+    /// The provider call. A local generation runs as the meeting's job
+    /// (`target.jobID`), so the local model's gate records which job owns its
+    /// helper (spec R10). Nothing asks again after a recording ended the
+    /// helper: a regeneration is not resumed by itself (spec R11).
+    private static func generate(
+        with generator: sending any ProtocolGenerating, asJob jobID: UUID?,
+        request: (transcript: String, title: String, meetingStartTime: Date?, instructions: ProtocolInstructions),
+    ) async throws -> String {
+        let diarized = ProtocolGenerator.looksDiarized(request.transcript)
+        #if !APPSTORE
+            if let local = generator as? LocalModelProtocolGenerator {
+                return try await LocalModelGate.$jobID.withValue(jobID) {
+                    try await local.generate(
+                        transcript: request.transcript, title: request.title, diarized: diarized,
+                        meetingStartTime: request.meetingStartTime, instructions: request.instructions,
+                    )
+                }
+            }
+        #endif
+        return try await generator.generate(
+            transcript: request.transcript, title: request.title, diarized: diarized,
+            meetingStartTime: request.meetingStartTime, instructions: request.instructions,
+        )
     }
 
     private func isBusy(_ target: ProtocolRegenerationTarget) -> Bool {
