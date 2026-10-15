@@ -151,6 +151,10 @@ Meeting content should not leave the Mac, and the user should not need a second 
 
 Maintainability (plan review): duplication - the helper's exit codes are defined in task 1 and mirrored in task 3's LocalModelOutcome (two packages, no shared code); structure - none identified
 
+FIT: GO · 2026-10-15 · base 4255990c · engine flow-next 8.7.0 · gh-2 landed as assumed (PR #116), no open spec claims this scope, every named path exists, Metal Toolchain installed on the build machine
+  - gh-2's regeneration on HEAD is `ProtocolRegenerator` (`app/MeetingTranscriber/Sources/ProtocolRegeneration.swift`, `Environment.generatorFactory`) opened via `RegenerateProtocolView`; the spec's "Try Again" is the notification action that starts it, not a UI name to search for
+  - `ProtocolGenerating.generate(transcript:title:diarized:meetingStartTime:instructions:)` is the signature a new generator satisfies; `ProtocolProvider` is switched in `PipelineController.makeProtocolGenerator()`, `MeetingProtocolOptions.swift` and `OutputSettingsView.providerConfigView`
+
 ## Requirement coverage
 
 | Req | Description | Task(s) | Gap justification |
