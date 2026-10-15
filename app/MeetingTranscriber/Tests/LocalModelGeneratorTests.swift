@@ -248,6 +248,20 @@ final class LocalModelGeneratorTests: XCTestCase {
             XCTAssertEqual(reread.localModelFolder.path, second.path)
         }
 
+        func testHelperIsFoundInHelpersBeforeMacOS() throws {
+            let bundle = try makeTempDirectory(prefix: "LocalModelBundle").appendingPathComponent("Test.app")
+            let name = LocalModelHelperLocator.executableName
+            let (beside, helpers) = (bundle.appendingPathComponent("Contents/MacOS/\(name)"), bundle.appendingPathComponent("Contents/Helpers/\(name)"))
+            XCTAssertNil(LocalModelHelperLocator.locate(inBundleAt: bundle))
+
+            for helper in [beside, helpers] {
+                try FileManager.default.createDirectory(at: helper.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Data("#!/bin/sh\n".utf8).write(to: helper)
+                try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: helper.path)
+                XCTAssertEqual(LocalModelHelperLocator.locate(inBundleAt: bundle), helper)
+            }
+        }
+
         func testLocalModelSendsTheTranscriptNowhereButThisMac() {
             XCTAssertEqual(
                 ProtocolDestination.resolve(provider: .localModel, openAIEndpoint: "https://api.example.com/v1"),

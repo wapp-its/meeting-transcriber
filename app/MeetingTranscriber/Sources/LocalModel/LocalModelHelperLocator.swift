@@ -2,16 +2,17 @@
 
     import Foundation
 
-    /// Finds the helper executable in the app bundle. The build scripts decide
-    /// where they place it, so both places a bundle keeps a helper tool are
-    /// searched, in this order: `Contents/MacOS` (beside the app's executable),
-    /// then `Contents/Helpers`. A test passes its own executable to the
-    /// generator instead.
+    /// Finds the helper executable in the app bundle. Both places a bundle
+    /// keeps a helper tool are searched: `Contents/Helpers` first, where the
+    /// build scripts place it (beside the app's executable in `Contents/MacOS`
+    /// the helper takes the app as its main bundle and does not find its
+    /// shaders), then `Contents/MacOS`. A test passes its own executable to
+    /// the generator instead.
     enum LocalModelHelperLocator {
         static let executableName = "local-llm-helper"
 
         static func locate(inBundleAt bundleURL: URL = Bundle.main.bundleURL) -> URL? {
-            ["MacOS", "Helpers"]
+            ["Helpers", "MacOS"]
                 .map { bundleURL.appendingPathComponent("Contents/\($0)/\(executableName)") }
                 .first(where: isExecutableFile)
         }
