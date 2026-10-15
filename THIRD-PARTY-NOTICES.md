@@ -212,7 +212,9 @@ so none of the components below ship there. Versions are the ones pinned in
   Copyright (c) 2024 ml-explore: the language model code. Shipped as
   `mlx-swift-lm-LICENSE.txt`.
 - **swift-transformers** 1.3.5 (<https://github.com/huggingface/swift-transformers>),
-  Apache License 2.0, Copyright 2022 Hugging Face SAS: the tokenizer. Shipped as
+  Apache License 2.0, Copyright 2022 Hugging Face SAS: the tokenizer, together
+  with its fallback tokenizer configurations in
+  `Contents/Helpers/swift-transformers_Hub.bundle`. Shipped as
   `swift-transformers-LICENSE.txt`; upstream carries no NOTICE file.
 - **swift-jinja** 2.5.1 (<https://github.com/huggingface/swift-jinja>), Apache
   License 2.0, Copyright 2022 Hugging Face SAS: renders the model's chat
@@ -228,7 +230,9 @@ so none of the components below ship there. Versions are the ones pinned in
   `yyjson-LICENSE.txt`.
 - **swift-crypto** 4.5.2 (<https://github.com/apple/swift-crypto>), Apache
   License 2.0, Copyright 2019 The SwiftCrypto Project, a dependency of
-  swift-transformers. Upstream carries a NOTICE file, so section 4(d) applies:
+  swift-transformers, with its privacy manifest in
+  `Contents/Helpers/swift-crypto_Crypto.bundle`. Upstream carries a NOTICE
+  file, so section 4(d) applies:
   shipped as `swift-crypto-LICENSE.txt` and `swift-crypto-NOTICE.txt`.
 
 Linked but needing no notice: **swift-collections** 1.7.3 and

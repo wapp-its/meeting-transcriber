@@ -15,6 +15,8 @@
 #
 #   Contents/Helpers/local-llm-helper         the executable
 #   Contents/Helpers/mlx-swift_Cmlx.bundle    MLX's compiled Metal shaders
+#   Contents/Helpers/<other>.bundle           every other SwiftPM resource
+#                                             bundle the build put beside it
 #
 # Contents/Helpers and not Contents/MacOS, measured: MLX looks for its shader
 # bundle in the directory of NSBundle.mainBundle, and an executable in
@@ -23,6 +25,16 @@
 # create stream". In Contents/Helpers the main bundle is the directory that
 # holds the helper, which is where SwiftPM puts the shader bundle in its own
 # build directory too, so the helper finds it exactly as it does there.
+#
+# Every bundle, not a list of names: a dependency reaches its resources through
+# SwiftPM's Bundle.module, which looks in that same directory and stops the
+# process when the bundle is not there. Today that is swift-transformers_Hub,
+# whose fallback tokenizer configurations a model folder without a
+# `tokenizer_class` needs (measured: without the bundle, `check` on such a
+# folder dies with "unable to find bundle named swift-transformers_Hub"), and
+# swift-crypto_Crypto. A list of names would miss the next dependency's bundle
+# the same way. Contents/Helpers holds this helper and nothing else, so every
+# bundle in it is the helper's.
 #
 # Source this, don't execute it.
 
@@ -58,16 +70,22 @@ require_metal_toolchain() {
     return 1
 }
 
+# local_llm_helper_bin_dir [extra swift build flags...]
+#
+# Prints the directory the release build puts the helper and its resource
+# bundles in. Asked of SwiftPM rather than hard-coded: with Swift 6.4,
+# `.build/release` is only a link to `.build/out/Products/Release`. Shared with
+# scripts/local-llm-bundle-check.sh, which compares an app bundle with it.
+local_llm_helper_bin_dir() {
+    (cd "$_LOCAL_LLM_HELPER_PACKAGE" && swift build -c release "$@" --show-bin-path)
+}
+
 # build_local_llm_helper [extra swift build flags...]
 #
 # Builds the helper in release and sets LOCAL_LLM_HELPER_BIN_DIR to the
-# directory holding the executable and its shader bundle. Always release, in
+# directory holding the executable and its resource bundles. Always release, in
 # both scripts: a debug build fails the 4-bit quantised matrix multiply every
 # layer of a quantised model runs (a GPU timeout and wrong numbers, measured).
-#
-# The products are found through `--show-bin-path` rather than a hard-coded
-# `.build/release`, which with Swift 6.4 is only a link to
-# `.build/out/Products/Release`.
 #
 # Every step propagates its own failure, like install_localvqe_resources, so
 # the function is safe to call from a condition.
@@ -78,7 +96,7 @@ build_local_llm_helper() {
     require_metal_toolchain || return 1
     echo "Building the local model helper (release)..."
     (cd "$_LOCAL_LLM_HELPER_PACKAGE" && swift build -c release "$@") || return 1
-    bin_dir="$(cd "$_LOCAL_LLM_HELPER_PACKAGE" && swift build -c release "$@" --show-bin-path)" || return 1
+    bin_dir="$(local_llm_helper_bin_dir "$@")" || return 1
     if [ ! -x "$bin_dir/$LOCAL_LLM_HELPER_NAME" ] || [ ! -d "$bin_dir/$LOCAL_LLM_SHADER_BUNDLE" ]; then
         echo "  ERROR: the helper build did not produce $LOCAL_LLM_HELPER_NAME and $LOCAL_LLM_SHADER_BUNDLE in ${bin_dir:-<no bin path>}" >&2
         return 1
@@ -88,13 +106,17 @@ build_local_llm_helper() {
 
 # install_local_llm_helper <app-bundle>
 #
-# Copies the helper and its shader bundle into the bundle's Contents/Helpers and
-# the licence texts of what it links into Contents/Resources/licenses. Needs
-# build_local_llm_helper first. run_app.sh reassembles its bundle in place, so
-# the two items are removed before the copy: `cp -R` onto an existing shader
-# bundle merges into it, and shaders of an older MLX would stay behind.
+# Copies the helper and every resource bundle of its build into the bundle's
+# Contents/Helpers, and the licence texts of what it links into
+# Contents/Resources/licenses. Needs build_local_llm_helper first.
+#
+# run_app.sh reassembles its bundle in place, so whatever an earlier run put in
+# Contents/Helpers is removed first, every bundle and not only the ones this
+# build produced: `cp -R` onto an existing bundle merges into it, which would
+# keep shaders of an older MLX, and a bundle a dependency update dropped would
+# otherwise stay in the app for good.
 install_local_llm_helper() {
-    local bundle="$1" dest
+    local bundle="$1" dest path count=0
     # Guarded because of the rm below: an empty argument would aim it at /Contents/Helpers.
     [ -n "$bundle" ] || { echo "  ERROR: no app bundle given" >&2; return 1; }
     [ -n "${LOCAL_LLM_HELPER_BIN_DIR:-}" ] || { echo "  ERROR: build_local_llm_helper has not run" >&2; return 1; }
@@ -105,27 +127,41 @@ install_local_llm_helper() {
     install_local_llm_helper_licenses "$bundle/Contents/Resources" "$_LOCAL_LLM_HELPER_PACKAGE" || return 1
 
     mkdir -p "$dest" || return 1
-    rm -rf "${dest:?}/$LOCAL_LLM_HELPER_NAME" "${dest:?}/$LOCAL_LLM_SHADER_BUNDLE" || return 1
-    cp "$LOCAL_LLM_HELPER_BIN_DIR/$LOCAL_LLM_HELPER_NAME" "$dest/" || return 1
-    cp -R "$LOCAL_LLM_HELPER_BIN_DIR/$LOCAL_LLM_SHADER_BUNDLE" "$dest/" || return 1
+    rm -f "${dest:?}/$LOCAL_LLM_HELPER_NAME" || return 1
+    for path in "$dest"/*.bundle; do
+        [ -e "$path" ] || continue
+        rm -rf "${path:?}" || return 1
+    done
 
-    echo "  Local model helper: $dest/$LOCAL_LLM_HELPER_NAME (+ $LOCAL_LLM_SHADER_BUNDLE)"
+    cp "$LOCAL_LLM_HELPER_BIN_DIR/$LOCAL_LLM_HELPER_NAME" "$dest/" || return 1
+    for path in "$LOCAL_LLM_HELPER_BIN_DIR"/*.bundle; do
+        [ -d "$path" ] || continue
+        cp -R "$path" "$dest/" || return 1
+        count=$((count + 1))
+    done
+
+    echo "  Local model helper: $dest/$LOCAL_LLM_HELPER_NAME (+ $count resource bundles)"
 }
 
-# Signing the two items is sign_local_llm_helper in lib/signing.sh, the one
-# place a codesign call that names a certificate belongs.
+# Signing them is sign_local_llm_helper in lib/signing.sh, the one place a
+# codesign call that names a certificate belongs.
 
 # verify_local_llm_helper <app-bundle>
 #
 # Call AFTER the outer bundle is signed. verify_signing in lib/signing.sh
 # speaks only about the outer bundle's entitlements, so this checks the nested
-# signatures themselves and prints the helper's flags and authority, where a
-# missing `runtime` would show before notarization rejects it.
+# signatures themselves, every resource bundle's and the helper's, and prints
+# the helper's flags and authority, where a missing `runtime` would show
+# before notarization rejects it.
 verify_local_llm_helper() {
-    local dir="$1/$LOCAL_LLM_HELPER_DIR" item details flags authority
-    for item in "$LOCAL_LLM_SHADER_BUNDLE" "$LOCAL_LLM_HELPER_NAME"; do
-        codesign --verify --strict "$dir/$item" || {
-            echo "  ERROR: the signature of $dir/$item does not verify" >&2
+    local dir="$1/$LOCAL_LLM_HELPER_DIR" path details flags authority
+    [ -d "$dir/$LOCAL_LLM_SHADER_BUNDLE" ] || {
+        echo "  ERROR: $dir/$LOCAL_LLM_SHADER_BUNDLE is missing" >&2
+        return 1
+    }
+    for path in "$dir"/*.bundle "$dir/$LOCAL_LLM_HELPER_NAME"; do
+        codesign --verify --strict "$path" || {
+            echo "  ERROR: the signature of $path does not verify" >&2
             return 1
         }
     done

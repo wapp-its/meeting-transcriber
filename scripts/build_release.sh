@@ -192,9 +192,9 @@ if [ "$NOTARIZE" = true ]; then
             codesign --force --sign "$DEVELOPER_ID" --options runtime --timestamp "$lib"
         done
 
-    # The local model helper and its shader bundle: the loop above matches
-    # neither a bare executable nor a resource bundle. Hardened Runtime and a
-    # timestamp, as notarization requires, before the outer bundle seals them.
+    # The local model helper and its resource bundles: the loop above matches
+    # neither a bare executable nor a bundle. Hardened Runtime and a timestamp,
+    # as notarization requires, before the outer bundle seals them.
     if [ "$APPSTORE" = false ]; then
         echo "  Signing the local model helper..."
         sign_local_llm_helper "$APP_BUNDLE" "$DEVELOPER_ID" --timestamp
@@ -242,7 +242,7 @@ if [ "$NOTARIZE" = true ]; then
         xcrun stapler validate "$APP_BUNDLE"
     fi
 else
-    # `--deep` also signs the local model helper and its shader bundle, with
+    # `--deep` also signs the local model helper and its resource bundles, with
     # this identity and the app's entitlements and without the Hardened
     # Runtime, replacing any signature they had (measured). That is why this
     # branch does not sign them first; the notarized branch and run_app.sh do.
