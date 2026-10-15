@@ -183,6 +183,23 @@
             )
         }
 
+        /// Screen 2 without a folder, screen 1 with one.
+        func testNotesFollowWhetherAFolderIsChosen() throws {
+            let settings = try makeSettings()
+            let model = LocalModelSettingsModel(settings: settings, pickFolder: { nil }, runCheck: { _ in .folderNotFound })
+            let noFolderCaption = "Transcripts are still saved. Download the model folder, then choose it here."
+            let recordingNote = "Waits while a recording runs. Stops if the Mac runs low on memory. The transcript is always kept."
+
+            let withoutFolder = try LocalModelSettingsView(model: model).inspect()
+            XCTAssertNoThrow(try withoutFolder.find(text: noFolderCaption))
+            XCTAssertThrowsError(try withoutFolder.find(text: recordingNote))
+
+            try settings.setLocalModelFolder(makeTempDirectory(prefix: "model"))
+            let withFolder = try LocalModelSettingsView(model: model).inspect()
+            XCTAssertNoThrow(try withFolder.find(text: recordingNote))
+            XCTAssertThrowsError(try withFolder.find(text: noFolderCaption))
+        }
+
         func testStatusLineChecksAnUncheckedFolderWhenItAppears() throws {
             let settings = try makeSettings()
             try settings.setLocalModelFolder(makeTempDirectory(prefix: "model"))
