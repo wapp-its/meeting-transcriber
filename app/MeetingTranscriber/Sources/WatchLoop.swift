@@ -133,6 +133,9 @@ class WatchLoop {
     /// Recordings start in the loop and nowhere else, so an answer arriving
     /// out of band parks here instead of starting one from the consent task.
     var approvedConsentMeeting: DetectedMeeting?
+    /// "Record with Options…" choices for the open question, then for the meeting it approved (`WatchLoop+Consent.swift`).
+    var pendingConsentProtocolOptions: MeetingProtocolOptions?
+    var approvedConsentProtocolOptions: MeetingProtocolOptions?
 
     /// The task awaiting the parked answer. Held so `stop()` can let go of it.
     var consentTask: Task<Void, Never>?
@@ -143,6 +146,8 @@ class WatchLoop {
         pendingConsentQuestion = nil
         appsWaitingForPrompt = []
         approvedConsentMeeting = nil
+        pendingConsentProtocolOptions = nil
+        approvedConsentProtocolOptions = nil
         consentTask = nil
     }
 
@@ -248,11 +253,12 @@ class WatchLoop {
 
     // MARK: - Manual Recording
 
-    func startManualRecording(pid: pid_t, appName: String, title: String) async throws {
+    func startManualRecording(pid: pid_t, appName: String, title: String, protocolOptions: MeetingProtocolOptions? = nil) async throws {
         try await startManualRecording(
             source: .forApp(pid: pid, noMic: noMic),
             appName: appName,
             title: title,
+            protocolOptions: protocolOptions,
         )
     }
 
@@ -264,11 +270,12 @@ class WatchLoop {
     /// this into a recording of nothing. Keeping the entry point out of reach
     /// while it is set is the menu's job, not this one's — a caller that got
     /// here asked for the microphone by name.
-    func startMicrophoneRecording() async throws {
+    func startMicrophoneRecording(protocolOptions: MeetingProtocolOptions? = nil) async throws {
         try await startManualRecording(
             source: .micOnly,
             appName: ManualRecordingInfo.microphoneAppName,
             title: ManualRecordingInfo.microphoneTitle,
+            protocolOptions: protocolOptions,
         )
     }
 
@@ -276,6 +283,7 @@ class WatchLoop {
         source: RecordingSource,
         appName: String,
         title: String,
+        protocolOptions: MeetingProtocolOptions?,
     ) async throws {
         guard state != .recording else {
             logger.warning("Cannot start manual recording — already recording")
@@ -308,7 +316,7 @@ class WatchLoop {
         activeRecorder = recorder
         update { next in
             next.phase = .recording
-            next.manualRecordingInfo = ManualRecordingInfo(pid: pid, appName: appName, title: title)
+            next.manualRecordingInfo = ManualRecordingInfo(pid: pid, appName: appName, title: title, protocolOptions: protocolOptions)
             next.detail = "Recording: \(title)"
         }
 
@@ -332,6 +340,7 @@ class WatchLoop {
             let (recording, pauses) = try stopManualCapture(recorder, cutAt: cutAt)
             enqueueRecording(
                 title: info.title, appName: info.appName, recording: recording, trigger: .manual, pauses: pauses,
+                protocolOptions: info.protocolOptions,
             )
         } catch {
             logger.error("Failed to stop manual recording: \(error.localizedDescription, privacy: .public)")
@@ -364,9 +373,9 @@ class WatchLoop {
             // arrives out of band, but recordings only ever start here.
             // Re-checked because up to a poll interval has passed since the
             // answer, and the call may have ended in it.
-            if let approved = takeApprovedConsentMeeting(), detector.isMeetingActive(approved),
-               !appsHeldFromDetection.contains(approved.pattern.identityKey) {
-                if await runMeeting(approved) { return }
+            if let approved = takeApprovedConsent(), detector.isMeetingActive(approved.meeting),
+               !appsHeldFromDetection.contains(approved.meeting.pattern.identityKey) {
+                if await runMeeting(approved.meeting, protocolOptions: approved.protocolOptions) { return }
             } else if let meeting = detector.checkOnce(excluding: appsExcludedFromDetection.union(appsHeldFromDetection)) {
                 // A detected meeting asks before recording unless its app
                 // records without asking. See WatchLoop+Consent.swift.
@@ -391,9 +400,9 @@ class WatchLoop {
 
     /// Record one meeting to completion and return to watching. True means the
     /// loop was cancelled mid-recording and must exit.
-    private func runMeeting(_ meeting: DetectedMeeting) async -> Bool {
+    private func runMeeting(_ meeting: DetectedMeeting, protocolOptions: MeetingProtocolOptions? = nil) async -> Bool {
         do {
-            try await handleMeeting(meeting)
+            try await handleMeeting(meeting, protocolOptions: protocolOptions)
         } catch {
             if error is CancellationError { return true }
             let msg = "Recording error: \(error.localizedDescription)"
@@ -419,7 +428,7 @@ class WatchLoop {
 
     // MARK: - Meeting Handling
 
-    func handleMeeting(_ meeting: DetectedMeeting) async throws {
+    func handleMeeting(_ meeting: DetectedMeeting, protocolOptions: MeetingProtocolOptions? = nil) async throws {
         defer { stopByHandRequestedAt = nil }
         let title = Self.cleanTitle(meeting.windowTitle)
 
@@ -480,6 +489,7 @@ class WatchLoop {
             trigger: .auto,
             pauses: stopped.pauses,
             participants: participants,
+            protocolOptions: protocolOptions,
         )
     }
 
@@ -492,6 +502,7 @@ class WatchLoop {
         trigger: RecordingSidecar.Trigger,
         pauses: [RecordingPause],
         participants: [String] = [],
+        protocolOptions: MeetingProtocolOptions? = nil,
     ) {
         if recordOnly() {
             do {
@@ -523,16 +534,9 @@ class WatchLoop {
             return
         }
 
-        let job = PipelineJob(
-            meetingTitle: title,
-            appName: appName,
-            mixPath: recording.mixPath,
-            appPath: recording.appPath,
-            micPath: recording.micPath,
-            micDelay: recording.micDelay,
+        let job = Self.pipelineJob(
+            title: title, appName: appName, recording: recording, pauses: pauses, protocolOptions: protocolOptions,
             participants: participants,
-            meetingStartTime: recording.recordingStartDate,
-            pauses: pauses,
         )
         pipelineQueue?.enqueue(job)
         logger.info("Enqueued pipeline job for: \(title, privacy: .private)")

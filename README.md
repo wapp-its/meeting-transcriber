@@ -93,7 +93,7 @@ flowchart TD
 - **Speaker recognition** — Voice embeddings stored across meetings, matched via cosine similarity
 - **VAD preprocessing** — Optional silence trimming via FluidAudio Silero v6 before transcription, with automatic timestamp remapping
 - **AI protocol generation** — Structured Markdown via [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), a custom command (any command-line model tool, e.g. `ollama run` or `mlx_lm.generate`, with `{model}`, `{prompt_file}`, `{transcript_file}` and `{output_file}` placeholders, run without a shell), OpenAI-compatible APIs (Ollama, LM Studio, etc.), or disabled (save transcript only)
-- **Configurable protocol prompt** — Custom prompt file support (`~/Library/Application Support/MeetingTranscriber/protocol_prompt.md`) with `{LANGUAGE}`, `{MEETING_DATE}` (`YYYY-MM-DD`), and `{MEETING_TIME}` (`HH:mm`) variables; recordings include authoritative metadata, while imports and recovery jobs resolve time placeholders to `Unknown`
+- **Protocol templates** — Several named prompts as Markdown files in `~/Library/Application Support/MeetingTranscriber/Protocol Templates/`, created, edited, deleted and picked as the default in Settings → Output, next to the read-only built-in "Standard (built-in)"; a custom prompt from an earlier version becomes the template "Custom Prompt" and the default. Every template can use `{LANGUAGE}`, `{MEETING_DATE}` (`YYYY-MM-DD`), and `{MEETING_TIME}` (`HH:mm`); recordings include authoritative metadata, while imports and recovery jobs resolve time placeholders to `Unknown`. Background info entered for a meeting is added to the prompt
 - **Manual recording** — Record any app via app picker, not just detected meetings
 - **Multi-format input** — Supports WAV, MP3, M4A, MP4, FLAC, plus the phone and messenger voice formats AMR, 3GP/3G2 and OPUS/OGG; MKV and WebM additionally need ffmpeg
 - **Update checker** — Notifies when a new version is available
@@ -255,7 +255,7 @@ Open Settings via the menu bar item or ⌘,.
 | **Audio** | Microphone device, voice activity detection (VAD), per-channel silence indicator, echo cancellation (off by default) |
 | **Transcribe** | ASR engine (WhisperKit / Parakeet) and per-engine options (model incl. a custom WhisperKit model, language, custom vocabulary from a file or a URL), terminology normalization rules, live caption overlay (PoC) |
 | **Speakers** | Diarization, mic speaker name, known voices, recognition stats |
-| **Output** | LLM provider (Claude CLI / Codex CLI / custom command / OpenAI-compatible / none), transcript-retention options, protocol language, output folder, custom prompt |
+| **Output** | LLM provider (Claude CLI / Codex CLI / custom command / OpenAI-compatible / none), transcript-retention options, protocol language, output folder, protocol templates (default, create, edit, delete, open folder) |
 | **Advanced** | Permissions status, diagnostics, version info |
 
 ### Custom WhisperKit models

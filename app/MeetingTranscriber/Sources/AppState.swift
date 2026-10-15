@@ -28,6 +28,8 @@ final class AppState {
 
     var updateChecker: UpdateChecker
     var selectedNamingJobID: UUID?
+    /// The recording prompt the Record Meeting window was last opened for (`AppState+ConsentPrompt.swift`).
+    var consentOptionsQuestion: ConsentQuestion?
 
     /// Transcription-engine concern (the three engine instances, active-engine
     /// selection, and settings → engine language/vocabulary sync), extracted
@@ -87,6 +89,10 @@ final class AppState {
     /// installation to it.
     let liveTranscription: LiveTranscriptionCoordinator
 
+    /// "Regenerate Protocol…": a new protocol for a finished meeting, one run
+    /// at a time and outside the pipeline queue.
+    let protocolRegenerator: ProtocolRegenerator
+
     #if !APPSTORE
         /// Debug RPC server lifecycle (launch gate, settings-driven start/stop,
         /// token rotation), extracted into its own controller. `AppState` supplies
@@ -114,6 +120,10 @@ final class AppState {
         // This is the only production construction of `AppSettings` — tests
         // inject their own, so none of them touch the real domains.
         LegacyDefaultsMigration.run(into: .standard)
+        // Before `AppSettings()` reads the default template this may set.
+        ProtocolTemplateMigration.run(
+            defaults: .standard, legacyPrompt: AppPaths.customPromptFile, store: .production,
+        )
         let settings = AppSettings()
         // Once, here, rather than from `customOutputDir` — that getter is read
         // during view updates, and repairing there would write observed state
@@ -137,6 +147,21 @@ final class AppState {
 
     private static func makeRemoteVocabulary(settings: AppSettings) -> RemoteVocabularyController {
         RemoteVocabularyController(settings: settings)
+    }
+
+    private static func makeProtocolRegenerator(
+        settings: AppSettings, notifier: any AppNotifying, pipeline: PipelineController,
+    ) -> ProtocolRegenerator {
+        ProtocolRegenerator(environment: ProtocolRegenerator.Environment(
+            generatorFactory: { [pipeline] in pipeline.makeProtocolGenerator() },
+            templateStore: .production,
+            includeFullTranscript: { [settings] in settings.includeFullTranscriptInProtocol },
+            recordOnly: { [settings] in settings.recordOnly },
+            queuedJobs: { [pipeline] in pipeline.queue.jobs },
+            records: { [pipeline] in pipeline.terminalJobStore.records },
+            outputDir: { [settings] in settings.effectiveOutputDir },
+            notifier: notifier,
+        ))
     }
 
     // MARK: - Init
@@ -167,6 +192,7 @@ final class AppState {
         self.permissions = PermissionsController(notifier: notifier)
         self.updateChecker = updateChecker ?? Self.makeUpdateChecker(notifier: notifier)
         self.pipeline = PipelineController(settings: settings, notifier: notifier, queueEnvironment: pipelineEnvironment)
+        self.protocolRegenerator = Self.makeProtocolRegenerator(settings: settings, notifier: notifier, pipeline: pipeline)
         self.channelHealth = ChannelHealthController(
             notifier: notifier,
             debounceSeconds: { [settings] in settings.asymmetricSilenceWarningSeconds },
@@ -463,6 +489,18 @@ final class AppState {
     /// the recording would begin a moment later regardless.
     var canStopRecording: Bool {
         watching.isRecording
+    }
+
+    /// The templates a protocol options window offers, read from the folder at
+    /// the call, so a window that asks when it opens lists templates added in
+    /// Finder since.
+    func protocolTemplateChoices() -> ProtocolTemplateChoices {
+        ProtocolTemplateChoices(settings: settings, store: .production)
+    }
+
+    /// Where an options window's background info goes, from the current settings.
+    func protocolOptionsUse() -> ProtocolOptionsUse {
+        ProtocolOptionsUse(settings: settings)
     }
 
     /// Whether the menu offers Pause/Resume: a recording's capture is running.

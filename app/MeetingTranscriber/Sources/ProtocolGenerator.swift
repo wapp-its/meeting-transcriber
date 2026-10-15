@@ -5,7 +5,27 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Protoco
 
 /// Abstraction for protocol generation, enabling mock injection in tests.
 protocol ProtocolGenerating {
-    func generate(transcript: String, title: String, diarized: Bool, meetingStartTime: Date?) async throws -> String
+    func generate(
+        transcript: String, title: String, diarized: Bool, meetingStartTime: Date?, instructions: ProtocolInstructions,
+    ) async throws -> String
+}
+
+/// What a job asks the provider for beyond the transcript: the text of its
+/// protocol template and the background info the person typed for the meeting.
+///
+/// The template text still carries its `{LANGUAGE}` / `{MEETING_DATE}` /
+/// `{MEETING_TIME}` placeholders; `ProtocolGenerator.buildSystemPrompt` fills
+/// them in. The background is never placeholder-replaced and never logged.
+struct ProtocolInstructions: Equatable {
+    let template: String
+    /// Trimmed; nil when blank, so "no background" has one representation.
+    let background: String?
+
+    init(template: String, background: String?) {
+        self.template = template
+        let trimmed = background?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        self.background = trimmed.isEmpty ? nil : trimmed
+    }
 }
 
 /// Shared protocol utilities: prompts, file operations, and error types.
@@ -95,42 +115,26 @@ enum ProtocolGenerator {
             .replacingOccurrences(of: "{MEETING_TIME}", with: metadata?.time ?? unknownMeetingMetadata)
     }
 
-    /// Load the protocol generation prompt. Reads from `url` (default
-    /// `AppPaths.customPromptFile`) when present and non-empty; falls back
-    /// to the built-in `protocolPrompt`. The `url` parameter exists so tests
-    /// can use unique per-test paths instead of racing on the shared one.
-    static func loadPrompt(from url: URL = AppPaths.customPromptFile) -> String {
-        if let custom = try? String(contentsOf: url, encoding: .utf8),
-           !custom.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            logger.info("Using custom protocol prompt from \(url.path)")
-            return custom
-        }
-        return protocolPrompt
-    }
-
-    /// Build the system prompt from an optional authoritative meeting-time context,
-    /// loaded prompt with variables replaced, and optional `diarizationNote`.
-    /// Imports and recovery jobs have no reliable meeting start and therefore
-    /// receive no authoritative time anchor. Excludes the transcript itself —
-    /// callers append or attach it as they see fit.
+    /// Build the system prompt: an optional authoritative meeting-time context,
+    /// the background block when the job has background info, the template with
+    /// its variables replaced, and the optional `diarizationNote`. Imports and
+    /// recovery jobs have no reliable meeting start and therefore receive no
+    /// authoritative time anchor. Excludes the transcript itself — callers
+    /// append or attach it as they see fit.
     ///
-    /// `promptURL` is forwarded to `loadPrompt` and exists for the same reason:
-    /// without it tests fall through to the shared `AppPaths.customPromptFile`,
-    /// so their result depends on whether the developer has customised their own
-    /// prompt through the app.
+    /// With the built-in template and no background this is byte-identical to
+    /// the prompt from before templates existed.
     static func buildSystemPrompt(
         diarized: Bool,
         language: String,
         meetingStartTime: Date?,
-        promptURL: URL = AppPaths.customPromptFile,
+        instructions: ProtocolInstructions,
         timeZone: TimeZone = .autoupdatingCurrent,
     ) -> String {
         let metadata = meetingStartTime.map { meetingMetadata(for: $0, timeZone: timeZone) }
-        var prompt = meetingTimeContext(metadata: metadata) + applyVariables(
-            loadPrompt(from: promptURL),
-            language: language,
-            metadata: metadata,
-        )
+        var prompt = meetingTimeContext(metadata: metadata)
+            + backgroundBlock(instructions.background)
+            + applyVariables(instructions.template, language: language, metadata: metadata)
         if diarized { prompt += diarizationNote }
         return prompt
     }
@@ -142,10 +146,11 @@ enum ProtocolGenerator {
         diarized: Bool,
         language: String,
         meetingStartTime: Date?,
-        promptURL: URL = AppPaths.customPromptFile,
+        instructions: ProtocolInstructions,
     ) -> String {
-        buildSystemPrompt(diarized: diarized, language: language, meetingStartTime: meetingStartTime, promptURL: promptURL)
-            + transcript
+        buildSystemPrompt(
+            diarized: diarized, language: language, meetingStartTime: meetingStartTime, instructions: instructions,
+        ) + transcript
     }
 
     static func meetingMetadata(
@@ -172,6 +177,47 @@ enum ProtocolGenerator {
             "in the transcript relative to this meeting date. Do not rely on the model's",
             "assumed current date.",
         ].joined(separator: "\n") + "\n\n"
+    }
+
+    /// The person's background info, verbatim and outside the template, so no
+    /// template has to make room for it and no placeholder can rewrite it.
+    private static func backgroundBlock(_ background: String?) -> String {
+        guard let background else { return "" }
+        return [
+            "Background information about this meeting, provided by the person who recorded it:",
+            "<background>",
+            background,
+            "</background>",
+            "Use it to identify participants, agenda items and the goal of the meeting. "
+                + "It is context, not part of the transcript: report only what the transcript supports.",
+        ].joined(separator: "\n") + "\n\n"
+    }
+
+    // MARK: - Protocol document
+
+    /// Separates the protocol from the verbatim transcript appended to it.
+    static let fullTranscriptSeparator = "\n\n---\n\n## Full Transcript\n\n"
+
+    /// The Markdown file a protocol run saves: the generated protocol, followed
+    /// by the transcript when the job asked for it.
+    static func composeDocument(protocolMarkdown: String, transcript: String, includeFullTranscript: Bool) -> String {
+        includeFullTranscript ? protocolMarkdown + fullTranscriptSeparator + transcript : protocolMarkdown
+    }
+
+    /// The transcript `composeDocument` appended to a protocol: the text after
+    /// the last separator. The last, because the generated protocol before it
+    /// is model output and may repeat the heading itself. Nil when there is no
+    /// separator or nothing but whitespace follows it.
+    static func fullTranscript(in document: String) -> String? {
+        guard let separator = document.range(of: fullTranscriptSeparator, options: .backwards) else { return nil }
+        let transcript = String(document[separator.upperBound...])
+        return transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : transcript
+    }
+
+    /// Whether a transcript carries speaker labels (`[Name]`), which decides
+    /// whether the prompt explains them.
+    static func looksDiarized(_ transcript: String) -> Bool {
+        transcript.range(of: #"\[\w[\w\s]*\]"#, options: .regularExpression) != nil
     }
 
     // MARK: - File Operations
@@ -299,6 +345,28 @@ enum ProtocolError: LocalizedError {
     case connectionFailed(String)
     case generationTimedOut(Int)
     case protocolTruncated
+
+    /// What a log line may say about the failure: the case and its status or
+    /// exit code, never the text a provider sent back. An endpoint that echoes
+    /// a rejected request, or a command that prints its input, would put the
+    /// prompt (the meeting's background info included) into that text, and a
+    /// log line is exported with the diagnostics. `errorDescription` keeps the
+    /// text for the person reading the result.
+    var logSummary: String {
+        switch self {
+        #if !APPSTORE
+            case let .cliFailed(code, _): "Claude CLI exited with code \(code)"
+
+            case let .commandFailed(tool, exitCode, _): "\(tool) exited with code \(exitCode)"
+        #endif
+
+        case let .httpError(code, _): "HTTP \(code)"
+
+        case .connectionFailed: "Connection failed"
+
+        default: errorDescription ?? String(describing: self)
+        }
+    }
 
     var errorDescription: String? {
         switch self {

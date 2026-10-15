@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// Pure derivations used by `OutputSettingsView`. Extracted so the wrapping
 /// logic can be unit-tested without instantiating a SwiftUI host.
@@ -31,6 +30,7 @@ enum OutputSettingsLogic {
 
 struct OutputSettingsView: View {
     @Bindable var settings: AppSettings
+    var templateStore: ProtocolTemplateStore = .production
 
     #if !APPSTORE
         @State private var claudeBinaries: [String] = ["claude"]
@@ -39,8 +39,6 @@ struct OutputSettingsView: View {
     @State private var connectionTestResult: ConnectionTestResult?
     @State private var availableModels: [String] = []
     @State private var didAttemptConnectionTest = false
-    @State private var showResetPromptConfirmation = false
-    @State private var hasCustomPrompt = false
 
     enum ConnectionTestResult {
         case success(String)
@@ -97,18 +95,18 @@ struct OutputSettingsView: View {
                         Text(lang).tag(lang)
                     }
                 }
-
-                promptControls
             }
             .accessibilityIdentifier(A11yID.protocolSection)
             .recordOnlyDisabled(settings.recordOnly)
+
+            ProtocolTemplatesSettingsView(model: ProtocolTemplatesModel(store: templateStore, settings: settings))
+                .recordOnlyDisabled(settings.recordOnly)
         }
         .formStyle(.grouped)
         .onAppear {
             #if !APPSTORE
                 claudeBinaries = ClaudeCLIProtocolGenerator.availableClaudeBinaries()
             #endif
-            refreshCustomPromptState()
         }
     }
 
@@ -228,53 +226,7 @@ struct OutputSettingsView: View {
         }
     }
 
-    private var promptControls: some View {
-        // swiftlint:disable:next closure_body_length
-        HStack {
-            Button("Edit Prompt") {
-                openCustomPrompt()
-                refreshCustomPromptState()
-            }
-
-            Button("Import Prompt") {
-                importCustomPrompt()
-                refreshCustomPromptState()
-            }
-
-            Button("Reset to Default") {
-                showResetPromptConfirmation = true
-            }
-            .disabled(!hasCustomPrompt)
-            .confirmationDialog(
-                "Reset protocol prompt to the built-in default?",
-                isPresented: $showResetPromptConfirmation,
-                titleVisibility: .visible,
-            ) {
-                Button("Reset", role: .destructive) {
-                    try? FileManager.default.removeItem(at: AppPaths.customPromptFile)
-                    refreshCustomPromptState()
-                }
-            }
-
-            Spacer()
-
-            if hasCustomPrompt {
-                Label("Custom prompt active", systemImage: "doc.text.fill")
-                    .foregroundStyle(.blue)
-                    .font(.caption)
-            } else {
-                Label("Using default prompt", systemImage: "doc.text")
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
-            }
-        }
-    }
-
     // MARK: - Helpers
-
-    private func refreshCustomPromptState() {
-        hasCustomPrompt = FileManager.default.fileExists(atPath: AppPaths.customPromptFile.path)
-    }
 
     func testConnection() {
         testingConnection = true
@@ -309,38 +261,6 @@ struct OutputSettingsView: View {
 
     private var modelPickerOptions: [String] {
         OutputSettingsLogic.mergePickerOptions(available: availableModels, selected: settings.openAIModel)
-    }
-
-    private func ensurePromptDirectory() {
-        try? FileManager.default.createDirectory(
-            at: AppPaths.customPromptFile.deletingLastPathComponent(),
-            withIntermediateDirectories: true,
-        )
-    }
-
-    private func openCustomPrompt() {
-        let url = AppPaths.customPromptFile
-        if !FileManager.default.fileExists(atPath: url.path) {
-            ensurePromptDirectory()
-            try? ProtocolGenerator.protocolPrompt.write(to: url, atomically: true, encoding: .utf8)
-        }
-        NSWorkspace.shared.open(url)
-    }
-
-    private func importCustomPrompt() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.plainText, .init(filenameExtension: "md")].compactMap(\.self)
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.message = "Select a prompt file to import"
-        guard panel.runModal() == .OK, let source = panel.url else { return }
-        ensurePromptDirectory()
-        let dest = AppPaths.customPromptFile
-        if FileManager.default.fileExists(atPath: dest.path) {
-            _ = try? FileManager.default.replaceItemAt(dest, withItemAt: source)
-        } else {
-            try? FileManager.default.copyItem(at: source, to: dest)
-        }
     }
 
     private var outputDirDisplay: String {

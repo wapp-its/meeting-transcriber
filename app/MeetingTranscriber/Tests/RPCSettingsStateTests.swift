@@ -141,6 +141,20 @@
             XCTAssertTrue(s.output.saveRawTranscriptSeparately)
         }
 
+        /// `hasCustomPrompt` keeps its key and now says whether the default
+        /// template is one of the person's own rather than the built-in.
+        func test_snapshot_output_hasCustomPromptFollowsTheDefaultTemplate() {
+            XCTAssertFalse(settings.rpcSettingsSnapshot().output.hasCustomPrompt)
+
+            settings.defaultProtocolTemplate = .file(name: "Board")
+
+            XCTAssertTrue(settings.rpcSettingsSnapshot().output.hasCustomPrompt)
+            XCTAssertEqual(
+                AppSettings(defaults: defaults).defaultProtocolTemplate, .file(name: "Board"),
+                "the default template did not persist",
+            )
+        }
+
         func test_snapshot_output_resolvesCustomBookmark() throws {
             let dir = try makeTempDirectory(prefix: "RPCSettingsOutput")
             // Plain (non-security-scoped) bookmark data resolves fine under the

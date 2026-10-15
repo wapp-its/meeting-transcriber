@@ -15,6 +15,7 @@ struct MenuBarView: View {
     /// restart.
     var history: [TerminalJobRecord] = []
     let onStartStop: () -> Void
+    /// Opens the start dialog, "Start Recording with Options…".
     let onRecordApp: () -> Void
     let onRecordMicrophone: () -> Void
     /// Whether the user set "No Microphone (app audio only)". Only reaches the
@@ -46,6 +47,8 @@ struct MenuBarView: View {
     let onProcessFiles: () -> Void
     /// Opens the Transcriptions window.
     var onShowAllTranscriptions: () -> Void = {}
+    /// Opens the Regenerate Protocol window.
+    var onRegenerateProtocol: () -> Void = {}
     /// Remove on a failed job: off the menu and out of the history for good.
     var onRemoveFailedJob: (UUID) -> Void = { _ in }
     /// Dismiss on a job waiting for speaker names.
@@ -56,6 +59,8 @@ struct MenuBarView: View {
     /// question rather than reading the open one, so a click on a menu that
     /// went stale answers nothing (`WatchLoop.answerParkedConsent`).
     var onAnswerConsent: ((ConsentQuestion, Bool) -> Void)?
+    /// Opens the Record Meeting window for the question the menu displayed.
+    var onRecordConsentWithOptions: ((ConsentQuestion) -> Void)?
     let onQuit: () -> Void
     /// Stores a chosen microphone's UID, empty for System Default.
     var onSelectMicrophone: (String) -> Void = { _ in }
@@ -143,6 +148,13 @@ struct MenuBarView: View {
                 Label("Record", systemImage: "record.circle")
             }
             .accessibilityIdentifier(A11yID.consentPromptRecord)
+
+            Button {
+                onRecordConsentWithOptions?(question)
+            } label: {
+                Label("Record with Options…", systemImage: "slider.horizontal.3")
+            }
+            .accessibilityIdentifier(A11yID.consentPromptRecordWithOptions)
 
             Button {
                 onAnswerConsent?(question, false)
@@ -247,7 +259,7 @@ struct MenuBarView: View {
             Button {
                 onRecordApp()
             } label: {
-                Label(Self.recordAppLabel(noMic: noMic), systemImage: "record.circle")
+                Label("Start Recording with Options…", systemImage: "record.circle")
             }
             .keyboardShortcut("r")
         }
@@ -336,6 +348,13 @@ struct MenuBarView: View {
         } label: {
             Label("Open Protocols Folder", systemImage: "folder")
         }
+
+        Button {
+            onRegenerateProtocol()
+        } label: {
+            Label("Regenerate Protocol…", systemImage: "arrow.triangle.2.circlepath")
+        }
+        .accessibilityIdentifier(A11yID.regenerateProtocolMenuItem)
     }
 
     @ViewBuilder private var updateSection: some View {
@@ -408,12 +427,6 @@ struct MenuBarView: View {
     }
 
     // MARK: - Helpers
-
-    /// "Record App..." alone reads as app audio only, while the recording
-    /// also takes the microphone unless "No Microphone" is set.
-    static func recordAppLabel(noMic: Bool) -> String {
-        noMic ? "Record App Audio..." : "Record App + Microphone..."
-    }
 
     /// One menu item per job, its actions in a submenu. A menu-style
     /// `MenuBarExtra` cannot lay anything out side by side: an `HStack` row

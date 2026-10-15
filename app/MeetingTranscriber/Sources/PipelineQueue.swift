@@ -123,6 +123,13 @@ class PipelineQueue {
     /// Reads the current Settings only when a job is enqueued; the values are
     /// then copied onto the job and remain stable for its whole lifecycle.
     private let transcriptOutputOptionsProvider: () -> TranscriptOutputOptions
+    /// Where a job's protocol template is read when its protocol is made.
+    /// Internal because `generateProtocol` in PipelineQueue+Stages.swift reads it.
+    let protocolTemplateStore: ProtocolTemplateStore
+    /// The current default template: stamped on a job when it is admitted, and
+    /// used for a job without one (an older snapshot, or a job no longer queued).
+    /// Internal for the same reason as `protocolTemplateStore`.
+    let defaultProtocolTemplateProvider: () -> ProtocolTemplateID
     let speakerMatcherFactory: () -> SpeakerMatcher
     let vadConfig: VADConfig?
     /// nil disables JSONL logging. AppState injects a real instance for production;
@@ -297,6 +304,8 @@ class PipelineQueue {
         inFlightRuns: InFlightRunRegistry? = nil,
         echoCancellationEnabled: @escaping () -> Bool = { false },
         echoCancellerFactory: (() -> (any EchoCancelling)?)? = nil,
+        defaultProtocolTemplateProvider: @escaping () -> ProtocolTemplateID = { .builtIn },
+        protocolTemplateStore: ProtocolTemplateStore = .production,
     ) {
         self.logDir = logDir ?? AppPaths.ipcDir
         self.processedLedger = ProcessedRecordingsLedger(logDir: self.logDir)
@@ -321,6 +330,8 @@ class PipelineQueue {
         )
         fallbackTranscriptOutputOptions = outputOptions
         transcriptOutputOptionsProvider = { outputOptions }
+        self.protocolTemplateStore = protocolTemplateStore
+        self.defaultProtocolTemplateProvider = defaultProtocolTemplateProvider
         self.speakerMatcherFactory = speakerMatcherFactory
         self.snapshotWriter = snapshotWriter
         self.vadConfig = nil
@@ -402,6 +413,8 @@ class PipelineQueue {
         includeFullTranscriptInProtocol: Bool = true,
         saveRawTranscriptSeparately: Bool = true,
         transcriptOutputOptionsProvider: (() -> TranscriptOutputOptions)? = nil,
+        defaultProtocolTemplateProvider: @escaping () -> ProtocolTemplateID = { .builtIn },
+        protocolTemplateStore: ProtocolTemplateStore = .production,
         speakerMatcherFactory: @escaping () -> SpeakerMatcher = PipelineQueue.throwawayMatcherFactory(),
         snapshotWriter: @escaping @Sendable ([PipelineJob], URL) throws -> Void = PipelineSnapshot.save,
         vadConfig: VADConfig? = nil,
@@ -444,6 +457,8 @@ class PipelineQueue {
         )
         fallbackTranscriptOutputOptions = outputOptions
         self.transcriptOutputOptionsProvider = transcriptOutputOptionsProvider ?? { outputOptions }
+        self.protocolTemplateStore = protocolTemplateStore
+        self.defaultProtocolTemplateProvider = defaultProtocolTemplateProvider
         self.speakerMatcherFactory = speakerMatcherFactory
         self.snapshotWriter = snapshotWriter
         self.vadConfig = vadConfig
@@ -515,9 +530,11 @@ class PipelineQueue {
         )
     }
 
-    /// Copy the current settings onto a newly admitted job. Recovery uses the
-    /// same admission rule as regular enqueueing so a later settings change
-    /// cannot change output handling for an already recovered recording.
+    /// Copy the current settings onto a newly admitted job: the transcript
+    /// output options and, unless the job brought its own, the default protocol
+    /// template. Recovery uses the same admission rule as regular enqueueing so
+    /// a later settings change cannot change output handling for an already
+    /// recovered recording.
     func stampTranscriptOutputOptions(on job: inout PipelineJob) {
         let outputOptions = transcriptOutputOptionsProvider()
         if job.includeFullTranscriptInProtocol == nil {
@@ -525,6 +542,9 @@ class PipelineQueue {
         }
         if job.saveRawTranscriptSeparately == nil {
             job.saveRawTranscriptSeparately = outputOptions.saveRawTranscriptSeparately
+        }
+        if job.protocolTemplate == nil {
+            job.protocolTemplate = defaultProtocolTemplateProvider()
         }
     }
 

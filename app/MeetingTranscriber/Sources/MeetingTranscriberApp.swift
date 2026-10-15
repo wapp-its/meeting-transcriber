@@ -140,6 +140,8 @@ struct MeetingTranscriberApp: App {
         settingsWindow
         recordAppWindow
         transcriptionsWindow
+        regenerateProtocolWindow
+        consentOptionsWindow
     }
 
     // MARK: - Menu Bar
@@ -180,12 +182,14 @@ struct MeetingTranscriberApp: App {
             } : nil,
             onProcessFiles: processAudioFiles,
             onShowAllTranscriptions: { bringWindowToFront(id: TranscriptionsView.windowID) },
+            onRegenerateProtocol: { bringWindowToFront(id: RegenerateProtocolView.windowID) },
             onRemoveFailedJob: { id in appState.pipeline.removeFailedJob(id: id) },
             onDismissJob: { id in appState.pipelineQueue.removeJob(id: id) },
             consentQuestion: appState.pendingConsentQuestion,
             onAnswerConsent: { question, granted in
                 appState.answerConsentQuestion(question, granted: granted)
             },
+            onRecordConsentWithOptions: openConsentOptions,
             onQuit: quit,
             onSelectMicrophone: { appState.settings.micDeviceUID = $0 },
             microphoneMenu: appState.microphoneMenuState,
@@ -323,7 +327,7 @@ struct MeetingTranscriberApp: App {
     }
 
     private var recordAppWindow: some Scene {
-        Window("Record App", id: "record-app") {
+        Window("Start Recording", id: "record-app") {
             AppPickerView(
                 appsProvider: SystemRunningAppsProvider(),
                 // The controller's wide predicate, not `appState.isManualRecording`.
@@ -332,8 +336,11 @@ struct MeetingTranscriberApp: App {
                 // menu item that opened it — it closes only on its own Start or
                 // Cancel — so it has to stay truthful across both halves.
                 startWouldBeRefused: appState.watching.isManualRecording,
-                onStartRecording: { pid, appName, title in
-                    appState.watching.startManualRecording(pid: pid, appName: appName, title: title)
+                noMic: appState.settings.noMic,
+                templateChoices: { appState.protocolTemplateChoices() },
+                optionsUse: { appState.protocolOptionsUse() },
+                onStartRecording: { request, options in
+                    appState.watching.startRecording(request, protocolOptions: options)
                     closeWindow(id: "record-app")
                 },
                 onCancel: { closeWindow(id: "record-app") },
@@ -359,6 +366,46 @@ struct MeetingTranscriberApp: App {
             .onAppear { appState.pipeline.prepareTranscriptionsWindow() }
         }
         .defaultSize(width: 760, height: 520)
+    }
+
+    private var regenerateProtocolWindow: some Scene {
+        Window("Regenerate Protocol", id: RegenerateProtocolView.windowID) {
+            RegenerateProtocolView(
+                phase: appState.protocolRegenerator.phase,
+                templateChoices: { appState.protocolTemplateChoices() },
+                optionsUse: { appState.protocolOptionsUse() },
+                latestTarget: { appState.protocolRegenerator.latestTarget() },
+                chooseFile: { RegenerateProtocolView.chooseFile(startingIn: appState.settings.effectiveOutputDir) },
+                resolveFile: { try appState.protocolRegenerator.target(for: $0) },
+                onGenerate: { target, options in
+                    Task { await appState.protocolRegenerator.regenerate(target, options: options) }
+                },
+                onClose: { closeWindow(id: RegenerateProtocolView.windowID) },
+            )
+            .onAppear { appState.protocolRegenerator.clearResult() }
+        }
+        .windowResizability(.contentSize)
+    }
+
+    private var consentOptionsWindow: some Scene {
+        Window("Record Meeting", id: ConsentOptionsView.windowID) {
+            ConsentOptionsView(
+                question: appState.consentOptionsQuestion,
+                templateChoices: { appState.protocolTemplateChoices() },
+                optionsUse: { appState.protocolOptionsUse() },
+                onRecord: { question, options in
+                    appState.answerConsentQuestion(question, granted: true, protocolOptions: options)
+                },
+                onClose: { closeWindow(id: ConsentOptionsView.windowID) },
+            )
+        }
+        .windowResizability(.contentSize)
+    }
+
+    /// "Record with Options…" on the menu's recording prompt.
+    private func openConsentOptions(_ question: ConsentQuestion) {
+        appState.consentOptionsQuestion = question
+        bringWindowToFront(id: ConsentOptionsView.windowID)
     }
 
     // MARK: - Speaker Naming Window

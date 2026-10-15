@@ -14,9 +14,11 @@ final class MenuBarViewConsentPromptTests: XCTestCase {
         case button(String)
     }
 
-    /// Every answer the menu handed back, in order.
+    /// Every answer the menu handed back, in order, and every question it
+    /// opened the Record Meeting window for.
     private final class Answers {
         var calls: [(question: ConsentQuestion, granted: Bool)] = []
+        var optionsOpened: [ConsentQuestion] = []
     }
 
     private let question = ConsentQuestion(
@@ -56,6 +58,7 @@ final class MenuBarViewConsentPromptTests: XCTestCase {
             onDismissJob: { _ in },
             consentQuestion: question,
             onAnswerConsent: { question, granted in answers.calls.append((question, granted)) },
+            onRecordConsentWithOptions: { answers.optionsOpened.append($0) },
             onQuit: {},
         )
     }
@@ -89,19 +92,21 @@ final class MenuBarViewConsentPromptTests: XCTestCase {
         let sut = makeView(question: nil)
 
         XCTAssertThrowsError(try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.consentPromptRecord))
+        XCTAssertThrowsError(try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.consentPromptRecordWithOptions))
         XCTAssertThrowsError(try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.consentPromptIgnore))
         XCTAssertEqual(try lines(of: sut).first, .status)
     }
 
-    func testWithAQuestionTheMenuOpensWithItsTextThenRecordAndIgnore() throws {
+    func testWithAQuestionTheMenuOpensWithItsTextThenItsAnswers() throws {
         let sut = makeView(question: question)
 
         XCTAssertEqual(
-            try Array(lines(of: sut).prefix(6)),
+            try Array(lines(of: sut).prefix(7)),
             [
                 .text(question.title),
                 .text(question.body),
                 .button("Record"),
+                .button("Record with Options…"),
                 .button("Ignore"),
                 .divider,
                 .status,
@@ -118,6 +123,18 @@ final class MenuBarViewConsentPromptTests: XCTestCase {
         XCTAssertEqual(answers.calls.count, 1)
         XCTAssertEqual(answers.calls.first?.question, question)
         XCTAssertEqual(answers.calls.first?.granted, true)
+    }
+
+    /// Opens the window for the displayed question and answers nothing itself:
+    /// the window's Record does.
+    func testRecordWithOptionsHandsBackTheDisplayedQuestion() throws {
+        let answers = Answers()
+        let sut = makeView(question: question, answers: answers)
+
+        try tap(A11yID.consentPromptRecordWithOptions, in: sut)
+
+        XCTAssertEqual(answers.optionsOpened, [question])
+        XCTAssertTrue(answers.calls.isEmpty)
     }
 
     func testIgnoreAnswersTheDisplayedQuestionWithNo() throws {

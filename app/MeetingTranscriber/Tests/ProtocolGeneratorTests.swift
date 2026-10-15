@@ -216,15 +216,12 @@ final class ProtocolGeneratorTests: XCTestCase {
     // MARK: - System Prompt Construction
 
     func testBuildSystemPromptSubstitutesLanguage() throws {
-        let url = makeTempFile(suffix: ".md")
-        try "Protocol language: {LANGUAGE}.".write(to: url, atomically: true, encoding: .utf8)
-
         let startTime = try localDate(2026, 8, 21, 13, 28)
         let prompt = ProtocolGenerator.buildSystemPrompt(
             diarized: false,
             language: "Polish",
             meetingStartTime: startTime,
-            promptURL: url,
+            instructions: ProtocolInstructions(template: "Protocol language: {LANGUAGE}.", background: nil),
         )
 
         XCTAssertEqual(
@@ -243,15 +240,13 @@ final class ProtocolGeneratorTests: XCTestCase {
     }
 
     func testBuildSystemPromptAppendsDiarizationNoteWhenDiarized() throws {
-        // Never created, so both calls fall back to the built-in default rather
-        // than to whatever the developer has in their own prompt file.
-        let url = makeTempFile(suffix: ".md")
+        let builtIn = ProtocolInstructions(template: ProtocolGenerator.protocolPrompt, background: nil)
         let startTime = try localDate(2026, 8, 21, 13, 28)
         let plain = ProtocolGenerator.buildSystemPrompt(
-            diarized: false, language: "German", meetingStartTime: startTime, promptURL: url,
+            diarized: false, language: "German", meetingStartTime: startTime, instructions: builtIn,
         )
         let diarized = ProtocolGenerator.buildSystemPrompt(
-            diarized: true, language: "German", meetingStartTime: startTime, promptURL: url,
+            diarized: true, language: "German", meetingStartTime: startTime, instructions: builtIn,
         )
         XCTAssertGreaterThan(diarized.count, plain.count)
         XCTAssertTrue(diarized.contains(ProtocolGenerator.diarizationNote))
@@ -354,36 +349,6 @@ final class ProtocolGeneratorTests: XCTestCase {
             )
         }
     #endif
-
-    // MARK: - Custom Prompt Loading
-
-    func testLoadPromptReturnsDefaultWhenNoFile() {
-        let url = makeTempFile(suffix: ".md")
-        // File doesn't exist → loadPrompt falls back to the built-in default.
-        XCTAssertEqual(ProtocolGenerator.loadPrompt(from: url), ProtocolGenerator.protocolPrompt)
-    }
-
-    func testLoadPromptReadsCustomFile() throws {
-        let url = makeTempFile(suffix: ".md")
-        let custom = "Custom prompt for testing"
-        try custom.write(to: url, atomically: true, encoding: .utf8)
-
-        XCTAssertEqual(ProtocolGenerator.loadPrompt(from: url), custom)
-    }
-
-    func testLoadPromptIgnoresEmptyFile() throws {
-        let url = makeTempFile(suffix: ".md")
-        try "".write(to: url, atomically: true, encoding: .utf8)
-
-        XCTAssertEqual(ProtocolGenerator.loadPrompt(from: url), ProtocolGenerator.protocolPrompt)
-    }
-
-    func testLoadPromptIgnoresWhitespaceOnlyFile() throws {
-        let url = makeTempFile(suffix: ".md")
-        try "   \n  \n  ".write(to: url, atomically: true, encoding: .utf8)
-
-        XCTAssertEqual(ProtocolGenerator.loadPrompt(from: url), ProtocolGenerator.protocolPrompt)
-    }
 
     #if !APPSTORE
         func testGenerateEnvStripDoesNotRemoveOtherVars() {
@@ -542,5 +507,16 @@ final class ProtocolGeneratorTests: XCTestCase {
             FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int,
         )
         XCTAssertEqual(mode & 0o777, 0o600)
+    }
+}
+
+/// The call shape from before protocol templates, for tests that are not about
+/// the prompt: the built-in template and no background.
+extension ProtocolGenerating {
+    func generate(transcript: String, title: String, diarized: Bool, meetingStartTime: Date? = nil) async throws -> String {
+        try await generate(
+            transcript: transcript, title: title, diarized: diarized, meetingStartTime: meetingStartTime,
+            instructions: ProtocolInstructions(template: ProtocolGenerator.protocolPrompt, background: nil),
+        )
     }
 }

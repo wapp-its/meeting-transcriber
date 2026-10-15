@@ -147,7 +147,9 @@ final class PipelineQueueSecurityScopeTests: XCTestCase {
         private var releaseContinuation: CheckedContinuation<Void, Never>?
         private var released = false
 
-        func generate(transcript _: String, title _: String, diarized _: Bool, meetingStartTime _: Date?) async -> String {
+        func generate(
+            transcript _: String, title _: String, diarized _: Bool, meetingStartTime _: Date?, instructions _: ProtocolInstructions,
+        ) async -> String {
             let waiter: CheckedContinuation<Void, Never>? = lock.withLock {
                 hasEntered = true
                 defer { entered = nil }

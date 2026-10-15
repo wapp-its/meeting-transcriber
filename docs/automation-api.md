@@ -441,6 +441,7 @@ Scope and limits:
   "protocolPath": "/Users/me/.../standup-protocol.md",
   "error": null,
   "warnings": [],
+  "meetingStartedAt": "2026-10-13T08:00:00Z",
   "echo": {
     "detected": true,
     "affectedWindowShare": 0.62,
@@ -463,6 +464,9 @@ Scope and limits:
   diarization failure on one track).
 - `echo`: the echo-bleed verdict, see below. Absent for a single-source job and
   for a dual-source job no verdict could be reached on.
+- `meetingStartedAt`: when the recording started, ISO 8601 in UTC. Absent for a
+  job with no live recording (an imported file, a recovered recording), and for
+  jobs that finished before the field was added.
 - `transcript`: the transcript text, present **only** when the request opted in
   via `?include=transcript` (see [Inline transcript](#inline-transcript)). Absent
   otherwise, so the default shape is unchanged.

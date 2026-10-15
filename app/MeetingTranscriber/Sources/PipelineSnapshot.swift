@@ -1,4 +1,7 @@
 import Foundation
+import os.log
+
+private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "PipelineSnapshot")
 
 /// Pure I/O helpers for persisting `PipelineQueue`'s `[PipelineJob]` array
 /// to disk and reading it back. Extracted from `PipelineQueue` so the
@@ -14,19 +17,68 @@ enum PipelineSnapshot {
     static let snapshotFilename = "pipeline_queue.json"
     static let stagingFilename = "pipeline_queue.tmp"
 
+    /// The encoder every snapshot is written with. Keys are sorted because a
+    /// plain `JSONEncoder` writes an object's keys in hash order, which can
+    /// differ between two encodes of the same value in one process, so equal
+    /// job lists would not always give equal bytes. Loading does not depend on
+    /// key order, so snapshots written before this still load.
+    static func makeEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return encoder
+    }
+
     /// JSON-encode `jobs` and atomically replace any existing snapshot at
     /// `logDir/pipeline_queue.json`. The staging write goes to
     /// `pipeline_queue.tmp` first; `replaceItemAt` (which lowers to
     /// `renamex_np` on macOS) swaps it in.
     ///
-    /// - Throws: `EncodingError` from JSONEncoder, or any
-    ///   `FileManager` / `Data.write` I/O error.
+    /// Both files are owner-only: a job carries the meeting's title, its
+    /// participants and the background info typed for its protocol.
+    ///
+    /// - Throws: `EncodingError` from JSONEncoder, or any `FileManager` /
+    ///   `FileHandle` I/O error. A failed replace leaves no staging file.
     static func save(_ jobs: [PipelineJob], to logDir: URL) throws {
-        let data = try JSONEncoder().encode(jobs)
+        try save(jobs, to: logDir) { snapshot, staging in
+            _ = try FileManager.default.replaceItemAt(snapshot, withItemAt: staging)
+        }
+    }
+
+    /// `save` with the swap passed in, so a test can look at the staging file
+    /// at the moment it is swapped in, or make the swap fail.
+    static func save(
+        _ jobs: [PipelineJob], to logDir: URL, replace: (_ snapshot: URL, _ staging: URL) throws -> Void,
+    ) throws {
+        let data = try makeEncoder().encode(jobs)
         let stagingPath = logDir.appendingPathComponent(stagingFilename)
-        try data.write(to: stagingPath)
+        try writeOwnerOnly(data, to: stagingPath)
         let snapshotPath = logDir.appendingPathComponent(snapshotFilename)
-        _ = try FileManager.default.replaceItemAt(snapshotPath, withItemAt: stagingPath)
+        do {
+            try replace(snapshotPath, stagingPath)
+        } catch {
+            try? FileManager.default.removeItem(at: stagingPath)
+            throw error
+        }
+        // `replaceItemAt` keeps the replaced file's permissions, so a snapshot
+        // written before this was owner-only stays readable until restricted.
+        do {
+            try FileManager.default.restrictToOwner(snapshotPath)
+        } catch {
+            logger.error("pipeline_snapshot_restrict_failed error=\(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Creates `url` empty and owner-only, then writes `data` into it, so no
+    /// byte is ever in a file other users can read. `Data.write` would create
+    /// the file under the process umask (typically 0644) with the bytes in it.
+    private static func writeOwnerOnly(_ data: Data, to url: URL) throws {
+        let created = FileManager.default.createFile(
+            atPath: url.path, contents: nil, attributes: [.posixPermissions: FileManager.ownerOnlyPermissions],
+        )
+        guard created else { throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: url.path]) }
+        let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+        try handle.write(contentsOf: data)
     }
 
     // swiftlint:disable discouraged_optional_collection

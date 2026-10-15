@@ -36,5 +36,29 @@
             // And a plain JobStatusDTO decode still sees the flattened status fields.
             XCTAssertEqual(try JSONDecoder().decode(JobStatusDTO.self, from: data), dto)
         }
+
+        /// A recording carries its start; an import has none and the key stays off the wire.
+        func testMeetingStartedAtIsSentForARecordingAndOmittedForAnImport() throws {
+            let recording = PipelineJob(
+                meetingTitle: "Standup", appName: "Teams",
+                mixPath: URL(fileURLWithPath: "/rec/mix.wav"), appPath: nil, micPath: nil, micDelay: 0,
+                meetingStartTime: Date(timeIntervalSince1970: 1_760_000_000),
+            )
+            let imported = PipelineJob(
+                meetingTitle: "call", appName: "File",
+                mixPath: URL(fileURLWithPath: "/in/call.m4a"), appPath: nil, micPath: nil, micDelay: 0,
+            )
+
+            let sent = try wireObject(JobStatusDTO(job: recording))
+            let omitted = try wireObject(JobStatusDTO(job: imported))
+
+            XCTAssertEqual(sent["meetingStartedAt"] as? String, "2025-10-09T08:53:20Z")
+            XCTAssertNil(omitted["meetingStartedAt"], "an import has no recording start: \(omitted)")
+        }
+
+        private func wireObject(_ status: JobStatusDTO) throws -> [String: Any] {
+            let data = try JSONEncoder().encode(JobStatusResponse(status, transcript: nil))
+            return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        }
     }
 #endif

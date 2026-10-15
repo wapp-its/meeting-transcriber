@@ -11,7 +11,7 @@
   "review": "codex:gpt-5.6-sol:xhigh",
   "spec": "gh-2-protocol-templates-and-background-info",
   "spec_path": ".flow/tasks/gh-2-protocol-templates-and-background-info.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Protocol templates section in Settings \u2192 Output",
   "updated_at": "2026-10-06T20:49:38.192977Z"
 }

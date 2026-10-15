@@ -81,6 +81,42 @@ final class ManualRecordingTests: XCTestCase {
         XCTAssertEqual(queue.jobs.first?.appName, "Chrome")
     }
 
+    /// The start dialog's choice reaches the job, for both sources it offers.
+    func testARecordingStartedWithOptionsEnqueuesAJobCarryingThem() async throws {
+        let options = MeetingProtocolOptions(template: .file(name: "Board"), rawBackground: "Agenda: budget")
+        let starts: [(String, (WatchLoop) async throws -> Void)] = [
+            ("app", { try await $0.startManualRecording(pid: 1234, appName: "Chrome", title: "Standup", protocolOptions: options) }),
+            ("microphone", { try await $0.startMicrophoneRecording(protocolOptions: options) }),
+        ]
+        // A local, not a closure literal: as the last argument one would be
+        // rewritten into a trailing closure that binds to another parameter.
+        let defaultTemplate: () -> ProtocolTemplateID = { .file(name: "Default") }
+        for (name, start) in starts {
+            let queue = PipelineQueue(defaultProtocolTemplateProvider: defaultTemplate)
+            let (loop, _) = makeLoop(pipelineQueue: queue)
+            try await start(loop)
+
+            loop.stopManualRecording()
+
+            XCTAssertEqual(queue.jobs.first?.protocolTemplate, .file(name: "Board"), name)
+            XCTAssertEqual(queue.jobs.first?.protocolBackground, "Agenda: budget", name)
+        }
+    }
+
+    /// The immediate menu item and `/v1/record` start without options: the job
+    /// gets the default template stamped when queued, and no background.
+    func testARecordingStartedWithoutOptionsGetsTheDefaultTemplateAndNoBackground() async throws {
+        let defaultTemplate: () -> ProtocolTemplateID = { .file(name: "Default") }
+        let queue = PipelineQueue(defaultProtocolTemplateProvider: defaultTemplate)
+        let (loop, _) = makeLoop(pipelineQueue: queue)
+        try await loop.startMicrophoneRecording()
+
+        loop.stopManualRecording()
+
+        XCTAssertEqual(queue.jobs.first?.protocolTemplate, .file(name: "Default"))
+        XCTAssertNil(queue.jobs.first?.protocolBackground)
+    }
+
     func testStopManualRecordingTransitionsToIdle() async throws {
         let (loop, _) = makeLoop()
         try await loop.startManualRecording(pid: 1234, appName: "Chrome", title: "Meeting")

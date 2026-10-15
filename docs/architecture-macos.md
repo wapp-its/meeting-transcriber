@@ -112,7 +112,8 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `WhisperKitStockModel.swift` | The six stock WhisperKit variants in picker order, each with its label and approximate download size (measured 2026-10-06) for the load offer |
 | `Settings/VocabularySourceSettingsView.swift` | "Vocabulary source" picker (Local file / URL); for URL the address, the Keychain-backed access token, "Update now" and the status line from `RemoteVocabularyController` |
 | `Settings/SpeakersSettingsView.swift` | Diarization · Mic Speaker Name · Known Voices · Recognition Stats · Experimental Diarization Tuning |
-| `Settings/OutputSettingsView.swift` | LLM provider · protocol language · output folder · custom prompt |
+| `Settings/OutputSettingsView.swift` | LLM provider · protocol language · output folder · Protocol Templates section |
+| `Settings/ProtocolTemplatesSettingsView.swift` | Protocol Templates section: default template picker, Edit and Delete per template file, Create Template, Open Templates Folder; its state and writes live in the `@Observable` `ProtocolTemplatesModel` |
 | `Settings/CommandProviderSettingsView.swift` | Codex CLI note · custom command editor, model and placeholder notes (`#if !APPSTORE`) |
 | `Settings/AdvancedSettingsView.swift` | Permissions · Diagnostics |
 | `Settings/AboutSettingsView.swift` | Version · bundle identifier · build date · ffmpeg status · project link · Updates |
@@ -633,7 +634,9 @@ with a saved protocol. If protocol generation is disabled, fails, or the job
 ends in an error, the raw transcript is retained with a warning; recordings are
 governed by their separate retention policy.
 
-`AppSettings.protocolLanguage` (default `"German"`) is substituted into the prompt as `{LANGUAGE}`. Custom prompts can also use `{MEETING_DATE}` (`YYYY-MM-DD`) and `{MEETING_TIME}` (`HH:mm`), derived from the captured recording start time. Imports and recovery jobs resolve those time placeholders to `Unknown` rather than their enqueue or processing time. Only recordings with a captured start receive the authoritative meeting-metadata block, so existing custom prompts receive reliable temporal context without needing to add the placeholders.
+The prompt is the job's protocol template: the built-in one ("Standard (built-in)") or a Markdown file in `~/Library/Application Support/MeetingTranscriber/Protocol Templates/`, named after the file and managed in Settings → Output. A job captures the template's name when it enters the queue (`AppSettings.defaultProtocolTemplate` unless the job names one), and the file is read when the protocol is made; a template that is missing or blank by then falls back to the built-in with a warning on the job. A custom prompt from an earlier version (`protocol_prompt.md`) is copied in once as the template "Custom Prompt" and made the default; the old file is left in place.
+
+`AppSettings.protocolLanguage` (default `"German"`) is substituted into the prompt as `{LANGUAGE}`. Every template can also use `{MEETING_DATE}` (`YYYY-MM-DD`) and `{MEETING_TIME}` (`HH:mm`), derived from the captured recording start time. Imports and recovery jobs resolve those time placeholders to `Unknown` rather than their enqueue or processing time. Only recordings with a captured start receive the authoritative meeting-metadata block, so templates receive reliable temporal context without needing to add the placeholders.
 
 ### CLI Runner
 
@@ -754,7 +757,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 | **Audio** | Microphone · VAD | `settings` | `audioDevices` |
 | **Transcription** | Engine + per-engine options + vocabulary source + status | `settings`, three engines, `remoteVocabulary?` | — |
 | **Speakers** | Diarization · Speaker Identity · Known Voices · Recognition Stats · Experimental Diarization Tuning | `settings`, `recognitionStatsLog`, `enrollmentDiarizerFactory` | `knownVoicesSheet` |
-| **Output** | LLM Provider · Protocol Language · Output Folder · Prompt | `settings` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`, `hasCustomPrompt` |
+| **Output** | LLM Provider · Protocol Language · Output Folder · Protocol Templates | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel` |
 | **Advanced** | Permissions · Diagnostics | — | `micPermission`, `screenRecordingOK`, `accessibilityOK` |
 | **About** | Build identity · Dependencies · Updates | `settings`, `updateChecker?` | — |
 
@@ -769,7 +772,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 - `updateChecker == nil` hides the entire Updates section in About
 
 **Cross-cutting concerns owned by sub-views:**
-- `OutputSettingsView` owns OpenAI-endpoint connection testing (`testConnection()`) and custom-prompt I/O (`openCustomPrompt`, `importCustomPrompt`, reset confirmation)
+- `OutputSettingsView` owns OpenAI-endpoint connection testing (`testConnection()`); `ProtocolTemplatesModel` owns the template folder I/O (create, open, move to the Trash, delete confirmation, the default template)
 - `AdvancedSettingsView` owns permission live-probing (`refreshPermissions()`)
 - `AboutSettingsView` owns version/build/ffmpeg status and update-check controls
 

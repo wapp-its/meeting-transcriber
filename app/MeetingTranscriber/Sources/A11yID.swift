@@ -111,7 +111,13 @@ enum A11yID {
     /// The menu's answers to the open recording prompt. No app name, for the
     /// reason on `consentDeniedAppRemove`.
     static let consentPromptRecord = "consentPromptRecord"
+    static let consentPromptRecordWithOptions = "consentPromptRecordWithOptions"
     static let consentPromptIgnore = "consentPromptIgnore"
+
+    /// The Record Meeting window's buttons. The window shows background text
+    /// and stays off every RPC allowlist.
+    static let consentOptionsRecordButton = "consentOptionsRecordButton"
+    static let consentOptionsCancelButton = "consentOptionsCancelButton"
 
     static let recordOnlyBanner = "recordOnlyBanner"
     static let transcriptionSection = "transcriptionSection"
@@ -120,6 +126,34 @@ enum A11yID {
     static let codexProviderNote = "codexProviderNote"
     static let customCommandEditor = "customCommandEditor"
     static let customCommandModelField = "customCommandModelField"
+    static let protocolTemplateDefaultPicker = "protocolTemplateDefaultPicker"
+    static let protocolTemplateNameField = "protocolTemplateNameField"
+    static let protocolTemplateCreateButton = "protocolTemplateCreateButton"
+    static let protocolTemplatesOpenFolderButton = "protocolTemplatesOpenFolderButton"
+
+    /// A template row's Edit button, addressed by ROW INDEX, never by template
+    /// name: the name is user input, for the reason on `consentDeniedAppRemove`.
+    static func protocolTemplateEdit(_ index: Int) -> String {
+        "protocolTemplateEdit.\(index)"
+    }
+
+    /// A template row's Delete button, addressed like `protocolTemplateEdit`.
+    static func protocolTemplateDelete(_ index: Int) -> String {
+        "protocolTemplateDelete.\(index)"
+    }
+
+    /// The per-recording options form (`ProtocolOptionsForm`). Constants only:
+    /// its windows show background text and stay off every RPC allowlist.
+    static let protocolOptionsTemplatePicker = "protocolOptionsTemplatePicker"
+    static let protocolOptionsBackgroundEditor = "protocolOptionsBackgroundEditor"
+    static let protocolOptionsDestinationNotice = "protocolOptionsDestinationNotice"
+
+    /// "Regenerate Protocol…" in the menu, and its window's controls. The
+    /// window shows background text and stays off every RPC allowlist.
+    static let regenerateProtocolMenuItem = "regenerateProtocolMenuItem"
+    static let regenerateChooseFileButton = "regenerateChooseFileButton"
+    static let regenerateGenerateButton = "regenerateGenerateButton"
+
     static let includeFullTranscriptToggle = "includeFullTranscriptToggle"
     static let saveRawTranscriptToggle = "saveRawTranscriptToggle"
     static let outputFolderSection = "outputFolderSection"

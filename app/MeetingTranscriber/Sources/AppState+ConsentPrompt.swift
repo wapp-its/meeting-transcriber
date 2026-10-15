@@ -19,10 +19,13 @@ extension AppState {
         pendingConsentQuestion != nil
     }
 
-    /// Answer `question` from the menu. Changes nothing unless it is still the
-    /// open prompt (`WatchLoop.answerParkedConsent`); a menu that went stale
-    /// has nothing to do with the result.
-    func answerConsentQuestion(_ question: ConsentQuestion, granted: Bool) {
-        _ = watching.watchLoop?.answerParkedConsent(question, granted: granted)
+    /// Answer `question` from the menu or the Record Meeting window, the
+    /// window's Record with its `protocolOptions`. Changes nothing unless it is
+    /// still the open prompt (`WatchLoop.answerParkedConsent`), and returns
+    /// whether it was: a menu that went stale has nothing to do with the
+    /// result, while the window says the question is no longer open.
+    @discardableResult
+    func answerConsentQuestion(_ question: ConsentQuestion, granted: Bool, protocolOptions: MeetingProtocolOptions? = nil) -> Bool {
+        watching.watchLoop?.answerParkedConsent(question, granted: granted, protocolOptions: protocolOptions) ?? false
     }
 }

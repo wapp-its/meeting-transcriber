@@ -93,7 +93,7 @@
             RPCStateSnapshot.Settings.Output(
                 directory: rpcOutputDirPath(),
                 hasCustomDirectory: customOutputDirBookmark != nil,
-                hasCustomPrompt: FileManager.default.fileExists(atPath: AppPaths.customPromptFile.path),
+                hasCustomPrompt: defaultProtocolTemplate != .builtIn,
                 includeFullTranscriptInProtocol: includeFullTranscriptInProtocol,
                 saveRawTranscriptSeparately: saveRawTranscriptSeparately,
             )

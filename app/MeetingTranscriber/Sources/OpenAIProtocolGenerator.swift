@@ -60,11 +60,13 @@ struct OpenAIProtocolGenerator: ProtocolGenerating {
         title _: String,
         diarized: Bool,
         meetingStartTime: Date?,
+        instructions: ProtocolInstructions,
     ) async throws -> String {
         let systemPrompt = ProtocolGenerator.buildSystemPrompt(
             diarized: diarized,
             language: language,
             meetingStartTime: meetingStartTime,
+            instructions: instructions,
         )
 
         let messages: [[String: Any]] = [
@@ -177,8 +179,12 @@ struct OpenAIProtocolGenerator: ProtocolGenerating {
                 errorBody += line
                 if errorBody.count > 500 { break }
             }
+            // The body is kept for the caller (the max_tokens retry reads it,
+            // and the person sees it in the result) but never logged: an
+            // endpoint that echoes the rejected request would put the prompt,
+            // background info included, into the exported diagnostics.
             logger.error(
-                "openai_http_error status=\(httpResponse.statusCode, privacy: .public) endpoint=\(requestURL.absoluteString, privacy: .public) body=\(errorBody, privacy: .public)",
+                "openai_http_error status=\(httpResponse.statusCode, privacy: .public) endpoint=\(requestURL.absoluteString, privacy: .public) body_length=\(errorBody.count, privacy: .public)",
             )
             throw ProtocolError.httpError(httpResponse.statusCode, errorBody)
         }
