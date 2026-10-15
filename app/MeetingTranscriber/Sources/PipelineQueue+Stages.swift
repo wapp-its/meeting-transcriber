@@ -162,6 +162,8 @@ extension PipelineQueue {
         // A claim that outlived one of them would lock the recording out of
         // any later attempt for the rest of the session.
         defer { inFlightRuns.end(jobID: job.id) }
+        processingJobID = job.id
+        defer { processingJobID = nil }
 
         // A job the restore found interrupted while its protocol was being
         // generated already has its transcript on disk. Attempted under the
@@ -964,12 +966,9 @@ extension PipelineQueue {
         updateJobState(id: jobID, to: .generatingProtocol)
         let protocolMD: String
         do {
-            protocolMD = try await generator.generate(
-                transcript: transcript,
-                title: title,
-                diarized: ProtocolGenerator.looksDiarized(transcript),
-                meetingStartTime: meetingStartTime,
-                instructions: instructions,
+            protocolMD = try await generateWaitingOutRecordings(
+                generator, jobID: jobID,
+                request: (transcript: transcript, title: title, meetingStartTime: meetingStartTime, instructions: instructions),
             )
         } catch {
             // Logged content-free: a provider's error text can echo the prompt
