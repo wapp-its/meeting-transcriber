@@ -82,23 +82,35 @@
             }
         }
 
-        /// A Hugging Face cache snapshot links every file to its blob.
-        func testWeightBytesSumTheSafetensorsFilesFollowingSymlinks() throws {
+        /// The files the helper loads: with an index, the distinct files its
+        /// `weight_map` names, in a subfolder too; without one, the top-level
+        /// `*.safetensors` files. Symlinks are followed, since a Hugging Face
+        /// cache snapshot links every file to its blob. A named file that is
+        /// not there, or an index that cannot be read, leaves the size unknown.
+        func testWeightBytesCountTheFilesTheHelperLoads() throws {
             let scratch = try makeTempDirectory(prefix: "LocalModelWeights")
-            let folder = scratch.appendingPathComponent("model", isDirectory: true)
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
             let blob = scratch.appendingPathComponent("blob")
             try Data(count: 50).write(to: blob)
-            try Data(count: 100).write(to: folder.appendingPathComponent("model-00001.safetensors"))
-            try FileManager.default.createSymbolicLink(at: folder.appendingPathComponent("model-00002.safetensors"), withDestinationURL: blob)
-            try FileManager.default.createSymbolicLink(
-                at: folder.appendingPathComponent("dangling.safetensors"), withDestinationURL: scratch.appendingPathComponent("missing"),
-            )
-            try FileManager.default.createDirectory(at: folder.appendingPathComponent("nested.safetensors"), withIntermediateDirectories: false)
-            try Data(count: 1000).write(to: folder.appendingPathComponent("config.json"))
+            let shards = #"{"weight_map":{"a":"weights/one.safetensors","b":"weights/one.safetensors","c":"weights/two.safetensors"}}"#
+            let gone = scratch.appendingPathComponent("gone")
+            let cases: [(name: String, layout: WeightLayout, expected: UInt64?)] = [
+                ("top level", WeightLayout(files: ["model-1.safetensors": 100, "config.json": 1000], links: ["model-2.safetensors": blob]), 150),
+                // The duplicate shard counts once, the top-level file the index does not name not at all.
+                (
+                    "index",
+                    WeightLayout(files: ["weights/one.safetensors": 30, "model.safetensors": 1000], links: ["weights/two.safetensors": blob], index: shards),
+                    80,
+                ),
+                ("no weights", WeightLayout(files: ["config.json": 10]), 0),
+                ("index naming a missing file", WeightLayout(files: ["weights/one.safetensors": 30], index: shards), nil),
+                ("index that is not JSON", WeightLayout(files: ["weights/one.safetensors": 30], index: "weight_map"), nil),
+                ("dangling link", WeightLayout(files: ["model-1.safetensors": 100], links: ["model-2.safetensors": gone]), nil),
+            ]
 
-            XCTAssertEqual(LocalModelMemoryGuard.weightBytes(in: folder), 150)
-            XCTAssertEqual(LocalModelMemoryGuard.weightBytes(in: scratch.appendingPathComponent("absent")), 0)
+            for (name, layout, expected) in cases {
+                let folder = try layout.make(in: scratch.appendingPathComponent(name, isDirectory: true))
+                XCTAssertEqual(LocalModelMemoryGuard.weightBytes(in: folder), expected, name)
+            }
         }
 
         func testSystemProbeReadsThisMacsFigures() {
@@ -116,6 +128,33 @@
             statistics.active_count = natural_t(active / pageSize)
             statistics.speculative_count = natural_t(speculative / pageSize)
             return statistics
+        }
+    }
+
+    /// A model folder's files for a test, by path relative to the folder:
+    /// plain files of a size, symlinks to a target, and the weight index text.
+    struct WeightLayout {
+        var files: [String: Int] = [:]
+        var links: [String: URL] = [:]
+        var index: String?
+
+        func make(in folder: URL) throws -> URL {
+            let manager = FileManager.default
+            try manager.createDirectory(at: folder, withIntermediateDirectories: true)
+            for (path, size) in files {
+                let file = folder.appendingPathComponent(path)
+                try manager.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Data(count: size).write(to: file)
+            }
+            for (path, target) in links {
+                let link = folder.appendingPathComponent(path)
+                try manager.createDirectory(at: link.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try manager.createSymbolicLink(at: link, withDestinationURL: target)
+            }
+            if let index {
+                try Data(index.utf8).write(to: folder.appendingPathComponent(LocalModelMemoryGuard.weightIndexFile))
+            }
+            return folder
         }
     }
 

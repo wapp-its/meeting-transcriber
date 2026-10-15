@@ -120,6 +120,47 @@
             XCTAssertEqual(end, .written("Protocol"))
         }
 
+        /// The shards a sharded model's index names in a subfolder count toward
+        /// the admission check like top-level weights.
+        func testAdmissionCountsTheShardsAnIndexNamesInASubfolder() async throws {
+            let bench = try LocalModelTestBench(scratch: makeTempDirectory(prefix: "LocalModelGate"))
+            let spawned = bench.scratch.appendingPathComponent("spawned")
+            let helper = try bench.helper(#"touch '\#(spawned.path)'; printf 'Protocol' > "$out""#)
+            let model = try WeightLayout(
+                files: ["weights/model-00001-of-00002.safetensors": 3000, "weights/model-00002-of-00002.safetensors": 5000],
+                index: #"{"weight_map":{"a":"weights/model-00001-of-00002.safetensors","b":"weights/model-00002-of-00002.safetensors"}}"#,
+            ).make(in: bench.scratch.appendingPathComponent("indexed", isDirectory: true))
+            let folder = LocalModelFolderSelection(path: model.path, bookmark: nil)
+            let needed: UInt64 = 8000 + LocalModelMemoryGuard.admissionHeadroomBytes
+
+            bench.probe.reading = LocalModelMemoryReading(pressure: .normal, availableBytes: needed - 1)
+            let refused = await bench.end(helper, folder: folder)
+            XCTAssertEqual(refused, .outcome(.lowMemory(bench.probe.reading)))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: spawned.path))
+
+            bench.probe.reading = LocalModelMemoryReading(pressure: .normal, availableBytes: needed)
+            let admitted = await bench.end(helper, folder: folder)
+            XCTAssertEqual(admitted, .written("Protocol"))
+        }
+
+        /// A weight size that cannot be told fails closed: the helper's own
+        /// folder check rejects such an index too, so it is no model.
+        func testIndexNamingAMissingShardIsNoModelAndStartsNoHelper() async throws {
+            let bench = try LocalModelTestBench(scratch: makeTempDirectory(prefix: "LocalModelGate"))
+            let spawned = bench.scratch.appendingPathComponent("spawned")
+            let helper = try bench.helper(#"touch '\#(spawned.path)'; printf 'Protocol' > "$out""#)
+            let model = try WeightLayout(
+                files: ["weights/model-00001-of-00002.safetensors": 3000],
+                index: #"{"weight_map":{"a":"weights/model-00001-of-00002.safetensors","b":"weights/model-00002-of-00002.safetensors"}}"#,
+            ).make(in: bench.scratch.appendingPathComponent("indexed", isDirectory: true))
+
+            let end = await bench.end(helper, folder: LocalModelFolderSelection(path: model.path, bookmark: nil))
+
+            XCTAssertEqual(end, .outcome(.noModel))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: spawned.path))
+            XCTAssertEqual(bench.diagnostics.lines(.warning, startingWith: "local_model_refused job=none reason=no_model weights=unknown").count, 1)
+        }
+
         func testWatchdogEndsARunningHelperOnWarningPressureOrBelowTheFloor() async throws {
             let bench = try LocalModelTestBench(scratch: makeTempDirectory(prefix: "LocalModelGate"))
             let started = bench.scratch.appendingPathComponent("started")

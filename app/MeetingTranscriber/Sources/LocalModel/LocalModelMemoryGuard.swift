@@ -116,19 +116,45 @@
             reading.pressure != .normal || reading.availableBytes < terminationFloorBytes
         }
 
-        /// The size on disk of the `.safetensors` files directly in `folder`,
-        /// following symlinks (a Hugging Face cache snapshot links every file to
-        /// its blob). Read by the app before any helper starts, since the
-        /// admission check needs it first.
-        static func weightBytes(in folder: URL) -> UInt64 {
-            let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
-            return names.filter { $0.hasSuffix(".safetensors") }.reduce(UInt64(0)) { total, name in
+        /// The index that names a sharded model's weight files.
+        static let weightIndexFile = "model.safetensors.index.json"
+
+        /// The size of the weight files the helper loads from `folder`, or nil
+        /// when it cannot be told. Read by the app before any helper starts,
+        /// since the admission check needs it first.
+        ///
+        /// The files are the ones the helper's folder check and its loader
+        /// pick: with `model.safetensors.index.json`, the distinct files its
+        /// `weight_map` names, relative to the folder and possibly in a
+        /// subfolder; without one, every `*.safetensors` file directly in the
+        /// folder. Symlinks are followed (a Hugging Face cache snapshot links
+        /// every file to its blob).
+        ///
+        /// nil for an index that cannot be read, and for a named file that is
+        /// not a regular file: a figure that leaves out weights the helper
+        /// would load is the failure the admission check exists to prevent.
+        static func weightBytes(in folder: URL) -> UInt64? {
+            let index = folder.appendingPathComponent(weightIndexFile)
+            let names: Set<String>
+            if FileManager.default.fileExists(atPath: index.path) {
+                guard let data = try? Data(contentsOf: index),
+                      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let map = object["weight_map"] as? [String: String], !map.isEmpty
+                else { return nil }
+                names = Set(map.values)
+            } else {
+                let listed = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+                names = Set(listed.filter { $0.hasSuffix(".safetensors") })
+            }
+            var total: UInt64 = 0
+            for name in names {
                 var status = stat()
                 guard stat(folder.appendingPathComponent(name).path, &status) == 0, status.st_mode & S_IFMT == S_IFREG else {
-                    return total
+                    return nil
                 }
-                return saturatingSum(total, UInt64(max(0, status.st_size)))
+                total = saturatingSum(total, UInt64(max(0, status.st_size)))
             }
+            return total
         }
 
         private static func saturatingSum(_ lhs: UInt64, _ rhs: UInt64) -> UInt64 {

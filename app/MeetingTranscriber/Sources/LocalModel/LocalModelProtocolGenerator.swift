@@ -86,6 +86,14 @@
                 diagnostics.warning("local_model_refused \(tag) reason=no_model folder=unreachable")
                 throw LocalModelOutcome.noModel
             }
+            // An unknown weight size never reaches the admission check: it
+            // fails closed here. It means a weight index the helper's own
+            // folder check rejects too (unreadable, or naming a missing
+            // file), so the outcome is the one the helper would report.
+            guard let weightBytes = LocalModelMemoryGuard.weightBytes(in: folderURL) else {
+                diagnostics.warning("local_model_refused \(tag) reason=no_model weights=unknown")
+                throw LocalModelOutcome.noModel
+            }
             let systemPrompt = ProtocolGenerator.buildSystemPrompt(
                 diarized: diarized, language: language, meetingStartTime: meetingStartTime, instructions: instructions,
             )
@@ -94,7 +102,7 @@
                 modelFolder: folderURL,
                 systemPrompt: systemPrompt,
                 userPrompt: transcript,
-                weightBytes: LocalModelMemoryGuard.weightBytes(in: folderURL),
+                weightBytes: weightBytes,
             ))
         }
     }
