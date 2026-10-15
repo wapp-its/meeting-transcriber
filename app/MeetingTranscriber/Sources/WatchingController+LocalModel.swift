@@ -1,0 +1,57 @@
+import Foundation
+
+/// What the local model's gate is told about recordings (spec R5): one
+/// recording-activity signal, composed here and nowhere else, pushed to the
+/// gate whenever one of its inputs changes. The gate ends a running helper
+/// when the signal turns on and admits nothing until it turns off; the
+/// protocols a recording deferred then run again by themselves
+/// (`PipelineQueue.generateWaitingOutRecordings`).
+///
+/// Pushed, not polled: every input changes on the main actor at a point this
+/// controller already sees (`watchLoop` and `manualStartTask` are set here, and
+/// the loop reports each phase change to the state-change handler), so the
+/// gate hears of a recording in the same turn it starts, and a recording
+/// never waits for the model. Its own file because `WatchingController.swift`
+/// sits at the line cap.
+@MainActor
+extension WatchingController {
+    /// Whether a recording runs: from the start of any recording (a detected
+    /// meeting, a manual one, a microphone-only one through `/v1/record`)
+    /// until it has stopped, paused included. A manual start counts from its
+    /// registration, before its recorder is up, because it awaits the
+    /// microphone gate first; a detected meeting is `.recording` before its
+    /// recorder starts. A pause keeps the phase at `.recording`.
+    ///
+    /// Accepted gap: Stop Watching during a detected meeting leaves
+    /// `.recording` at once, while the cancelled loop still stops the recorder
+    /// and enqueues the recording in its next turn. A deferred helper may be
+    /// admitted in that turn; it only starts loading the model by then.
+    var isRecordingActivity: Bool {
+        manualStartTask != nil || watchLoop?.state == .recording
+    }
+
+    /// Tells the gate whether to hold: while a recording runs, and in
+    /// record-only mode, where this Mac makes no protocol (the copy Settings
+    /// shows for it), so a local protocol due then waits in `.generatingProtocol`
+    /// until record-only is off. Switching record-only on ends a running helper
+    /// like a recording start does. Idempotent; the gate ignores a repeat.
+    func recordingActivityChanged() {
+        #if !APPSTORE
+            pipeline.localModelGate.setRecordingActive(isRecordingActivity || settings.recordOnly)
+        #endif
+    }
+
+    /// Pushes the current state once and again on every record-only switch.
+    /// Called once, from `init`. `withObservationTracking` fires once, so each
+    /// firing re-arms.
+    func holdLocalModelInRecordOnlyMode() {
+        #if !APPSTORE
+            recordingActivityChanged()
+            withObservationTracking {
+                _ = settings.recordOnly
+            } onChange: { [weak self] in
+                Task { @MainActor [weak self] in self?.holdLocalModelInRecordOnlyMode() }
+            }
+        #endif
+    }
+}
