@@ -10,7 +10,9 @@
     "gh-2-protocol-templates-and-background-info"
   ],
   "id": "gh-138-local-model-for-protocols-in-the",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-138-local-model-for-protocols-in-the.1": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -593,15 +595,94 @@
       "task": null,
       "timestamp": "2026-10-14T12:52:46.511833Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "9669d218339e129e21b2a0831e283a8e3c390e45e18bf54706269fcabf422ca9",
+      "backend": "codex",
+      "base_sha": "834249487cb3957342a4d98963ee80eab7331d19",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-759db4a34f67380d253dcc94b7e0192a",
+            "classification": "introduced",
+            "findingId": "finding-759db4a34f67380d253dcc94b7e0192a",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-582e8b67771de06d2c15a6255dc52c7c",
+            "classification": "introduced",
+            "findingId": "finding-582e8b67771de06d2c15a6255dc52c7c",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-d93ed3cc322c12e710843dc4b8381849",
+            "classification": "introduced",
+            "findingId": "finding-d93ed3cc322c12e710843dc4b8381849",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-c039a7e540f4cbb6fced571cfd13a818",
+            "classification": "introduced",
+            "findingId": "finding-c039a7e540f4cbb6fced571cfd13a818",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-de86c6c0d07a59145528a2c057681753",
+            "classification": "introduced",
+            "findingId": "finding-de86c6c0d07a59145528a2c057681753",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "6dadc040ab5160c573d5e6d5fb9567abedf5df23",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 3938,
+      "output_sha256": "6c8b4e773ac5bee87faed0888ac41ca505869df696b99ff6eab2ea710961427a",
+      "reservation_id": "d6d5e9b1a9e743faa050043de43b2f8b",
+      "round_consumed": true,
+      "scope": "impl:gh-138-local-model-for-protocols-in-the.1",
+      "superseded_by": null,
+      "task": "gh-138-local-model-for-protocols-in-the.1",
+      "timestamp": "2026-10-15T19:10:07.691493Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-138-local-model-for-protocols-in-the.1": 1,
     "plan": 2,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-138-local-model-for-protocols-in-the.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-138-local-model-for-protocols-in-the.md",
@@ -619,5 +700,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nDer Test in #112 zeigt: Qwen3.8-27B in 4-bit schreibt ohne Denken brauchbare Protokolle in etwa 3 min. \u00dcber LM Studio ist das aber umst\u00e4ndlich und fehleranf\u00e4llig. LM Studio ignoriert den Schalter f\u00fcrs Denken und die eingestellte Kontextl\u00e4nge. Sein Download blieb stundenlang h\u00e4ngen. Ausserdem muss man eine zweite App installieren, starten und einrichten. Die App k\u00f6nnte das Modell wie die Transkriptionsmodelle selbst von Hugging Face laden und mit `mlx-swift-lm` ausf\u00fchren. Das Paket kennt `qwen3_5`, `qwen3_8` und `gemma4`.\n\n## NOTES\n\n- Erst bauen, wenn der Test mit einem echten Meeting \u00fcber LM Studio (#112) gut ausf\u00e4llt.\n- Das Modell l\u00e4uft in einem eigenen Hilfsprozess der App (XPC-Dienst), nicht im App-Prozess. So beendet ein Absturz oder Speicherproblem des Modells keine laufende Aufnahme. Das geht auch in der App-Store-Variante.\n- Nur laufen lassen, wenn nicht aufgenommen wird, und das Modell danach sofort entladen. Kontext und Ausgabe begrenzen.\n- 27B in 4-bit braucht rund 20 GB und passt damit auf 64-GB-Macs. F\u00fcr 32-GB-Macs braucht es ein kleineres Modell, das separat getestet wird.\n- Die Transkriptions-Engines (`TranscribingEngine`) haben heute keine M\u00f6glichkeit, ihre Modelle zu entladen. Das wird gebraucht.\n- Der OpenAI-kompatible Provider bleibt f\u00fcr Server, zum Beispiel einen Hochschul-Server.\n\n## TASKS\n\n- [x] Ein Tag Spike: Qwen3.8-27B 4-bit \u00fcber `mlx-swift-lm` in einem XPC-Dienst, Speicher, Dauer und Abbruch messen (als eigener Prozess ohne XPC, Ergebnis in den Kommentaren)\n- [x] Danach entscheiden: als Spec bauen oder verwerfen (Pilot zuerst, nur Homebrew-Version)",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/138"
   },
-  "updated_at": "2026-10-14T18:29:54.833431Z"
+  "updated_at": "2026-10-15T19:10:07.977565Z"
 }
