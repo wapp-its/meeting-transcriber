@@ -63,6 +63,8 @@ enum ProtocolDestination: Equatable {
             case .codexCLI: .remote(name: "OpenAI (Codex)")
 
             case .customCommand: .remote(name: "the custom command set in Settings → Output")
+
+            case .localModel: .local(host: "this Mac")
         #endif
 
         case .openAICompatible: endpoint(openAIEndpoint)

@@ -100,6 +100,7 @@ enum ProtocolProvider: String, CaseIterable {
         case claudeCLI
         case codexCLI
         case customCommand
+        case localModel
     #endif
     case openAICompatible
     case none // swiftlint:disable:this discouraged_none_name
@@ -112,6 +113,8 @@ enum ProtocolProvider: String, CaseIterable {
             case .codexCLI: "Codex CLI"
 
             case .customCommand: "Custom Command"
+
+            case .localModel: "Local model (on this Mac)"
         #endif
 
         case .openAICompatible: "OpenAI-Compatible API"
@@ -646,6 +649,16 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         var customCommandModel: String {
             didSet { defaults.set(customCommandModel, forKey: "customCommandModel") }
         }
+
+        /// The local model's folder as chosen, for display. Reads go through
+        /// `localModelFolderBookmark`; see `AppSettings+LocalModel.swift`.
+        private(set) var localModelFolderPath: String {
+            didSet { defaults.set(localModelFolderPath, forKey: "localModelFolderPath") }
+        }
+
+        private(set) var localModelFolderBookmark: Data? {
+            didSet { defaults.set(localModelFolderBookmark, forKey: "localModelFolderBookmark") }
+        }
     #endif
 
     /// Default OpenAI-compatible endpoint — Ollama's base URL. Both the base
@@ -848,6 +861,8 @@ final class AppSettings { // swiftlint:disable:this type_body_length
             claudeBin = defaults.object(forKey: "claudeBin") as? String ?? "claude"
             customCommandArguments = defaults.stringArray(forKey: "customCommandArguments") ?? []
             customCommandModel = defaults.string(forKey: "customCommandModel") ?? ""
+            localModelFolderPath = defaults.string(forKey: "localModelFolderPath") ?? ""
+            localModelFolderBookmark = defaults.data(forKey: "localModelFolderBookmark")
         #endif
         protocolLanguage = defaults.string(forKey: "protocolLanguage") ?? "German"
         defaultProtocolTemplate = ProtocolTemplateID(storedValue: defaults.string(forKey: Self.defaultProtocolTemplateKey) ?? "")
@@ -892,6 +907,13 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         var customCommandText: String {
             get { customCommandArguments.joined(separator: "\n") }
             set { customCommandArguments = newValue.components(separatedBy: "\n") }
+        }
+
+        /// Both halves of the local model folder setting at once, so a path is
+        /// never kept with another folder's bookmark.
+        func updateLocalModelFolder(path: String, bookmark: Data?) {
+            localModelFolderPath = path
+            localModelFolderBookmark = bookmark
         }
     }
 #endif

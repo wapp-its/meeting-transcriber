@@ -69,6 +69,11 @@ final class PipelineController {
 
     @ObservationIgnored private let queueEnvironment: QueueEnvironment
 
+    #if !APPSTORE
+        /// The one gate every local-model protocol goes through (spec R10).
+        let localModelGate = LocalModelGate()
+    #endif
+
     /// Called with the new queue whenever `rebuild()` replaces it, so a holder
     /// of the old one can follow. The active `WatchLoop` is one: it enqueues
     /// every recording it finishes into the queue it was given, so without
@@ -352,6 +357,9 @@ final class PipelineController {
                 CommandProtocolGenerator.custom(
                     arguments: settings.customCommandArguments, model: settings.customCommandModel, language: settings.protocolLanguage,
                 )
+
+            case .localModel:
+                LocalModelProtocolGenerator(folder: settings.localModelFolder, language: settings.protocolLanguage, gate: localModelGate)
         #endif
 
         case .openAICompatible:
