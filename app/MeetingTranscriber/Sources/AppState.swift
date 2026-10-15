@@ -277,10 +277,23 @@ final class AppState {
                     self?.stopPersistentLogStreamer()
                 }
             }
+            Self.endLocalModelOnQuit(pipeline.localModelGate)
         #endif
     }
 
     #if !APPSTORE
+        /// Ends the local model's helper when the app quits: SIGTERM, then
+        /// SIGKILL after the gate's quit grace, so no helper outlives the app
+        /// holding the model's memory. Registered with no queue so it runs
+        /// synchronously before `terminate` calls `exit` (as `LivenessMarker`
+        /// does); it leaks for the process's life like the streamer's observer.
+        static func endLocalModelOnQuit(_ gate: LocalModelGate, center: NotificationCenter = .default) {
+            // swiftlint:disable:next discarded_notification_center_observer
+            center.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: nil) { _ in
+                MainActor.assumeIsolated { gate.terminateForQuit() }
+            }
+        }
+
         /// Stop the persistent log streamer cleanly. Called from the
         /// `NSApplication.willTerminateNotification` handler.
         func stopPersistentLogStreamer() {
