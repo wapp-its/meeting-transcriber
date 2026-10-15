@@ -344,6 +344,7 @@ final class LocalModelGeneratorTests: XCTestCase {
                 quitGrace: .milliseconds(300),
                 pollInterval: .milliseconds(50),
                 drainAfterExit: .milliseconds(500),
+                deferredHold: .seconds(2),
             )
         }
     }

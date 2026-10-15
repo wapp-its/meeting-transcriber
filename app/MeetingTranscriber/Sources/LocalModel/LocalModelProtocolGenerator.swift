@@ -25,6 +25,10 @@
         var pollInterval: Duration = .seconds(1)
         /// How long stderr may stay open after the helper exited, for its last lines.
         var drainAfterExit: Duration = .seconds(2)
+        /// How long the gate holds the place of a job whose helper a recording
+        /// ended. Its caller comes back at once, in milliseconds; this only
+        /// bounds the wait for one that does not come back.
+        var deferredHold: Duration = .seconds(10)
     }
 
     /// What one generation hands the gate, fixed when it starts.

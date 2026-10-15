@@ -217,6 +217,58 @@
             XCTAssertEqual(try bench.contents(of: events), "first\nsecond\n")
         }
 
+        /// The recording ends while the interrupted helper is still inside its
+        /// termination grace, with a later job already waiting: the deferred
+        /// job, back at once, still goes first.
+        func testDeferredJobKeepsItsPlaceWhenTheRecordingEndsBeforeItsHelperExited() async throws {
+            let bench = try LocalModelTestBench(scratch: makeTempDirectory(prefix: "LocalModelGate"))
+            let (started, events) = (bench.scratch.appendingPathComponent("started"), bench.scratch.appendingPathComponent("events"))
+            // Takes about 0.35 s to exit after SIGTERM, inside the 0.5 s grace.
+            let slow = try bench.helper("trap 'sleep 0.3; exit 13' TERM; echo $$ > '\(started.path)'; while :; do sleep 0.05; done")
+            let firstAgain = try bench.helper(#"echo first >> '\#(events.path)'; printf 'first' > "$out""#)
+            let secondHelper = try bench.helper(#"echo second >> '\#(events.path)'; printf 'second' > "$out""#)
+            let (first, second) = (UUID(), UUID())
+            let firstJob = Task {
+                await LocalModelGate.$jobID.withValue(first) { await [bench.end(slow), bench.end(firstAgain)] }
+            }
+            _ = try await bench.pid(writtenTo: started)
+            let later = Task { await LocalModelGate.$jobID.withValue(second) { await bench.end(secondHelper) } }
+            try await bench.waitForNotices("local_model_waiting", count: 1)
+
+            bench.gate.setRecordingActive(true)
+            bench.gate.setRecordingActive(false)
+            let firstEnds = await firstJob.value
+            let laterEnd = await later.value
+
+            XCTAssertEqual(firstEnds, [.outcome(.deferredForRecording), .written("first")])
+            XCTAssertEqual(laterEnd, .written("second"))
+            XCTAssertEqual(try bench.contents(of: events), "first\nsecond\n")
+        }
+
+        /// A regeneration a recording ended is not resumed, so its place is
+        /// freed after the hold and the next job starts.
+        func testPlaceOfADeferredJobThatDoesNotComeBackIsFreedAfterTheHold() async throws {
+            let bench = try LocalModelTestBench(scratch: makeTempDirectory(prefix: "LocalModelGate"))
+            let (started, events) = (bench.scratch.appendingPathComponent("started"), bench.scratch.appendingPathComponent("events"))
+            let slow = try bench.helper("trap 'exit 13' TERM; echo $$ > '\(started.path)'; while :; do sleep 0.05; done")
+            let secondHelper = try bench.helper(#"echo second >> '\#(events.path)'; printf 'second' > "$out""#)
+            let (first, second) = (UUID(), UUID())
+            let firstJob = Task { await LocalModelGate.$jobID.withValue(first) { await bench.end(slow) } }
+            _ = try await bench.pid(writtenTo: started)
+            let later = Task { await LocalModelGate.$jobID.withValue(second) { await bench.end(secondHelper) } }
+            try await bench.waitForNotices("local_model_waiting", count: 1)
+
+            bench.gate.setRecordingActive(true)
+            bench.gate.setRecordingActive(false)
+            let firstEnd = await firstJob.value
+            XCTAssertEqual(firstEnd, .outcome(.deferredForRecording))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: events.path), "the next job started inside the hold")
+            let laterEnd = await later.value
+
+            XCTAssertEqual(laterEnd, .written("second"))
+            XCTAssertEqual(bench.diagnostics.lines(.notice, startingWith: "local_model_place_freed").count, 1)
+        }
+
         func testQuitEndsTheHelperWithinTheQuitGrace() async throws {
             let bench = try LocalModelTestBench(scratch: makeTempDirectory(prefix: "LocalModelGate"))
             let started = bench.scratch.appendingPathComponent("started")

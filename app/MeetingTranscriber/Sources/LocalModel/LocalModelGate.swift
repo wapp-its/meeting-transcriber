@@ -13,7 +13,12 @@
     ///
     /// The line is FIFO by arrival, with one exception: a job whose helper was
     /// ended for a recording keeps its place, so jobs deferred by one recording
-    /// resume in their original order. Admission waits while a recording runs.
+    /// resume in their original order. The place is held from the deferral
+    /// until the job comes back, which its caller does at once, also when the
+    /// recording ended before the helper had exited; nobody behind it is
+    /// admitted meanwhile. A job that does not come back (a regeneration is not
+    /// resumed) frees it after `LocalModelLimits.deferredHold`. Admission waits
+    /// while a recording runs.
     ///
     /// Ready synchronously at init: nothing a job does before its state
     /// transition may wait for the gate to come up (a restored job races otherwise).
@@ -46,9 +51,9 @@
         /// when it reaches the gate only after the cancel (a speaker-naming task
         /// has no handle that a cancel could reach).
         private var cancelledJobs: Set<UUID> = []
-        /// The place in line of jobs whose helper a recording ended, until they
-        /// come back.
-        private var deferredOrder: [UUID: Int] = [:]
+        /// The places held for jobs whose helper a recording ended, until they
+        /// come back or the hold runs out.
+        private var heldPlaces: [UUID: HeldPlace] = [:]
         private var isRecording = false
 
         init(configuration: Configuration = Configuration()) {
@@ -68,13 +73,14 @@
         /// refused. Other jobs and their helpers are untouched.
         func cancel(jobID: UUID) {
             cancelledJobs.insert(jobID)
-            deferredOrder[jobID] = nil
+            heldPlaces[jobID] = nil
             let leaving = waiters.filter { $0.jobID == jobID }
             waiters.removeAll { $0.jobID == jobID }
             leaving.forEach { $0.continuation.resume(throwing: CancellationError()) }
             let owns = owner?.jobID == jobID
             if owns { owner?.stop(.cancelled) }
             diagnostics.notice("local_model_cancel \(Self.logTag(jobID)) running=\(owns) waiting=\(leaving.count)")
+            admitNext()
         }
 
         /// Whether a recording runs, from its start until it has fully stopped
@@ -110,13 +116,14 @@
                 throw CancellationError()
             }
             try Task.checkCancellation()
-            let order = jobID.flatMap { deferredOrder.removeValue(forKey: $0) } ?? takeOrder()
-            if owner == nil, !isRecording {
+            let order = jobID.flatMap { heldPlaces.removeValue(forKey: $0)?.order } ?? takeOrder()
+            if owner == nil, !isRecording, isNextInLine(order) {
                 let turn = Turn(jobID: jobID, order: order)
                 owner = turn
                 return turn
             }
-            diagnostics.notice("local_model_waiting \(tag) reason=\(isRecording ? "recording" : "busy")")
+            let reason = isRecording ? "recording" : owner != nil ? "busy" : "held_place"
+            diagnostics.notice("local_model_waiting \(tag) reason=\(reason)")
             let token = UUID()
             return try await withTaskCancellationHandler {
                 try await withCheckedThrowingContinuation { continuation in
@@ -145,7 +152,8 @@
 
         private func admitNext() {
             guard owner == nil, !isRecording,
-                  let next = waiters.indices.min(by: { waiters[$0].order < waiters[$1].order })
+                  let next = waiters.indices.min(by: { waiters[$0].order < waiters[$1].order }),
+                  isNextInLine(waiters[next].order)
             else { return }
             let waiter = waiters.remove(at: next)
             let turn = Turn(jobID: waiter.jobID, order: waiter.order)
@@ -153,7 +161,37 @@
             waiter.continuation.resume(returning: turn)
         }
 
+        /// Whether nobody waiting, and no job whose place is held, comes before `order`.
+        private func isNextInLine(_ order: Int) -> Bool {
+            !waiters.contains { $0.order < order } && !heldPlaces.values.contains { $0.order < order }
+        }
+
+        /// Holds `order` for `jobID`, whose helper a recording ended, until it
+        /// comes back or `LocalModelLimits.deferredHold` runs out.
+        private func holdPlace(of jobID: UUID, order: Int) {
+            let token = UUID()
+            heldPlaces[jobID] = HeldPlace(order: order, token: token)
+            let hold = configuration.limits.deferredHold
+            Task { [weak self] in
+                try? await Task.sleep(for: hold)
+                self?.endHold(of: jobID, token: token)
+            }
+        }
+
+        private func endHold(of jobID: UUID, token: UUID) {
+            guard heldPlaces[jobID]?.token == token else { return }
+            heldPlaces[jobID] = nil
+            diagnostics.notice("local_model_place_freed \(Self.logTag(jobID)) reason=not_back")
+            admitNext()
+        }
+
         // MARK: - Types
+
+        private struct HeldPlace {
+            let order: Int
+            /// Tells this hold from a later one for the same job.
+            let token: UUID
+        }
 
         private struct Waiter {
             let token: UUID
@@ -209,7 +247,7 @@
             do {
                 return try await runHelper(job, turn: turn, tag: tag)
             } catch LocalModelOutcome.deferredForRecording {
-                if let jobID, !cancelledJobs.contains(jobID) { deferredOrder[jobID] = turn.order }
+                if let jobID, !cancelledJobs.contains(jobID) { holdPlace(of: jobID, order: turn.order) }
                 throw LocalModelOutcome.deferredForRecording
             }
         }
