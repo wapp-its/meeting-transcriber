@@ -129,6 +129,10 @@ install_local_llm_helper_licenses() {
         esac
     done <<< "$pins"
 
+    # `install -m 0644` and not `cp`: SwiftPM leaves its checkouts read-only,
+    # cp carries that mode into the bundle, and the next in-place assembly
+    # (run_app.sh) then cannot overwrite the copy (measured: "Permission
+    # denied" on the second build).
     mkdir -p "$dest" || return 1
     while read -r source_path name; do
         [ -n "$source_path" ] || continue
@@ -136,7 +140,7 @@ install_local_llm_helper_licenses() {
             echo "  ERROR: licence text not found: $checkouts/$source_path" >&2
             return 1
         fi
-        cp "$checkouts/$source_path" "$dest/$name" || return 1
+        install -m 0644 "$checkouts/$source_path" "$dest/$name" || return 1
         count=$((count + 1))
     done <<< "$LOCAL_LLM_HELPER_LICENSES"
 

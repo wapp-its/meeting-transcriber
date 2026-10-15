@@ -9,7 +9,9 @@
 # on any model folder without a `tokenizer_class`, because
 # swift-transformers_Hub.bundle was left behind. So every bundle the build put
 # beside the helper is installed, signed and verified, and every bundle an
-# earlier run left in Contents/Helpers is cleared first.
+# earlier run left in Contents/Helpers is cleared first. The last case covers
+# the helper's licence texts (scripts/lib/bundle-licenses.sh), which have to
+# survive being installed again into the same bundle.
 #
 # Every case runs the real functions against a fake build directory and a
 # fake app bundle; `codesign` is a stand-in on PATH that logs its calls.
@@ -161,11 +163,47 @@ test_verify_checks_every_bundle() {
     return "$rc"
 }
 
+# SwiftPM leaves its checkouts read-only. A licence text copied with that mode
+# could not be overwritten by the next in-place assembly, so run_app.sh failed
+# on every build after the first.
+test_licences_install_again_from_read_only_checkouts() {
+    local work package resources rc=0
+    work="$(mktemp -d)"
+    package="$work/tools/local-llm-helper"
+    resources="$work/App.app/Contents/Resources"
+    mkdir -p "$package" "$resources" || { rm -rf "$work"; return 1; }
+    cp "$REPO_ROOT/tools/local-llm-helper/Package.resolved" "$package/" || { rm -rf "$work"; return 1; }
+    (
+        # shellcheck source=../lib/bundle-licenses.sh
+        source "$REPO_ROOT/scripts/lib/bundle-licenses.sh"
+        while read -r path _; do
+            [ -n "$path" ] || continue
+            mkdir -p "$package/.build/checkouts/$(dirname "$path")" || exit 1
+            printf 'stand-in licence\n' > "$package/.build/checkouts/$path" || exit 1
+            chmod 0444 "$package/.build/checkouts/$path" || exit 1
+        done <<< "$LOCAL_LLM_HELPER_LICENSES"
+    ) || { echo "  fixture failed" >&2; rm -rf "$work"; return 1; }
+
+    (
+        # shellcheck source=../lib/bundle-licenses.sh
+        source "$REPO_ROOT/scripts/lib/bundle-licenses.sh"
+        install_local_llm_helper_licenses "$resources" "$package" \
+            && install_local_llm_helper_licenses "$resources" "$package"
+    ) > "$work/out.log" 2>&1 \
+        || { echo "  the second install failed:" >&2; sed 's/^/    /' "$work/out.log" >&2; rc=1; }
+    [ -w "$resources/licenses/mlx-swift-LICENSE.txt" ] \
+        || { echo "  the installed licence text is not writable" >&2; rc=1; }
+    chmod -R u+w "$package"
+    rm -rf "$work"
+    return "$rc"
+}
+
 echo "Testing how the local model helper's resource bundles are installed"
 echo
 run_test "install copies every bundle and clears stale ones" test_install_copies_every_bundle_and_clears_stale_ones
 run_test "sign signs every bundle before the helper" test_sign_signs_every_bundle_before_the_helper
 run_test "verify checks every bundle" test_verify_checks_every_bundle
+run_test "licence texts install again from read-only checkouts" test_licences_install_again_from_read_only_checkouts
 
 echo
 if [ "$FAILED" -eq 0 ]; then
