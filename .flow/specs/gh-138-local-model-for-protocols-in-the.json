@@ -14,6 +14,7 @@
     "gh-138-local-model-for-protocols-in-the.1": 0,
     "gh-138-local-model-for-protocols-in-the.2": 0,
     "gh-138-local-model-for-protocols-in-the.3": 0,
+    "gh-138-local-model-for-protocols-in-the.4": 0,
     "gh-138-local-model-for-protocols-in-the.6": 0
   },
   "next_task": 1,
@@ -917,12 +918,101 @@
       "task": "gh-138-local-model-for-protocols-in-the.6",
       "timestamp": "2026-10-15T21:50:44.203369Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "0477248d0fbe57110595e9912bbd56a83257452af5c51c194c2514946cc3e691",
+      "backend": "codex",
+      "base_sha": "1572ebd0cfe526429ada7a400ee46c5bec7e472c",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-95976c525130bfe7321108e00b0e2d2c",
+            "classification": "introduced",
+            "findingId": "finding-95976c525130bfe7321108e00b0e2d2c",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "f01dc3a93c7a8fc04e5f5ef3fdd95e1a5cc5739a",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1087,
+      "output_sha256": "9eabc3f15c0560c50329ebb2004fbd6fe36b39b2a3ef74e6b74ce141c6ef2b9c",
+      "reservation_id": "39af5f73166e424baf833a11c6ff3572",
+      "round_consumed": true,
+      "scope": "impl:gh-138-local-model-for-protocols-in-the.4",
+      "superseded_by": null,
+      "task": "gh-138-local-model-for-protocols-in-the.4",
+      "timestamp": "2026-10-15T22:05:29.487690Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "947d30c5c3d03c810fff08e557d1a436f0a41530751e9f9a1329c702817d7012",
+      "backend": "codex",
+      "base_sha": "1572ebd0cfe526429ada7a400ee46c5bec7e472c",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-95976c525130bfe7321108e00b0e2d2c",
+            "classification": "introduced",
+            "findingId": "finding-95976c525130bfe7321108e00b0e2d2c",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "e73813b863611fe8f5729f7ff038a3350f35aa15",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 964,
+      "output_sha256": "91f5923e0e84323c69be16d585bcf4ba7f08d2c1293fcc5286d9ae53eff0ebc3",
+      "reservation_id": "9da6372b6402458286f78d1078e5cf55",
+      "round_consumed": true,
+      "scope": "impl:gh-138-local-model-for-protocols-in-the.4",
+      "superseded_by": null,
+      "task": "gh-138-local-model-for-protocols-in-the.4",
+      "timestamp": "2026-10-15T22:32:35.850252Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-138-local-model-for-protocols-in-the.1": 1,
     "impl:gh-138-local-model-for-protocols-in-the.2": 1,
     "impl:gh-138-local-model-for-protocols-in-the.3": 1,
+    "impl:gh-138-local-model-for-protocols-in-the.4": 1,
     "impl:gh-138-local-model-for-protocols-in-the.6": 1,
     "plan": 2,
     "plan#completion": 0
@@ -941,6 +1031,7 @@
     "impl:gh-138-local-model-for-protocols-in-the.1": 0,
     "impl:gh-138-local-model-for-protocols-in-the.2": 0,
     "impl:gh-138-local-model-for-protocols-in-the.3": 0,
+    "impl:gh-138-local-model-for-protocols-in-the.4": 0,
     "impl:gh-138-local-model-for-protocols-in-the.6": 0,
     "plan": 0
   },
@@ -959,5 +1050,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nDer Test in #112 zeigt: Qwen3.8-27B in 4-bit schreibt ohne Denken brauchbare Protokolle in etwa 3 min. \u00dcber LM Studio ist das aber umst\u00e4ndlich und fehleranf\u00e4llig. LM Studio ignoriert den Schalter f\u00fcrs Denken und die eingestellte Kontextl\u00e4nge. Sein Download blieb stundenlang h\u00e4ngen. Ausserdem muss man eine zweite App installieren, starten und einrichten. Die App k\u00f6nnte das Modell wie die Transkriptionsmodelle selbst von Hugging Face laden und mit `mlx-swift-lm` ausf\u00fchren. Das Paket kennt `qwen3_5`, `qwen3_8` und `gemma4`.\n\n## NOTES\n\n- Erst bauen, wenn der Test mit einem echten Meeting \u00fcber LM Studio (#112) gut ausf\u00e4llt.\n- Das Modell l\u00e4uft in einem eigenen Hilfsprozess der App (XPC-Dienst), nicht im App-Prozess. So beendet ein Absturz oder Speicherproblem des Modells keine laufende Aufnahme. Das geht auch in der App-Store-Variante.\n- Nur laufen lassen, wenn nicht aufgenommen wird, und das Modell danach sofort entladen. Kontext und Ausgabe begrenzen.\n- 27B in 4-bit braucht rund 20 GB und passt damit auf 64-GB-Macs. F\u00fcr 32-GB-Macs braucht es ein kleineres Modell, das separat getestet wird.\n- Die Transkriptions-Engines (`TranscribingEngine`) haben heute keine M\u00f6glichkeit, ihre Modelle zu entladen. Das wird gebraucht.\n- Der OpenAI-kompatible Provider bleibt f\u00fcr Server, zum Beispiel einen Hochschul-Server.\n\n## TASKS\n\n- [x] Ein Tag Spike: Qwen3.8-27B 4-bit \u00fcber `mlx-swift-lm` in einem XPC-Dienst, Speicher, Dauer und Abbruch messen (als eigener Prozess ohne XPC, Ergebnis in den Kommentaren)\n- [x] Danach entscheiden: als Spec bauen oder verwerfen (Pilot zuerst, nur Homebrew-Version)",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/138"
   },
-  "updated_at": "2026-10-15T21:50:44.225309Z"
+  "updated_at": "2026-10-15T22:32:35.874551Z"
 }
