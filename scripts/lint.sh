@@ -16,6 +16,8 @@ SWIFT_DIRS=(
     app/MeetingTranscriber/Tests
     tools/audiotap/Sources
     tools/audiotap/Tests
+    tools/local-llm-helper/Sources
+    tools/local-llm-helper/Tests
     tools/meeting-simulator/Sources
     tools/mt-cli/Sources
     tools/mt-cli/Tests
