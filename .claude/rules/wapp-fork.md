@@ -17,8 +17,8 @@ untouched by fork work.
   `local/*` stays in the fork. Spec work (flow-next) branches from `wapp/main`.
 - **Never wait for the original's maintainer** (owner, 2026-10-02).
   A feature is done for us when it is merged into `wapp/main` and installed via
-  `mt-update`; a PR to the original is optional and fire-and-forget, never a
-  dependency and never a reason to park work.
+  `mt-update`; a PR to the original (the upstream lane below) is never a dependency
+  and never a reason to park work.
 - Branch `tools` holds the fork's tooling: `mt-update.sh` (builds `upstream/main`
   plus every branch in `branches.txt` and installs
   `/Applications/MeetingTranscriber-Dev.app`), `branches.txt`, `submit.sh`.
@@ -29,6 +29,30 @@ untouched by fork work.
   ruleset in the same step: otherwise merging a fork PR from it deletes it, which also
   closes its PR in the original.
 - Never work inside `~/Library/Application Support/mt-update/` — mt-update resets it.
+
+## Upstream lane (owner, 2026-10-16)
+
+The fork keeps `wapp/main` as its home and also sends generic work to the original,
+so the gap stays small and the original's audio-capture fixes keep merging in.
+
+- **Before capturing or planning a fork spec, search the original's open issues and
+  PRs for the same problem** (`gh issue list -R pasrom/meeting-transcriber --search …`,
+  the same with `gh pr list`) and note any match in the spec. When the original has a
+  fix for it in review, build on that fix or adopt it once merged instead of adding a
+  second mechanism. If we need ours now, keep it small and file the overlap (next bullet).
+- **When the original solves a problem the fork already solved, switch to the
+  original's version and remove ours**, unless ours covers a case it misses (say
+  which). Known cases are open fork issues labelled `upstream-overlap`; read them
+  before resolving an `upstream-sync` conflict.
+- **Generic fixes and small features go to the original one at a time:** one focused
+  change with its tests, preferring ones that answer an issue someone filed there,
+  prepared with `submit.sh` and posted only after the owner saw the exact title and body
+  (the "go" rule below). Fork-only work (mt-update, in-app self-update, university
+  defaults) never goes. The candidate list stays in the session or in
+  `docs/plans/.local/`, never in a public issue.
+- A merged fork PR's branch is gone (auto-delete), and `submit.sh` finds no commits on
+  a branch already inside `wapp/main`. Rebuild it first: cherry-pick the PR's code
+  commits onto `upstream/main` into a new local branch, then run `submit.sh` on that.
 
 ## Identity, accounts, outward actions
 
