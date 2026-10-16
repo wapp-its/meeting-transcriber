@@ -148,7 +148,7 @@ With the tested model:
 - A protocol takes about 18 GB of memory while it is written, and about 4 minutes for a one-hour meeting.
 - A protocol starts only when macOS reports no memory pressure and at least the model's size plus 6 GB is free; it is stopped when free memory drops below 4 GB or memory pressure rises. The notification "Protocol not written: low memory" then offers **Try Again**.
 - A recording always comes first. A protocol being written when a recording starts is stopped within 5 seconds, and none starts while a recording runs. A meeting's protocol is then written by itself once the recording has ended ("Protocol paused for your recording"); a regeneration you started has to be started again.
-- The transcript is saved in every case.
+- When no protocol is written, the transcript is always kept, whatever the transcript options under Settings → Output say.
 
 ---
 
