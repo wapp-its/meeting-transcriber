@@ -104,6 +104,19 @@ build_local_llm_helper() {
     LOCAL_LLM_HELPER_BIN_DIR="$bin_dir"
 }
 
+# test_local_llm_helper
+#
+# Runs the helper package's tests. No CI job runs them, because the hosted
+# runners lack the Metal Toolchain (see NOT_RUN_BY_CI in
+# scripts/tests/test_mt_cli_tests_are_compiled.sh), so pre-push.sh is where
+# they run. Call it after build_local_llm_helper: the GPU self-test spawns the
+# release build and skips when there is none.
+test_local_llm_helper() {
+    require_metal_toolchain || return 1
+    echo "Testing the local model helper..."
+    (cd "$_LOCAL_LLM_HELPER_PACKAGE" && swift test) || return 1
+}
+
 # install_local_llm_helper <app-bundle>
 #
 # Copies the helper and every resource bundle of its build into the bundle's

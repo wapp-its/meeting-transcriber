@@ -3,7 +3,7 @@
 # CI's release pipeline would otherwise catch first.
 #
 # Usage:
-#   ./scripts/pre-push.sh                     # release build of the app and its helper
+#   ./scripts/pre-push.sh                     # release build of the app and its helper, helper tests
 #   ./scripts/pre-push.sh --with-tests        # also build the test target
 #   ./scripts/pre-push.sh --with-appstore     # also build the App Store variant
 #   ./scripts/pre-push.sh --all               # everything
@@ -49,9 +49,13 @@ swift build -c release
 # The Homebrew bundle carries the local model helper, its own package, which
 # needs Xcode's Metal Toolchain. A machine without it can still push app-only
 # changes, so the helper is skipped there with one line rather than failing.
+# Its tests run here without --with-tests: no CI job runs them, so this is the
+# gate that does.
 if metal_toolchain_installed; then
     echo "==> swift build -c release (local model helper)"
     build_local_llm_helper
+    echo "==> swift test (local model helper)"
+    test_local_llm_helper
 else
     echo "==> skipped the local model helper: Xcode's Metal Toolchain is not installed (xcodebuild -downloadComponent MetalToolchain)"
 fi
