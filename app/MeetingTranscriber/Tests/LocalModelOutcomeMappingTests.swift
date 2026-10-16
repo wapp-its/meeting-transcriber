@@ -138,25 +138,34 @@
         }
 
         /// Record-only mode holds the gate like a recording (A19) but posts
-        /// no notice (A21): the job waits in its protocol state.
+        /// no notice (A21): the job waits in its protocol state. A recording
+        /// that defers the same job afterwards still gets its paused notice.
         func testARecordOnlyHoldPostsNoNotice() async throws {
             let (bench, release, helper) = try blockingHelperBench()
             let pipeline = try LocalModelPipelineBench(bench, helper: helper)
             let notifier = LocalModelNoticeSpy()
             let settings = try install(notifier, on: pipeline)
             let id = try pipeline.enqueue(title: "Standup")
+            let waiting = "local_model_waiting \(LocalModelGate.logTag(id)) reason=recording"
             try await bench.waitForNotices("local_model_started", count: 1)
 
             settings.recordOnly = true
             bench.gate.setRecordingActive(true)
-            try await bench.waitForNotices("local_model_waiting \(LocalModelGate.logTag(id)) reason=recording", count: 1)
+            try await bench.waitForNotices(waiting, count: 1)
             XCTAssertEqual(pipeline.job(id)?.state, .generatingProtocol)
+            XCTAssertEqual(notifier.notices, [])
 
-            try Data().write(to: release)
             settings.recordOnly = false
             bench.gate.setRecordingActive(false)
+            try await bench.waitForNotices("local_model_started", count: 2)
+            bench.gate.setRecordingActive(true)
+            try await bench.waitForNotices(waiting, count: 2)
+            XCTAssertEqual(notifier.notices, [.paused(jobID: id, title: "Standup")])
+
+            try Data().write(to: release)
+            bench.gate.setRecordingActive(false)
             try await pipeline.waitUntilDone([id])
-            XCTAssertEqual(notifier.notices, [])
+            XCTAssertEqual(notifier.notices, [.paused(jobID: id, title: "Standup")])
         }
 
         // MARK: - Helpers

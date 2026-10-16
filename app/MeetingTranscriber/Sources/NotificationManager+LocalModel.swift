@@ -142,8 +142,7 @@
         static let live = Self(
             open: { NSWorkspace.shared.open($0) },
             reveal: { NSWorkspace.shared.activateFileViewerSelecting([$0]) },
-            // The scene that observes it brings the Settings window to the front.
-            openSettings: { NotificationCenter.default.post(name: .showSettings, object: nil) },
+            openSettings: { SettingsNavigation.shared.show(.output) },
             fileExists: { FileManager.default.fileExists(atPath: $0.path) },
         )
     }
@@ -231,6 +230,9 @@
         /// Jobs told about with a low-memory or no-model notice, whose end then
         /// posts no "Transcript Saved" beside it.
         private var noticedJobs: Set<UUID> = []
+        /// Jobs told their protocol is paused, until they leave the protocol
+        /// stage: one paused notice per stage, however often it is deferred.
+        private var pausedJobs: Set<UUID> = []
 
         init(notifier: any AppNotifying, settings: AppSettings) {
             self.notifier = notifier
@@ -243,6 +245,7 @@
         func install(on queue: PipelineQueue) {
             let announce = queue.onJobStateChange
             queue.onJobStateChange = { [self] job, oldState, newState in
+                if oldState == .generatingProtocol { pausedJobs.remove(job.id) }
                 if newState.isTerminal, noticedJobs.remove(job.id) != nil, newState == .done { return }
                 announce?(job, oldState, newState)
             }
@@ -258,6 +261,7 @@
                 // protocol state without a notice (A21). Remove this line to
                 // post the paused notice in that case as well.
                 guard !settings.recordOnly else { return }
+                guard pausedJobs.insert(jobID).inserted else { return }
                 notifier.postLocalModelNotice(.paused(jobID: jobID, title: title))
 
             case let .notWritten(shortfall, meeting):

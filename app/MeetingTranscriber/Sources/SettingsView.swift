@@ -31,6 +31,8 @@ struct SettingsView: View {
     /// True when the pipeline is processing a job — soft hint only.
     var pipelineBusy: Bool = false
     var onSpeakerMutate: (() -> Void)?
+    /// Where a tab another part of the app asks for arrives.
+    var navigation: SettingsNavigation = .shared
 
     @State private var selection: SettingsTab = .general
     /// Owned here rather than by the Transcription tab, so a pending load offer
@@ -53,6 +55,12 @@ struct SettingsView: View {
             detailView(for: selection)
         }
         .navigationTitle("Settings")
+        // `initial`, so a request made before the window opened is applied too.
+        .onChange(of: navigation.requestedTab, initial: true) { _, tab in
+            guard let tab else { return }
+            selection = tab
+            navigation.requestedTab = nil
+        }
         .frame(
             minWidth: 760,
             idealWidth: 860,
@@ -112,7 +120,7 @@ struct SettingsView: View {
     }
 }
 
-private enum SettingsTab: String, CaseIterable, Identifiable {
+enum SettingsTab: String, CaseIterable, Identifiable {
     case general, audio, transcription, speakers, output, advanced, about
 
     var id: String {
@@ -141,5 +149,22 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .advanced: "wrench.and.screwdriver"
         case .about: "info.circle"
         }
+    }
+}
+
+/// A Settings tab another part of the app asks for, such as a notice's Open
+/// Settings. The Settings view takes it when its window opens, or at once
+/// when the window is already open.
+@MainActor
+@Observable
+final class SettingsNavigation {
+    static let shared = SettingsNavigation()
+
+    var requestedTab: SettingsTab?
+
+    /// Brings the Settings window to the front on `tab`.
+    func show(_ tab: SettingsTab) {
+        requestedTab = tab
+        NotificationCenter.default.post(name: .showSettings, object: nil)
     }
 }

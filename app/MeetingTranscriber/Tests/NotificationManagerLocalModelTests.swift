@@ -2,6 +2,7 @@
 
     @testable import MeetingTranscriber
     import UserNotifications
+    import ViewInspector
     import XCTest
 
     /// The local-model notices (spec R4, R5, R8) on the real manager over a
@@ -164,6 +165,28 @@
             XCTAssertEqual(LocalModelTranscriptDestination.of(standup) { [transcript, protocolFile].contains($0) }, .open(transcript))
             XCTAssertEqual(LocalModelTranscriptDestination.of(standup) { $0 == protocolFile }, .open(protocolFile))
             XCTAssertEqual(LocalModelTranscriptDestination.of(standup) { _ in false }, .reveal(standup.folder))
+        }
+
+        /// Open Settings asks for the Output tab and brings Settings to the
+        /// front; the Settings view takes that request when it opens.
+        func testOpenSettingsOpensSettingsOnTheOutputTab() async throws {
+            addTeardownBlock { @MainActor in SettingsNavigation.shared.requestedTab = nil }
+            let shown = expectation(forNotification: .showSettings, object: nil)
+            LocalModelNoticeEffects.live.openSettings()
+            await fulfillment(of: [shown], timeout: 1)
+            XCTAssertEqual(SettingsNavigation.shared.requestedTab, .output)
+
+            let suite = "NotificationManagerLocalModelTests-\(UUID().uuidString)"
+            addTeardownBlock { DefaultsSuite.remove(suite) }
+            let navigation = SettingsNavigation()
+            navigation.requestedTab = .output
+            let settings = try SettingsView(
+                settings: AppSettings(defaults: XCTUnwrap(UserDefaults(suiteName: suite))),
+                whisperKitEngine: WhisperKitEngine(), parakeetEngine: ParakeetEngine(),
+                recognitionStatsLog: RecognitionStatsLog(), stageTimingLog: StageTimingLog(), navigation: navigation,
+            )
+            try settings.inspect().navigationSplitView().callOnChange(oldValue: SettingsTab?.none, newValue: SettingsTab?.some(.output))
+            XCTAssertNil(navigation.requestedTab, "the Settings view did not take the request")
         }
 
         // MARK: - Helpers
