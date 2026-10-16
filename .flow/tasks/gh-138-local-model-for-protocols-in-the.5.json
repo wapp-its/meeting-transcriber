@@ -1,7 +1,4 @@
 {
-  "assignee": null,
-  "claim_note": "",
-  "claimed_at": null,
   "created_at": "2026-10-14T12:37:55.069172Z",
   "depends_on": [
     "gh-138-local-model-for-protocols-in-the.4"
@@ -11,7 +8,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-138-local-model-for-protocols-in-the",
   "spec_path": ".flow/tasks/gh-138-local-model-for-protocols-in-the.5.md",
-  "status": "todo",
+  "status": "done",
   "title": "Pipeline outcomes, notifications and Try Again",
-  "updated_at": "2026-10-14T12:44:35.813353Z"
+  "updated_at": "2026-10-15T23:19:29.613593Z"
 }

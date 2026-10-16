@@ -126,6 +126,12 @@ enum A11yID {
     static let codexProviderNote = "codexProviderNote"
     static let customCommandEditor = "customCommandEditor"
     static let customCommandModelField = "customCommandModelField"
+    /// The local model's Choose… opens a folder panel, so it stays off the
+    /// `/ui/press` allowlist. The status line's identifier carries no path or
+    /// model name.
+    static let localModelChooseFolderButton = "localModelChooseFolderButton"
+    static let localModelCheckButton = "localModelCheckButton"
+    static let localModelStatus = "localModelStatus"
     static let protocolTemplateDefaultPicker = "protocolTemplateDefaultPicker"
     static let protocolTemplateNameField = "protocolTemplateNameField"
     static let protocolTemplateCreateButton = "protocolTemplateCreateButton"

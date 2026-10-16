@@ -28,7 +28,10 @@ import Observation
 @Observable
 @MainActor
 final class WatchingController {
-    var watchLoop: WatchLoop?
+    @ObservationIgnored var detectedCapturesRunning = 0
+    var watchLoop: WatchLoop? {
+        didSet { watchLoopChanged() }
+    }
 
     /// Non-nil while `toggleWatching`'s async start is in flight — it awaits mic
     /// access before `watchLoop` is assigned, so without this a second toggle in
@@ -43,11 +46,13 @@ final class WatchingController {
     /// `watchLoop` holds the manual loop. `startTask`'s counterpart for the
     /// manual path, so `isManualRecording` covers the window before the loop
     /// exists.
-    var manualStartTask: Task<ManualRecordingStartResult, Never>?
+    var manualStartTask: Task<ManualRecordingStartResult, Never>? {
+        didSet { recordingActivityChanged() }
+    }
 
     let settings: AppSettings
     private let notifier: any AppNotifying
-    private let pipeline: PipelineController
+    let pipeline: PipelineController
     let channelHealth: ChannelHealthController
     private let permissions: PermissionsController
     let liveTranscription: LiveTranscriptionCoordinator
@@ -167,6 +172,7 @@ final class WatchingController {
         pipeline.onQueueReplaced = { [weak self] queue in
             self?.watchLoop?.pipelineQueue = queue
         }
+        holdLocalModelInRecordOnlyMode()
     }
 
     /// Wire the engine-sync hook. Called once from `AppState.init` after its
@@ -553,6 +559,7 @@ final class WatchingController {
     /// auto-detect path; manual recording emits its own start notification.
     private func attachStateChangeHandler(to loop: WatchLoop, notifyOnRecording: Bool) {
         loop.onStateChange = { [weak self, weak loop, notifier] oldState, newState in
+            self?.recordingActivityChanged()
             // Leaving `.recording` (natural meeting end, manual stop, or
             // mid-recording cancel — all route through this transition) is the
             // unified stop signal for both the auto-detect and manual paths.

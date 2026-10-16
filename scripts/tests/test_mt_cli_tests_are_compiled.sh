@@ -1,7 +1,8 @@
 #!/bin/bash
 # Regression test: every SwiftPM package in this repository that declares a
-# test target must have those tests run by CI, and mt-cli's must run inside a
-# REQUIRED check.
+# test target must have those tests run by CI, or be listed in NOT_RUN_BY_CI
+# below with its reason and the gate that runs them instead, and mt-cli's must
+# run inside a REQUIRED check.
 #
 # `tools/mt-cli` carried 31 tests that no gate compiled. `swift build` does not
 # build a test target, and the only gate that touched the test FILES was
@@ -28,6 +29,19 @@ source "$ROOT/scripts/lib/ci-yaml.sh"
 
 CI="$ROOT/.github/workflows/ci.yml"
 REQUIRED_JOB="test"
+
+# Packages whose tests ci.yml deliberately does not run. An entry is an
+# exception to the rule above, not a pass: it needs its reason here and a gate
+# that does run the tests, and the checks below fail as soon as it stops being
+# true (no such package, no test target, or ci.yml runs the tests after all).
+#
+#   tools/local-llm-helper: links MLX, whose Metal shaders build only with
+#   Xcode's Metal Toolchain, which the hosted runners do not have, and keeping
+#   MLX out of hosted CI is a design decision of the local model helper.
+#   scripts/pre-push.sh runs these tests wherever the toolchain is installed.
+#   Running them in CI would mean downloading the toolchain on every run, and
+#   whether MLX starts on a hosted runner is not measured yet.
+NOT_RUN_BY_CI="tools/local-llm-helper"
 STEP_RUN="cd tools/mt-cli && swift test"
 PASSED=0
 FAILED=0
@@ -60,7 +74,19 @@ while IFS= read -r manifest; do
     # 141 when grep exits on the first match while the producer still has more
     # than a pipe buffer to write, which turned a passing package red once the
     # file grew past about 13 KB below the match.
-    if grep -qE "^[[:space:]]*(- )?run:[[:space:]]*cd $rel && swift test" "$CI"; then
+    runs_in_ci=0
+    grep -qE "^[[:space:]]*(- )?run:[[:space:]]*cd $rel && swift test" "$CI" && runs_in_ci=1
+    case " $NOT_RUN_BY_CI " in
+        *" $rel "*)
+            if [ "$runs_in_ci" -eq 1 ]; then
+                bad "$rel is still an exception" "ci.yml runs its tests now; drop it from NOT_RUN_BY_CI"
+            else
+                # Printed, not counted as a pass: these tests are not run by CI.
+                echo "ci.yml runs the tests of $rel ... EXCEPTION: listed in NOT_RUN_BY_CI"
+            fi
+            continue ;;
+    esac
+    if [ "$runs_in_ci" -eq 1 ]; then
         ok "ci.yml runs the tests of $rel"
     else
         bad "ci.yml runs the tests of $rel" "this package declares a test target that no job in ci.yml builds. \`swift build\` does not build test targets, so those tests cannot fail and cannot be trusted."
@@ -68,6 +94,14 @@ while IFS= read -r manifest; do
 done <<EOF
 $(find "$ROOT/app" "$ROOT/tools" -maxdepth 2 -name Package.swift 2>/dev/null | sort)
 EOF
+
+# An exception that names no package with a test target excuses nothing any
+# more, and left in place it would excuse the next package given that path.
+for rel in $NOT_RUN_BY_CI; do
+    if ! grep -qs 'testTarget' "$ROOT/$rel/Package.swift"; then
+        bad "$rel is a package with a test target" "it is listed in NOT_RUN_BY_CI, but $rel/Package.swift is missing or declares no test target; drop it from the list"
+    fi
+done
 
 if [ "$found_any" -eq 0 ]; then
     bad "packages with test targets were found" "no Package.swift declaring a test target was found under app/ or tools/, so this test inspected nothing. If the layout moved, move this scan with it rather than leaving a check that cannot fail."

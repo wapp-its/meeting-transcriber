@@ -109,7 +109,10 @@ test_the_exclusion_list_has_no_stale_members() {
 # dev keychain the fallback looks for does not exist; `swift` is stubbed to fail
 # immediately, so a driver that gets past the precondition dies at its build
 # instead of actually building; `launchctl` is stubbed so the exit trap cannot
-# boot out a developer's real dev app. Nothing is deployed on either path: the
+# boot out a developer's real dev app; `xcodebuild` is stubbed to report the
+# Metal Toolchain installed, because run_app.sh refuses before its first build
+# without it, and a hosted runner does not have it, so the control would stop
+# there and never reach the build. Nothing is deployed on either path: the
 # rsync sits far below both stopping points.
 #
 # Scoped to this one driver on purpose. The other three reach their precondition
@@ -124,7 +127,9 @@ _precondition_sandbox() {
     # `|| true`: the message is printed either way, only the stopping differs.
     printf '#!/usr/bin/env bash\necho REACHED_THE_BUILD >&2\nexit 1\n' > "$home/bin/swift"
     printf '#!/usr/bin/env bash\nexit 0\n' > "$home/bin/launchctl"
-    chmod +x "$home/bin/swift" "$home/bin/launchctl"
+    printf '#!/usr/bin/env bash\ncase "${1:-}" in -showComponent) echo "Status: installed";; esac\nexit 0\n' \
+        > "$home/bin/xcodebuild"
+    chmod +x "$home/bin/swift" "$home/bin/launchctl" "$home/bin/xcodebuild"
 }
 
 # Runs the driver on its BUILD path (no --no-build) and reports where it stopped.

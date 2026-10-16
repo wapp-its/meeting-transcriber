@@ -73,7 +73,9 @@ Native SwiftUI menu bar application that orchestrates meeting detection, recordi
         │ 8. Save transcript (.txt)                                      │
         │ 9. Protocol generation                                         │
         │      └─ ProtocolProvider: .claudeCLI | .codexCLI |             │
-        │         .customCommand | .openAICompatible | .none             │
+        │         .customCommand | .openAICompatible | .localModel |     │
+        │         .none                                                  │
+        │         (.localModel: a helper process per protocol)           │
         │ 10. Save protocol (.md, transcript appended)                   │
         └────────────────────────────────────────────────────────────────┘
 ```
@@ -113,6 +115,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `Settings/VocabularySourceSettingsView.swift` | "Vocabulary source" picker (Local file / URL); for URL the address, the Keychain-backed access token, "Update now" and the status line from `RemoteVocabularyController` |
 | `Settings/SpeakersSettingsView.swift` | Diarization · Mic Speaker Name · Known Voices · Recognition Stats · Experimental Diarization Tuning |
 | `Settings/OutputSettingsView.swift` | LLM provider · protocol language · output folder · Protocol Templates section |
+| `Settings/LocalModelSettingsView.swift` | The local model provider's panel in Settings → Output: the model folder with Choose…, the status line with Check Model (runs the helper's `check` mode, no weights loaded), and the memory and recording notes (`#if !APPSTORE`) |
 | `Settings/ProtocolTemplatesSettingsView.swift` | Protocol Templates section: default template picker, Edit and Delete per template file, Create Template, Open Templates Folder; its state and writes live in the `@Observable` `ProtocolTemplatesModel` |
 | `Settings/CommandProviderSettingsView.swift` | Codex CLI note · custom command editor, model and placeholder notes (`#if !APPSTORE`) |
 | `Settings/AdvancedSettingsView.swift` | Permissions · Diagnostics |
@@ -127,6 +130,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `AppSettings.swift` | `@Observable` settings persisted to UserDefaults |
 | `AppSettings+Computed.swift` | Values derived from stored `AppSettings` toggles, split out to keep `AppSettings.swift` under the line cap |
 | `AppSettings+OutputDirectory.swift` | Everything derived from `customOutputDirBookmark`, split out to keep `AppSettings.swift` under the line cap |
+| `AppSettings+LocalModel.swift` | The local model's folder: the plain path for display and the security-scoped bookmark reads go through, taken by value when a generator is made so a later change never reaches a running protocol (`#if !APPSTORE`) |
 | `AppSettings+Vocabulary.swift` | Custom-vocabulary file selection, sandbox bookmark resolution, and validation state — shared by both ASR engines; `effectiveVocabularyPath` / `effectiveVocabularyBookmark` hand the engines the local file or the URL source's cached copy |
 | `RemoteVocabularyController.swift` | Keeps the URL source's cached copy current (launch, 2 s after a change, "Update now", hourly), adopts only valid downloads, and publishes the `RemoteVocabularyStatus` Settings shows; owned by `AppState` as `remoteVocabulary` |
 | `LegacyDefaultsMigration.swift` | One-shot carry-over of settings from the pre-rename bundle identifier, since `UserDefaults` is scoped per identifier |
@@ -247,6 +251,16 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `CommandTemplate.swift` | The custom command's placeholder rules: `{model}`, `{prompt_file}`, `{transcript_file}`, `{output_file}` (`#if !APPSTORE`) |
 | `CLIProcessRunner.swift` | Shared runner for every CLI provider: no shell, private run folder, wall-clock timeout, output cap (`#if !APPSTORE`) |
 | `OpenAIProtocolGenerator.swift` | OpenAI-compatible API protocol generation (Ollama, LM Studio, etc.) |
+| `LocalModel/LocalModelProtocolGenerator.swift` | Local model protocol generation: sends the same prompt as the other providers to the bundled helper through `LocalModelGate`; also holds `LocalModelLimits`, every fixed limit of a local run (`#if !APPSTORE`) |
+| `LocalModel/LocalModelGate.swift` | The one way into the local model for the whole app, owned by `PipelineController`: admits one helper at a time in arrival order, runs the memory guard's admission check and watchdog, holds every start while a recording runs and ends a running helper when one starts (`#if !APPSTORE`) |
+| `LocalModel/LocalModelMemoryGuard.swift` | Pure memory decisions and the system probe behind them: start only at normal pressure with free plus inactive memory of at least the weights plus 6 GB, end a running helper at warning pressure or below 4 GB; an unreadable figure fails closed (`#if !APPSTORE`) |
+| `LocalModel/LocalModelHelperRunner.swift` | One helper process from start to confirmed exit: fixed argument vector (no shell), request file on stdin, private run directory as working directory, stderr read for progress lines; ends it with SIGTERM, then SIGKILL, on a deadline or when asked (`#if !APPSTORE`) |
+| `LocalModel/LocalModelHelperLocator.swift` | Finds the helper in the app bundle, `Contents/Helpers` first (`#if !APPSTORE`) |
+| `LocalModel/LocalModelRunDirectory.swift` | The owner-only directory one helper run works in (request and protocol), removed after the helper exited; a launch removes leftovers whose process is gone (`#if !APPSTORE`) |
+| `LocalModel/LocalModelOutcome.swift` | The helper's exit statuses (the app's copy of the helper README's table, kept in step by a test) and every way a local generation ends other than a written protocol (`#if !APPSTORE`) |
+| `LocalModel/LocalModelCheck.swift` | Settings' Check Model: runs the helper's `check` mode on a folder and decodes its one-line JSON report (`#if !APPSTORE`) |
+| `PipelineQueue+LocalModel.swift` | Where the queue meets the gate: the job a generation runs under, waiting out a recording that ended the helper and then generating again, and a job cancel that reaches its helper |
+| `WatchingController+LocalModel.swift` | Composes the one recording-activity signal (detected meeting, manual recording) and pushes it to the gate whenever an input changes, so a recording never waits for the model |
 | `RecordingSidecar.swift` | Metadata sidecar written next to recordings in record-only mode |
 | `RecordingFileSuffix.swift` | Filename suffix constants for dual-source recordings (`_app.wav`, `_mic.wav`, `_mix.wav`) |
 | `SilentRecordingMonitor.swift` | Pure state machine detecting fully-silent recordings (both channels below threshold) |
@@ -332,6 +346,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `NotificationUrgency.swift` | How urgently a notification must reach the user — two cases (vs. the five `UNNotificationInterruptionLevel` offers) mapped to whether a given notification should pierce Focus |
 | `NotificationScheduling.swift` | Port over the `UNUserNotificationCenter` slice `NotificationManager` uses, so posting/registration is testable against a fake scheduler |
 | `NotificationRingBuffer.swift` | Bounded, thread-safe log of recently-posted notifications (`#if !APPSTORE`) |
+| `NotificationManager+LocalModel.swift` | The local model's notices: "Protocol paused for your recording", "Protocol not written: low memory" (Try Again, Show Transcript) and "Protocol not written: no local model" (Open Settings), one notice per episode naming every meeting it covers (`#if !APPSTORE`) |
 | `DateFormatter+FilenameStamp.swift` | `DateFormatter` pinned to Gregorian calendar + POSIX locale for filename timestamp stamps |
 | `KeychainHelper.swift` | Legacy keychain CRUD (token now file-based) |
 | `RecognitionStats.swift` | Recognition event model + `recognition_log.jsonl` reader/writer — backs `RecognitionStatsView` |
@@ -375,6 +390,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 |------|------|
 | `tools/mt-cli/` | Thin Swift client for `DebugRPCServer`. Subcommands: `state`, `healthz`, `screenshot`, `open-settings`, `close-settings`, `confirm-browser-consent`, `wav-verdict`, `seed-speaker`, `rename-speaker`, `delete-speaker`, `merge-speakers`, `ui-tree`, `ui-press`. Reads token from `~/Library/Application Support/MeetingTranscriber/.rpc-token`. Skill doc at `tools/mt-cli/skill.md`. |
 | `tools/meeting-simulator/` | Test fixture: spawns a fake meeting window for E2E detection tests |
+| `tools/local-llm-helper/` | The program the app starts to write one protocol with a local MLX model (`run`, `check <folder>`, `selftest`). Its own SwiftPM package, so the app's package never depends on MLX; bundled in the Homebrew build only. Process contract and exit statuses in its `README.md`; see [Local Model](#local-model) |
 
 ---
 
@@ -623,6 +639,7 @@ When dual-source recording (app + mic) is available:
 - **`.codexCLI`** — Codex CLI subprocess with the user's Codex login, model and reasoning effort (`#if !APPSTORE`)
 - **`.customCommand`** — A command the user enters, one argument per line, with the placeholders `{model}`, `{prompt_file}` (instructions and transcript), `{transcript_file}` and `{output_file}`; without an input-file placeholder the prompt goes to stdin, without `{output_file}` the protocol is read from stdout (`#if !APPSTORE`)
 - **`.openAICompatible`** — Any OpenAI-compatible HTTP API (Ollama, LM Studio, llama.cpp, etc.)
+- **`.localModel`** — A local MLX model folder the user picked, run by the bundled helper `local-llm-helper` in a process of its own per protocol; see [Local Model](#local-model) (`#if !APPSTORE`)
 - **`.none`** — Skip LLM generation; save transcript only
 
 `AppSettings.includeFullTranscriptInProtocol` and
@@ -641,6 +658,21 @@ The prompt is the job's protocol template: the built-in one ("Standard (built-in
 ### CLI Runner
 
 The Claude CLI, Codex CLI and custom command providers share one runner, `CLIProcessRunner`. Every run works in a fresh owner-only folder under the per-user temporary directory, removed when the run ends; the runner starts the program there directly from an argument vector, never through a shell, stops it after 10 minutes of wall-clock time even when it prints nothing (SIGTERM, then SIGKILL one second later), and caps stdout at 32 MiB. The Codex preset runs `codex exec --json --ephemeral --skip-git-repo-check --sandbox read-only --output-last-message {output_file} -` with the prompt on stdin; `--ephemeral` keeps the run out of Codex's session store.
+
+### Local Model
+
+`LocalModelProtocolGenerator` sends the prompt every provider sends (the system prompt, the transcript as the user prompt) to `tools/local-llm-helper`, a program the app starts for that one protocol and that exits afterwards. The model's memory (about 17 GB at peak for the tested 27B 4-bit model) and any crash therefore stay out of the app's process. The helper is its own SwiftPM package, so the app's package, its tests and the App Store build never compile MLX. The two share no code; the contract is the process boundary in the helper's `README.md`: the request as one JSON object on stdin, the private run directory as working directory, the protocol appended to `protocol.md` there as it is generated, progress and lifecycle lines on stderr, and a fixed table of exit statuses.
+
+- **One door.** Every local protocol (queued jobs, every speaker-naming path, a regeneration, Try Again) goes through the single `LocalModelGate` that `PipelineController` owns. It runs one helper at a time, in arrival order, from the memory check until the helper's exit is confirmed.
+- **Memory guard.** A helper starts only at normal memory pressure with free plus inactive memory of at least the weights' size plus 6 GB, and is ended at warning pressure or below 4 GB, checked every second while it runs (`LocalModelMemoryGuard`). A refusal or a stop becomes "Protocol not written: low memory" with Try Again.
+- **Recordings first.** `WatchingController` pushes one recording-activity signal to the gate. When it turns on, a running helper gets SIGTERM and SIGKILL 3 s later if it is still there, and no helper starts until the signal turns off; the queue then generates the deferred protocols again by itself. A regeneration is not resumed.
+- **Fixed limits** (`LocalModelLimits`, not settings): a 32,768-token context, 16,000 output tokens, 20 minutes in total and 3 minutes without a progress line. A prompt that does not fit is refused before any weights load; a protocol stopped at the output limit is kept with a warning.
+- **Quit.** The app ends a running helper when it quits (SIGTERM, then SIGKILL after 1 s), and a run directory left by a crash is removed at the next launch.
+- **Logs.** Every local-model log line is content-free (ids, counts, fixed words and memory figures), under the `LocalModel` category.
+
+**Packaging.** `scripts/lib/local-llm-helper.sh` is the single place that builds the helper (release build only: a debug build computes wrong numbers on a 4-bit model) and installs it into a bundle; `build_release.sh` and `run_app.sh` both go through it and stop when Xcode's Metal Toolchain is missing, since a bundle without the helper would offer a provider that never works. The helper goes to `Contents/Helpers/local-llm-helper`, with every SwiftPM resource bundle the build put beside it (MLX's shaders `mlx-swift_Cmlx.bundle`, the Hub tokenizer fallbacks, ...). It cannot go into `Contents/MacOS`: MLX looks for its shaders beside `NSBundle.mainBundle`, which for an executable there is the app, not the helper's directory. `scripts/lib/signing.sh` signs the resource bundles and then the helper, with the Hardened Runtime, before the outer bundle (notarized build and `run_app.sh`; the unnotarized `--deep` branch of `build_release.sh` re-signs them without it); `scripts/lib/bundle-licenses.sh` installs the licence texts of the helper's dependencies from its resolved checkouts. The App Store build neither builds nor contains the helper. `scripts/local-llm-bundle-check.sh` proves a built bundle by running the helper's `selftest` from inside it and checking the signatures; it needs a GPU and is run by hand, not by CI. `scripts/pre-push.sh` builds the helper when the Metal Toolchain is installed and skips it with one line otherwise.
+
+**Real-model test.** `LocalModelRealModelTests` runs the app's generator, gate and memory guard against real weights when `LOCAL_LLM_HELPER_TEST_MODEL` names a model folder, and skips without it, so CI never loads a model. It needs the helper's release build (`cd tools/local-llm-helper && swift build -c release`) and runs the helper with networking denied by `sandbox-exec`. A refusal by the memory guard skips the test with the readings rather than failing it. The second test starts a recording through the automation API's `POST /v1/record` and checks that the helper is gone within 5 seconds.
 
 ### Claude CLI Invocation
 
@@ -711,6 +743,7 @@ AppSettings (UserDefaults)
 | ProtocolGenerating | `protocolGenerator` protocol in PipelineQueue |
 | RecordingProvider | `recorderFactory` closure in WatchLoop |
 | ProtocolGenerator | `claudeBin` parameter |
+| LocalModelProtocolGenerator | `locateHelper` closure (a stub helper script in tests); `LocalModelGate.Configuration` injects the memory probe, the limits, the run-directory parent and the diagnostics sink |
 | NotificationManager | `NotificationScheduling` port over `UNUserNotificationCenter` (fake scheduler in tests) |
 | ConsentPromptCoordinator | Injected timeout clock; pure register/resolve-once API (no UI dependency) |
 | LiveCaptionsGate.strategy | Pure static function — call directly with any input combination, no controller needed |
@@ -757,7 +790,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 | **Audio** | Microphone · VAD | `settings` | `audioDevices` |
 | **Transcription** | Engine + per-engine options + vocabulary source + status | `settings`, three engines, `remoteVocabulary?` | — |
 | **Speakers** | Diarization · Speaker Identity · Known Voices · Recognition Stats · Experimental Diarization Tuning | `settings`, `recognitionStatsLog`, `enrollmentDiarizerFactory` | `knownVoicesSheet` |
-| **Output** | LLM Provider · Protocol Language · Output Folder · Protocol Templates | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel` |
+| **Output** | LLM Provider (with the local model's folder and Check Model) · Protocol Language · Output Folder · Protocol Templates | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel` |
 | **Advanced** | Permissions · Diagnostics | — | `micPermission`, `screenRecordingOK`, `accessibilityOK` |
 | **About** | Build identity · Dependencies · Updates | `settings`, `updateChecker?` | — |
 
@@ -767,8 +800,8 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 - `vadEnabled` hides the VAD threshold slider
 - `transcriptionEngine` switches between WhisperKit / Parakeet option panels
 - `vocabularySource` switches between the local vocabulary file row and the URL controls (address, token, "Update now", status)
-- `protocolProvider` switches between Claude CLI / Codex CLI / Custom Command / OpenAI-compatible / None panels
-- `#if APPSTORE` removes the Claude CLI, Codex CLI and Custom Command provider options entirely
+- `protocolProvider` switches between Claude CLI / Codex CLI / Custom Command / OpenAI-compatible / Local model / None panels
+- `#if APPSTORE` removes the Claude CLI, Codex CLI, Custom Command and Local model provider options entirely
 - `updateChecker == nil` hides the entire Updates section in About
 
 **Cross-cutting concerns owned by sub-views:**

@@ -62,3 +62,87 @@ install_third_party_licenses() {
 
     echo "  Third-party licenses: $dest (${#licence_files[@]} files)"
 }
+
+# The local model helper (lib/local-llm-helper.sh) is its own SwiftPM package
+# and ships only in the Homebrew bundle, so its notices cannot live in
+# licenses/, which every bundle gets. They come from the helper's own resolved
+# checkouts instead, so the text in the bundle is always the one of the version
+# that was built.
+#
+# One entry per text: <path under tools/local-llm-helper/.build/checkouts>
+# <file name in Contents/Resources/licenses>. The mlx-swift lines below its
+# own cover code it vendors and compiles into the helper. THIRD-PARTY-NOTICES.md
+# describes each.
+LOCAL_LLM_HELPER_LICENSES="
+mlx-swift/LICENSE mlx-swift-LICENSE.txt
+mlx-swift/Source/Cmlx/mlx/LICENSE mlx-swift-mlx-LICENSE.txt
+mlx-swift/Source/Cmlx/mlx-c/LICENSE mlx-swift-mlx-c-LICENSE.txt
+mlx-swift/Source/Cmlx/json/LICENSE.MIT mlx-swift-json-LICENSE.txt
+mlx-swift/Source/Cmlx/metal-cpp/LICENSE.txt mlx-swift-metal-cpp-LICENSE.txt
+mlx-swift-lm/LICENSE mlx-swift-lm-LICENSE.txt
+swift-transformers/LICENSE swift-transformers-LICENSE.txt
+swift-jinja/LICENSE swift-jinja-LICENSE.txt
+swift-huggingface/LICENSE swift-huggingface-LICENSE.txt
+EventSource/LICENSE.md EventSource-LICENSE.txt
+yyjson/LICENSE yyjson-LICENSE.txt
+swift-crypto/LICENSE.txt swift-crypto-LICENSE.txt
+swift-crypto/NOTICE.txt swift-crypto-NOTICE.txt
+"
+
+# Pins in the helper's Package.resolved that need no notice in the bundle:
+# swift-syntax serves only a compiler macro plugin the helper does not use,
+# swift-asn1 is not linked, and swift-collections and swift-numerics are
+# Apache-2.0 with the Swift runtime library exception, which waives
+# attribution for compiled code.
+LOCAL_LLM_HELPER_UNATTRIBUTED_PINS="swift-syntax swift-asn1 swift-collections swift-numerics"
+
+# install_local_llm_helper_licenses <resources-dir> <helper-package-dir>
+#
+# Copies the texts above into <resources-dir>/licenses/. Fails when a text is
+# missing, and when Package.resolved pins a package that is neither attributed
+# above nor listed as needing no notice: a list of components is exactly what
+# the licenses/ loop exists to avoid, so this one must not fall behind a
+# dependency update in silence.
+install_local_llm_helper_licenses() {
+    local resources_dir="$1" package_dir="$2"
+    local checkouts="$package_dir/.build/checkouts" dest="$1/licenses"
+    local source_path name pins pin covered count=0
+
+    # Pin identities are lower case, checkout directories keep the repository's
+    # case (EventSource), so the comparison is made in lower case.
+    pins="$(sed -n 's/.*"identity" : "\([^"]*\)".*/\1/p' "$package_dir/Package.resolved")" || return 1
+    [ -n "$pins" ] || { echo "  ERROR: no pins read from $package_dir/Package.resolved" >&2; return 1; }
+    covered=" $LOCAL_LLM_HELPER_UNATTRIBUTED_PINS "
+    while read -r source_path name; do
+        [ -n "$source_path" ] || continue
+        covered="$covered${source_path%%/*} "
+    done <<< "$LOCAL_LLM_HELPER_LICENSES"
+    covered="$(tr '[:upper:]' '[:lower:]' <<< "$covered")"
+    while read -r pin; do
+        case "$covered" in
+            *" $pin "*) ;;
+            *)
+                echo "  ERROR: the local model helper pins $pin, which has no licence entry in" >&2
+                echo "  scripts/lib/bundle-licenses.sh. Attribute it there and in THIRD-PARTY-NOTICES.md." >&2
+                return 1
+                ;;
+        esac
+    done <<< "$pins"
+
+    # `install -m 0644` and not `cp`: SwiftPM leaves its checkouts read-only,
+    # cp carries that mode into the bundle, and the next in-place assembly
+    # (run_app.sh) then cannot overwrite the copy (measured: "Permission
+    # denied" on the second build).
+    mkdir -p "$dest" || return 1
+    while read -r source_path name; do
+        [ -n "$source_path" ] || continue
+        if [ ! -f "$checkouts/$source_path" ]; then
+            echo "  ERROR: licence text not found: $checkouts/$source_path" >&2
+            return 1
+        fi
+        install -m 0644 "$checkouts/$source_path" "$dest/$name" || return 1
+        count=$((count + 1))
+    done <<< "$LOCAL_LLM_HELPER_LICENSES"
+
+    echo "  Local model helper licenses: $dest ($count files)"
+}

@@ -82,6 +82,19 @@ protocol AppNotifying {
         var recentNotifications: [NotificationRingBuffer.Entry] {
             get
         }
+
+        /// Tell the person about a local generation: paused for a recording,
+        /// or not written for want of memory or of a model (spec R4, R5, R8).
+        /// Defaults to nothing, like every notice of a notifier that shows none.
+        func postLocalModelNotice(_ notice: LocalModelNotice)
+
+        /// A local protocol was written, so a later low-memory or no-model
+        /// notice starts a notification of its own instead of joining the one
+        /// still on screen.
+        func endLocalModelNoticeEpisodes()
+
+        /// Who runs a notice's Try Again; held weakly.
+        func setLocalModelNoticeResponder(_ responder: any LocalModelNoticeResponding)
     #endif
 }
 
@@ -90,6 +103,12 @@ protocol AppNotifying {
         var recentNotifications: [NotificationRingBuffer.Entry] {
             []
         }
+
+        func postLocalModelNotice(_: LocalModelNotice) {}
+
+        func endLocalModelNoticeEpisodes() {}
+
+        func setLocalModelNoticeResponder(_: any LocalModelNoticeResponding) {}
     }
 #endif
 

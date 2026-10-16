@@ -69,7 +69,7 @@ final class CommandProviderSettingsTests: XCTestCase {
         }
 
         func testProviderOrderAndLabels() {
-            XCTAssertEqual(ProtocolProvider.allCases, [.claudeCLI, .codexCLI, .customCommand, .openAICompatible, .none])
+            XCTAssertEqual(ProtocolProvider.allCases, [.claudeCLI, .codexCLI, .customCommand, .localModel, .openAICompatible, .none])
             XCTAssertEqual(ProtocolProvider.codexCLI.label, "Codex CLI")
             XCTAssertEqual(ProtocolProvider.customCommand.label, "Custom Command")
         }

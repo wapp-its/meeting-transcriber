@@ -142,6 +142,9 @@ struct OutputSettingsView: View {
 
             case .customCommand:
                 CustomCommandSettingsView(settings: settings)
+
+            case .localModel:
+                LocalModelSettingsView(model: LocalModelSettingsModel(settings: settings))
         #endif
 
         case .openAICompatible:

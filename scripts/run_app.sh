@@ -31,6 +31,15 @@ INFO_PLIST="$SPM_DIR/Sources/Info.plist"
 # shellcheck source=lib/bundle-ids.sh
 source "$SCRIPT_DIR/lib/bundle-ids.sh"
 
+# The local model helper, the same one build_release.sh bundles. Fatal here as
+# there: mt-update installs the app through this script, and a bundle without
+# the helper has a protocol provider that never works. Built before the app so
+# a machine without Xcode's Metal Toolchain stops here with the install
+# command, not after the app's compile.
+# shellcheck source=lib/local-llm-helper.sh
+source "$SCRIPT_DIR/lib/local-llm-helper.sh"
+build_local_llm_helper
+
 # Always rebuild to pick up code changes
 echo "Building Meeting Transcriber app..."
 cd "$SPM_DIR"
@@ -81,6 +90,8 @@ cp "$BUILD_BINARY" "$APP_BINARY"
 source "$SCRIPT_DIR/lib/bundle-licenses.sh"
 install_third_party_licenses "$APP_BUNDLE/Contents/Resources"
 
+install_local_llm_helper "$APP_BUNDLE"
+
 # LocalVQE echo-cancellation model, the same resources build_release.sh bundles,
 # so the dev app (which scripts/e2e-app.sh deploys) can exercise the feature.
 # Non-fatal here and fatal there: an unreachable download must not stop someone
@@ -116,12 +127,17 @@ fi
 # and any later re-sign of the deployed bundle cannot drift apart (issue #609).
 prepare_signing "$APP_BUNDLE" "$DEV_ENTITLEMENTS" "$DEV_BUNDLE_ID" "$CHOSEN_IDENTITY"
 if [ -n "$SIGNING_IDENTITY" ]; then
+    # The helper first, with the same identity: the outer signature seals the
+    # nested ones as they are when it is made.
+    sign_local_llm_helper "$APP_BUNDLE" "$SIGNING_IDENTITY" \
+        || { echo "codesign failed for the local model helper (identity $SIGNING_IDENTITY)" >&2; exit 1; }
     # Failure is fatal and its stderr is kept. This used to be `2>/dev/null && echo`,
     # which hid both: a bad entitlements path left the bundle completely UNSIGNED
     # with no diagnostic, and every lane that rsyncs it then loses its TCC grants.
     codesign --force --sign "$SIGNING_IDENTITY" --entitlements "$SIGNING_ENTITLEMENTS" "$APP_BUNDLE" \
         || { echo "codesign failed for $APP_BUNDLE (identity $SIGNING_IDENTITY, entitlements $SIGNING_ENTITLEMENTS)" >&2; exit 1; }
     echo "  Signed with: $SIGNING_IDENTITY (+ entitlements)"
+    verify_local_llm_helper "$APP_BUNDLE"
 else
     # Not fatal: a contributor without any certificate can still run the app.
     # But not silent either. This used to die inside codesign by accident (the

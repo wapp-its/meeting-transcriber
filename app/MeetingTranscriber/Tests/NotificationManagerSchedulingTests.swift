@@ -37,9 +37,14 @@ final class NotificationManagerSchedulingTests: XCTestCase {
         XCTAssertTrue(manager.isSetUp)
         XCTAssertIdentical(fake.delegate, manager)
         XCTAssertTrue(fake.authRequested)
+        #if APPSTORE
+            let localModel: Set<String> = []
+        #else
+            let localModel = NotificationManager.localModelCategoryIDs
+        #endif
         XCTAssertEqual(
             Set(fake.categories.map(\.identifier)),
-            [NotificationManager.consentCategoryID, NotificationManager.meetingEndCategoryID],
+            localModel.union([NotificationManager.consentCategoryID, NotificationManager.meetingEndCategoryID]),
         )
     }
 

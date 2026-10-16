@@ -192,6 +192,24 @@ class PipelineQueue {
     var jobAudioSeconds: [UUID: Double] = [:]
 
     private var processTask: Task<Void, Never>?
+    /// The job `processNext` runs now, so a cancel cancels `processTask` only
+    /// for that job: a speaker-naming path writes its protocol in a task of its
+    /// own, and cancelling the queue's task for such a job would end the run
+    /// of whichever job the queue is processing.
+    /// Internal (not private) because `processNext` in PipelineQueue+Stages.swift
+    /// sets it.
+    @ObservationIgnored var processingJobID: UUID?
+    #if !APPSTORE
+        /// The gate of the local generators this queue ran, so a cancel reaches
+        /// a helper started from any path. Taken from the generator rather than
+        /// handed in: it is the gate the job's generation went through, also
+        /// after the provider was switched mid-run. Internal (not private)
+        /// because PipelineQueue+LocalModel.swift sets it.
+        @ObservationIgnored var localModelGate: LocalModelGate?
+        /// Told what the protocol stage's local generations come to, for the
+        /// notices of spec R4, R5 and R8 (`LocalModelJobNotices`).
+        @ObservationIgnored var onLocalModelEvent: ((LocalModelEvent) -> Void)?
+    #endif
     /// Internal (not private) because `processNext` in PipelineQueue+Stages.swift
     /// reads this to distinguish a cancellation from a real pipeline error.
     var cancelledJobIDs = Set<UUID>()
@@ -655,7 +673,8 @@ class PipelineQueue {
 
         case .transcribing, .diarizing, .generatingProtocol:
             cancelledJobIDs.insert(id)
-            processTask?.cancel()
+            if processingJobID == id { processTask?.cancel() }
+            cancelLocalModelGeneration(jobID: id)
             naming.removeNamingData(jobID: id, slug: slug)
             jobs.remove(at: index)
             saveSnapshot()
