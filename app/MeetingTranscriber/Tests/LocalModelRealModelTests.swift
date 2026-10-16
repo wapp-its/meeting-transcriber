@@ -66,6 +66,9 @@
             let api = try await automationAPI(recordingWith: controller)
             let gate = controller.pipeline.localModelGate
             let generation = GenerationRun { try await self.generate(with: gate, folder: folder, helper: helper.wrapper) }
+            // A test that fails before the helper ended must not leave the
+            // model loaded for the tests after it.
+            addTeardownBlock { await generation.cancelAndWait() }
 
             guard let pid = try await waitForWriting(helper.started, or: generation) else { return }
             let recordingStart = ContinuousClock.now
@@ -224,10 +227,18 @@
     @MainActor
     private final class GenerationRun {
         private(set) var result: Result<String, any Error>?
+        private var task: Task<Void, Never>?
 
         /// Starts `body` in a task of its own.
         init(_ body: @escaping @MainActor () async throws -> String) {
-            Task { await self.finish(body) }
+            task = Task { await self.finish(body) }
+        }
+
+        /// Cancels the generation, which ends its helper, and returns once it
+        /// has ended. Nothing to do for one that has already ended.
+        func cancelAndWait() async {
+            task?.cancel()
+            await task?.value
         }
 
         private func finish(_ body: () async throws -> String) async {
