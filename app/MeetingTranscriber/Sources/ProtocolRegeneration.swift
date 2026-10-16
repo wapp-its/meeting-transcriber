@@ -23,6 +23,15 @@ enum ProtocolRegenerationError: LocalizedError, Equatable {
     /// The new file could not be put in place and the old one could not be
     /// moved back: it is kept under this name beside its path.
     case restoreFailed(keptAs: String)
+    #if !APPSTORE
+        /// The local model is held back for a recording: refused at start, or
+        /// ended mid-run and not resumed (spec R11).
+        case recording
+        case lowMemory
+        case noLocalModel
+        /// Try Again on a notice while another regeneration runs.
+        case regenerationRunning
+    #endif
 
     var errorDescription: String? {
         switch self {
@@ -49,6 +58,20 @@ enum ProtocolRegenerationError: LocalizedError, Equatable {
 
         case let .restoreFailed(keptAs):
             "The new protocol could not be saved, and the previous one could not be put back. It is kept as \(keptAs)."
+
+        #if !APPSTORE
+            case .recording:
+                "The protocol was not made because a recording is running. Start it again once the recording has ended."
+
+            case .lowMemory:
+                "There was not enough free memory for the local model, so nothing was replaced."
+
+            case .noLocalModel:
+                "No local model is chosen, or it cannot be reached, so nothing was replaced. Choose one in Settings → Output."
+
+            case .regenerationRunning:
+                "Another protocol is being made. Try again once it has finished."
+        #endif
         }
     }
 }
@@ -259,6 +282,9 @@ final class ProtocolRegenerator {
 
     init(environment: Environment) {
         self.environment = environment
+        #if !APPSTORE
+            environment.notifier.setLocalModelNoticeResponder(self)
+        #endif
     }
 
     var isRunning: Bool {
@@ -289,8 +315,9 @@ final class ProtocolRegenerator {
     }
 
     /// Generates, then replaces the meeting's protocol; the outcome lands in
-    /// `phase` and a notification. Ignored while a run is going.
-    func regenerate(_ target: ProtocolRegenerationTarget, options: MeetingProtocolOptions) async {
+    /// `phase` and a notification. Ignored while a run is going. `notes` join
+    /// a success's warnings.
+    func regenerate(_ target: ProtocolRegenerationTarget, options: MeetingProtocolOptions, notes: [String] = []) async {
         guard !isRunning else { return }
         phase = .running
         let scope = environment.outputDir()
@@ -301,7 +328,7 @@ final class ProtocolRegenerator {
             "protocol_regeneration_started job=\(target.jobID ?? "none", privacy: .public) background=\(backgroundPresence, privacy: .public)",
         )
         do {
-            let warnings = try await run(target, options: options)
+            let warnings = try await run(target, options: options) + notes
             logger.info("protocol_regenerated job=\(target.jobID ?? "none", privacy: .public)")
             phase = .succeeded(target.protocolURL, warnings: warnings)
             environment.notifier.notify(title: Self.succeededTitle, body: ([target.title] + warnings).joined(separator: "\n"))
@@ -440,3 +467,49 @@ final class ProtocolRegenerator {
         return try body()
     }
 }
+
+#if !APPSTORE
+
+    // MARK: - Local model
+
+    extension ProtocolRegenerator: LocalModelNoticeResponding {
+        static let backgroundLostNote = "The background info was not used: the app has restarted since the protocol was due."
+
+        /// How a regeneration ends for a local outcome other than a protocol
+        /// (spec R11). A recording ending the helper is not resumed; in
+        /// record-only mode, which holds the local model the same way, that
+        /// mode is the reason. A prompt too long, a deadline and any other
+        /// failure stay the generic failure, as they are for a queued job.
+        static func regenerationError(for outcome: LocalModelOutcome, recordOnly: Bool) -> ProtocolRegenerationError {
+            switch outcome {
+            case .deferredForRecording: recordOnly ? .recordOnly : .recording
+            case .lowMemory: .lowMemory
+            case .noModel: .noLocalModel
+            case .incomplete, .promptTooLong, .deadline, .failure: .generationFailed
+            }
+        }
+
+        /// Try Again on a local-model notice (spec R4): the meeting's protocol
+        /// stage alone, as a regeneration with the template and background it
+        /// was due with. A refusal (record-only mode, a recording, the meeting
+        /// still in the queue) is that regeneration's failure notification.
+        /// False only when the meeting's files are gone.
+        func tryAgain(_ meeting: LocalModelNoticeMeeting) async -> Bool {
+            guard let resolved = try? target(for: meeting.transcriptURL) else { return false }
+            // A meeting without a finished-job record still runs as its job.
+            let target = resolved.jobID != nil ? resolved : ProtocolRegenerationTarget(
+                folder: resolved.folder, basename: resolved.basename, title: meeting.title,
+                meetingStartTime: resolved.meetingStartTime, jobID: meeting.jobID.uuidString, files: resolved.files,
+            )
+            guard !isRunning else {
+                let reason = ProtocolRegenerationError.regenerationRunning.localizedDescription
+                environment.notifier.notify(title: Self.failedTitle, body: "\(target.title): \(reason)")
+                return true
+            }
+            let options = MeetingProtocolOptions(template: meeting.template, rawBackground: meeting.background ?? "")
+            let backgroundLost = meeting.hadBackground && meeting.background == nil
+            await regenerate(target, options: options, notes: backgroundLost ? [Self.backgroundLostNote] : [])
+            return true
+        }
+    }
+#endif

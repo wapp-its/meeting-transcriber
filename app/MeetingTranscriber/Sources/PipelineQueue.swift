@@ -206,6 +206,9 @@ class PipelineQueue {
         /// after the provider was switched mid-run. Internal (not private)
         /// because PipelineQueue+LocalModel.swift sets it.
         @ObservationIgnored var localModelGate: LocalModelGate?
+        /// Told what the protocol stage's local generations come to, for the
+        /// notices of spec R4, R5 and R8 (`LocalModelJobNotices`).
+        @ObservationIgnored var onLocalModelEvent: ((LocalModelEvent) -> Void)?
     #endif
     /// Internal (not private) because `processNext` in PipelineQueue+Stages.swift
     /// reads this to distinguish a cancellation from a real pipeline error.

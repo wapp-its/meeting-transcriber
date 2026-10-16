@@ -1118,3 +1118,22 @@ extension PipelineQueue {
         )
     }
 }
+
+#if !APPSTORE
+
+    // MARK: - Local outcomes
+
+    extension PipelineQueue {
+        /// What a local generation in the protocol stage came to, for the
+        /// notices (`onLocalModelEvent`).
+        enum LocalModelEvent: Equatable {
+            /// A recording ended the job's helper for the first time in this
+            /// stage; a second deferral of the same job tells nothing new.
+            case deferred(jobID: UUID, title: String)
+            /// The protocol was not written; the job keeps its transcript.
+            case notWritten(LocalModelNotice.Shortfall, LocalModelNoticeMeeting)
+            /// A local protocol was written, in full or up to the output limit.
+            case written
+        }
+    }
+#endif

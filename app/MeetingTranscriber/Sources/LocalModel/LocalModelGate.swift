@@ -68,6 +68,12 @@
             owner?.jobID
         }
 
+        /// Whether the gate holds for a recording now (`setRecordingActive`),
+        /// for a caller that refuses rather than waits (a regeneration, spec R11).
+        var isRecordingActive: Bool {
+            isRecording
+        }
+
         /// Cancels every generation of `jobID`: one waiting in line leaves it, the
         /// running helper is ended if this job owns it, and a later attempt is
         /// refused. Other jobs and their helpers are untouched.

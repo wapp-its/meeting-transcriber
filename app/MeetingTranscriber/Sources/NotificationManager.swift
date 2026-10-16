@@ -61,6 +61,12 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
         var recentNotifications: [NotificationRingBuffer.Entry] {
             recentNotificationsLog.entries
         }
+
+        /// The open local-model notices and who runs their Try Again.
+        let localModelNotices = LocalModelNoticeBook()
+        /// What the local-model notice actions do outside the app; a test
+        /// replaces it before any notice is answered.
+        var localModelEffects = LocalModelNoticeEffects.live
     #endif
 
     /// The notification center behind a port (so posting + registration are
@@ -95,8 +101,19 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
         }
         isSetUp = true
         scheduler.setDelegate(self)
-        scheduler.setCategories([Self.makeConsentCategory(), Self.makeMeetingEndCategory()])
+        scheduler.setCategories(Self.makeCategories())
         scheduler.requestAuthorization()
+    }
+
+    /// Every category the app posts under, registered at once because
+    /// registering replaces the whole set.
+    static func makeCategories() -> Set<UNNotificationCategory> {
+        let categories: Set = [makeConsentCategory(), makeMeetingEndCategory()]
+        #if !APPSTORE
+            return categories.union(makeLocalModelCategories())
+        #else
+            return categories
+        #endif
     }
 
     func notify(title: String, body: String, urgency: NotificationUrgency) {
@@ -462,15 +479,54 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
         await handler(answer)
     }
 
-    // Handle a tapped action (or a dismiss): a meeting-end question by its
-    // category, everything else is the consent prompt.
-    func userNotificationCenter(_: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        let request = response.notification.request
-        if request.content.categoryIdentifier == Self.meetingEndCategoryID {
-            await answerMeetingEndQuestion(id: request.identifier, actionIdentifier: response.actionIdentifier)
+    // MARK: - Local-model notices
+
+    #if !APPSTORE
+        /// Posts a local-model notice (spec R4, R5, R8). A low-memory or
+        /// no-model notice is posted under its episode's identifier, so a
+        /// later job joining the episode replaces the notification instead of
+        /// adding one (`LocalModelNoticeBook`). Its user info names the
+        /// meetings for the actions, never their background info.
+        func postLocalModelNotice(_ notice: LocalModelNotice) {
+            let (identifier, meetings) = localModelNotices.file(notice)
+            let (title, body, categoryID) = Self.localModelNoticeContent(for: notice, meetings: meetings)
+            let deliverable = deliverableOrLogDrop()
+            recentNotificationsLog.record(title: title, body: body, posted: deliverable)
+            guard deliverable else { return }
+            let content = Self.makeNotificationContent(title: title, body: body, categoryID: categoryID)
+            content.userInfo = LocalModelNoticeMeeting.userInfo(for: meetings)
+            scheduler.add(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
+            logPosted(id: identifier, urgency: .standard)
+        }
+
+        func endLocalModelNoticeEpisodes() {
+            localModelNotices.endEpisodes()
+        }
+
+        func setLocalModelNoticeResponder(_ responder: any LocalModelNoticeResponding) {
+            localModelNotices.responder = responder
+        }
+    #endif
+
+    // MARK: - Responses
+
+    /// Deliver a response from its primitives, so the routing is testable
+    /// without a real `UNNotificationResponse`.
+    func respond(toCategory category: String, requestID: String, actionID: String, userInfo _: [AnyHashable: Any]) async {
+        if category == Self.meetingEndCategoryID {
+            await answerMeetingEndQuestion(id: requestID, actionIdentifier: actionID)
             return
         }
-        resolveConsent(responseIdentifier: request.identifier, actionIdentifier: response.actionIdentifier)
+        resolveConsent(responseIdentifier: requestID, actionIdentifier: actionID)
+    }
+
+    // Handle a tapped action (or a dismiss), routed by its category.
+    func userNotificationCenter(_: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        let request = response.notification.request
+        await respond(
+            toCategory: request.content.categoryIdentifier, requestID: request.identifier,
+            actionID: response.actionIdentifier, userInfo: request.content.userInfo,
+        )
     }
 
     // Show notifications even when app is in foreground
