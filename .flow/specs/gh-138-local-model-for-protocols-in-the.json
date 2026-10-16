@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-138-local-model-for-protocols-in-the",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-16T02:14:51.787787Z",
   "created_at": "2026-10-14T11:34:22.255353Z",
   "default_impl": null,
   "default_review": null,
@@ -1240,6 +1240,42 @@
       "task": "gh-138-local-model-for-protocols-in-the.7",
       "timestamp": "2026-10-16T01:59:59.280638Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "9c6eabe260dd5de394775ee6550602f65b89219486708c5015e0eacca63c31d4",
+      "backend": "codex",
+      "base_sha": "4255990cc8301ffbc4d7e8c0cc7a8a14f3d078da",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "3d1a860d5cced46a221f7d55c0385bbb0d30d4fb",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1060762,
+      "output_sha256": "1b391ea14fc29e9989d2b2b3967a303e316e573b20d38d61e181011b6a3c60fb",
+      "reservation_id": "a273e763a5e04e22a1208b05bfe870a4",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-16T02:14:51.717859Z",
+      "tool_calls": 51,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -1251,7 +1287,7 @@
     "impl:gh-138-local-model-for-protocols-in-the.6": 1,
     "impl:gh-138-local-model-for-protocols-in-the.7": 1,
     "plan": 2,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {
@@ -1264,6 +1300,7 @@
   },
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-138-local-model-for-protocols-in-the.1": 0,
     "impl:gh-138-local-model-for-protocols-in-the.2": 0,
     "impl:gh-138-local-model-for-protocols-in-the.3": 0,
@@ -1288,5 +1325,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nDer Test in #112 zeigt: Qwen3.8-27B in 4-bit schreibt ohne Denken brauchbare Protokolle in etwa 3 min. \u00dcber LM Studio ist das aber umst\u00e4ndlich und fehleranf\u00e4llig. LM Studio ignoriert den Schalter f\u00fcrs Denken und die eingestellte Kontextl\u00e4nge. Sein Download blieb stundenlang h\u00e4ngen. Ausserdem muss man eine zweite App installieren, starten und einrichten. Die App k\u00f6nnte das Modell wie die Transkriptionsmodelle selbst von Hugging Face laden und mit `mlx-swift-lm` ausf\u00fchren. Das Paket kennt `qwen3_5`, `qwen3_8` und `gemma4`.\n\n## NOTES\n\n- Erst bauen, wenn der Test mit einem echten Meeting \u00fcber LM Studio (#112) gut ausf\u00e4llt.\n- Das Modell l\u00e4uft in einem eigenen Hilfsprozess der App (XPC-Dienst), nicht im App-Prozess. So beendet ein Absturz oder Speicherproblem des Modells keine laufende Aufnahme. Das geht auch in der App-Store-Variante.\n- Nur laufen lassen, wenn nicht aufgenommen wird, und das Modell danach sofort entladen. Kontext und Ausgabe begrenzen.\n- 27B in 4-bit braucht rund 20 GB und passt damit auf 64-GB-Macs. F\u00fcr 32-GB-Macs braucht es ein kleineres Modell, das separat getestet wird.\n- Die Transkriptions-Engines (`TranscribingEngine`) haben heute keine M\u00f6glichkeit, ihre Modelle zu entladen. Das wird gebraucht.\n- Der OpenAI-kompatible Provider bleibt f\u00fcr Server, zum Beispiel einen Hochschul-Server.\n\n## TASKS\n\n- [x] Ein Tag Spike: Qwen3.8-27B 4-bit \u00fcber `mlx-swift-lm` in einem XPC-Dienst, Speicher, Dauer und Abbruch messen (als eigener Prozess ohne XPC, Ergebnis in den Kommentaren)\n- [x] Danach entscheiden: als Spec bauen oder verwerfen (Pilot zuerst, nur Homebrew-Version)",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/138"
   },
-  "updated_at": "2026-10-16T01:59:59.316093Z"
+  "updated_at": "2026-10-16T02:14:51.797634Z"
 }
