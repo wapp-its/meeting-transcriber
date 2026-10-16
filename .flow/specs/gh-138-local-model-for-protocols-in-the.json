@@ -16,7 +16,8 @@
     "gh-138-local-model-for-protocols-in-the.3": 0,
     "gh-138-local-model-for-protocols-in-the.4": 0,
     "gh-138-local-model-for-protocols-in-the.5": 0,
-    "gh-138-local-model-for-protocols-in-the.6": 0
+    "gh-138-local-model-for-protocols-in-the.6": 0,
+    "gh-138-local-model-for-protocols-in-the.7": 0
   },
   "next_task": 1,
   "plan_review_rounds": 0,
@@ -1135,6 +1136,110 @@
       "task": "gh-138-local-model-for-protocols-in-the.5",
       "timestamp": "2026-10-16T00:34:53.745079Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "5a22f6fe9ef63cf1ab2d09a3a8cc89a78a10d621a4777c204a01c2ce07415903",
+      "backend": "codex",
+      "base_sha": "4acbe58522ee80567a7dae4d77ae0a87bc9c95dd",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-6a3adbfac1fb71c82817ebc8ed00b253",
+            "classification": "introduced",
+            "findingId": "finding-6a3adbfac1fb71c82817ebc8ed00b253",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-f236607eb55f1930a6b5a07110643883",
+            "classification": "introduced",
+            "findingId": "finding-f236607eb55f1930a6b5a07110643883",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "8a70b7f7dfee55ae9d9760f26e255f7d85096760",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1726,
+      "output_sha256": "0dcabc0ac0628cae4bfae5d8e04a399eb41ef6f076b7413433beaa808b8e876f",
+      "reservation_id": "3f541933e7b1438f8cff0ea28f048c18",
+      "round_consumed": true,
+      "scope": "impl:gh-138-local-model-for-protocols-in-the.7",
+      "superseded_by": null,
+      "task": "gh-138-local-model-for-protocols-in-the.7",
+      "timestamp": "2026-10-16T01:54:35.291784Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "9499314f59e32c83cfcd0fc527e179398058ca2af36092467c0f8d25ec0cf188",
+      "backend": "codex",
+      "base_sha": "4acbe58522ee80567a7dae4d77ae0a87bc9c95dd",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-6a3adbfac1fb71c82817ebc8ed00b253",
+            "classification": "introduced",
+            "findingId": "finding-6a3adbfac1fb71c82817ebc8ed00b253",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-f236607eb55f1930a6b5a07110643883",
+            "classification": "introduced",
+            "findingId": "finding-f236607eb55f1930a6b5a07110643883",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "9f99ab517139123363ca03d46ea8a5e79aa1c6b0",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 949,
+      "output_sha256": "df108c5460cc51584d1ef1ccf178a9bb077d08084b85a67eccc6bde343a8b4af",
+      "reservation_id": "91e49566be4d460a8992320f723865c8",
+      "round_consumed": true,
+      "scope": "impl:gh-138-local-model-for-protocols-in-the.7",
+      "superseded_by": null,
+      "task": "gh-138-local-model-for-protocols-in-the.7",
+      "timestamp": "2026-10-16T01:59:59.280638Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -1144,6 +1249,7 @@
     "impl:gh-138-local-model-for-protocols-in-the.4": 1,
     "impl:gh-138-local-model-for-protocols-in-the.5": 1,
     "impl:gh-138-local-model-for-protocols-in-the.6": 1,
+    "impl:gh-138-local-model-for-protocols-in-the.7": 1,
     "plan": 2,
     "plan#completion": 0
   },
@@ -1164,6 +1270,7 @@
     "impl:gh-138-local-model-for-protocols-in-the.4": 0,
     "impl:gh-138-local-model-for-protocols-in-the.5": 0,
     "impl:gh-138-local-model-for-protocols-in-the.6": 0,
+    "impl:gh-138-local-model-for-protocols-in-the.7": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-138-local-model-for-protocols-in-the.md",
@@ -1181,5 +1288,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nDer Test in #112 zeigt: Qwen3.8-27B in 4-bit schreibt ohne Denken brauchbare Protokolle in etwa 3 min. \u00dcber LM Studio ist das aber umst\u00e4ndlich und fehleranf\u00e4llig. LM Studio ignoriert den Schalter f\u00fcrs Denken und die eingestellte Kontextl\u00e4nge. Sein Download blieb stundenlang h\u00e4ngen. Ausserdem muss man eine zweite App installieren, starten und einrichten. Die App k\u00f6nnte das Modell wie die Transkriptionsmodelle selbst von Hugging Face laden und mit `mlx-swift-lm` ausf\u00fchren. Das Paket kennt `qwen3_5`, `qwen3_8` und `gemma4`.\n\n## NOTES\n\n- Erst bauen, wenn der Test mit einem echten Meeting \u00fcber LM Studio (#112) gut ausf\u00e4llt.\n- Das Modell l\u00e4uft in einem eigenen Hilfsprozess der App (XPC-Dienst), nicht im App-Prozess. So beendet ein Absturz oder Speicherproblem des Modells keine laufende Aufnahme. Das geht auch in der App-Store-Variante.\n- Nur laufen lassen, wenn nicht aufgenommen wird, und das Modell danach sofort entladen. Kontext und Ausgabe begrenzen.\n- 27B in 4-bit braucht rund 20 GB und passt damit auf 64-GB-Macs. F\u00fcr 32-GB-Macs braucht es ein kleineres Modell, das separat getestet wird.\n- Die Transkriptions-Engines (`TranscribingEngine`) haben heute keine M\u00f6glichkeit, ihre Modelle zu entladen. Das wird gebraucht.\n- Der OpenAI-kompatible Provider bleibt f\u00fcr Server, zum Beispiel einen Hochschul-Server.\n\n## TASKS\n\n- [x] Ein Tag Spike: Qwen3.8-27B 4-bit \u00fcber `mlx-swift-lm` in einem XPC-Dienst, Speicher, Dauer und Abbruch messen (als eigener Prozess ohne XPC, Ergebnis in den Kommentaren)\n- [x] Danach entscheiden: als Spec bauen oder verwerfen (Pilot zuerst, nur Homebrew-Version)",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/138"
   },
-  "updated_at": "2026-10-16T00:34:53.775158Z"
+  "updated_at": "2026-10-16T01:59:59.316093Z"
 }
