@@ -117,6 +117,29 @@
             XCTAssertEqual(try String(contentsOf: world.transcriptFile, encoding: .utf8), transcriptText, "the transcript was rewritten")
         }
 
+        /// Try Again while another protocol is being made is refused with its
+        /// reason; that is an answer, so the notice does not fall back to the
+        /// transcript.
+        func testTryAgainWhileAnotherProtocolIsBeingMadeIsRefused() async throws {
+            let bench = try LocalModelTestBench(scratch: makeTempDirectory(prefix: "LocalModelRegeneration"))
+            let run = try bench.blockingOnceHelper()
+            let world = try makeWorld()
+            let notifier = LocalModelNoticeSpy()
+            let regenerator = makeRegenerator(world, notifier: notifier) { bench.generator(helper: run.helper) }
+            let regeneration = Task {
+                try await regenerator.regenerate(world.target(), options: MeetingProtocolOptions(template: .builtIn, rawBackground: ""))
+            }
+            _ = try await bench.pid(writtenTo: run.started)
+
+            let answered = await regenerator.tryAgain(world.meeting())
+
+            let reason = try XCTUnwrap(ProtocolRegenerationError.regenerationRunning.errorDescription)
+            XCTAssertTrue(answered)
+            XCTAssertEqual(notifier.notifications.map(\.body), ["Standup: \(reason)"])
+            bench.gate.setRecordingActive(true)
+            try await regeneration.value
+        }
+
         func testTryAgainIsRefusedInRecordOnlyMode() async throws {
             let world = try makeWorld()
             let notifier = LocalModelNoticeSpy()
