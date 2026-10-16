@@ -26,7 +26,7 @@ Meeting Transcriber runs the entire pipeline (recording, transcription, speaker 
 | Audio leaves your machine      | Yes                | **No**                  |
 | Recurring cost                 | $10–30 / month     | **Free**                |
 | Works offline                  | No                 | **Yes**                 |
-| Choice of summarization LLM    | Vendor-locked      | **Claude · Ollama · LM Studio · any OpenAI API** |
+| Choice of summarization LLM    | Vendor-locked      | **Claude · Ollama · LM Studio · any OpenAI API · a local MLX model** |
 | Per-source speaker separation  | Mixed track        | **Dual-track diarization** |
 | Source available               | No                 | **MIT licensed**        |
 
@@ -55,7 +55,7 @@ flowchart TD
     D1["WhisperKit<br/>99 languages"]
     D2["Parakeet TDT v3<br/>25 EU languages"]
     E["Speaker Diarization<br/>FluidAudio · dual-track + recognition"]
-    F["Protocol Generation<br/>Claude CLI · Codex CLI · custom command<br/>OpenAI-compatible · none"]
+    F["Protocol Generation<br/>Claude CLI · Codex CLI · custom command<br/>OpenAI-compatible · local MLX model · none"]
     G["Markdown Protocol<br/>Summary · Decisions · Tasks · Transcript"]
 
     A --> B
@@ -92,7 +92,7 @@ flowchart TD
 - **Echo bleed handling** — On loudspeaker recordings, remote voices picked up by the microphone are detected automatically and reported. Two optional remedies, both off by default: acoustic echo cancellation removes the bleed from the microphone audio itself, and a transcript dedup leaves the duplicated lines out. The dedup is off because it can mistake a quiet remark made over the far end for echo and drop it
 - **Speaker recognition** — Voice embeddings stored across meetings, matched via cosine similarity
 - **VAD preprocessing** — Optional silence trimming via FluidAudio Silero v6 before transcription, with automatic timestamp remapping
-- **AI protocol generation** — Structured Markdown via [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), a custom command (any command-line model tool, e.g. `ollama run` or `mlx_lm.generate`, with `{model}`, `{prompt_file}`, `{transcript_file}` and `{output_file}` placeholders, run without a shell), OpenAI-compatible APIs (Ollama, LM Studio, etc.), or disabled (save transcript only)
+- **AI protocol generation** — Structured Markdown via [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), a custom command (any command-line model tool, e.g. `ollama run` or `mlx_lm.generate`, with `{model}`, `{prompt_file}`, `{transcript_file}` and `{output_file}` placeholders, run without a shell), OpenAI-compatible APIs (Ollama, LM Studio, etc.), a local MLX model the app runs itself without a server (Homebrew build, see [Using the local model](#using-the-local-model)), or disabled (save transcript only)
 - **Protocol templates** — Several named prompts as Markdown files in `~/Library/Application Support/MeetingTranscriber/Protocol Templates/`, created, edited, deleted and picked as the default in Settings → Output, next to the read-only built-in "Standard (built-in)"; a custom prompt from an earlier version becomes the template "Custom Prompt" and the default. Every template can use `{LANGUAGE}`, `{MEETING_DATE}` (`YYYY-MM-DD`), and `{MEETING_TIME}` (`HH:mm`); recordings include authoritative metadata, while imports and recovery jobs resolve time placeholders to `Unknown`. Background info entered for a meeting is added to the prompt
 - **Manual recording** — Record any app via app picker, not just detected meetings
 - **Multi-format input** — Supports WAV, MP3, M4A, MP4, FLAC, plus the phone and messenger voice formats AMR, 3GP/3G2 and OPUS/OGG; MKV and WebM additionally need ffmpeg
@@ -113,6 +113,7 @@ flowchart TD
   - [Codex CLI](https://github.com/openai/codex) — installed and logged in (`codex --version`)
   - A command-line model tool (e.g. `ollama run`, `mlx_lm.generate`, llama.cpp) — set up as a custom command in Settings
   - An OpenAI-compatible API endpoint (e.g. [Ollama](https://ollama.com), LM Studio, llama.cpp) — configure in Settings
+  - A model folder in MLX format, for the local model provider (Homebrew build, Apple silicon) — see [Using the local model](#using-the-local-model)
 
 No HuggingFace token needed — FluidAudio and WhisperKit download their models automatically on first run.
 
@@ -134,6 +135,20 @@ The app detects ffmpeg automatically. Status is shown in Settings → About.
 4. In the app's Settings, select **OpenAI-Compatible API** as provider and set:
    - **Endpoint:** `http://localhost:11434/v1/chat/completions`
    - **Model:** `llama3.1` (must match the pulled model name)
+
+### Using the local model
+
+The Homebrew build can write the protocol with a local model in [MLX](https://github.com/ml-explore/mlx) format itself, with no Ollama, LM Studio or other server running. For each protocol the app starts a helper program that loads the model, writes the protocol and exits, so the model takes memory only while it writes. The helper contains no download code, and the transcript never leaves the Mac. The App Store build does not include it.
+
+1. Download a model folder in MLX format from Hugging Face. Tested: [`mlx-community/Qwen3.8-27B-4bit`](https://huggingface.co/mlx-community/Qwen3.8-27B-4bit) (about 16 GB). The app never downloads a model itself.
+2. In Settings → Output, select **Local model (on this Mac)** as provider, click **Choose…** and pick the model folder. **Check Model** reads the folder without loading the weights and shows its name, quantisation and size, or what is wrong with it.
+
+With the tested model:
+
+- A protocol takes about 18 GB of memory while it is written, and about 4 minutes for a one-hour meeting.
+- A protocol starts only when macOS reports no memory pressure and at least the model's size plus 6 GB is free; it is stopped when free memory drops below 4 GB or memory pressure rises. The notification "Protocol not written: low memory" then offers **Try Again**.
+- A recording always comes first. A protocol being written when a recording starts is stopped within 5 seconds, and none starts while a recording runs. A meeting's protocol is then written by itself once the recording has ended ("Protocol paused for your recording"); a regeneration you started has to be started again.
+- The transcript is saved in every case.
 
 ---
 
@@ -164,6 +179,15 @@ git clone https://github.com/pasrom/meeting-transcriber
 cd meeting-transcriber
 ./scripts/run_app.sh
 ```
+
+Building the Homebrew app (`run_app.sh` or `build_release.sh`) also builds the local model helper, which needs Xcode's Metal Toolchain to compile MLX's shaders. Without it both scripts stop with the install command. Check and install it with:
+
+```bash
+xcodebuild -showComponent MetalToolchain
+xcodebuild -downloadComponent MetalToolchain
+```
+
+The first must report `Status: installed`. The App Store build (`build_release.sh --appstore`) does not need it.
 
 ---
 
@@ -255,7 +279,7 @@ Open Settings via the menu bar item or ⌘,.
 | **Audio** | Microphone device, voice activity detection (VAD), per-channel silence indicator, echo cancellation (off by default) |
 | **Transcribe** | ASR engine (WhisperKit / Parakeet) and per-engine options (model incl. a custom WhisperKit model, language, custom vocabulary from a file or a URL), terminology normalization rules, live caption overlay (PoC) |
 | **Speakers** | Diarization, mic speaker name, known voices, recognition stats |
-| **Output** | LLM provider (Claude CLI / Codex CLI / custom command / OpenAI-compatible / none), transcript-retention options, protocol language, output folder, protocol templates (default, create, edit, delete, open folder) |
+| **Output** | LLM provider (Claude CLI / Codex CLI / custom command / OpenAI-compatible / local model / none), the local model's folder, transcript-retention options, protocol language, output folder, protocol templates (default, create, edit, delete, open folder) |
 | **Advanced** | Permissions status, diagnostics, version info |
 
 ### Custom WhisperKit models
@@ -298,6 +322,9 @@ Disable both to retain only the generated meeting minutes. The recording follows
 | Empty transcription | Check that the file contains an audio track — the app converts to 16 kHz mono automatically |
 | Models not loading | Models download on first run (WhisperKit ~1 GB, Parakeet ~50 MB); check internet connectivity |
 | OpenAI-compatible API connection failed | Verify the endpoint URL and that the local model server is running |
+| "Protocol not written: no local model" | Choose the model folder in Settings → Output; **Check Model** says what is wrong with it. An unplugged drive holding the folder has the same effect |
+| "Protocol not written: low memory" | Close memory-heavy apps, then use **Try Again** on the notification. The local model needs its size plus 6 GB free to start |
+| Build stops: "Xcode's Metal Toolchain is not installed" | Run `xcodebuild -downloadComponent MetalToolchain` (needed for the local model helper) |
 
 ### Diagnosing silent app-audio recordings
 
