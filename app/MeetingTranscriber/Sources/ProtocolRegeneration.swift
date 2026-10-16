@@ -353,16 +353,10 @@ final class ProtocolRegenerator {
         let (instructions, templateWarning) = environment.templateStore.instructions(
             for: options.template, background: options.background,
         )
-        let protocolMarkdown: String
-        do {
-            protocolMarkdown = try await Self.generate(
-                with: generator, asJob: target.jobID.flatMap(UUID.init(uuidString:)),
-                request: (transcript: transcript.text, title: target.title, meetingStartTime: target.meetingStartTime, instructions: instructions),
-            )
-        } catch {
-            logger.warning("protocol_regeneration_provider_failed type=\(String(describing: type(of: error)), privacy: .public)")
-            throw ProtocolRegenerationError.generationFailed
-        }
+        let (protocolMarkdown, incompleteWarning) = try await makeProtocol(
+            with: generator, asJob: target.jobID.flatMap(UUID.init(uuidString:)),
+            request: (transcript: transcript.text, title: target.title, meetingStartTime: target.meetingStartTime, instructions: instructions),
+        )
         // A Retry may have started, or even finished and rewritten both
         // files, while the provider was working.
         guard !isBusy(target) else { throw ProtocolRegenerationError.meetingBusy }
@@ -374,7 +368,42 @@ final class ProtocolRegenerator {
             protocolMarkdown: protocolMarkdown, transcript: transcript.text, includeFullTranscript: includeFullTranscript,
         )
         let trashWarning = try replaceProtocol(of: target, with: Data(document.utf8), replacing: files.protocolFile != nil)
-        return [templateWarning, trashWarning].compactMap(\.self)
+        return [templateWarning, incompleteWarning, trashWarning].compactMap(\.self)
+    }
+
+    /// The provider's protocol, and a warning when the local model stopped at
+    /// its output limit. A local generation's other outcomes end the run with
+    /// their own reasons (spec R11), and it does not start while the local
+    /// model is held for a recording; every other failure is the generic one.
+    private func makeProtocol(
+        with generator: sending any ProtocolGenerating, asJob jobID: UUID?,
+        request: (transcript: String, title: String, meetingStartTime: Date?, instructions: ProtocolInstructions),
+    ) async throws -> (text: String, incompleteWarning: String?) {
+        #if !APPSTORE
+            let localGate = (generator as? LocalModelProtocolGenerator)?.gate
+            // The gate would wait for the recording to end; a regeneration does not start.
+            if localGate?.isRecordingActive == true { throw ProtocolRegenerationError.recording }
+        #endif
+        do {
+            let text = try await Self.generate(with: generator, asJob: jobID, request: request)
+            #if !APPSTORE
+                if localGate != nil { environment.notifier.endLocalModelNoticeEpisodes() }
+            #endif
+            return (text, nil)
+        } catch {
+            #if !APPSTORE
+                if let outcome = error as? LocalModelOutcome {
+                    logger.warning("protocol_regeneration_local_outcome \(outcome.description, privacy: .public)")
+                    guard case let .incomplete(text) = outcome else {
+                        throw Self.regenerationError(for: outcome, recordOnly: environment.recordOnly())
+                    }
+                    environment.notifier.endLocalModelNoticeEpisodes()
+                    return (text, LocalModelNotice.incompleteWarning)
+                }
+            #endif
+            logger.warning("protocol_regeneration_provider_failed type=\(String(describing: type(of: error)), privacy: .public)")
+            throw ProtocolRegenerationError.generationFailed
+        }
     }
 
     /// The provider call. A local generation runs as the meeting's job

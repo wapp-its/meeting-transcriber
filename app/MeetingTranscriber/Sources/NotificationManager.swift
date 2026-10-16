@@ -511,13 +511,27 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
     // MARK: - Responses
 
     /// Deliver a response from its primitives, so the routing is testable
-    /// without a real `UNNotificationResponse`.
-    func respond(toCategory category: String, requestID: String, actionID: String, userInfo _: [AnyHashable: Any]) async {
-        if category == Self.meetingEndCategoryID {
+    /// without a real `UNNotificationResponse`. Routed by the category of the
+    /// notification it came from, so only a consent prompt's own category
+    /// reaches the consent coordinator: an action on any other notification
+    /// can never answer a parked prompt. A notification without actions (most
+    /// are), or a category this build does not know, has nothing to answer.
+    func respond(toCategory category: String, requestID: String, actionID: String, userInfo: [AnyHashable: Any]) async {
+        switch category {
+        case Self.consentCategoryID:
+            resolveConsent(responseIdentifier: requestID, actionIdentifier: actionID)
+
+        case Self.meetingEndCategoryID:
             await answerMeetingEndQuestion(id: requestID, actionIdentifier: actionID)
-            return
+
+        #if !APPSTORE
+            case _ where Self.localModelCategoryIDs.contains(category):
+                await answerLocalModelNotice(actionID: actionID, meetings: LocalModelNoticeMeeting.meetings(in: userInfo))
+        #endif
+
+        default:
+            break
         }
-        resolveConsent(responseIdentifier: requestID, actionIdentifier: actionID)
     }
 
     // Handle a tapped action (or a dismiss), routed by its category.

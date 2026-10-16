@@ -25,6 +25,8 @@ extension PipelineQueue {
     /// throughout (spec A8), which is what makes a restart resume only this
     /// stage. Only the attempt that ends the loop reaches the caller, so a
     /// deferred attempt never records its outcome over the one that followed it.
+    /// The first deferral is reported (`onLocalModelEvent`) for the "paused for
+    /// your recording" notice; a later one of the same stage tells nothing new.
     func generateWaitingOutRecordings(
         _ generator: sending any ProtocolGenerating, jobID: UUID,
         request: (transcript: String, title: String, meetingStartTime: Date?, instructions: ProtocolInstructions),
@@ -43,6 +45,7 @@ extension PipelineQueue {
                             )
                         } catch LocalModelOutcome.deferredForRecording {
                             deferrals += 1
+                            if deferrals == 1 { onLocalModelEvent?(.deferred(jobID: jobID, title: request.title)) }
                             logger.info(
                                 "[\(PipelineJob.shortID(for: jobID), privacy: .public)] protocol_deferred_for_recording deferrals=\(deferrals, privacy: .public)",
                             )

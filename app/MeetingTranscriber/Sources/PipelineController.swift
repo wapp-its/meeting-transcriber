@@ -393,6 +393,9 @@ final class PipelineController {
                 break
             }
         }
+        #if !APPSTORE
+            LocalModelJobNotices(notifier: notifier, settings: settings).install(on: queue)
+        #endif
     }
 
     // MARK: - File enqueue

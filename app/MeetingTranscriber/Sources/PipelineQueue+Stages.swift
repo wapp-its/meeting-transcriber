@@ -964,24 +964,11 @@ extension PipelineQueue {
             "[\(shortID, privacy: .public)] protocol_template template=\(templateID.storedValue, privacy: .private) fallback=\(templateWarning != nil, privacy: .public) background=\(backgroundPresence, privacy: .public)",
         )
         updateJobState(id: jobID, to: .generatingProtocol)
-        let protocolMD: String
-        do {
-            protocolMD = try await generateWaitingOutRecordings(
-                generator, jobID: jobID,
-                request: (transcript: transcript, title: title, meetingStartTime: meetingStartTime, instructions: instructions),
-            )
-        } catch {
-            // Logged content-free: a provider's error text can echo the prompt
-            // it rejected (an HTTP endpoint quoting the request, a command
-            // printing its input), and since the prompt carries the meeting's
-            // background info that text may not reach the exported
-            // diagnostics (R9 of the protocol-templates spec). The person
-            // still sees the full text where the result is shown.
-            let summary = (error as? ProtocolError)?.logSummary ?? String(describing: type(of: error))
-            logger.warning("[\(shortID, privacy: .public)] protocol_generation_failed error=\(summary, privacy: .public)")
-            addWarning(id: jobID, "Protocol generation failed — transcript saved")
-            return
-        }
+        guard let protocolMD = await protocolText(
+            from: generator, jobID: jobID,
+            request: (transcript: transcript, title: title, meetingStartTime: meetingStartTime, instructions: instructions),
+            meeting: (folder: protocolsDir, basename: basename, template: templateID, background: job?.protocolBackground),
+        ) else { return }
         let markdown = ProtocolGenerator.composeDocument(
             protocolMarkdown: protocolMD,
             transcript: transcript,
@@ -998,6 +985,48 @@ extension PipelineQueue {
             // CocoaError names the file, and the file name is the meeting title.
             logger.warning("[\(shortID, privacy: .public)] protocol_save_failed error=\(error.localizedDescription, privacy: .private)")
             addWarning(id: jobID, "Protocol was generated but could not be saved; the transcript was saved")
+        }
+    }
+
+    /// The protocol text to save for `jobID`, or nil when there is none and
+    /// the job keeps only its transcript, with a warning saying why. A local
+    /// generation's outcome is told apart (spec R11); every other failure is
+    /// the generic one, as it always was. `meeting` is where the transcript was
+    /// saved and what the protocol was due with, for a notice's actions.
+    private func protocolText(
+        from generator: sending any ProtocolGenerating, jobID: UUID,
+        request: (transcript: String, title: String, meetingStartTime: Date?, instructions: ProtocolInstructions),
+        meeting: (folder: URL, basename: String, template: ProtocolTemplateID, background: String?),
+    ) async -> String? {
+        #if !APPSTORE
+            // Read before the generator is handed over.
+            let isLocal = generator is LocalModelProtocolGenerator
+        #endif
+        do {
+            let text = try await generateWaitingOutRecordings(generator, jobID: jobID, request: request)
+            #if !APPSTORE
+                if isLocal { onLocalModelEvent?(.written) }
+            #endif
+            return text
+        } catch {
+            #if !APPSTORE
+                if let outcome = error as? LocalModelOutcome {
+                    return localModelResult(outcome, meeting: LocalModelNoticeMeeting(
+                        jobID: jobID, title: request.title, folder: meeting.folder, basename: meeting.basename,
+                        template: meeting.template, background: meeting.background,
+                    ))
+                }
+            #endif
+            // Logged content-free: a provider's error text can echo the prompt
+            // it rejected (an HTTP endpoint quoting the request, a command
+            // printing its input), and since the prompt carries the meeting's
+            // background info that text may not reach the exported
+            // diagnostics (R9 of the protocol-templates spec). The person
+            // still sees the full text where the result is shown.
+            let summary = (error as? ProtocolError)?.logSummary ?? String(describing: type(of: error))
+            logger.warning("[\(PipelineJob.shortID(for: jobID), privacy: .public)] protocol_generation_failed error=\(summary, privacy: .public)")
+            addWarning(id: jobID, "Protocol generation failed — transcript saved")
+            return nil
         }
     }
 
@@ -1134,6 +1163,32 @@ extension PipelineQueue {
             case notWritten(LocalModelNotice.Shortfall, LocalModelNoticeMeeting)
             /// A local protocol was written, in full or up to the output limit.
             case written
+        }
+
+        /// What a local outcome leaves the job with (spec R11): the text of a
+        /// protocol stopped at its output limit, saved like any other with a
+        /// warning, or nil and the warning for the transcript kept alone. A
+        /// deferral does not get here (`generateWaitingOutRecordings` asks again).
+        fileprivate func localModelResult(_ outcome: LocalModelOutcome, meeting: LocalModelNoticeMeeting) -> String? {
+            logger.warning("[\(PipelineJob.shortID(for: meeting.jobID), privacy: .public)] protocol_local_outcome \(outcome.description, privacy: .public)")
+            switch outcome {
+            case let .incomplete(text):
+                addWarning(id: meeting.jobID, LocalModelNotice.incompleteWarning)
+                onLocalModelEvent?(.written)
+                return text
+
+            case .lowMemory:
+                addWarning(id: meeting.jobID, LocalModelNotice.Shortfall.lowMemory.warning)
+                onLocalModelEvent?(.notWritten(.lowMemory, meeting))
+
+            case .noModel:
+                addWarning(id: meeting.jobID, LocalModelNotice.Shortfall.noModel.warning)
+                onLocalModelEvent?(.notWritten(.noModel, meeting))
+
+            case .deferredForRecording, .promptTooLong, .deadline, .failure:
+                addWarning(id: meeting.jobID, "Protocol generation failed — transcript saved")
+            }
+            return nil
         }
     }
 #endif
