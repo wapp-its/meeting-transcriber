@@ -12,9 +12,10 @@ struct AllRecordingsActions {
     var openProtocol: (URL) -> Bool
     var openTranscript: (URL) -> Bool
     var reveal: (URL) -> Bool
-    /// "Regenerate Protocol…" on a row, with the row's meeting, and "Regenerate
-    /// from File…" in the toolbar, with none.
-    var regenerate: (TranscriptionEntry?) -> Void
+    /// Opens the regenerate sheet: "Regenerate Protocol…" on a row, with the
+    /// row's meeting, and "Regenerate from File…" in the toolbar, with none.
+    /// False when the row's files are gone, like Open.
+    var regenerate: (TranscriptionEntry?) -> Bool
     var retry: (UUID) -> Void
     /// Remove on a failed job: off the list and out of the history for good.
     var remove: (UUID) -> Void
@@ -31,13 +32,27 @@ struct AllRecordingsActions {
     /// window asks it through `RowAvailability`, never on each redraw.
     var filesOnDisk: (TranscriptionEntry) -> FilesOnDisk
 
-    /// Every action does nothing, no job can be retried and no file is on
-    /// disk, so a test sets only what it asserts on.
+    // MARK: Regenerate sheet
+
+    /// Read when the sheet opens, so templates added in Finder since are listed.
+    var templateChoices: () -> ProtocolTemplateChoices
+    /// Read on every redraw of the sheet, so it follows a change in Settings.
+    var optionsUse: () -> ProtocolOptionsUse
+    /// "Choose File…": the open panel.
+    var chooseFile: () -> URL?
+    /// The meeting a chosen protocol or transcript belongs to.
+    var resolveFile: (URL) throws -> ProtocolRegenerationTarget
+    /// Generate: starts the run, which reports its outcome in the sheet and
+    /// as a notification.
+    var generate: (ProtocolRegenerationTarget, MeetingProtocolOptions) -> Void
+
+    /// Every action does nothing, no job can be retried, no file is on disk
+    /// and protocol generation is off, so a test sets only what it asserts on.
     static let noop = Self(
         openProtocol: { _ in true },
         openTranscript: { _ in true },
         reveal: { _ in true },
-        regenerate: { _ in },
+        regenerate: { _ in true },
         retry: { _ in },
         remove: { _ in },
         dismiss: { _ in },
@@ -46,6 +61,11 @@ struct AllRecordingsActions {
         openProtocolsFolder: {},
         canRetry: { _ in false },
         filesOnDisk: { _ in FilesOnDisk(protocolExists: false, transcriptExists: false, transcriptSource: .none) },
+        templateChoices: { ProtocolTemplateChoices(templates: [.builtIn], defaultTemplate: .builtIn) },
+        optionsUse: { ProtocolOptionsUse(destination: .off, recordOnly: false) },
+        chooseFile: { nil },
+        resolveFile: { _ in throw ProtocolRegenerationError.noTranscript },
+        generate: { _, _ in },
     )
 
     // MARK: - Production

@@ -89,8 +89,8 @@ final class AppState {
     /// installation to it.
     let liveTranscription: LiveTranscriptionCoordinator
 
-    /// "Regenerate Protocol…": a new protocol for a finished meeting, one run
-    /// at a time and outside the pipeline queue.
+    /// The All Recordings window's regenerate sheet: a new protocol for a
+    /// finished meeting, one run at a time and outside the pipeline queue.
     let protocolRegenerator: ProtocolRegenerator
 
     #if !APPSTORE

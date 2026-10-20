@@ -3,9 +3,9 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// What the Regenerate Protocol window holds while it is open. A reference
-/// type so a view test presets the meeting and reads back what Generate hands
-/// over (CLAUDE.md, GUI Testing, rung 2).
+/// What the regenerate sheet holds while it is open. A reference type so a
+/// view test presets the meeting and reads back what Generate hands over
+/// (CLAUDE.md, GUI Testing, rung 2).
 @Observable
 @MainActor
 final class RegenerateProtocolDraft {
@@ -19,31 +19,36 @@ final class RegenerateProtocolDraft {
         self.protocolOptions = protocolOptions
     }
 
-    /// How every opening starts: the latest finished meeting, the default
-    /// template and no background.
-    func reset(latest: ProtocolRegenerationTarget?, defaultTemplate: ProtocolTemplateID) {
-        target = latest
+    /// How every opening starts: the meeting it was opened for, if any, the
+    /// default template and no background.
+    func reset(target opened: ProtocolRegenerationTarget?, defaultTemplate: ProtocolTemplateID) {
+        target = opened
         fileProblem = nil
         protocolOptions.reset(to: defaultTemplate)
     }
 }
 
-/// "Regenerate Protocol…": a new protocol for a finished meeting, from another
-/// template or with background info. Shows background text, so it stays off
-/// the `/screenshot`, `/ui/tree` and `/ui/press` allowlists.
+/// The All Recordings window's regenerate sheet: a new protocol for a finished
+/// meeting, from another template or with background info. A row opens it for
+/// its meeting, "Regenerate from File…" without one and with "Choose File…".
+/// Shows background text, so it stays off the `/screenshot`, `/ui/tree` and
+/// `/ui/press` allowlists, as the window it is shown over does.
 @MainActor
 struct RegenerateProtocolView: View {
-    static let windowID = "regenerate-protocol"
     static let trashNote = "The current protocol is moved to the Trash and replaced."
     static let unknownDateNote = "This meeting's date is not known, so the protocol shows it as Unknown."
     static let noMeeting = "No recent meeting found"
 
     let phase: ProtocolRegenerator.Phase
-    /// Read when the window opens, so templates added in Finder since are listed.
+    /// Read when the sheet opens, so templates added in Finder since are listed.
     let templateChoices: () -> ProtocolTemplateChoices
     /// Read on every redraw, so the notice and Generate follow a change in Settings.
     let optionsUse: () -> ProtocolOptionsUse
-    let latestTarget: () -> ProtocolRegenerationTarget?
+    /// The meeting the sheet opens with; nil opens it without one.
+    let initialTarget: ProtocolRegenerationTarget?
+    /// Whether "Choose File…" is offered: not when a row opened the sheet for
+    /// its meeting.
+    let allowsChooseFile: Bool
     /// Runs the open panel; a test hands in a URL instead.
     let chooseFile: () -> URL?
     let resolveFile: (URL) throws -> ProtocolRegenerationTarget
@@ -57,7 +62,8 @@ struct RegenerateProtocolView: View {
         phase: ProtocolRegenerator.Phase,
         templateChoices: @escaping () -> ProtocolTemplateChoices,
         optionsUse: @escaping () -> ProtocolOptionsUse,
-        latestTarget: @escaping () -> ProtocolRegenerationTarget?,
+        initialTarget: ProtocolRegenerationTarget?,
+        allowsChooseFile: Bool,
         chooseFile: @escaping () -> URL?,
         resolveFile: @escaping (URL) throws -> ProtocolRegenerationTarget,
         draft: RegenerateProtocolDraft = RegenerateProtocolDraft(),
@@ -67,7 +73,8 @@ struct RegenerateProtocolView: View {
         self.phase = phase
         self.templateChoices = templateChoices
         self.optionsUse = optionsUse
-        self.latestTarget = latestTarget
+        self.initialTarget = initialTarget
+        self.allowsChooseFile = allowsChooseFile
         self.chooseFile = chooseFile
         self.resolveFile = resolveFile
         _draft = State(initialValue: draft)
@@ -101,7 +108,7 @@ struct RegenerateProtocolView: View {
         .onAppear {
             let opened = templateChoices()
             openedChoices = opened
-            draft.reset(latest: latestTarget(), defaultTemplate: opened.defaultTemplate)
+            draft.reset(target: initialTarget, defaultTemplate: opened.defaultTemplate)
         }
     }
 
@@ -126,17 +133,19 @@ struct RegenerateProtocolView: View {
                 .foregroundStyle(.red)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        Button("Choose File…") {
-            guard let url = chooseFile() else { return }
-            do {
-                draft.target = try resolveFile(url)
-                draft.fileProblem = nil
-            } catch {
-                draft.target = nil
-                draft.fileProblem = error.localizedDescription
+        if allowsChooseFile {
+            Button("Choose File…") {
+                guard let url = chooseFile() else { return }
+                do {
+                    draft.target = try resolveFile(url)
+                    draft.fileProblem = nil
+                } catch {
+                    draft.target = nil
+                    draft.fileProblem = error.localizedDescription
+                }
             }
+            .accessibilityIdentifier(A11yID.regenerateChooseFileButton)
         }
-        .accessibilityIdentifier(A11yID.regenerateChooseFileButton)
     }
 
     @ViewBuilder private var targetNotes: some View {
@@ -182,10 +191,11 @@ struct RegenerateProtocolView: View {
 
     private var actions: some View {
         HStack {
-            Button("Close") {
+            Button("Cancel") {
                 onClose()
             }
             .keyboardShortcut(.cancelAction)
+            .accessibilityIdentifier(A11yID.regenerateCancelButton)
 
             Spacer()
 

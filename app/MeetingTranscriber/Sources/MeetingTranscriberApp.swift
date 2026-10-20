@@ -91,6 +91,7 @@ struct MeetingTranscriberApp: App {
     // reports the property as unused.
     // swiftlint:disable:next unused_declaration
     @State private var transcriptionsQuery = ""
+    @State private var regenerateSheet = RegenerateSheetState()
     @Environment(\.openWindow)
     private var openWindow
 
@@ -140,7 +141,6 @@ struct MeetingTranscriberApp: App {
         settingsWindow
         recordAppWindow
         transcriptionsWindow
-        regenerateProtocolWindow
         consentOptionsWindow
     }
 
@@ -201,9 +201,7 @@ struct MeetingTranscriberApp: App {
             openProtocol: { AllRecordingsActions.openFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
             openTranscript: { AllRecordingsActions.openFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
             reveal: { AllRecordingsActions.revealFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
-            // The Regenerate Protocol window for now, without the row's meeting,
-            // until a sheet of the All Recordings window takes this over.
-            regenerate: { _ in bringWindowToFront(id: RegenerateProtocolView.windowID) },
+            regenerate: { regenerateSheet.present(entry: $0, using: appState.protocolRegenerator) },
             retry: { appState.pipeline.retryJob(id: $0) },
             remove: { appState.pipeline.removeFailedJob(id: $0) },
             dismiss: { appState.pipelineQueue.removeJob(id: $0) },
@@ -215,6 +213,13 @@ struct MeetingTranscriberApp: App {
             openProtocolsFolder: { AllRecordingsActions.openFolder(appState.settings.effectiveOutputDir) },
             canRetry: { appState.pipeline.canRetryJob(id: $0) },
             filesOnDisk: { AllRecordingsActions.readFilesOnDisk(of: $0, scopeRoot: appState.settings.effectiveOutputDir) },
+            templateChoices: { appState.protocolTemplateChoices() },
+            optionsUse: { appState.protocolOptionsUse() },
+            chooseFile: { RegenerateProtocolView.chooseFile(startingIn: appState.settings.effectiveOutputDir) },
+            resolveFile: { try appState.protocolRegenerator.target(for: $0) },
+            generate: { target, options in
+                Task { await appState.protocolRegenerator.regenerate(target, options: options) }
+            },
         )
     }
 
@@ -373,6 +378,8 @@ struct MeetingTranscriberApp: App {
                 entries: appState.pipeline.transcriptionEntries,
                 query: $transcriptionsQuery,
                 actions: allRecordingsActions,
+                regenerateSheet: regenerateSheet,
+                regenerationPhase: appState.protocolRegenerator.phase,
             )
             // Starts the pipeline the way an import does, so failed jobs from an
             // earlier session are in the queue and can be retried. Also runs when
@@ -380,25 +387,6 @@ struct MeetingTranscriberApp: App {
             .onAppear { appState.pipeline.prepareTranscriptionsWindow() }
         }
         .defaultSize(width: 760, height: 520)
-    }
-
-    private var regenerateProtocolWindow: some Scene {
-        Window("Regenerate Protocol", id: RegenerateProtocolView.windowID) {
-            RegenerateProtocolView(
-                phase: appState.protocolRegenerator.phase,
-                templateChoices: { appState.protocolTemplateChoices() },
-                optionsUse: { appState.protocolOptionsUse() },
-                latestTarget: { appState.protocolRegenerator.latestTarget() },
-                chooseFile: { RegenerateProtocolView.chooseFile(startingIn: appState.settings.effectiveOutputDir) },
-                resolveFile: { try appState.protocolRegenerator.target(for: $0) },
-                onGenerate: { target, options in
-                    Task { await appState.protocolRegenerator.regenerate(target, options: options) }
-                },
-                onClose: { closeWindow(id: RegenerateProtocolView.windowID) },
-            )
-            .onAppear { appState.protocolRegenerator.clearResult() }
-        }
-        .windowResizability(.contentSize)
     }
 
     private var consentOptionsWindow: some Scene {

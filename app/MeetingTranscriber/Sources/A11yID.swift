@@ -193,9 +193,10 @@ enum A11yID {
     static let protocolOptionsBackgroundEditor = "protocolOptionsBackgroundEditor"
     static let protocolOptionsDestinationNotice = "protocolOptionsDestinationNotice"
 
-    /// The Regenerate Protocol window's controls. The window shows background
-    /// text and stays off every RPC allowlist.
+    /// The regenerate sheet's controls (All Recordings window). The sheet shows
+    /// background text and stays off every RPC allowlist.
     static let regenerateChooseFileButton = "regenerateChooseFileButton"
+    static let regenerateCancelButton = "regenerateCancelButton"
     static let regenerateGenerateButton = "regenerateGenerateButton"
 
     static let includeFullTranscriptToggle = "includeFullTranscriptToggle"

@@ -22,6 +22,8 @@ final class TranscriptionsViewTests: XCTestCase {
         query: String = "",
         queryBox: QueryBox? = nil,
         actions: AllRecordingsActions = .noop,
+        regenerateSheet: RegenerateSheetState = RegenerateSheetState(),
+        regenerationPhase: ProtocolRegenerator.Phase = .idle,
     ) -> TranscriptionsView {
         let box = queryBox ?? QueryBox()
         box.text = query
@@ -29,6 +31,8 @@ final class TranscriptionsViewTests: XCTestCase {
             entries: entries,
             query: Binding(get: { box.text }, set: { box.text = $0 }),
             actions: actions,
+            regenerateSheet: regenerateSheet,
+            regenerationPhase: regenerationPhase,
         )
     }
 
@@ -38,7 +42,7 @@ final class TranscriptionsViewTests: XCTestCase {
         actions.openProtocol = { calls("openProtocol \($0.path)"); return true }
         actions.openTranscript = { calls("openTranscript \($0.path)"); return true }
         actions.reveal = { calls("reveal \($0.path)"); return true }
-        actions.regenerate = { calls("regenerate \($0?.id.uuidString ?? "none")") }
+        actions.regenerate = { calls("regenerate \($0?.id.uuidString ?? "none")"); return true }
         actions.retry = { calls("retry \($0)") }
         actions.remove = { calls("remove \($0)") }
         actions.dismiss = { calls("dismiss \($0)") }
@@ -140,6 +144,61 @@ final class TranscriptionsViewTests: XCTestCase {
         try regenerate.tap()
 
         XCTAssertEqual(calls, ["regenerate none"])
+    }
+
+    // MARK: - Regenerate sheet
+
+    /// Through the presenter the App wires in: a row's "Regenerate Protocol…"
+    /// opens the sheet over the window with that row's meeting, the
+    /// regenerator's state and no "Choose File…"; Cancel closes it; the
+    /// toolbar's "Regenerate from File…" opens it without a meeting and with
+    /// "Choose File…".
+    func testRegenerateOpensTheSheetForTheRowOrWithoutAMeeting() throws {
+        let row = entry("Board", protocolPath: "/out/board.md", transcriptPath: "/out/board.txt")
+        let regenerator = ProtocolRegenerator.reading(["/out/board.txt": Data("[Anna] Hello".utf8)])
+        let sheet = RegenerateSheetState()
+        var actions = AllRecordingsActions.noop
+        actions.filesOnDisk = { Self.recordedFilesOnDisk($0) }
+        actions.regenerate = { sheet.present(entry: $0, using: regenerator) }
+        let reason = ProtocolRegenerationError.generationFailed.localizedDescription
+        let sut = makeView([row], actions: actions, regenerateSheet: sheet, regenerationPhase: .failed(reason))
+        XCTAssertThrowsError(try sut.inspect().find(ViewType.Sheet.self), "a sheet before any click")
+
+        try button(A11yID.recordingMenuRegenerate(0), in: sut).tap()
+        let forRow = try sut.inspect().find(ViewType.Sheet.self)
+        let form = try forRow.find(RegenerateProtocolView.self)
+        try form.vStack().callOnAppear()
+        XCTAssertNoThrow(try form.find(text: "Board"))
+        XCTAssertNoThrow(try form.find(text: "board.md"))
+        XCTAssertNoThrow(try form.find(text: reason))
+        XCTAssertThrowsError(try form.find(viewWithAccessibilityIdentifier: A11yID.regenerateChooseFileButton))
+
+        try form.find(viewWithAccessibilityIdentifier: A11yID.regenerateCancelButton).button().tap()
+        XCTAssertFalse(sheet.isPresented)
+
+        try button(A11yID.recordingsRegenerateFromFileButton, in: sut).tap()
+        let fromFile = try sut.inspect().find(ViewType.Sheet.self)
+        XCTAssertNoThrow(try fromFile.find(text: RegenerateProtocolView.noMeeting))
+        XCTAssertNoThrow(try fromFile.find(viewWithAccessibilityIdentifier: A11yID.regenerateChooseFileButton))
+    }
+
+    /// The row's files went away after its menu was built: the window says
+    /// so, and no empty sheet opens.
+    func testARegenerateWhoseFilesAreGoneShowsTheMovedOrDeletedMessage() throws {
+        let sheet = RegenerateSheetState()
+        var actions = AllRecordingsActions.noop
+        actions.filesOnDisk = { Self.recordedFilesOnDisk($0) }
+        actions.regenerate = { sheet.present(entry: $0, using: ProtocolRegenerator.reading([:])) }
+        let sut = makeView(
+            [entry("Retro", protocolPath: "/out/retro.md", transcriptPath: "/out/retro.txt")],
+            actions: actions, regenerateSheet: sheet,
+        )
+
+        try button(A11yID.recordingMenuRegenerate(0), in: sut).tap()
+
+        XCTAssertNoThrow(try sut.inspect().find(text: "The file was moved or deleted."))
+        XCTAssertFalse(sheet.isPresented)
+        XCTAssertThrowsError(try sut.inspect().find(ViewType.Sheet.self))
     }
 
     // MARK: - Main button

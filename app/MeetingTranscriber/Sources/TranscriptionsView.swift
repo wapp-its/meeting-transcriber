@@ -15,7 +15,8 @@ final class TranscriptionsFileNotice {
 /// The All Recordings window: every job the app knows, newest first, searched
 /// by title and participant. Each row has the one main button its state calls
 /// for and a "…" menu, which its right-click menu repeats, both decided by
-/// `RecordingRowActions`.
+/// `RecordingRowActions`. Regenerating a protocol happens in a sheet over the
+/// window, which `regenerateSheet` presents.
 ///
 /// Data and actions arrive as stored properties, the way `SettingsView` takes
 /// them, so the view reads no app state of its own. The query is a binding for
@@ -34,14 +35,26 @@ struct TranscriptionsView: View {
     let entries: [TranscriptionEntry]
     let query: Binding<String>
     let actions: AllRecordingsActions
+    let regenerateSheet: RegenerateSheetState
+    /// The regenerator's state, which the sheet shows; a reopened sheet shows
+    /// a run still going.
+    let regenerationPhase: ProtocolRegenerator.Phase
 
     @State private var notice: TranscriptionsFileNotice
     @State private var availability: RowAvailability
 
-    init(entries: [TranscriptionEntry], query: Binding<String>, actions: AllRecordingsActions) {
+    init(
+        entries: [TranscriptionEntry],
+        query: Binding<String>,
+        actions: AllRecordingsActions,
+        regenerateSheet: RegenerateSheetState,
+        regenerationPhase: ProtocolRegenerator.Phase,
+    ) {
         self.entries = entries
         self.query = query
         self.actions = actions
+        self.regenerateSheet = regenerateSheet
+        self.regenerationPhase = regenerationPhase
         // Created here, not as the properties' defaults: SwiftUI defers creating
         // an `@Observable` default until the view is installed, so a view that
         // never is (one under test) would read a new object every time.
@@ -58,6 +71,7 @@ struct TranscriptionsView: View {
         }
         .frame(minWidth: 560, minHeight: 320)
         .toolbar { toolbarItems }
+        .sheet(isPresented: Bindable(regenerateSheet).isPresented) { regenerateForm }
         // The moments the rows' files are read again (see `RowAvailability`).
         .onAppear { availability.refresh() }
         .onChange(of: entries) { availability.refresh() }
@@ -86,13 +100,28 @@ struct TranscriptionsView: View {
             }
             .accessibilityIdentifier(A11yID.recordingsOpenFolderButton)
             Button {
-                actions.regenerate(nil)
+                _ = actions.regenerate(nil)
             } label: {
                 Label("Regenerate from File…", systemImage: "arrow.triangle.2.circlepath")
                     .labelStyle(.titleAndIcon)
             }
             .accessibilityIdentifier(A11yID.recordingsRegenerateFromFileButton)
         }
+    }
+
+    /// The regenerate form, opened with what the presenter chose: a row's
+    /// meeting, or none and "Choose File…". Cancel closes the sheet.
+    private var regenerateForm: some View {
+        RegenerateProtocolView(
+            phase: regenerationPhase,
+            templateChoices: actions.templateChoices,
+            optionsUse: actions.optionsUse,
+            initialTarget: regenerateSheet.initialTarget,
+            allowsChooseFile: regenerateSheet.allowsChooseFile,
+            chooseFile: actions.chooseFile,
+            resolveFile: actions.resolveFile,
+            onGenerate: actions.generate,
+        ) { regenerateSheet.isPresented = false }
     }
 
     @ViewBuilder private var fileMissingMessage: some View {
@@ -242,7 +271,7 @@ struct TranscriptionsView: View {
         case .openProtocol: open(entry.protocolURL, with: actions.openProtocol)
         case .openTranscript: open(entry.transcriptURL, with: actions.openTranscript)
         case .showInFinder: open(onDisk.protocolExists ? entry.protocolURL : entry.transcriptURL, with: actions.reveal)
-        case .regenerate: actions.regenerate(entry)
+        case .regenerate: notice.fileMissing = !actions.regenerate(entry)
         case .retry: actions.retry(entry.id)
         case .remove: actions.remove(entry.id)
         case .dismiss: actions.dismiss(entry.id)
