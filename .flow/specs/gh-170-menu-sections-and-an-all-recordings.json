@@ -12,6 +12,7 @@
   "id": "gh-170-menu-sections-and-an-all-recordings",
   "impl_review_rounds": {
     "gh-170-menu-sections-and-an-all-recordings.1": 0,
+    "gh-170-menu-sections-and-an-all-recordings.2": 0,
     "gh-170-menu-sections-and-an-all-recordings.3": 0
   },
   "next_task": 1,
@@ -340,10 +341,46 @@
       "task": "gh-170-menu-sections-and-an-all-recordings.1",
       "timestamp": "2026-10-20T21:25:16.200138Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "2eb79c2413c3a3399d37fd918fba889979b043136153100c5c86a101c03c1565",
+      "backend": "codex",
+      "base_sha": "8a88c7a19e7165fd4f370de661c9188138e7d9b3",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "a4461bd59bd8e2799cf9dc3e782daab6de254ddb",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "b8826b7c9349420fa4ee4060ebec6b5c",
+      "round_consumed": true,
+      "scope": "impl:gh-170-menu-sections-and-an-all-recordings.2",
+      "superseded_by": null,
+      "task": "gh-170-menu-sections-and-an-all-recordings.2",
+      "timestamp": "2026-10-20T21:48:53.829197Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-170-menu-sections-and-an-all-recordings.1": 1,
+    "impl:gh-170-menu-sections-and-an-all-recordings.2": 1,
     "impl:gh-170-menu-sections-and-an-all-recordings.3": 1,
     "plan": 2,
     "plan#completion": 0
@@ -353,6 +390,7 @@
   "review_reservations": {},
   "review_transport_failures": {
     "impl:gh-170-menu-sections-and-an-all-recordings.1": 0,
+    "impl:gh-170-menu-sections-and-an-all-recordings.2": 0,
     "impl:gh-170-menu-sections-and-an-all-recordings.3": 0,
     "plan": 0
   },
@@ -371,5 +409,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nThe menu bar menu shows its items in one long run with dividers but no headings. Recording, devices and results are mixed. The owner asked for headed sections and for one place that holds everything you can do with a finished recording (paraphrased, 2026-10-20).\n\n## NOTES\n\n- Accepted mockup, menu (2026-10-20): three headings, \"Record & Import\", \"Audio Devices\" and \"Recordings\". \"Process Audio/Video Files\u2026\" becomes \"Import Audio/Video Files\u2026\" and \"Start Recording with Options\u2026\" becomes \"Record with Options\u2026\". The \"In progress\" and \"Needs you\" groups stay as they are.\n- The Recordings group keeps only \"Open Last Protocol\" and \"All Recordings\u2026\". \"Open Protocols Folder\" and \"Regenerate Protocol\u2026\" leave the menu.\n- Accepted mockup, window (2026-10-20): the Transcriptions window from #13 becomes \"All Recordings\". Each row gets one main button that depends on its state (Open Protocol, Name Speakers, Retry, Cancel) and a \"\u2026\" button. That menu also opens on right-click and holds Open Protocol, Open Transcript, Show in Finder and Regenerate Protocol\u2026. The toolbar holds the search field, \"Open Protocols Folder\" and \"Regenerate from File\u2026\".\n- \"Regenerate Protocol\u2026\" on a row opens today's form as a sheet with that meeting filled in. \"Regenerate from File\u2026\" opens it with the file picker, for transcripts that are not in the list.\n- The same change also does #156 (one actions value instead of 21 closures, one device picker) and #140 (menu code left unused).\n- Comes after #105, as #154 asks. Transcribe again and identify speakers again follow in a second issue.\n\n## TASKS\n\n- [ ] Capture a flow-next spec from this issue and the mockup\n- [ ] Build the menu headings and the All Recordings window as in the mockup",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/170"
   },
-  "updated_at": "2026-10-20T21:25:16.445098Z"
+  "updated_at": "2026-10-20T21:48:54.093681Z"
 }
