@@ -13,7 +13,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-170-menu-sections-and-an-all-recordings",
   "spec_path": ".flow/tasks/gh-170-menu-sections-and-an-all-recordings.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "The All Recordings window: title, toolbar, rows with a main button and a \"\u2026\" menu",
   "updated_at": "2026-10-20T19:12:39.347231Z"
 }

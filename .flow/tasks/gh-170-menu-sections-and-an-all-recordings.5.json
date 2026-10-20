@@ -12,7 +12,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-170-menu-sections-and-an-all-recordings",
   "spec_path": ".flow/tasks/gh-170-menu-sections-and-an-all-recordings.5.md",
-  "status": "todo",
+  "status": "done",
   "title": "The regenerate sheet replaces the Regenerate Protocol window",
   "updated_at": "2026-10-20T19:12:39.593351Z"
 }

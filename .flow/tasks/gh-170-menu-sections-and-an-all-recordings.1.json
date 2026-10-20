@@ -9,7 +9,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-170-menu-sections-and-an-all-recordings",
   "spec_path": ".flow/tasks/gh-170-menu-sections-and-an-all-recordings.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "One MenuActions value, one shared device picker, and the two leftovers settled",
   "updated_at": "2026-10-20T19:00:53.975259Z"
 }

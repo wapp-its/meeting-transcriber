@@ -11,7 +11,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-170-menu-sections-and-an-all-recordings",
   "spec_path": ".flow/tasks/gh-170-menu-sections-and-an-all-recordings.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Menu sections, the two renames, and Name Speakers inside Needs you",
   "updated_at": "2026-10-20T19:00:53.975506Z"
 }
