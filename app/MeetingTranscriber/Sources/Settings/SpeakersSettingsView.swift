@@ -47,10 +47,14 @@ struct SpeakersSettingsView: View {
     /// Hint under the method picker while an overlap-aware method is picked;
     /// `nil` for Standard. The per-call figure is twice the per-track cap: a
     /// recorded call is two tracks, each diarized on its own, so a "caps at
-    /// 4" hint read as a meeting limit was wrong by half (issue #163).
+    /// 4" hint read as a meeting limit was wrong by half (issue #163). The
+    /// total is written as its sum (2 × cap) next to the per-input cap,
+    /// because a bare "up to 8" hid the limit a user actually runs into.
     static func methodHint(for mode: DiarizerMode) -> String? {
         guard mode.countsSpeakersItself else { return nil }
-        return "\(mode.displayName) counts the speakers itself. In a recorded call, the call audio and your microphone are two sides, so a call can have up to \(mode.speakerCap * 2) speakers."
+        let cap = mode.speakerCap
+        return "\(mode.displayName) counts the speakers itself: up to \(cap) per input. "
+            + "A recorded call has two inputs, the call audio and your microphone, so up to \(cap * 2) speakers in total (2 × \(cap))."
     }
 
     /// What the Standard count does, including the part that misled a user

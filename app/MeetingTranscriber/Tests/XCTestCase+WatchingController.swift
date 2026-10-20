@@ -73,6 +73,9 @@ extension XCTestCase {
     /// - Parameter microphone: handed through to the controller; nil (the
     ///   default) leaves recordings without a microphone controller.
     /// - Parameter output: the same, for the output-device controller.
+    /// - Parameter permissions: the permission controller to hand through, for
+    ///   a test that drives its checks; nil (the default) builds one with the
+    ///   live probe, which nothing here asks to run.
     func makeWatchingController(
         logDir: URL,
         notifier: any AppNotifying = RecordingNotifier(),
@@ -86,6 +89,7 @@ extension XCTestCase {
         channelFaultWindow: TimeInterval = 0,
         microphone: MicrophoneController? = nil,
         output: OutputDeviceController? = nil,
+        permissions: PermissionsController? = nil,
         makeDetector: @escaping () -> any MeetingDetecting = { makeSilentDetector() },
         makeRecorder: @escaping @MainActor () -> any RecordingProvider = { makeMockRecorder() },
     ) -> WatchingController {
@@ -137,7 +141,7 @@ extension XCTestCase {
             debounceSeconds: { channelFaultWindow },
             indicatorEnabled: { false },
         )
-        let permissions = PermissionsController(notifier: notifier)
+        let permissions = permissions ?? PermissionsController(notifier: notifier)
         if let permissionHealth { permissions.handle(permissionHealth) }
         let liveTranscription = LiveTranscriptionCoordinator(
             captions: LiveCaptionsState(),

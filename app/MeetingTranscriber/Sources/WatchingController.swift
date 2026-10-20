@@ -12,7 +12,7 @@ import Observation
 /// god-class split). Unlike the earlier leaf controllers, watching is a hub: it
 /// reaches across the already-extracted siblings — `pipeline` (to rebuild/ensure
 /// the queue and pass it to the loop), `channelHealth` (start/stop on state
-/// transitions), `permissions` (seed the loop's permission checker),
+/// transitions), `permissions` (seed the loop's checker, hold checks while recording),
 /// `liveTranscription` (attach live sinks to each recorder) and `microphone`
 /// (attach/detach on the same transitions as `channelHealth`). It holds those
 /// siblings as direct references (not an `AppState` back-reference) since they
@@ -66,7 +66,7 @@ final class WatchingController {
     let notifier: any AppNotifying
     let pipeline: PipelineController
     let channelHealth: ChannelHealthController
-    private let permissions: PermissionsController
+    let permissions: PermissionsController
     let liveTranscription: LiveTranscriptionCoordinator
     /// Nil where the caller supplies none, as most tests do; so is `output`.
     let microphone: MicrophoneController?
