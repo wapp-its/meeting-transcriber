@@ -223,15 +223,6 @@ struct MenuBarView: View {
             .keyboardShortcut("r")
         }
 
-        if let nameSpeakers = actions.nameSpeakers {
-            Button {
-                nameSpeakers()
-            } label: {
-                Label("Name Speakers...", systemImage: "person.2.fill")
-            }
-            .keyboardShortcut("n")
-        }
-
         Button {
             actions.processFiles()
         } label: {
@@ -241,30 +232,47 @@ struct MenuBarView: View {
     }
 
     /// The jobs under way and the jobs waiting on the user, each group under
-    /// its own header and only when it has a job. Row indexes run on across
-    /// both groups, so every row's identifiers stay unique.
+    /// its own header and only when it has a line. Row indexes run on across
+    /// both groups and count only job rows, so every row's identifiers stay
+    /// unique and "Name Speakers…" shifts none of them.
     @ViewBuilder private var jobSections: some View {
         let sections = TranscriptionList.menuSections(transcriptionEntries)
-        jobSection("In progress", systemImage: "gearshape.2.fill", entries: sections.inProgress, firstIndex: 0)
-        jobSection(
-            "Needs you", systemImage: "exclamationmark.circle",
-            entries: sections.needsYou, firstIndex: sections.inProgress.count,
-        )
+        if !sections.inProgress.isEmpty {
+            jobGroupHeader("In progress", systemImage: "gearshape.2.fill")
+            jobRows(sections.inProgress, firstIndex: 0)
+        }
+        if !sections.needsYou.isEmpty || actions.nameSpeakers != nil {
+            jobGroupHeader("Needs you", systemImage: "exclamationmark.circle")
+            nameSpeakersItem
+            jobRows(sections.needsYou, firstIndex: sections.inProgress.count)
+        }
     }
 
     @ViewBuilder
-    private func jobSection(
-        _ title: String, systemImage: String, entries: [TranscriptionEntry], firstIndex: Int,
-    ) -> some View {
-        if !entries.isEmpty {
-            Divider()
-            Label(title, systemImage: systemImage)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private func jobGroupHeader(_ title: String, systemImage: String) -> some View {
+        Divider()
+        Label(title, systemImage: systemImage)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
 
-            ForEach(Array(entries.enumerated()), id: \.element.id) { offset, entry in
-                jobRow(entry, index: firstIndex + offset)
+    private func jobRows(_ entries: [TranscriptionEntry], firstIndex: Int) -> some View {
+        ForEach(Array(entries.enumerated()), id: \.element.id) { offset, entry in
+            jobRow(entry, index: firstIndex + offset)
+        }
+    }
+
+    /// The first line of "Needs you" while a job waits for speaker names. A
+    /// hidden item registers no shortcut, so ⌘N exists only while it shows.
+    @ViewBuilder private var nameSpeakersItem: some View {
+        if let nameSpeakers = actions.nameSpeakers {
+            Button {
+                nameSpeakers()
+            } label: {
+                Label("Name Speakers…", systemImage: "person.2.fill")
             }
+            .keyboardShortcut("n")
+            .accessibilityIdentifier(A11yID.nameSpeakersMenuItem)
         }
     }
 

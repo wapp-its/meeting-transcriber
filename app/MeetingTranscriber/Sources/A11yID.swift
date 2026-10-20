@@ -77,6 +77,11 @@ enum A11yID {
     /// Menu bar item that opens the Transcriptions window.
     static let allTranscriptionsMenuItem = "allTranscriptionsMenuItem"
 
+    /// The menu's "Name Speakers…", the first line of "Needs you". Tests find
+    /// it by this value: the state line of a job waiting for names reads
+    /// "Name Speakers..." too.
+    static let nameSpeakersMenuItem = "nameSpeakersMenuItem"
+
     /// The menu's Pause Recording / Resume Recording item: one identifier for
     /// both labels, since it is one item whose label follows the state.
     static let pauseResumeRecording = "pauseResumeRecording"

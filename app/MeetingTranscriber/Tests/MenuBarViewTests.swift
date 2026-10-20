@@ -119,14 +119,14 @@ final class MenuBarViewTests: XCTestCase {
     func testNameSpeakersButtonShownWhenWaiting() throws {
         // swiftlint:disable:next trailing_closure
         let sut = makeView(status: makeStatus(state: .waitingForSpeakerNames), onNameSpeakers: {})
-        let body = try sut.inspect()
-        XCTAssertNoThrow(try body.find(text: "Name Speakers..."))
+        let item = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.nameSpeakersMenuItem)
+        XCTAssertNoThrow(try item.find(text: "Name Speakers…"))
     }
 
     func testNameSpeakersButtonHiddenWhenIdle() throws {
         let sut = makeView(status: makeStatus(state: .idle))
         let body = try sut.inspect()
-        XCTAssertThrowsError(try body.find(text: "Name Speakers..."))
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.nameSpeakersMenuItem))
     }
 
     // MARK: - Detail text
@@ -345,7 +345,7 @@ final class MenuBarViewTests: XCTestCase {
             actions: actions,
         )
         let body = try sut.inspect()
-        try body.find(button: "Name Speakers...").tap()
+        try body.find(viewWithAccessibilityIdentifier: A11yID.nameSpeakersMenuItem).button().tap()
         XCTAssertTrue(called)
     }
 
