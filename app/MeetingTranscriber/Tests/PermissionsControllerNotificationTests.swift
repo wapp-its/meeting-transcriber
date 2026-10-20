@@ -16,8 +16,8 @@ import XCTest
 /// `provisional` and `ephemeral` have none in `PermissionStatus`.
 @MainActor
 final class PermissionsControllerNotificationTests: XCTestCase {
-    private func healthyProbe() -> () -> HealthCheckResult {
-        { HealthCheckResult(screenRecording: .healthy, microphone: .healthy, accessibility: .healthy) }
+    private func healthyProbe() -> PermissionsController.Probe {
+        { _ in HealthCheckResult(screenRecording: .healthy, microphone: .healthy, accessibility: .healthy) }
     }
 
     /// Authorised-and-visible apart from the status under test: this suite is

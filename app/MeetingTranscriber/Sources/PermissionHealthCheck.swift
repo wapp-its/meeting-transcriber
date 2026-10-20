@@ -532,7 +532,7 @@ enum PermissionHealthCheck {
 
     static func runLive() async -> HealthCheckResult {
         let sr = checkScreenRecordingLive()
-        let mic = await checkMicrophoneLive()
+        let mic = await checkMicrophoneLive() ?? .broken
         let ax = checkAccessibilityLive()
         let result = overallHealth(screenRecording: sr, microphone: mic, accessibility: ax)
         if !result.isHealthy {

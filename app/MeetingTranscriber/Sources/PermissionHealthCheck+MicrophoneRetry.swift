@@ -56,7 +56,8 @@ extension PermissionHealthCheck {
         logFailure: @Sendable (_ attempt: Int, _ failure: MicProbeFailure) -> Void = { attempt, failure in
             logMicProbeFailure(attempt: attempt, failure: failure)
         },
-    ) async -> PermissionStatus {
+        mayRetry _: @Sendable () async -> Bool = { true },
+    ) async -> PermissionStatus? {
         if authStatus != .authorized {
             let r = checkMicrophone(authStatus: authStatus, probeSucceeds: false)
             debugLog("checkMicrophoneLive: authStatus=\(authStatus.rawValue) probe=skipped → \(r)")
