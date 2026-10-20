@@ -70,7 +70,8 @@ struct TranscriptionsView: View {
 
     /// The search, and the two actions that belong to no row: the folder the
     /// protocols are written to, and a protocol made again from a file chosen
-    /// by hand, for a meeting the list does not hold.
+    /// by hand, for a meeting the list does not hold. The two buttons show
+    /// their names, which a toolbar would otherwise reduce to the icon.
     private var toolbarItems: some ToolbarContent {
         ToolbarItemGroup {
             TextField("Search titles and participants", text: query)
@@ -81,12 +82,14 @@ struct TranscriptionsView: View {
                 actions.openProtocolsFolder()
             } label: {
                 Label("Open Protocols Folder", systemImage: "folder")
+                    .labelStyle(.titleAndIcon)
             }
             .accessibilityIdentifier(A11yID.recordingsOpenFolderButton)
             Button {
                 actions.regenerate(nil)
             } label: {
                 Label("Regenerate from File…", systemImage: "arrow.triangle.2.circlepath")
+                    .labelStyle(.titleAndIcon)
             }
             .accessibilityIdentifier(A11yID.recordingsRegenerateFromFileButton)
         }
