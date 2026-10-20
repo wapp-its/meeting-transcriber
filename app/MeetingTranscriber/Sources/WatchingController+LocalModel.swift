@@ -46,7 +46,11 @@ extension WatchingController {
     /// shows for it), so a local protocol due then waits in `.generatingProtocol`
     /// until record-only is off. Switching record-only on ends a running helper
     /// like a recording start does. Idempotent; the gate ignores a repeat.
+    ///
+    /// The permission check hears the same signal, without record-only: its
+    /// probe opens the microphone, which must not happen under a recording.
     func recordingActivityChanged() {
+        permissions.setRecordingActive(isRecordingActivity)
         #if !APPSTORE
             pipeline.localModelGate.setRecordingActive(isRecordingActivity || settings.recordOnly)
         #endif

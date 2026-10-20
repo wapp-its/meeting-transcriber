@@ -530,9 +530,21 @@ enum PermissionHealthCheck {
         )
     }
 
+    /// The check for a caller with nothing to yield to: `WatchLoop`'s gate before a
+    /// manual start, which runs while that start already counts as the recording.
+    /// The retry is always allowed, so there is always a verdict.
     static func runLive() async -> HealthCheckResult {
+        guard let result = await runLive(mayRetryMicrophone: { true }) else {
+            preconditionFailure("a check whose microphone retry is always allowed ended without a verdict")
+        }
+        return result
+    }
+
+    /// The live check, or nil when `mayRetryMicrophone` declined the microphone
+    /// probe's retry (see `checkMicrophoneLive`): the check then has no verdict.
+    static func runLive(mayRetryMicrophone: @escaping @Sendable () async -> Bool) async -> HealthCheckResult? {
         let sr = checkScreenRecordingLive()
-        let mic = await checkMicrophoneLive() ?? .broken
+        guard let mic = await checkMicrophoneLive(mayRetry: mayRetryMicrophone) else { return nil }
         let ax = checkAccessibilityLive()
         let result = overallHealth(screenRecording: sr, microphone: mic, accessibility: ax)
         if !result.isHealthy {
