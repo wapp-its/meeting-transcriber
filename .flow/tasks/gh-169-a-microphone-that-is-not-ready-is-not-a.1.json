@@ -10,7 +10,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-169-a-microphone-that-is-not-ready-is-not-a",
   "spec_path": ".flow/tasks/gh-169-a-microphone-that-is-not-ready-is-not-a.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement A microphone that is not ready is not a broken permission",
   "updated_at": "2026-10-20T15:13:15.895680Z"
 }

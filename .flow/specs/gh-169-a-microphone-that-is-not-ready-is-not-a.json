@@ -209,7 +209,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-169-a-microphone-that-is-not-ready-is-not-a.md",
-  "status": "open",
+  "status": "done",
   "title": "A microphone that is not ready is not a broken permission",
   "tracker": {
     "baseHashFlow": "b873b323a376b4c87fcf1edd8be6cf087eadf97cf9cdc9852110b92e009982c9",
@@ -223,5 +223,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nThe menu bar icon showed the red permission badge for three days. The app had posted \"Microphone looks enabled but isn't working - toggle it off and on in System Settings\". The microphone grant was fine. Bringing the app to the front ran the check again, and it passed at once (48 kHz, signal present). So one failed check kept a false warning on the icon for days.\n\n## NOTES\n\n- The failed check ran about three minutes after the Mac woke from sleep. Both probe attempts (the retry from #124 included) logged `probeMicrophone: invalid format sampleRate=0.0 channels=0`. The input device had no format yet, so the engine never started. This says nothing about the grant.\n- `PermissionsController.check` runs only at launch and on `didBecomeActive`. A menu bar app is rarely activated, so the verdict stays until the user opens a window or restarts the app.\n- `checkMicrophone` turns every probe failure into `.broken`. The Accessibility probe already reports an inconclusive answer as healthy. The microphone probe has no such case.\n\n## TASKS\n\n- [ ] Report the probe failures that only show a device that is not ready (`noInputDevice`, `invalidFormat`) as inconclusive, not as a broken grant\n- [ ] Run the check again after wake from sleep and after a change of the default input device, so a false verdict clears without a click\n- [ ] Add tests: a probe that fails with an invalid format gives no badge and no notification. A later passing check clears the badge.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/169"
   },
-  "updated_at": "2026-10-20T18:31:47.861494Z"
+  "updated_at": "2026-10-20T18:35:40.693895Z"
 }
