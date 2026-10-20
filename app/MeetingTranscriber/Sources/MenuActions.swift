@@ -32,8 +32,6 @@ struct MenuActions {
     var processFiles: () -> Void
     /// Opens the All Recordings window.
     var showAllTranscriptions: () -> Void
-    /// Opens the Regenerate Protocol window.
-    var regenerateProtocol: () -> Void
     /// Remove on a failed job: off the menu and out of the history for good.
     var removeFailedJob: (UUID) -> Void
     /// Dismiss on a job waiting for speaker names.
@@ -61,7 +59,6 @@ struct MenuActions {
         openSettings: {},
         processFiles: {},
         showAllTranscriptions: {},
-        regenerateProtocol: {},
         removeFailedJob: { _ in },
         dismissJob: { _ in },
         quit: {},

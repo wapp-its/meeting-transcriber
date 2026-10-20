@@ -40,7 +40,6 @@ final class MenuBarViewTests: XCTestCase {
         noMic: Bool = false,
         manualRecordingPendingOrActive: Bool = false,
         onShowAllTranscriptions: @escaping () -> Void = {},
-        onRegenerateProtocol: @escaping () -> Void = {},
         onOpenProtocol: @escaping (URL) -> Void = { _ in },
         onOpenLastProtocol: @escaping (URL) -> Void = { _ in },
         history: [TerminalJobRecord] = [],
@@ -56,7 +55,6 @@ final class MenuBarViewTests: XCTestCase {
         actions.openLastProtocol = onOpenLastProtocol
         actions.nameSpeakers = onNameSpeakers
         actions.showAllTranscriptions = onShowAllTranscriptions
-        actions.regenerateProtocol = onRegenerateProtocol
         return MenuBarView(
             status: status,
             isWatching: isWatching,
@@ -351,16 +349,25 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertTrue(called)
     }
 
-    func testRegenerateProtocolCallsItsClosure() throws {
-        var called = false
-        // swiftlint:disable:next trailing_closure
-        let item = try makeView(status: makeStatus(state: .idle), onRegenerateProtocol: { called = true })
-            .inspect()
-            .find(viewWithAccessibilityIdentifier: A11yID.regenerateProtocolMenuItem)
+    /// Regenerating moved into the All Recordings window, on a row and in its
+    /// toolbar, so the menu has no item for it, finished recording or not.
+    func testTheMenuHasNoRegenerateProtocolItem() throws {
+        var finished = PipelineJob(
+            meetingTitle: "Standup", appName: "Teams",
+            mixPath: URL(fileURLWithPath: "/tmp/mix.wav"), appPath: nil, micPath: nil, micDelay: 0,
+        )
+        finished.state = .done
+        finished.protocolPath = URL(fileURLWithPath: "/tmp/standup.md")
+        let views = [
+            makeView(status: makeStatus(state: .idle)),
+            makeView(status: makeStatus(state: .idle), history: [TerminalJobRecord(job: finished)]),
+        ]
 
-        XCTAssertNoThrow(try item.find(text: "Regenerate Protocol…"))
-        try item.button().tap()
-        XCTAssertTrue(called)
+        for view in views {
+            let body = try view.inspect()
+            XCTAssertNoThrow(try body.find(text: "All Recordings…"), "the Recordings section is searched")
+            XCTAssertThrowsError(try body.find(text: "Regenerate Protocol…"))
+        }
     }
 
     // MARK: - State label

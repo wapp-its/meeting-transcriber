@@ -193,9 +193,8 @@ enum A11yID {
     static let protocolOptionsBackgroundEditor = "protocolOptionsBackgroundEditor"
     static let protocolOptionsDestinationNotice = "protocolOptionsDestinationNotice"
 
-    /// "Regenerate Protocol…" in the menu, and its window's controls. The
-    /// window shows background text and stays off every RPC allowlist.
-    static let regenerateProtocolMenuItem = "regenerateProtocolMenuItem"
+    /// The Regenerate Protocol window's controls. The window shows background
+    /// text and stays off every RPC allowlist.
     static let regenerateChooseFileButton = "regenerateChooseFileButton"
     static let regenerateGenerateButton = "regenerateGenerateButton"
 

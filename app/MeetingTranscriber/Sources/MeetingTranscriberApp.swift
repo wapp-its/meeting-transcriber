@@ -186,7 +186,6 @@ struct MeetingTranscriberApp: App {
             } : nil,
             processFiles: processAudioFiles,
             showAllTranscriptions: { bringWindowToFront(id: TranscriptionsView.windowID) },
-            regenerateProtocol: { bringWindowToFront(id: RegenerateProtocolView.windowID) },
             removeFailedJob: { id in appState.pipeline.removeFailedJob(id: id) },
             dismissJob: { id in appState.pipelineQueue.removeJob(id: id) },
             answerConsent: { question, granted in appState.answerConsentQuestion(question, granted: granted) },

@@ -320,13 +320,6 @@ struct MenuBarView: View {
             }
             .keyboardShortcut("t")
             .accessibilityIdentifier(A11yID.allRecordingsMenuItem)
-
-            Button {
-                actions.regenerateProtocol()
-            } label: {
-                Label("Regenerate Protocol…", systemImage: "arrow.triangle.2.circlepath")
-            }
-            .accessibilityIdentifier(A11yID.regenerateProtocolMenuItem)
         }
     }
 
