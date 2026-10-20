@@ -30,11 +30,11 @@ final class FluidDiarizerSortformerTests: XCTestCase {
         XCTAssertEqual(DiarizerMode.offline.methodDescription, "Any number of speakers. Groups similar voices.")
         XCTAssertEqual(
             DiarizerMode.sortformer.methodDescription,
-            "Handles people talking at the same time. Up to 4 speakers per side.",
+            "Handles people talking at the same time. Up to 4 speakers per input.",
         )
         XCTAssertEqual(
             DiarizerMode.nemotron.methodDescription,
-            "Handles people talking at the same time. Up to 8 speakers per side.",
+            "Handles people talking at the same time. Up to 8 speakers per input.",
         )
     }
 

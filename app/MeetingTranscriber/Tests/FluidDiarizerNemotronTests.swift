@@ -24,7 +24,7 @@ final class FluidDiarizerNemotronTests: XCTestCase {
 
     func testNemotronDisplayNameAndDescriptionCarryItsCap() {
         XCTAssertEqual(DiarizerMode.nemotron.displayName, "Nemotron 3")
-        XCTAssertTrue(DiarizerMode.nemotron.methodDescription.contains("Up to \(DiarizerMode.nemotron.speakerCap) speakers per side"))
+        XCTAssertTrue(DiarizerMode.nemotron.methodDescription.contains("Up to \(DiarizerMode.nemotron.speakerCap) speakers per input"))
     }
 
     /// The UI cap and the model's output slots must agree: a Stepper that
