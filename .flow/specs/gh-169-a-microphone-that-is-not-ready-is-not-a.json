@@ -1,0 +1,150 @@
+{
+  "branch_name": "gh-169-a-microphone-that-is-not-ready-is-not-a",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-20T11:38:58.479798Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-169-a-microphone-that-is-not-ready-is-not-a",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-20T11:48:32.512527Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "b1165acac817252f2ddd61db218569ae194220fbdd7450539467ca584954641b",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-8c3d06731ec9834fd1a245a54b474a96",
+            "classification": "introduced",
+            "findingId": "finding-8c3d06731ec9834fd1a245a54b474a96",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-3472373d8f8943fa452adbb080ec7afc",
+            "classification": "introduced",
+            "findingId": "finding-3472373d8f8943fa452adbb080ec7afc",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "5680e5c4fcf08b8b16afb05144b9fbaa63a5c4bd",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 310001,
+      "output_sha256": "ccbe1f9165eb2a77827abbdca9ce5b04664b0ecfe03f2d500815d65d5e9baac6",
+      "reservation_id": "e21ad17c4e484288a62e1a29b18de446",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-20T11:46:46.708299Z",
+      "tool_calls": 22,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "2a52ba03639cb73432a741ff9d841127910af40c432843705f9b8394ab4563b2",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-8c3d06731ec9834fd1a245a54b474a96",
+            "classification": "introduced",
+            "findingId": "finding-8c3d06731ec9834fd1a245a54b474a96",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-3472373d8f8943fa452adbb080ec7afc",
+            "classification": "introduced",
+            "findingId": "finding-3472373d8f8943fa452adbb080ec7afc",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "5680e5c4fcf08b8b16afb05144b9fbaa63a5c4bd",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 896,
+      "output_sha256": "b7b581f282cb4da2321626f0eb4cfb561b3d07bc5ff90ebed2ba10e3f010f474",
+      "reservation_id": "d2b2dd3aeaaf4551be4b8bed4d215add",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-20T11:48:32.481005Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-169-a-microphone-that-is-not-ready-is-not-a.md",
+  "status": "open",
+  "title": "A microphone that is not ready is not a broken permission",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABYhdcJg",
+    "identifier": "#169",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/169"
+  },
+  "updated_at": "2026-10-20T11:53:59.734170Z"
+}
