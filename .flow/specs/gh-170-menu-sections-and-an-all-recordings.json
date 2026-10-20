@@ -1,13 +1,137 @@
 {
   "branch_name": "gh-170-menu-sections-and-an-all-recordings",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
   "created_at": "2026-10-20T11:41:12.136854Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
   "depends_on_epics": [
     "gh-105-watching-pauses-during-a-recording-and"
   ],
   "id": "gh-170-menu-sections-and-an-all-recordings",
+  "impl_review_rounds": {},
   "next_task": 1,
-  "plan_review_status": "unknown",
-  "plan_reviewed_at": null,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-20T11:53:54.462267Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "84f0e93aa969c0e2c310a7828a3fd7851d3d1b3cae2f3c6d9cb5c935ed774d66",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-d33a7ff785e133425a2010a3ec05ffd3",
+            "classification": "introduced",
+            "findingId": "finding-d33a7ff785e133425a2010a3ec05ffd3",
+            "firstSeenThisRound": true,
+            "severity": "P0",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-dc7905f2ae2f2db241b43cc4b475233d",
+            "classification": "introduced",
+            "findingId": "finding-dc7905f2ae2f2db241b43cc4b475233d",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "5680e5c4fcf08b8b16afb05144b9fbaa63a5c4bd",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 323928,
+      "output_sha256": "31d6492adf478fd147f4055a4fd61a10109a412ca801549299cc506f3fca6b56",
+      "reservation_id": "14c3b26d74614503b3b61afaf0175dff",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-20T11:53:09.632234Z",
+      "tool_calls": 22,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "6a4ebddee336eb657a1789ba2bc2b59a9c1c681a43a951b14a351e534abd1296",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-d33a7ff785e133425a2010a3ec05ffd3",
+            "classification": "introduced",
+            "findingId": "finding-d33a7ff785e133425a2010a3ec05ffd3",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-dc7905f2ae2f2db241b43cc4b475233d",
+            "classification": "introduced",
+            "findingId": "finding-dc7905f2ae2f2db241b43cc4b475233d",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "5680e5c4fcf08b8b16afb05144b9fbaa63a5c4bd",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 695,
+      "output_sha256": "e2fe1bb0e1a5464532a0df28454ae7ff7cc478f75982d1b2fe8ec20f12b60bcc",
+      "reservation_id": "ac9118cf1b304894a4538b45c9390904",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-20T11:53:54.427536Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
   "spec_path": ".flow/specs/gh-170-menu-sections-and-an-all-recordings.md",
   "status": "open",
   "title": "Menu sections and an All Recordings window",
@@ -23,5 +147,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/170"
   },
-  "updated_at": "2026-10-20T11:41:18.871204Z"
+  "updated_at": "2026-10-20T11:54:00.262731Z"
 }
