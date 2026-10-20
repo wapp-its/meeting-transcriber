@@ -34,7 +34,10 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
         error: String? = nil,
         taps: Taps = Taps(),
     ) -> MenuBarView {
-        MenuBarView(
+        var actions = MenuActions.noop
+        actions.startStop = { taps.toggles += 1 }
+        actions.stopManualRecording = recording ? { taps.stops += 1 } : nil
+        return MenuBarView(
             status: TranscriberStatus(
                 version: 1,
                 timestamp: "2024-01-01T00:00:00",
@@ -48,20 +51,9 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
             isWatching: isWatching,
             pipelineQueue: PipelineQueue(),
             updateChecker: nil,
-            onStartStop: { taps.toggles += 1 },
-            onRecordApp: {},
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: recording ? { taps.stops += 1 } : nil,
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: {},
-            onOpenSettings: {},
-            onNameSpeakers: nil,
-            onProcessFiles: {},
-            onDismissJob: { _ in },
-            onQuit: {},
+            actions: actions,
         )
     }
 

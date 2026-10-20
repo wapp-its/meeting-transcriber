@@ -47,32 +47,27 @@ final class MenuBarViewTests: XCTestCase {
         isRecordingPaused: Bool = false,
         onTogglePause: (() -> Void)? = nil,
     ) -> MenuBarView {
-        MenuBarView(
+        var actions = MenuActions.noop
+        actions.installUpdate = onInstallUpdate
+        actions.recordMicrophone = onRecordMicrophone
+        actions.stopManualRecording = onStopManualRecording
+        actions.togglePause = onTogglePause
+        actions.openProtocol = onOpenProtocol
+        actions.openLastProtocol = onOpenLastProtocol
+        actions.nameSpeakers = onNameSpeakers
+        actions.showAllTranscriptions = onShowAllTranscriptions
+        actions.regenerateProtocol = onRegenerateProtocol
+        return MenuBarView(
             status: status,
             isWatching: isWatching,
             pipelineQueue: pipelineQueue ?? PipelineQueue(),
             updateChecker: updateChecker,
             updateInstallBlockedReason: updateInstallBlockedReason,
-            onInstallUpdate: onInstallUpdate,
             history: history,
-            onStartStop: {},
-            onRecordApp: {},
-            onRecordMicrophone: onRecordMicrophone,
             noMic: noMic,
             manualRecordingPendingOrActive: manualRecordingPendingOrActive,
-            onStopManualRecording: onStopManualRecording,
             isRecordingPaused: isRecordingPaused,
-            onTogglePause: onTogglePause,
-            onOpenProtocol: onOpenProtocol,
-            onOpenLastProtocol: onOpenLastProtocol,
-            onOpenProtocolsFolder: {},
-            onOpenSettings: {},
-            onNameSpeakers: onNameSpeakers,
-            onProcessFiles: {},
-            onShowAllTranscriptions: onShowAllTranscriptions,
-            onRegenerateProtocol: onRegenerateProtocol,
-            onDismissJob: { _ in },
-            onQuit: {},
+            actions: actions,
         )
     }
 
@@ -266,25 +261,16 @@ final class MenuBarViewTests: XCTestCase {
 
     func testStartStopButtonCallsCallback() throws {
         var called = false
+        var actions = MenuActions.noop
+        actions.startStop = { called = true }
         let sut = MenuBarView(
             status: makeStatus(state: .idle),
             isWatching: false,
             pipelineQueue: PipelineQueue(),
             updateChecker: nil,
-            onStartStop: { called = true },
-            onRecordApp: {},
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: nil,
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: {},
-            onOpenSettings: {},
-            onNameSpeakers: nil,
-            onProcessFiles: {},
-            onDismissJob: { _ in },
-            onQuit: {},
+            actions: actions,
         )
         let body = try sut.inspect()
         try body.find(button: "Start Watching for Meetings").tap()
@@ -293,25 +279,16 @@ final class MenuBarViewTests: XCTestCase {
 
     func testQuitButtonCallsCallback() throws {
         var called = false
+        var actions = MenuActions.noop
+        actions.quit = { called = true }
         let sut = MenuBarView(
             status: makeStatus(state: .idle),
             isWatching: false,
             pipelineQueue: PipelineQueue(),
             updateChecker: nil,
-            onStartStop: {},
-            onRecordApp: {},
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: nil,
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: {},
-            onOpenSettings: {},
-            onNameSpeakers: nil,
-            onProcessFiles: {},
-            onDismissJob: { _ in },
-            onQuit: { called = true },
+            actions: actions,
         )
         let body = try sut.inspect()
         try body.find(button: "Quit").tap()
@@ -320,25 +297,16 @@ final class MenuBarViewTests: XCTestCase {
 
     func testSettingsButtonCallsCallback() throws {
         var called = false
+        var actions = MenuActions.noop
+        actions.openSettings = { called = true }
         let sut = MenuBarView(
             status: makeStatus(state: .idle),
             isWatching: false,
             pipelineQueue: PipelineQueue(),
             updateChecker: nil,
-            onStartStop: {},
-            onRecordApp: {},
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: nil,
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: {},
-            onOpenSettings: { called = true },
-            onNameSpeakers: nil,
-            onProcessFiles: {},
-            onDismissJob: { _ in },
-            onQuit: {},
+            actions: actions,
         )
         let body = try sut.inspect()
         try body.find(button: "Settings...").tap()
@@ -347,25 +315,16 @@ final class MenuBarViewTests: XCTestCase {
 
     func testProtocolsFolderButtonCallsCallback() throws {
         var called = false
+        var actions = MenuActions.noop
+        actions.openProtocolsFolder = { called = true }
         let sut = MenuBarView(
             status: makeStatus(state: .idle),
             isWatching: false,
             pipelineQueue: PipelineQueue(),
             updateChecker: nil,
-            onStartStop: {},
-            onRecordApp: {},
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: nil,
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: { called = true },
-            onOpenSettings: {},
-            onNameSpeakers: nil,
-            onProcessFiles: {},
-            onDismissJob: { _ in },
-            onQuit: {},
+            actions: actions,
         )
         let body = try sut.inspect()
         try body.find(button: "Open Protocols Folder").tap()
@@ -374,25 +333,16 @@ final class MenuBarViewTests: XCTestCase {
 
     func testNameSpeakersButtonCallsCallback() throws {
         var called = false
+        var actions = MenuActions.noop
+        actions.nameSpeakers = { called = true }
         let sut = MenuBarView(
             status: makeStatus(state: .waitingForSpeakerNames),
             isWatching: false,
             pipelineQueue: PipelineQueue(),
             updateChecker: nil,
-            onStartStop: {},
-            onRecordApp: {},
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: nil,
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: {},
-            onOpenSettings: {},
-            onNameSpeakers: { called = true },
-            onProcessFiles: {},
-            onDismissJob: { _ in },
-            onQuit: {},
+            actions: actions,
         )
         let body = try sut.inspect()
         try body.find(button: "Name Speakers...").tap()
@@ -510,25 +460,16 @@ final class MenuBarViewTests: XCTestCase {
 
     func testProcessFilesButtonCallsCallback() throws {
         var called = false
+        var actions = MenuActions.noop
+        actions.processFiles = { called = true }
         let sut = MenuBarView(
             status: makeStatus(),
             isWatching: false,
             pipelineQueue: PipelineQueue(),
             updateChecker: nil,
-            onStartStop: {},
-            onRecordApp: {},
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: nil,
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: {},
-            onOpenSettings: {},
-            onNameSpeakers: nil,
-            onProcessFiles: { called = true },
-            onDismissJob: { _ in },
-            onQuit: {},
+            actions: actions,
         )
         let body = try sut.inspect()
         try body.find(button: "Process Audio/Video Files...").tap()
@@ -551,25 +492,16 @@ final class MenuBarViewTests: XCTestCase {
         queue.insertJobForTesting(job)
 
         var dismissedID: UUID?
+        var actions = MenuActions.noop
+        actions.dismissJob = { dismissedID = $0 }
         let sut = MenuBarView(
             status: makeStatus(),
             isWatching: false,
             pipelineQueue: queue,
             updateChecker: nil,
-            onStartStop: {},
-            onRecordApp: {},
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: nil,
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: {},
-            onOpenSettings: {},
-            onNameSpeakers: nil,
-            onProcessFiles: {},
-            onDismissJob: { dismissedID = $0 },
-            onQuit: {},
+            actions: actions,
         )
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(button: "Name Speakers"))
@@ -596,20 +528,9 @@ final class MenuBarViewTests: XCTestCase {
             isWatching: false,
             pipelineQueue: queue,
             updateChecker: nil,
-            onStartStop: {},
-            onRecordApp: {},
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: nil,
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: {},
-            onOpenSettings: {},
-            onNameSpeakers: nil,
-            onProcessFiles: {},
-            onDismissJob: { _ in },
-            onQuit: {},
+            actions: .noop,
         )
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(button: "Remove"))
@@ -680,25 +601,16 @@ final class MenuBarViewTests: XCTestCase {
 
     func testRecordAppButtonCallsCallback() throws {
         var called = false
+        var actions = MenuActions.noop
+        actions.recordApp = { called = true }
         let sut = MenuBarView(
             status: makeStatus(state: .idle),
             isWatching: false,
             pipelineQueue: PipelineQueue(),
             updateChecker: nil,
-            onStartStop: {},
-            onRecordApp: { called = true },
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: nil,
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: {},
-            onOpenSettings: {},
-            onNameSpeakers: nil,
-            onProcessFiles: {},
-            onDismissJob: { _ in },
-            onQuit: {},
+            actions: actions,
         )
         let body = try sut.inspect()
         try body.find(button: "Start Recording with Options…").tap()
@@ -722,25 +634,16 @@ final class MenuBarViewTests: XCTestCase {
 
     func testStopRecordingButtonCallsCallback() throws {
         var called = false
+        var actions = MenuActions.noop
+        actions.stopManualRecording = { called = true }
         let sut = MenuBarView(
             status: makeStatus(state: .recording),
             isWatching: false,
             pipelineQueue: PipelineQueue(),
             updateChecker: nil,
-            onStartStop: {},
-            onRecordApp: {},
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: { called = true },
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: {},
-            onOpenSettings: {},
-            onNameSpeakers: nil,
-            onProcessFiles: {},
-            onDismissJob: { _ in },
-            onQuit: {},
+            actions: actions,
         )
         let body = try sut.inspect()
         try body.find(button: "Stop Recording").tap()
@@ -916,20 +819,9 @@ final class MenuBarViewTests: XCTestCase {
             isWatching: false,
             pipelineQueue: queue,
             updateChecker: nil,
-            onStartStop: {},
-            onRecordApp: {},
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: nil,
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: {},
-            onOpenSettings: {},
-            onNameSpeakers: nil,
-            onProcessFiles: {},
-            onDismissJob: { _ in },
-            onQuit: {},
+            actions: .noop,
         )
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Transcription failed"))
@@ -1057,20 +949,9 @@ final class MenuBarViewTests: XCTestCase {
             isWatching: false,
             pipelineQueue: queue,
             updateChecker: nil,
-            onStartStop: {},
-            onRecordApp: {},
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: nil,
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: {},
-            onOpenSettings: {},
-            onNameSpeakers: nil,
-            onProcessFiles: {},
-            onDismissJob: { _ in },
-            onQuit: {},
+            actions: .noop,
         )
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Meeting 1"))

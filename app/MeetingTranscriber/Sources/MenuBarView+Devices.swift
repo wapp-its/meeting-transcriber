@@ -27,7 +27,7 @@ extension MenuBarView {
     /// checkmark on the current choice. Choosing one only stores it; nothing
     /// here touches the macOS default input.
     private func microphonePicker(_ menu: MicrophoneMenuState) -> some View {
-        Picker("Microphone", selection: Binding(get: { menu.checkedUID }, set: { onSelectMicrophone($0) })) {
+        Picker("Microphone", selection: Binding(get: { menu.checkedUID }, set: { actions.selectMicrophone($0) })) {
             ForEach(menu.items, id: \.uid) { item in
                 Text(item.label)
                     .disabled(!item.isEnabled)
@@ -61,7 +61,7 @@ extension MenuBarView {
     /// An inline picker, like the microphone's. Unlike that one, choosing an
     /// item changes the Mac's default output, system-wide.
     private func outputPicker(_ menu: OutputMenuState) -> some View {
-        Picker("Output", selection: Binding(get: { menu.checkedUID }, set: { onSelectOutput($0) })) {
+        Picker("Output", selection: Binding(get: { menu.checkedUID }, set: { actions.selectOutput($0) })) {
             ForEach(menu.items, id: \.uid) { item in
                 Text(item.label)
                     .disabled(!item.isEnabled)

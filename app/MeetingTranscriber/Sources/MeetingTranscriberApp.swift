@@ -153,48 +153,48 @@ struct MeetingTranscriberApp: App {
             pipelineQueue: appState.pipelineQueue,
             updateChecker: appState.updateChecker,
             updateInstallBlockedReason: appState.updateInstallBlockedReason,
-            onInstallUpdate: { appState.installUpdate() },
             history: appState.pipeline.terminalJobStore.records,
-            onStartStop: { appState.watching.toggleWatching() },
-            onRecordApp: { bringWindowToFront(id: "record-app") },
-            onRecordMicrophone: { appState.watching.startMicrophoneRecording() },
             noMic: appState.settings.noMic,
             manualRecordingPendingOrActive: appState.watching.isManualRecording,
-            onStopManualRecording: appState.canStopRecording ? {
+            isRecordingPaused: appState.isRecordingPaused,
+            consentQuestion: appState.pendingConsentQuestion,
+            microphoneMenu: appState.microphoneMenuState,
+            outputMenu: appState.outputMenuState,
+            actions: menuActions,
+        )
+    }
+
+    private var menuActions: MenuActions {
+        MenuActions(
+            installUpdate: { appState.installUpdate() },
+            startStop: { appState.watching.toggleWatching() },
+            recordApp: { bringWindowToFront(id: "record-app") },
+            recordMicrophone: { appState.watching.startMicrophoneRecording() },
+            stopManualRecording: appState.canStopRecording ? {
                 appState.watching.stopRecording()
             } : nil,
-            isRecordingPaused: appState.isRecordingPaused,
-            onTogglePause: appState.canPauseRecording ? {
+            togglePause: appState.canPauseRecording ? {
                 appState.watching.togglePause()
             } : nil,
-            onOpenProtocol: openJobFile,
-            onOpenLastProtocol: { url in
-                Self.openLastProtocol(
-                    url, scopeRoot: appState.settings.effectiveOutputDir, notifier: NotificationManager.shared,
-                )
+            openProtocol: openJobFile,
+            openLastProtocol: { url in
+                Self.openLastProtocol(url, scopeRoot: appState.settings.effectiveOutputDir, notifier: NotificationManager.shared)
             },
-            onOpenProtocolsFolder: openProtocolsFolder,
-            onOpenSettings: {
-                bringWindowToFront(id: "settings")
-            },
-            onNameSpeakers: appState.hasPendingSpeakerNamingJobs ? {
+            openProtocolsFolder: openProtocolsFolder,
+            openSettings: { bringWindowToFront(id: "settings") },
+            nameSpeakers: appState.hasPendingSpeakerNamingJobs ? {
                 bringWindowToFront(id: "speaker-naming")
             } : nil,
-            onProcessFiles: processAudioFiles,
-            onShowAllTranscriptions: { bringWindowToFront(id: TranscriptionsView.windowID) },
-            onRegenerateProtocol: { bringWindowToFront(id: RegenerateProtocolView.windowID) },
-            onRemoveFailedJob: { id in appState.pipeline.removeFailedJob(id: id) },
-            onDismissJob: { id in appState.pipelineQueue.removeJob(id: id) },
-            consentQuestion: appState.pendingConsentQuestion,
-            onAnswerConsent: { question, granted in
-                appState.answerConsentQuestion(question, granted: granted)
-            },
-            onRecordConsentWithOptions: openConsentOptions,
-            onQuit: quit,
-            onSelectMicrophone: { appState.settings.micDeviceUID = $0 },
-            microphoneMenu: appState.microphoneMenuState,
-            onSelectOutput: { appState.output.select(uid: $0) },
-            outputMenu: appState.outputMenuState,
+            processFiles: processAudioFiles,
+            showAllTranscriptions: { bringWindowToFront(id: TranscriptionsView.windowID) },
+            regenerateProtocol: { bringWindowToFront(id: RegenerateProtocolView.windowID) },
+            removeFailedJob: { id in appState.pipeline.removeFailedJob(id: id) },
+            dismissJob: { id in appState.pipelineQueue.removeJob(id: id) },
+            answerConsent: { question, granted in appState.answerConsentQuestion(question, granted: granted) },
+            recordConsentWithOptions: openConsentOptions,
+            quit: quit,
+            selectMicrophone: { appState.settings.micDeviceUID = $0 },
+            selectOutput: { appState.output.select(uid: $0) },
         )
     }
 
