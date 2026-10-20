@@ -11,6 +11,11 @@ struct TranscriptionEntry: Identifiable, Equatable {
     /// recovered recording, which have no meeting start. Nil for a record
     /// written before the history kept either.
     let date: Date?
+    /// When the meeting started; nil for an import or a recovered recording,
+    /// and for a record written before the history kept it. Never the enqueue
+    /// time `date` falls back to: a protocol made for this entry must not
+    /// present processing time as the meeting's.
+    let meetingStartTime: Date?
     /// When the job was added, which orders the list. A retry keeps it.
     let enqueuedAt: Date?
     /// The recording's length in seconds; nil until stage 1 measured it.
@@ -43,6 +48,7 @@ struct TranscriptionEntry: Identifiable, Equatable {
         title = job.meetingTitle
         appName = job.appName
         date = job.meetingStartTime ?? job.enqueuedAt
+        meetingStartTime = job.meetingStartTime
         enqueuedAt = job.enqueuedAt
         audioDuration = job.audioDuration
         participants = job.participants
@@ -63,6 +69,7 @@ struct TranscriptionEntry: Identifiable, Equatable {
         title = status.meetingTitle
         appName = record.appName
         date = record.meetingStartTime ?? record.enqueuedAt
+        meetingStartTime = record.meetingStartTime
         enqueuedAt = record.enqueuedAt
         audioDuration = record.audioDuration
         participants = record.participants

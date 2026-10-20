@@ -90,6 +90,22 @@ final class TranscriptionListTests: XCTestCase {
         XCTAssertEqual(entries.map(\.date), [Self.at(minute: -100), Self.at(minute: 20), Self.at(minute: 10), nil, nil])
     }
 
+    /// The meeting start a regenerated protocol is dated by: a job's and its
+    /// record's own, and none for an import, whose date is when it was added.
+    func testTheMeetingStartIsTheMeetingsOwnAndNoneForAnImport() throws {
+        let recorded = try job("Recorded", addedAt: 30, state: .done, meetingStartedAt: -100)
+        let imported = try job("Imported", addedAt: 40, state: .done)
+
+        let fromJob = TranscriptionEntry(job: recorded, finishOrder: nil)
+        let fromRecord = try XCTUnwrap(TranscriptionEntry(record: TerminalJobRecord(job: recorded), finishOrder: 0))
+        let importEntry = TranscriptionEntry(job: imported, finishOrder: nil)
+
+        XCTAssertEqual(fromJob.meetingStartTime, Self.at(minute: -100))
+        XCTAssertEqual(fromRecord.meetingStartTime, Self.at(minute: -100))
+        XCTAssertNil(importEntry.meetingStartTime)
+        XCTAssertEqual(importEntry.date, Self.at(minute: 40), "an import's row is still dated by when it was added")
+    }
+
     // MARK: - Status wording
 
     /// The window and the menu say the same thing about a job, whether it is
