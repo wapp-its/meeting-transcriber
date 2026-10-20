@@ -26,8 +26,10 @@ struct TranscriptionEntry: Identifiable, Equatable {
     /// it from the snapshot.
     let isLive: Bool
     /// Where the job stands among the finished ones in the order they
-    /// finished, higher meaning later, and nil while it is unfinished. Only
-    /// comparable between entries of one `TranscriptionList.entries` call.
+    /// finished, higher meaning later: its history record's index. Nil while
+    /// it is unfinished, and for a finished job the history holds no record
+    /// of. Only comparable between entries of one `TranscriptionList.entries`
+    /// call.
     let finishOrder: Int?
 
     /// What Open opens and Show in Finder reveals: the protocol, else the
@@ -89,12 +91,13 @@ enum TranscriptionList {
     /// jobs finished in, while the enqueue time is not: a retry keeps it. The
     /// index is taken before a live job replaces its record, so a finished
     /// live job ranks by its record too. A finished live job with no record
-    /// ranks below every record, among such jobs by when they were added. In
-    /// the app that is a failed job whose record the history's cap evicted:
-    /// the queue keeps failed jobs until they are removed, and such a job
+    /// has no finish order, which `menuSections` and `lastFinished` rank
+    /// below every record, among such jobs by when they were added. In the
+    /// app that is a failed job whose record the history's cap evicted: the
+    /// queue keeps failed jobs until they are removed, and such a job
     /// finished before anything still recorded.
     static func entries(liveJobs: [PipelineJob], records: [TerminalJobRecord]) -> [TranscriptionEntry] {
-        let finishOrder = finishOrders(liveJobs: liveJobs, records: records)
+        let finishOrder = finishOrders(records: records)
         var seen: Set<UUID> = []
         var listed: [TranscriptionEntry] = []
         for job in liveJobs {
@@ -117,18 +120,11 @@ enum TranscriptionList {
         }.map(\.element)
     }
 
-    /// The finish order of every job that has one: its record's index, or
-    /// below zero for a finished live job without a record.
-    private static func finishOrders(liveJobs: [PipelineJob], records: [TerminalJobRecord]) -> [UUID: Int] {
+    /// The finish order of every job the history records: its record's index.
+    private static func finishOrders(records: [TerminalJobRecord]) -> [UUID: Int] {
         var order: [UUID: Int] = [:]
         for (index, record) in records.enumerated() {
             if let id = UUID(uuidString: record.status.jobID) { order[id] = index }
-        }
-        let unrecorded = liveJobs.enumerated()
-            .filter { $0.element.state.isTerminal && order[$0.element.id] == nil }
-            .sorted { ($0.element.enqueuedAt, $0.offset) < ($1.element.enqueuedAt, $1.offset) }
-        for (rank, item) in unrecorded.enumerated() {
-            order[item.element.id] = rank - unrecorded.count
         }
         return order
     }
