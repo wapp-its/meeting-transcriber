@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-169-a-microphone-that-is-not-ready-is-not-a",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-20T18:31:47.857392Z",
   "created_at": "2026-10-20T11:38:58.479798Z",
   "default_impl": null,
   "default_review": null,
@@ -157,17 +157,54 @@
       "task": "gh-169-a-microphone-that-is-not-ready-is-not-a.1",
       "timestamp": "2026-10-20T18:23:58.369864Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "d61e309eda7bb86afb52ee5ee65bc00c4277928c75c8f99c1df83aa4db1d1b89",
+      "backend": "codex",
+      "base_sha": "5978abbfa707d12efba0c3b6cd608e758f965e52",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "407bbe23c071bc30825a521e31c517c3fd5a6ccc",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 354241,
+      "output_sha256": "39bacc57baceabd8549a709368b533ef745726c9ea82a0d310cfa4f3afb73fa1",
+      "reservation_id": "772e2264d9444ee3a167a5777ef19a47",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-20T18:31:47.818673Z",
+      "tool_calls": 26,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-169-a-microphone-that-is-not-ready-is-not-a.1": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-169-a-microphone-that-is-not-ready-is-not-a.1": 0,
     "plan": 0
   },
@@ -186,5 +223,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nThe menu bar icon showed the red permission badge for three days. The app had posted \"Microphone looks enabled but isn't working - toggle it off and on in System Settings\". The microphone grant was fine. Bringing the app to the front ran the check again, and it passed at once (48 kHz, signal present). So one failed check kept a false warning on the icon for days.\n\n## NOTES\n\n- The failed check ran about three minutes after the Mac woke from sleep. Both probe attempts (the retry from #124 included) logged `probeMicrophone: invalid format sampleRate=0.0 channels=0`. The input device had no format yet, so the engine never started. This says nothing about the grant.\n- `PermissionsController.check` runs only at launch and on `didBecomeActive`. A menu bar app is rarely activated, so the verdict stays until the user opens a window or restarts the app.\n- `checkMicrophone` turns every probe failure into `.broken`. The Accessibility probe already reports an inconclusive answer as healthy. The microphone probe has no such case.\n\n## TASKS\n\n- [ ] Report the probe failures that only show a device that is not ready (`noInputDevice`, `invalidFormat`) as inconclusive, not as a broken grant\n- [ ] Run the check again after wake from sleep and after a change of the default input device, so a false verdict clears without a click\n- [ ] Add tests: a probe that fails with an invalid format gives no badge and no notification. A later passing check clears the badge.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/169"
   },
-  "updated_at": "2026-10-20T18:23:58.651387Z"
+  "updated_at": "2026-10-20T18:31:47.861494Z"
 }
