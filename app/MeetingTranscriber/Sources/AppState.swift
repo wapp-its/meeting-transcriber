@@ -580,7 +580,6 @@ final class AppState {
             state: loop.transcriberState,
             detail: loop.detail,
             meeting: meeting,
-            protocolPath: nil,
             error: loop.lastError,
             audioPath: nil,
             pid: Int(ProcessInfo.processInfo.processIdentifier),

@@ -41,7 +41,6 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
                 state: state,
                 detail: "",
                 meeting: meeting,
-                protocolPath: nil,
                 error: error,
                 audioPath: nil,
                 pid: nil,

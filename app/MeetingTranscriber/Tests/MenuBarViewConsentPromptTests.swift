@@ -35,7 +35,6 @@ final class MenuBarViewConsentPromptTests: XCTestCase {
                 state: .watching,
                 detail: "",
                 meeting: nil,
-                protocolPath: nil,
                 error: nil,
                 audioPath: nil,
                 pid: nil,

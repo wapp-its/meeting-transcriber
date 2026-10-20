@@ -13,7 +13,6 @@ final class MenuBarViewTests: XCTestCase {
         state: TranscriberState = .idle,
         detail: String = "",
         meeting: MeetingInfo? = nil,
-        protocolPath: String? = nil,
         error: String? = nil,
     ) -> TranscriberStatus {
         TranscriberStatus(
@@ -22,7 +21,6 @@ final class MenuBarViewTests: XCTestCase {
             state: state,
             detail: detail,
             meeting: meeting,
-            protocolPath: protocolPath,
             error: error,
             audioPath: nil,
             pid: nil,
@@ -180,12 +178,11 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertEqual(openedURL, URL(fileURLWithPath: "/tmp/Retro.md"))
     }
 
-    /// No finished job, no item: a failed job does not count, and neither
-    /// does a protocol path left in the status file.
+    /// No finished job, no item: a failed job does not count.
     func testOpenLastProtocolHiddenWithoutAFinishedJob() throws {
         let failed = finishedJob(.error, protocolPath: nil, transcriptPath: "/tmp/Retro.txt")
         let body = try makeView(
-            status: makeStatus(state: .protocolReady, protocolPath: "/tmp/p.md"),
+            status: makeStatus(state: .protocolReady),
             history: [TerminalJobRecord(job: failed)],
         ).inspect()
         XCTAssertThrowsError(try body.find(text: "Open Last Protocol"))

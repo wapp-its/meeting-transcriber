@@ -5,13 +5,12 @@ final class NotificationContentTests: XCTestCase {
     private func makeStatus(
         state: TranscriberState,
         meeting: MeetingInfo? = nil,
-        protocolPath: String? = nil,
         error: String? = nil,
     ) -> TranscriberStatus {
         TranscriberStatus(
             version: 1, timestamp: "2026-03-03T10:00:00",
             state: state, detail: "", meeting: meeting,
-            protocolPath: protocolPath, error: error, audioPath: nil, pid: nil,
+            error: error, audioPath: nil, pid: nil,
         )
     }
 
@@ -41,7 +40,7 @@ final class NotificationContentTests: XCTestCase {
 
     func testProtocolReadyNotification() {
         let meeting = MeetingInfo(app: "Zoom", title: "Design Review", pid: 99)
-        let status = makeStatus(state: .protocolReady, meeting: meeting, protocolPath: "/tmp/protocol.md")
+        let status = makeStatus(state: .protocolReady, meeting: meeting)
 
         let content = NotificationManager.notificationContent(for: .protocolReady, status: status)
 
