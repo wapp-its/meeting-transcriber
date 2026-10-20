@@ -54,9 +54,48 @@ Today's Transcriptions window becomes "All Recordings": a toolbar with the searc
 - [ ] TBD
 
 ## Done summary
-TBD
+The window opened by "All Recordings…" is now titled "All Recordings" (scene id still `transcriptions`), with the search, "Open Protocols Folder" and "Regenerate from File…" in its toolbar, and each row shows the one main button `RecordingRowActions.mainAction` picks plus a "…" menu whose items the row's right-click menu repeats. "Open Protocols Folder" left the menu bar menu and `MenuActions`. File availability per row is cached in the new `RowAvailability` and read through the new `AllRecordingsActions.filesOnDisk`, which applies the regenerator's own transcript rule.
 
+- R3, title and menu: `MeetingTranscriberApp.transcriptionsWindow` is `Window("All Recordings", id: TranscriptionsView.windowID)`, same list source and query binding. `MenuBarMenuOrderTests/testTheMenuReadsInTheMockupsOrderWithItsShortcuts` no longer lists "Open Protocols Folder" (the one `.item` line dropped, as the run note asked), so the pinned full menu proves it absent.
+- R5, toolbar: `TranscriptionsViewTests/testOpenProtocolsFolderCallsItsAction` (moved from the two `MenuBarViewTests` folder tests) and `testRegenerateFromFileCallsRegenerateWithNoMeeting` (asserts `regenerate(nil)`). Search tests unchanged and green. The folder action is the App's old body moved as is into `AllRecordingsActions.openFolder` (creates the folder, opens it, no message). It is not unit-tested because it opens Finder, which was also true of the menu item.
+- R6, main button: `testEachRowsMainButtonCallsItsActionWithTheRowsJobOrFile` covers all six kinds with literal labels and the closure argument. Name Speakers hands the row's job id to `nameSpeakers` (A5), and Cancel reaches `cancel`. The error case (a finished job with neither file has no button) is the last assertion. The production `nameSpeakers` sets `appState.selectedNamingJobID` before `bringWindowToFront(id: "speaker-naming")`.
+- R7, "…" menu: `testEachMenuItemCallsItsActionWithTheRowsJobOrFile` taps all seven item kinds by `A11yID`. `testTheMoreMenuListsExactlyTheRowsMenuItems` asserts the menu's buttons equal `RecordingRowActions.menuItems` in order, Regenerate disabled exactly at `.regenerate(enabled: false)`, and "…" disabled for a running job. The context menu and the "…" menu render one `items` value per row (ViewInspector 0.10.3 cannot traverse `.contextMenu`, so parity rests on that shared value). Error cases: a missing file's item left out (`RowAvailabilityTests/testARemovedTranscriptLeavesTheMenuAtTheNextRefreshAndARestoredOneComesBack`, and the "No source" row above), Regenerate disabled without a source (same two tests), and a file gone after the menu was built (`testAMissingFileShowsTheMovedOrDeletedMessage`, main button and menu item both).
+- R7, cache: `RowAvailabilityTests` shows removal and restoration seen only after `refresh()` and the resolver called once per row between refreshes (`testARenderBetweenRefreshesReadsNoFile`). `testTheTranscriptSourceIsTheRegeneratorsOwnRule` covers `.none` for a blank or invalid-UTF-8 `.txt` without a full-transcript protocol, `.protocolOnly` with one, and `.transcriptFile`. `TranscriptionsViewTests/testARowActionReadsTheRowsFilesAgain` pins the after-action refresh in the view. A mutation run with the cache disabled turned two `RowAvailabilityTests` red (reverted, never committed).
+- R10: `TranscriptionsWindowPrivacyTests` is green with the same window id. `testNoIdentifierCarriesATitleParticipantOrPath` now lists the new index-only ids, the toolbar ones included.
+- Docs: `.github/README.md` and `docs/automation-api.md` say "All Recordings window" (Cmd-T kept). `CLAUDE.md` is untouched.
+
+baseline: green via handoff (green, verified at a4461bd5 by the conductor: both of the spec's Quick commands plus MenuBarMenuOrderTests, 128 tests, rc=0. a4461bd5..8ad3eb87 touched only .flow/). Lint baseline green (0 violations, 911 files).
+
+Gates at HEAD (ab073323). `flowctl gate classify` said FULL, so no GATE_SKIPPED line. Spec Quick command rc=0 with 117 tests (log /private/tmp/mt-gh170/task4/quick.log). `RecordingRowActionsTests` rc=0 with 9 tests (quick-rows.log). `MenuBarMenuOrderTests` rc=0 with 4 tests (order.log). `RowAvailabilityTests` rc=0 with 3 tests (row-availability.log). `./scripts/lint.sh` rc=0, 0 violations in 911 files, 0/932 files need formatting (lint.log). Not run, per the dispatch, is the clean `xcodebuild` build for `swiftlint analyze`. Every new declaration has a reader: the `AllRecordingsActions` members are read in `TranscriptionsView`, `noop` in the tests, the statics in `MeetingTranscriberApp`, and each new `A11yID` constant in the view and the tests. `MenuActions.openProtocolsFolder` and the four `A11yID.transcription*Button` ids are deleted. `MeetingTranscriberApp.swift` is 590 of 600 lines.
+
+Integration warning: the interim `regenerate` closure opens the old Regenerate Protocol window, which prefills the newest meeting (`latestTarget`), not the row's. Task .4 must therefore not ship without task .5. Notes for .5 are in the run-notes directory as `task4-integration.md`.
+
+Feature routes: the window is reached as before (menu "All Recordings…", Cmd-T) and is now titled "All Recordings". "Open Protocols Folder" moved from the menu bar menu to that window's toolbar.
+
+Tier: implementer - opus (explicit invocation) at xhigh effort (requested) (model: claude-opus-5-5)
+
+### Decisions
+
+- DECIDED: live window check skipped (installed app running, same bundle id); owner look-and-feel check needed after the PR builds
+- ASSUMED: one `ToolbarItemGroup` at the default placement holds the search field (240 pt wide), then "Open Protocols Folder", then "Regenerate from File…", and both buttons show title and icon (`.labelStyle(.titleAndIcon)`; a toolbar shows a `Label` as icon only otherwise) · alternatives: B - icon-only buttons with tooltips; C - the search at `.principal` and the buttons trailing · flip at: `TranscriptionsView.toolbarItems` · test: `TranscriptionsViewTests/testOpenProtocolsFolderCallsItsAction`, `testRegenerateFromFileCallsRegenerateWithNoMeeting`
+- ASSUMED: the "…" control is a borderless `Menu` labelled "More" with the `ellipsis.circle` icon only and no menu indicator · alternatives: B - a plain "…" text button; C - a bordered button · flip at: `TranscriptionsView.row(_:index:)` · test: `TranscriptionsViewTests/testTheMoreMenuListsExactlyTheRowsMenuItems`
+- ASSUMED: a row's transcript source is read from the two files beside `entry.fileToOpen` (protocol, else transcript), the file a user would pick in "Choose File…" · alternatives: B - beside the transcript first · flip at: `AllRecordingsActions.readFilesOnDisk` · test: `RowAvailabilityTests/testTheTranscriptSourceIsTheRegeneratorsOwnRule`. Task .5's row target should resolve from the same file.
+- DECIDED: Show in Finder reveals the protocol when it was on disk at the last read, else the transcript. With the recorded protocol gone and the transcript present, revealing the recorded protocol would answer "moved or deleted" for an item offered because of the transcript.
+- DECIDED: the rows' files are re-read after every row action, Cancel, Dismiss and Name Speakers included (the task lists open, reveal, retry, remove, regenerate). One code path, and those three change the entries anyway.
+- DECIDED: `onAppear` and `didBecomeKey` both refresh, as the AC names both, so opening the window reads each visible row up to three times (first draw, appear, key). The cost is bounded by the visible rows. `didBecomeKey` is filtered to this window by its identifier.
+- DECIDED: `row(_:index:)` computes `canRetry`, the files on disk and `items` once and passes them to the main button, the "…" menu and the context menu. The two menus then share one value by construction, and `canRetry` (a file existence check for a failed job) runs once per row draw.
+- DECIDED: the window's open, reveal and folder helpers moved from `MeetingTranscriberApp` into `AllRecordingsActions` statics (`openFile`, `revealFile`, `openFolder`, `readFilesOnDisk`). This keeps the App at 590 of 600 lines (rule 1, run note `task1-integration.md`), while the actions value is still built in the App next to the menu's (A5 flip point).
+- DECIDED: `AllRecordingsActions` is a `@MainActor` struct with plain closure types (rule 1, run note `task1-integration.md`).
+- DECIDED: the interim regenerate comment names the follow-up in plain words without a task id (rule 1, CLAUDE.md on internal identifiers in shared artifacts).
+- DECIDED: running rows still resolve their files although their menu is empty by state. This keeps one lookup path, and the cost is a few reads for the jobs in flight.
+- DECIDED: the placeholders "No transcriptions yet" / "No transcriptions match", `TranscriptionsFileNotice`, `TranscriptionsView` and `A11yID.transcriptionsSearchField` keep their names (the task keeps type names, and the search tests pin the field id).
+- DECIDED: stale label comments in `MenuActions.swift` updated to "Name Speakers…" and "Record with Options…" (dispatch instruction).
+
+stage: impl-review - ran [8ad3eb87..8d81e955] (codex:gpt-6-astra:xhigh, three draws correctness/contracts/integration, all SHIP, 0 findings; receipt /tmp/impl-review-receipt-d1cb77e1af10-gh-170-menu-sections-and-an-all-recordings.4.json)
+stage: wave-join - ran (lane f1444f3f..ab073323 cherry-picked onto 8ad3eb87 as 80c2b395..8d81e955; focused verify both Quick commands plus MenuBarMenuOrderTests and RowAvailabilityTests rc 0, 133 tests, log /private/tmp/mt-gh170/verify4/quick.log; the two ASSUMED lines above are recorded as A7 and A8 in the spec, commit 41e2b946)
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 80c2b395b99c6452cae02ac4e7e284ec0b9b4a87, 49ff9648e4a52f98725f9a6ed9d91ba876eeb4cf, 5b82c059d5905847d12fe312da3a2eb1b42a5cf7, ab1f74cad0b2bf5005d79b34a3caf061d8bd56d1, 8d81e95558110f689904b4d5df0a2bf11f98e8e6
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh170/home swift test --parallel --filter '<spec Quick command 1 filter>|RecordingRowActionsTests|MenuBarMenuOrderTests|RowAvailabilityTests' (rc 0, 133 tests); ./scripts/lint.sh (rc 0, 0 violations in 911 files)
 - PRs:
