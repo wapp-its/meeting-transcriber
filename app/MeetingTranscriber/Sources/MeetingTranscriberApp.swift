@@ -85,7 +85,7 @@ private struct WindowAccessor: NSViewRepresentable {
 struct MeetingTranscriberApp: App {
     @State private var appState = AppState(notifier: NotificationManager.shared)
     @State private var captionsWindow: LiveCaptionsWindowController?
-    // The Transcriptions window's search text, kept while the window is closed.
+    // The All Recordings window's search text, kept while the window is closed.
     // Read only through `$transcriptionsQuery`. Built with Xcode 27, `swiftlint
     // analyze` does not see a reference made through the projected value and
     // reports the property as unused.
@@ -195,6 +195,28 @@ struct MeetingTranscriberApp: App {
             quit: quit,
             selectMicrophone: { appState.settings.micDeviceUID = $0 },
             selectOutput: { appState.output.select(uid: $0) },
+        )
+    }
+
+    private var allRecordingsActions: AllRecordingsActions {
+        AllRecordingsActions(
+            openProtocol: { AllRecordingsActions.openFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
+            openTranscript: { AllRecordingsActions.openFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
+            reveal: { AllRecordingsActions.revealFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
+            // The Regenerate Protocol window for now, without the row's meeting,
+            // until a sheet of the All Recordings window takes this over.
+            regenerate: { _ in bringWindowToFront(id: RegenerateProtocolView.windowID) },
+            retry: { appState.pipeline.retryJob(id: $0) },
+            remove: { appState.pipeline.removeFailedJob(id: $0) },
+            dismiss: { appState.pipelineQueue.removeJob(id: $0) },
+            cancel: { appState.pipelineQueue.cancelJob(id: $0) },
+            nameSpeakers: { id in
+                appState.selectedNamingJobID = id
+                bringWindowToFront(id: "speaker-naming")
+            },
+            openProtocolsFolder: { AllRecordingsActions.openFolder(appState.settings.effectiveOutputDir) },
+            canRetry: { appState.pipeline.canRetryJob(id: $0) },
+            filesOnDisk: { AllRecordingsActions.readFilesOnDisk(of: $0, scopeRoot: appState.settings.effectiveOutputDir) },
         )
     }
 
@@ -352,11 +374,7 @@ struct MeetingTranscriberApp: App {
             TranscriptionsView(
                 entries: appState.pipeline.transcriptionEntries,
                 query: $transcriptionsQuery,
-                canRetry: { appState.pipeline.canRetryJob(id: $0) },
-                onOpen: openTranscriptionFile,
-                onReveal: revealTranscriptionFile,
-                onRetry: { appState.pipeline.retryJob(id: $0) },
-                onRemove: { appState.pipeline.removeFailedJob(id: $0) },
+                actions: allRecordingsActions,
             )
             // Starts the pipeline the way an import does, so failed jobs from an
             // earlier session are in the queue and can be retried. Also runs when
@@ -518,22 +536,6 @@ struct MeetingTranscriberApp: App {
         }
     }
 
-    /// The Transcriptions window's Open, inside the output folder's security
-    /// scope like a job line's. False when the file is gone, so the window can
-    /// say so.
-    private func openTranscriptionFile(_ url: URL) -> Bool {
-        TranscriptionFileOpener.perform(url, scopeRoot: appState.settings.effectiveOutputDir) { file in
-            NSWorkspace.shared.open(file)
-        }
-    }
-
-    /// The Transcriptions window's Show in Finder, under the same rule as Open.
-    private func revealTranscriptionFile(_ url: URL) -> Bool {
-        TranscriptionFileOpener.perform(url, scopeRoot: appState.settings.effectiveOutputDir) { file in
-            NSWorkspace.shared.activateFileViewerSelecting([file])
-        }
-    }
-
     private func quit() {
         appState.watching.watchLoop?.stop()
         NSApplication.shared.terminate(nil)
@@ -584,7 +586,7 @@ struct MeetingTranscriberApp: App {
     }
 
     /// "Open Last Protocol": the file inside the output folder's security
-    /// scope, through the check the Transcriptions window's Open makes. When
+    /// scope, through the check the All Recordings window's Open makes. When
     /// the file is gone the window says "The file was moved or deleted."; the
     /// menu has closed by then, so the same sentence arrives as a notification.
     static func openLastProtocol(

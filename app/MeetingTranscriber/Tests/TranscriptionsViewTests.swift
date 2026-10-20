@@ -3,11 +3,14 @@ import SwiftUI
 import ViewInspector
 import XCTest
 
-/// The Transcriptions window's wiring: what each control hands to the closure
+/// The All Recordings window's wiring: what each control hands to the action
 /// or binding it was given, which rows a query leaves, and what a row says. The
-/// list itself (merge, order, search rule) is covered by `TranscriptionListTests`.
+/// list itself (merge, order, search rule) is covered by `TranscriptionListTests`,
+/// and which buttons and items a row gets by `RecordingRowActionsTests`.
 @MainActor
 final class TranscriptionsViewTests: XCTestCase {
+    private typealias FilesOnDisk = RecordingRowActions.FilesOnDisk
+
     /// What the search field's binding writes to, so a test reads the typed
     /// text without reaching into SwiftUI's state.
     private final class QueryBox {
@@ -18,22 +21,39 @@ final class TranscriptionsViewTests: XCTestCase {
         _ entries: [TranscriptionEntry],
         query: String = "",
         queryBox: QueryBox? = nil,
-        canRetry: @escaping (UUID) -> Bool = { _ in false },
-        onOpen: @escaping (URL) -> Bool = { _ in true },
-        onReveal: @escaping (URL) -> Bool = { _ in true },
-        onRetry: @escaping (UUID) -> Void = { _ in },
-        onRemove: @escaping (UUID) -> Void = { _ in },
+        actions: AllRecordingsActions = .noop,
     ) -> TranscriptionsView {
         let box = queryBox ?? QueryBox()
         box.text = query
         return TranscriptionsView(
             entries: entries,
             query: Binding(get: { box.text }, set: { box.text = $0 }),
-            canRetry: canRetry,
-            onOpen: onOpen,
-            onReveal: onReveal,
-            onRetry: onRetry,
-            onRemove: onRemove,
+            actions: actions,
+        )
+    }
+
+    /// Every action and its argument, in the order they were called.
+    private func recording(into calls: @escaping (String) -> Void, base: AllRecordingsActions = .noop) -> AllRecordingsActions {
+        var actions = base
+        actions.openProtocol = { calls("openProtocol \($0.path)"); return true }
+        actions.openTranscript = { calls("openTranscript \($0.path)"); return true }
+        actions.reveal = { calls("reveal \($0.path)"); return true }
+        actions.regenerate = { calls("regenerate \($0?.id.uuidString ?? "none")") }
+        actions.retry = { calls("retry \($0)") }
+        actions.remove = { calls("remove \($0)") }
+        actions.dismiss = { calls("dismiss \($0)") }
+        actions.cancel = { calls("cancel \($0)") }
+        actions.nameSpeakers = { calls("nameSpeakers \($0)") }
+        actions.openProtocolsFolder = { calls("openProtocolsFolder") }
+        return actions
+    }
+
+    /// The files the entry recorded are all on disk, the transcript readable.
+    private static func recordedFilesOnDisk(_ entry: TranscriptionEntry) -> FilesOnDisk {
+        FilesOnDisk(
+            protocolExists: entry.protocolURL != nil,
+            transcriptExists: entry.transcriptURL != nil,
+            transcriptSource: entry.transcriptURL != nil ? .transcriptFile : .none,
         )
     }
 
@@ -95,76 +115,174 @@ final class TranscriptionsViewTests: XCTestCase {
         XCTAssertThrowsError(try empty.find(text: "No transcriptions match"))
     }
 
-    // MARK: - Open and Show in Finder
+    // MARK: - Main button
 
-    /// Open and Show in Finder take the protocol, else the transcript; an
-    /// entry with neither file offers neither.
-    func testOpenAndShowInFinderHandTheEntrysFileToTheirClosures() throws {
-        var opened: [URL] = []
-        var revealed: [URL] = []
+    /// Each row shows the one button its state calls for, labelled by it, and
+    /// hands that action the row's own job or file; a failed row also shows
+    /// its error, and a finished job with neither file has no button.
+    func testEachRowsMainButtonCallsItsActionWithTheRowsJobOrFile() throws {
+        let running = entry("Running", state: .transcribing)
+        let naming = entry("Naming", state: .speakerNamingPending)
+        let withProtocol = entry("Protocol", protocolPath: "/out/p.md", transcriptPath: "/out/p.txt")
+        let transcriptOnly = entry("Transcript", transcriptPath: "/out/t.txt")
+        let retryable = entry("Retryable", state: .error, error: "Diarization failed")
+        let refused = entry("Refused", state: .error, error: "Audio file missing")
+        let neither = entry("Neither")
+        var calls: [String] = []
+        var base = AllRecordingsActions.noop
+        base.canRetry = { $0 == retryable.id }
         let sut = makeView(
-            [
-                entry("Both", protocolPath: "/out/both.md", transcriptPath: "/out/both.txt"),
-                entry("Transcript only", transcriptPath: "/out/only.txt"),
-                entry("Neither", state: .error, error: "Transcription failed"),
-            ],
-            onOpen: { opened.append($0); return true },
-            onReveal: { revealed.append($0); return true },
+            [running, naming, withProtocol, transcriptOnly, retryable, refused, neither],
+            actions: recording(into: { calls.append($0) }, base: base),
         )
+        let expected: [(label: String, call: String)] = [
+            ("Cancel", "cancel \(running.id)"),
+            ("Name Speakers", "nameSpeakers \(naming.id)"),
+            ("Open Protocol", "openProtocol /out/p.md"),
+            ("Open Transcript", "openTranscript /out/t.txt"),
+            ("Retry", "retry \(retryable.id)"),
+            ("Remove", "remove \(refused.id)"),
+        ]
 
-        try button(A11yID.transcriptionOpenButton(0), in: sut).tap()
-        try button(A11yID.transcriptionRevealButton(1), in: sut).tap()
+        for (index, want) in expected.enumerated() {
+            let main = try button(A11yID.recordingMainButton(index), in: sut)
+            XCTAssertEqual(try main.labelView().text().string(), want.label)
+            try main.tap()
+        }
 
-        XCTAssertEqual(opened, [URL(fileURLWithPath: "/out/both.md")])
-        XCTAssertEqual(revealed, [URL(fileURLWithPath: "/out/only.txt")])
-        XCTAssertThrowsError(try button(A11yID.transcriptionOpenButton(2), in: sut))
-        XCTAssertThrowsError(try button(A11yID.transcriptionRevealButton(2), in: sut))
+        XCTAssertEqual(calls, expected.map(\.call))
+        XCTAssertNoThrow(try sut.inspect().find(text: "Audio file missing"))
+        XCTAssertThrowsError(try button(A11yID.recordingMainButton(6), in: sut), "a finished job with neither file")
+    }
+
+    // MARK: - The "…" menu
+
+    /// Each item of a row's "…" menu, labelled, hands its action the row's own
+    /// job or file. Show in Finder reveals the protocol, else the transcript,
+    /// whichever was on disk.
+    func testEachMenuItemCallsItsActionWithTheRowsJobOrFile() throws {
+        let finished = entry("Finished", protocolPath: "/out/f.md", transcriptPath: "/out/f.txt")
+        let protocolGone = entry("Protocol gone", protocolPath: "/out/g.md", transcriptPath: "/out/g.txt")
+        let failed = entry("Failed", state: .error, error: "Diarization failed", transcriptPath: "/out/e.txt")
+        let naming = entry("Naming", state: .speakerNamingPending)
+        var calls: [String] = []
+        var base = AllRecordingsActions.noop
+        base.canRetry = { $0 == failed.id }
+        base.filesOnDisk = { entry in
+            entry.id == protocolGone.id
+                ? FilesOnDisk(protocolExists: false, transcriptExists: true, transcriptSource: .transcriptFile)
+                : Self.recordedFilesOnDisk(entry)
+        }
+        let sut = makeView(
+            [finished, protocolGone, failed, naming],
+            actions: recording(into: { calls.append($0) }, base: base),
+        )
+        let taps: [(id: String, label: String, call: String)] = [
+            (A11yID.recordingMenuOpenProtocol(0), "Open Protocol", "openProtocol /out/f.md"),
+            (A11yID.recordingMenuOpenTranscript(0), "Open Transcript", "openTranscript /out/f.txt"),
+            (A11yID.recordingMenuShowInFinder(0), "Show in Finder", "reveal /out/f.md"),
+            (A11yID.recordingMenuRegenerate(0), "Regenerate Protocol…", "regenerate \(finished.id)"),
+            (A11yID.recordingMenuShowInFinder(1), "Show in Finder", "reveal /out/g.txt"),
+            (A11yID.recordingMenuRetry(2), "Retry", "retry \(failed.id)"),
+            (A11yID.recordingMenuRemove(2), "Remove", "remove \(failed.id)"),
+            (A11yID.recordingMenuDismiss(3), "Dismiss", "dismiss \(naming.id)"),
+        ]
+
+        for tap in taps {
+            let item = try button(tap.id, in: sut)
+            XCTAssertEqual(try item.labelView().text().string(), tap.label)
+            try item.tap()
+        }
+
+        XCTAssertEqual(calls, taps.map(\.call))
+    }
+
+    /// The "…" menu holds exactly `RecordingRowActions.menuItems` for its row,
+    /// in that order, Regenerate disabled without a transcript source; a
+    /// running job's menu is empty and its "…" disabled.
+    func testTheMoreMenuListsExactlyTheRowsMenuItems() throws {
+        let rows: [(entry: TranscriptionEntry, onDisk: FilesOnDisk, canRetry: Bool)] = [
+            (
+                entry("Both", protocolPath: "/out/b.md", transcriptPath: "/out/b.txt"),
+                FilesOnDisk(protocolExists: true, transcriptExists: true, transcriptSource: .transcriptFile), false,
+            ),
+            (
+                entry("No source", protocolPath: "/out/n.md", transcriptPath: "/out/n.txt"),
+                FilesOnDisk(protocolExists: true, transcriptExists: false, transcriptSource: .none), false,
+            ),
+            (
+                entry("Failed", state: .error, error: "Failed", protocolPath: "/out/e.md"),
+                FilesOnDisk(protocolExists: true, transcriptExists: false, transcriptSource: .protocolOnly), true,
+            ),
+            (
+                entry("Naming", state: .speakerNamingPending, transcriptPath: "/out/d.txt"),
+                FilesOnDisk(protocolExists: false, transcriptExists: true, transcriptSource: .transcriptFile), false,
+            ),
+            (
+                entry("Running", state: .diarizing, transcriptPath: "/out/r.txt"),
+                FilesOnDisk(protocolExists: false, transcriptExists: true, transcriptSource: .transcriptFile), false,
+            ),
+        ]
+        var actions = AllRecordingsActions.noop
+        actions.canRetry = { id in rows.contains { $0.entry.id == id && $0.canRetry } }
+        actions.filesOnDisk = { entry in rows.first { $0.entry.id == entry.id }?.onDisk ?? Self.recordedFilesOnDisk(entry) }
+        let sut = makeView(rows.map(\.entry), actions: actions)
+
+        for (index, row) in rows.enumerated() {
+            let expected = RecordingRowActions.menuItems(state: row.entry.state, onDisk: row.onDisk, canRetry: row.canRetry)
+            let menu = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.recordingMoreButton(index))
+            let items = menu.findAll(ViewType.Button.self)
+
+            XCTAssertEqual(
+                try items.map { try $0.accessibilityIdentifier() },
+                expected.map { TranscriptionsView.identifier(of: $0, index: index) },
+                row.entry.title,
+            )
+            XCTAssertEqual(items.map { $0.isDisabled() }, expected.map { $0 == .regenerate(enabled: false) }, row.entry.title)
+            XCTAssertEqual(menu.isDisabled(), expected.isEmpty, row.entry.title)
+        }
     }
 
     /// A file that is gone says so in the window instead of nothing happening,
-    /// and the next action that finds its file takes the message away.
+    /// whether the main button or a menu item tried it, and the next action
+    /// that finds its file takes the message away.
     func testAMissingFileShowsTheMovedOrDeletedMessage() throws {
         let message = "The file was moved or deleted."
-        let sut = makeView(
-            [entry("Retro", protocolPath: "/out/retro.md")],
-            onOpen: { _ in false },
-            onReveal: { _ in true },
-        )
+        var actions = AllRecordingsActions.noop
+        actions.openProtocol = { _ in false }
+        actions.filesOnDisk = { _ in FilesOnDisk(protocolExists: true, transcriptExists: false, transcriptSource: .none) }
+        let sut = makeView([entry("Retro", protocolPath: "/out/retro.md")], actions: actions)
         XCTAssertThrowsError(try sut.inspect().find(text: message))
 
-        try button(A11yID.transcriptionOpenButton(0), in: sut).tap()
+        try button(A11yID.recordingMainButton(0), in: sut).tap()
         XCTAssertNoThrow(try sut.inspect().find(text: message))
 
-        try button(A11yID.transcriptionRevealButton(0), in: sut).tap()
+        try button(A11yID.recordingMenuShowInFinder(0), in: sut).tap()
         XCTAssertThrowsError(try sut.inspect().find(text: message))
+
+        try button(A11yID.recordingMenuOpenProtocol(0), in: sut).tap()
+        XCTAssertNoThrow(try sut.inspect().find(text: message))
     }
 
-    // MARK: - Failed entries
+    /// A row action reads the rows' files again at the next draw; drawing
+    /// again without one reads nothing.
+    func testARowActionReadsTheRowsFilesAgain() throws {
+        var reads = 0
+        var actions = AllRecordingsActions.noop
+        actions.filesOnDisk = { entry in
+            reads += 1
+            return Self.recordedFilesOnDisk(entry)
+        }
+        let sut = makeView([entry("Retro", protocolPath: "/out/retro.md")], actions: actions)
+        let draw = { _ = try sut.inspect().find(text: "Retro") }
 
-    /// A failed row shows its error, Retry only where the pipeline would
-    /// accept it, and Remove; a done row has neither action.
-    func testAFailedRowShowsItsErrorRetryWhenAcceptedAndRemove() throws {
-        let refused = entry("Refused", state: .error, error: "Audio file missing")
-        let accepted = entry("Accepted", state: .error, error: "Diarization failed")
-        let done = entry("Done", protocolPath: "/out/done.md")
-        var retried: [UUID] = []
-        var removed: [UUID] = []
-        let sut = makeView(
-            [refused, accepted, done],
-            canRetry: { $0 == accepted.id || $0 == done.id },
-            onRetry: { retried.append($0) },
-            onRemove: { removed.append($0) },
-        )
+        try draw()
+        try draw()
+        XCTAssertEqual(reads, 1)
 
-        XCTAssertNoThrow(try sut.inspect().find(text: "Audio file missing"))
-        XCTAssertThrowsError(try button(A11yID.transcriptionRetryButton(0), in: sut))
-        try button(A11yID.transcriptionRetryButton(1), in: sut).tap()
-        try button(A11yID.transcriptionRemoveButton(0), in: sut).tap()
-        XCTAssertEqual(retried, [accepted.id])
-        XCTAssertEqual(removed, [refused.id])
-
-        XCTAssertThrowsError(try button(A11yID.transcriptionRetryButton(2), in: sut), "Retry offered on a done row")
-        XCTAssertThrowsError(try button(A11yID.transcriptionRemoveButton(2), in: sut), "Remove offered on a done row")
+        try button(A11yID.recordingMainButton(0), in: sut).tap()
+        try draw()
+        XCTAssertEqual(reads, 2)
     }
 
     // MARK: - Detail line
@@ -204,17 +322,21 @@ final class TranscriptionsViewTests: XCTestCase {
             "Board Meeting", state: .error, participants: ["Dana Scully"], error: "Failed",
             protocolPath: "/out/board-meeting.md",
         )
-        // swiftlint:disable:next trailing_closure
-        let identifiers = try makeView([failed], canRetry: { _ in true }).inspect()
+        var actions = AllRecordingsActions.noop
+        actions.canRetry = { _ in true }
+        actions.filesOnDisk = { Self.recordedFilesOnDisk($0) }
+        let identifiers = try makeView([failed], actions: actions).inspect()
             .findAll { (try? $0.accessibilityIdentifier()) != nil }
             .map { try $0.accessibilityIdentifier() }
 
         XCTAssertEqual(Set(identifiers), [
             A11yID.transcriptionsSearchField,
-            A11yID.transcriptionOpenButton(0),
-            A11yID.transcriptionRevealButton(0),
-            A11yID.transcriptionRetryButton(0),
-            A11yID.transcriptionRemoveButton(0),
+            A11yID.recordingMainButton(0),
+            A11yID.recordingMoreButton(0),
+            A11yID.recordingMenuOpenProtocol(0),
+            A11yID.recordingMenuShowInFinder(0),
+            A11yID.recordingMenuRetry(0),
+            A11yID.recordingMenuRemove(0),
         ])
     }
 }

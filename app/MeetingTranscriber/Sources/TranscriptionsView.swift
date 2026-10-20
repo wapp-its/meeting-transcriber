@@ -12,8 +12,10 @@ final class TranscriptionsFileNotice {
     var fileMissing = false
 }
 
-/// The Transcriptions window: every job the app knows, newest first, searched
-/// by title and participant, with the actions each entry allows.
+/// The All Recordings window: every job the app knows, newest first, searched
+/// by title and participant. Each row has the one main button its state calls
+/// for and a "…" menu, which its right-click menu repeats, both decided by
+/// `RecordingRowActions`.
 ///
 /// Data and actions arrive as stored properties, the way `SettingsView` takes
 /// them, so the view reads no app state of its own. The query is a binding for
@@ -23,40 +25,28 @@ final class TranscriptionsFileNotice {
 /// every debug RPC window allowlist, and its row identifiers carry the row's
 /// index only.
 struct TranscriptionsView: View {
+    typealias MainAction = RecordingRowActions.MainAction
+    typealias MenuItem = RecordingRowActions.MenuItem
+    typealias FilesOnDisk = RecordingRowActions.FilesOnDisk
+
     nonisolated static let windowID = "transcriptions"
 
     let entries: [TranscriptionEntry]
     let query: Binding<String>
-    /// Whether the pipeline would accept a retry of this job now.
-    let canRetry: (UUID) -> Bool
-    /// Open and Show in Finder return false when the file is gone.
-    let onOpen: (URL) -> Bool
-    let onReveal: (URL) -> Bool
-    let onRetry: (UUID) -> Void
-    let onRemove: (UUID) -> Void
+    let actions: AllRecordingsActions
 
     @State private var notice: TranscriptionsFileNotice
+    @State private var availability: RowAvailability
 
-    init(
-        entries: [TranscriptionEntry],
-        query: Binding<String>,
-        canRetry: @escaping (UUID) -> Bool,
-        onOpen: @escaping (URL) -> Bool,
-        onReveal: @escaping (URL) -> Bool,
-        onRetry: @escaping (UUID) -> Void,
-        onRemove: @escaping (UUID) -> Void,
-    ) {
+    init(entries: [TranscriptionEntry], query: Binding<String>, actions: AllRecordingsActions) {
         self.entries = entries
         self.query = query
-        self.canRetry = canRetry
-        self.onOpen = onOpen
-        self.onReveal = onReveal
-        self.onRetry = onRetry
-        self.onRemove = onRemove
-        // Created here, not as the property's default: SwiftUI defers creating
+        self.actions = actions
+        // Created here, not as the properties' defaults: SwiftUI defers creating
         // an `@Observable` default until the view is installed, so a view that
         // never is (one under test) would read a new object every time.
         _notice = State(initialValue: TranscriptionsFileNotice())
+        _availability = State(initialValue: RowAvailability())
     }
 
     // Sections hoisted out of `body`, each type-checked on its own budget (see
@@ -69,6 +59,12 @@ struct TranscriptionsView: View {
             listOrPlaceholder
         }
         .frame(minWidth: 560, minHeight: 320)
+        // The moments the rows' files are read again (see `RowAvailability`).
+        .onAppear { availability.refresh() }
+        .onChange(of: entries) { availability.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
+            if (note.object as? NSWindow)?.identifier?.rawValue == Self.windowID { availability.refresh() }
+        }
     }
 
     // MARK: - Sections
@@ -114,8 +110,13 @@ struct TranscriptionsView: View {
 
     // MARK: - Row
 
+    /// The "…" menu and the right-click menu are one list by construction:
+    /// both are built from the same `items`.
     private func row(_ entry: TranscriptionEntry, index: Int) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        let canRetry = actions.canRetry(entry.id)
+        let onDisk = availability.filesOnDisk(for: entry, resolve: actions.filesOnDisk)
+        let items = RecordingRowActions.menuItems(state: entry.state, onDisk: onDisk, canRetry: canRetry)
+        return HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(entry.title)
                     .fontWeight(.medium)
@@ -127,10 +128,21 @@ struct TranscriptionsView: View {
                 outcome(entry)
             }
             Spacer(minLength: 12)
-            fileActions(entry, index: index)
-            failureActions(entry, index: index)
+            mainButton(entry, canRetry: canRetry, index: index)
+            Menu {
+                rowMenu(items, entry: entry, onDisk: onDisk, index: index)
+            } label: {
+                Label("More", systemImage: "ellipsis.circle")
+                    .labelStyle(.iconOnly)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .disabled(items.isEmpty)
+            .accessibilityIdentifier(A11yID.recordingMoreButton(index))
         }
         .padding(.vertical, 4)
+        .contextMenu { rowMenu(items, entry: entry, onDisk: onDisk, index: index) }
     }
 
     /// The line under a row's title: app, date and time, and duration, each
@@ -168,29 +180,96 @@ struct TranscriptionsView: View {
 
     // MARK: - Actions
 
-    /// Open and Show in Finder act on the protocol, else the transcript; an
-    /// entry with neither has neither button.
+    /// Follows the files the job recorded, not the disk: a file gone since
+    /// still gets its button, and the button says it was moved or deleted.
     @ViewBuilder
-    private func fileActions(_ entry: TranscriptionEntry, index: Int) -> some View {
-        if let url = entry.fileToOpen {
-            Button("Open") { notice.fileMissing = !onOpen(url) }
-                .accessibilityIdentifier(A11yID.transcriptionOpenButton(index))
-            Button("Show in Finder") { notice.fileMissing = !onReveal(url) }
-                .accessibilityIdentifier(A11yID.transcriptionRevealButton(index))
+    private func mainButton(_ entry: TranscriptionEntry, canRetry: Bool, index: Int) -> some View {
+        let recorded = RecordingRowActions.RecordedFiles(
+            hasProtocol: entry.protocolURL != nil, hasTranscript: entry.transcriptURL != nil,
+        )
+        if let action = RecordingRowActions.mainAction(state: entry.state, files: recorded, canRetry: canRetry) {
+            Button(Self.title(of: action)) { perform(action, on: entry) }
+                .accessibilityIdentifier(A11yID.recordingMainButton(index))
         }
     }
 
-    /// Retry where the pipeline would accept it now, and Remove, on a failed
-    /// entry only.
-    @ViewBuilder
-    private func failureActions(_ entry: TranscriptionEntry, index: Int) -> some View {
-        if entry.state == .error {
-            if canRetry(entry.id) {
-                Button("Retry") { onRetry(entry.id) }
-                    .accessibilityIdentifier(A11yID.transcriptionRetryButton(index))
-            }
-            Button("Remove") { onRemove(entry.id) }
-                .accessibilityIdentifier(A11yID.transcriptionRemoveButton(index))
+    /// The row's "…" menu and its right-click menu, one builder for both.
+    /// `onDisk` comes from `availability`, never from the disk: SwiftUI builds
+    /// both menus on every redraw of the row.
+    private func rowMenu(_ items: [MenuItem], entry: TranscriptionEntry, onDisk: FilesOnDisk, index: Int) -> some View {
+        ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+            Button(Self.title(of: item)) { perform(item, on: entry, onDisk: onDisk) }
+                .disabled(item == .regenerate(enabled: false))
+                .accessibilityIdentifier(Self.identifier(of: item, index: index))
+        }
+    }
+
+    private func perform(_ action: MainAction, on entry: TranscriptionEntry) {
+        switch action {
+        case .cancel: actions.cancel(entry.id)
+        case .nameSpeakers: actions.nameSpeakers(entry.id)
+        case .openProtocol: open(entry.protocolURL, with: actions.openProtocol)
+        case .openTranscript: open(entry.transcriptURL, with: actions.openTranscript)
+        case .retry: actions.retry(entry.id)
+        case .remove: actions.remove(entry.id)
+        }
+        availability.refresh()
+    }
+
+    /// Show in Finder reveals the protocol, else the transcript, whichever
+    /// was there when the menu was built.
+    private func perform(_ item: MenuItem, on entry: TranscriptionEntry, onDisk: FilesOnDisk) {
+        switch item {
+        case .openProtocol: open(entry.protocolURL, with: actions.openProtocol)
+        case .openTranscript: open(entry.transcriptURL, with: actions.openTranscript)
+        case .showInFinder: open(onDisk.protocolExists ? entry.protocolURL : entry.transcriptURL, with: actions.reveal)
+        case .regenerate: actions.regenerate(entry)
+        case .retry: actions.retry(entry.id)
+        case .remove: actions.remove(entry.id)
+        case .dismiss: actions.dismiss(entry.id)
+        }
+        availability.refresh()
+    }
+
+    /// A file that is gone says so in the window, and the next action that
+    /// finds its file takes the message away.
+    private func open(_ url: URL?, with action: (URL) -> Bool) {
+        guard let url else { return }
+        notice.fileMissing = !action(url)
+    }
+
+    static func title(of action: MainAction) -> String {
+        switch action {
+        case .cancel: "Cancel"
+        case .nameSpeakers: "Name Speakers"
+        case .openProtocol: "Open Protocol"
+        case .openTranscript: "Open Transcript"
+        case .retry: "Retry"
+        case .remove: "Remove"
+        }
+    }
+
+    static func title(of item: MenuItem) -> String {
+        switch item {
+        case .openProtocol: "Open Protocol"
+        case .openTranscript: "Open Transcript"
+        case .showInFinder: "Show in Finder"
+        case .regenerate: "Regenerate Protocol…"
+        case .retry: "Retry"
+        case .remove: "Remove"
+        case .dismiss: "Dismiss"
+        }
+    }
+
+    static func identifier(of item: MenuItem, index: Int) -> String {
+        switch item {
+        case .openProtocol: A11yID.recordingMenuOpenProtocol(index)
+        case .openTranscript: A11yID.recordingMenuOpenTranscript(index)
+        case .showInFinder: A11yID.recordingMenuShowInFinder(index)
+        case .regenerate: A11yID.recordingMenuRegenerate(index)
+        case .retry: A11yID.recordingMenuRetry(index)
+        case .remove: A11yID.recordingMenuRemove(index)
+        case .dismiss: A11yID.recordingMenuDismiss(index)
         }
     }
 }

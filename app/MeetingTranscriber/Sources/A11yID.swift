@@ -74,7 +74,7 @@ enum A11yID {
         "jobRemoveButton.\(index)"
     }
 
-    /// Menu bar item that opens the Transcriptions window, "All Recordings…".
+    /// Menu bar item that opens the All Recordings window, "All Recordings…".
     static let allRecordingsMenuItem = "allRecordingsMenuItem"
 
     /// The menu's "Name Speakers…", the first line of "Needs you". Tests find
@@ -99,26 +99,48 @@ enum A11yID {
     /// allowlist like `updateInstallButton`.
     static let menuInstallUpdateButton = "menuInstallUpdateButton"
 
-    // Transcriptions window. Its rows show meeting titles and participants,
-    // so the per-row buttons are addressed by ROW INDEX in the filtered list,
+    // All Recordings window. Its rows show meeting titles and participants,
+    // so the per-row controls are addressed by ROW INDEX in the filtered list,
     // like `jobRetryButton`, and no identifier carries a title, participant or
     // path.
     static let transcriptionsSearchField = "transcriptionsSearchField"
 
-    static func transcriptionOpenButton(_ index: Int) -> String {
-        "transcriptionOpenButton.\(index)"
+    /// A row's one main button, whose label follows the row's state.
+    static func recordingMainButton(_ index: Int) -> String {
+        "recordingMainButton.\(index)"
     }
 
-    static func transcriptionRevealButton(_ index: Int) -> String {
-        "transcriptionRevealButton.\(index)"
+    /// A row's "…" menu, whose items its right-click menu repeats.
+    static func recordingMoreButton(_ index: Int) -> String {
+        "recordingMoreButton.\(index)"
     }
 
-    static func transcriptionRetryButton(_ index: Int) -> String {
-        "transcriptionRetryButton.\(index)"
+    static func recordingMenuOpenProtocol(_ index: Int) -> String {
+        "recordingMenuOpenProtocol.\(index)"
     }
 
-    static func transcriptionRemoveButton(_ index: Int) -> String {
-        "transcriptionRemoveButton.\(index)"
+    static func recordingMenuOpenTranscript(_ index: Int) -> String {
+        "recordingMenuOpenTranscript.\(index)"
+    }
+
+    static func recordingMenuShowInFinder(_ index: Int) -> String {
+        "recordingMenuShowInFinder.\(index)"
+    }
+
+    static func recordingMenuRegenerate(_ index: Int) -> String {
+        "recordingMenuRegenerate.\(index)"
+    }
+
+    static func recordingMenuRetry(_ index: Int) -> String {
+        "recordingMenuRetry.\(index)"
+    }
+
+    static func recordingMenuRemove(_ index: Int) -> String {
+        "recordingMenuRemove.\(index)"
+    }
+
+    static func recordingMenuDismiss(_ index: Int) -> String {
+        "recordingMenuDismiss.\(index)"
     }
 
     /// The menu's answers to the open recording prompt. No app name, for the
