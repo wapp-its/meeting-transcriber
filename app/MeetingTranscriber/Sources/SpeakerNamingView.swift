@@ -76,28 +76,61 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
         _rows = State(
             initialValue: SpeakerNamingRowState(names: Self.computeInitialNames(speakers: speakerList)),
         )
-        let initialMode = currentDiarizerMode ?? .offline
-        _rerunMode = State(initialValue: initialMode)
-        let initialCount = max(2, speakerList.count + 1)
-        _rerunCount = State(initialValue: Self.clampCount(initialCount, for: initialMode))
+        _rerunMode = State(initialValue: currentDiarizerMode ?? .offline)
+        _rerunCount = State(initialValue: Self.initialRerunCount(labels: speakerList.map(\.label)))
         // Initialize the grace-period gate to "active" when the period is positive
         // so the buttons start disabled. When tests pass gracePeriod = 0 the gate
         // starts open (no grace) and the unlock task is a no-op.
         _keyboardGracePeriodActive = State(initialValue: gracePeriod > 0)
     }
 
-    /// Clamp a desired speaker count to the cap that applies for the
-    /// given mode. Returns at most the upper bound of `rerunCountRange`
-    /// so callers can write the result back into the Stepper without
-    /// risking an out-of-range value on the next frame.
-    /// Pure so tests can pin it without instantiating the view.
-    static func clampCount(_ count: Int, for mode: DiarizerMode) -> Int {
-        max(1, min(count, rerunCountRange(for: mode).upperBound))
+    /// Smallest width the dialog can be shown at. The window scene uses
+    /// `.windowResizability(.contentSize)`, so this is also the narrowest the
+    /// window opens at, and every control in the re-run area has to fit it
+    /// without truncation (`SpeakerNamingRerunLayoutTests`).
+    static let minimumWidth: CGFloat = 400
+
+    /// Range of the re-run count. The count is read by the Standard method
+    /// only (`DiarizerMode.countsSpeakersItself`), so the range is Standard's
+    /// and does not change with the picked method.
+    static let rerunCountRange = 1 ... DiarizerMode.offline.speakerCap
+
+    /// The count the dialog starts at: one more than the speakers the count
+    /// applies to, because the user opens this control when the result has
+    /// too few. In a two-track recording the count applies to the call audio
+    /// only (the microphone track is always diarized automatically), so with
+    /// track-prefixed labels only the call audio's (`R_`) speakers are counted.
+    /// Unprefixed labels (a single file, or a two-track job where one track's
+    /// diarization failed and the other's labels were kept bare) count every
+    /// speaker: the naming data does not say which track survived, and a
+    /// starting value the user can change in one click did not justify
+    /// persisting that. At least 2, at most Standard's cap.
+    static func initialRerunCount(labels: some Sequence<String>) -> Int {
+        let keys = labels.map(SpeakerKey.init(encoded:))
+        let prefixed = keys.contains { $0.track != .single }
+        let counted = keys.filter { !prefixed || $0.track == .app }.count
+        return min(max(2, counted + 1), rerunCountRange.upperBound)
     }
 
-    /// Re-run Stepper range for the given mode.
-    static func rerunCountRange(for mode: DiarizerMode) -> ClosedRange<Int> {
-        1 ... mode.speakerCap
+    /// Label of the count control. Names the call audio for a two-track job,
+    /// because that is the only track the count applies to.
+    static func rerunCountLabel(count: Int, isDualSource: Bool) -> String {
+        isDualSource ? "Speakers in the call audio: \(count)" : "Speakers: \(count)"
+    }
+
+    /// Shown under the count of a two-track job.
+    static let micSideNote = "Your microphone side is always counted automatically."
+
+    /// Hint shown in place of the count while an overlap-aware method is
+    /// picked; `nil` for Standard. Per track, never per meeting: the earlier
+    /// "caps at 4 speakers" hint read as a meeting limit and was contradicted
+    /// by the two-track result it sat under (issue #163).
+    static func rerunMethodHint(mode: DiarizerMode, isDualSource: Bool) -> String? {
+        guard mode.countsSpeakersItself else { return nil }
+        let cap = mode.speakerCap
+        return isDualSource
+            ? "\(mode.displayName) counts the speakers itself: up to \(cap) in the call audio and \(cap) on your microphone."
+            : "\(mode.displayName) counts the speakers itself: up to \(cap)."
     }
 
     /// Identity of the current grace window. Changing it re-locks the buttons.
@@ -127,53 +160,75 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
         Self.computeSpeakers(from: data)
     }
 
-    /// Re-run controls: mode picker, speaker-count Stepper, and Re-run button.
-    /// Stepper range narrows in Sortformer mode (1...4) and Nemotron 3 mode
-    /// (1...8); mode-flip clamps `rerunCount` to the new range. Re-run posts
-    /// `.rerunWithMode(mode, count)` when the picked mode differs from
-    /// `currentDiarizerMode`, otherwise the legacy `.rerun(count)` form (so
-    /// consumers that don't care about mode-switching stay unaffected).
+    /// Re-run controls on two lines: the method picker across the full width,
+    /// then either the count (Standard) or the hint that the method counts
+    /// the speakers itself (Sortformer, Nemotron 3), with the Re-run button
+    /// at the end of that line. Two lines because the single row this
+    /// replaced (label, 280 pt picker, stepper, button) was wider than the
+    /// dialog's minimum width, and at that width SwiftUI truncated its texts.
+    /// Now the only fixed-width items on a line are the stepper and the
+    /// button; the texts wrap. Re-run posts `.rerunWithMode(mode, count)`
+    /// when the caller tracks the job's method, otherwise the legacy
+    /// `.rerun(count)` form (so consumers that don't care about
+    /// mode-switching stay unaffected); in the overlap-aware modes the count
+    /// travels along and the diarizer ignores it, as it always did.
     private var rerunSection: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 8) {
-                Text("Wrong count?").font(.caption).foregroundStyle(.secondary)
-                // Hide the mode picker for callers that don't track per-job
-                // diarizer mode (currently the voice-enrollment flow): they
-                // can't honour `.rerunWithMode`, so a visible-but-inert
-                // picker would silently discard the user's choice.
-                if currentDiarizerMode != nil {
-                    rerunModePicker
-                }
-                Stepper(
-                    "\(rerunCount) speakers", value: $rerunCount,
-                    in: Self.rerunCountRange(for: rerunMode),
-                )
-                .font(.caption)
-                .accessibilityIdentifier(A11yID.rerunStepper)
-                rerunButton
+        VStack(alignment: .leading, spacing: 8) {
+            // Hide the mode picker for callers that don't track per-job
+            // diarizer mode (currently the voice-enrollment flow): they
+            // can't honour `.rerunWithMode`, so a visible-but-inert
+            // picker would silently discard the user's choice.
+            if currentDiarizerMode != nil {
+                rerunModePicker
             }
-            if currentDiarizerMode != nil, rerunMode != .offline {
-                Text("\(rerunMode.shortLabel) caps at \(rerunMode.speakerCap) speakers — switch to Offline for larger meetings.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier(A11yID.speakerCapHint)
+            HStack(alignment: .top, spacing: 12) {
+                if let hint = Self.rerunMethodHint(mode: rerunMode, isDualSource: data.isDualSource) {
+                    Text(hint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier(A11yID.rerunMethodHint)
+                } else {
+                    rerunCountControl
+                }
+                rerunButton
             }
         }
     }
 
+    private var rerunCountControl: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Stepper(
+                Self.rerunCountLabel(count: rerunCount, isDualSource: data.isDualSource),
+                value: $rerunCount,
+                in: Self.rerunCountRange,
+            )
+            .font(.caption)
+            .fixedSize()
+            .accessibilityIdentifier(A11yID.rerunStepper)
+            if data.isDualSource {
+                Text(Self.micSideNote)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier(A11yID.rerunMicSideNote)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var rerunModePicker: some View {
         Picker("", selection: $rerunMode) {
-            Text(DiarizerMode.sortformer.shortLabel).tag(DiarizerMode.sortformer)
-            Text(DiarizerMode.offline.shortLabel).tag(DiarizerMode.offline)
-            Text(DiarizerMode.nemotron.shortLabel).tag(DiarizerMode.nemotron)
+            ForEach(DiarizerMode.displayOrder, id: \.self) { mode in
+                Text(mode.displayName).tag(mode)
+            }
         }
         .pickerStyle(.segmented)
-        .frame(width: 280)
+        .labelsHidden()
+        .frame(maxWidth: .infinity)
         .font(.caption)
         .accessibilityIdentifier(A11yID.rerunModePicker)
-        .onChange(of: rerunMode) { _, newMode in
-            rerunCount = Self.clampCount(rerunCount, for: newMode)
-        }
     }
 
     private var rerunButton: some View {
@@ -197,6 +252,8 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
             }
         }
         .font(.caption)
+        // Never shrinks or wraps: the texts on its line give way instead.
+        .fixedSize()
         .accessibilityIdentifier(A11yID.rerunButton)
     }
 
@@ -265,7 +322,7 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
             escapeDismissShortcut
         }
         .padding()
-        .frame(minWidth: 400, maxHeight: 700)
+        .frame(minWidth: Self.minimumWidth, maxHeight: 700)
         .id(data.meetingTitle)
         .onAppear { resetForCurrentPresentation() }
         // After Re-run, lateDiarization replaces the SpeakerNamingData for
@@ -345,13 +402,8 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
         // Re-seed `rerunMode` from the prop so cross-job dialog switches
         // (same view identity, different data) start with the correct
         // picker selection instead of inheriting the previous job's mode.
-        // Then clamp the count to the active mode's Stepper range so the
-        // value never sits outside `in:` on first frame (Sortformer caps
-        // at 4 even when the diarizer detected 4 speakers, which would
-        // otherwise compute max(2, 4+1) = 5).
-        let mode = currentDiarizerMode ?? rerunMode
-        rerunMode = mode
-        rerunCount = Self.clampCount(max(2, speakers.count + 1), for: mode)
+        rerunMode = currentDiarizerMode ?? rerunMode
+        rerunCount = Self.initialRerunCount(labels: speakers.map(\.label))
     }
 
     private func speakerRow(

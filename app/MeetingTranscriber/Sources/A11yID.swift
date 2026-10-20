@@ -174,7 +174,9 @@ enum A11yID {
     static let silentTrackWatchdogToggle = "silentTrackWatchdogToggle"
     static let levelBalanceToggle = "levelBalanceToggle"
     static let experimentalTuningDisclosure = "experimentalTuningDisclosure"
-    static let speakerCapHint = "speaker-cap-hint"
+    static let diarizationMethodPicker = "diarizationMethodPicker"
+    static let diarizationMethodHint = "diarizationMethodHint"
+    static let expectedSpeakersStepper = "expectedSpeakersStepper"
 
     /// One permission row's request button in Settings → Advanced → Permissions.
     static func permissionRequestButton(_ kind: PermissionKind) -> String {
@@ -252,6 +254,12 @@ enum A11yID {
     static let rerunButton = "rerun-button"
     static let rerunStepper = "rerun-stepper"
     static let rerunModePicker = "rerun-mode-picker"
+    /// The dialog's hint that the picked method counts the speakers itself
+    /// (Sortformer, Nemotron 3); absent while Standard is picked.
+    static let rerunMethodHint = "rerun-method-hint"
+    /// The line under the Standard count of a two-track job saying the
+    /// microphone side is counted automatically; absent for a single file.
+    static let rerunMicSideNote = "rerun-mic-side-note"
 
     /// Per-speaker play button (`play-<label>`); the label varies at runtime.
     static func play(_ speakerLabel: String) -> String {

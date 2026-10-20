@@ -1,0 +1,151 @@
+{
+  "branch_name": "gh-170-menu-sections-and-an-all-recordings",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-20T11:41:12.136854Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [
+    "gh-105-watching-pauses-during-a-recording-and"
+  ],
+  "id": "gh-170-menu-sections-and-an-all-recordings",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-20T11:53:54.462267Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "84f0e93aa969c0e2c310a7828a3fd7851d3d1b3cae2f3c6d9cb5c935ed774d66",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-d33a7ff785e133425a2010a3ec05ffd3",
+            "classification": "introduced",
+            "findingId": "finding-d33a7ff785e133425a2010a3ec05ffd3",
+            "firstSeenThisRound": true,
+            "severity": "P0",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-dc7905f2ae2f2db241b43cc4b475233d",
+            "classification": "introduced",
+            "findingId": "finding-dc7905f2ae2f2db241b43cc4b475233d",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "5680e5c4fcf08b8b16afb05144b9fbaa63a5c4bd",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 323928,
+      "output_sha256": "31d6492adf478fd147f4055a4fd61a10109a412ca801549299cc506f3fca6b56",
+      "reservation_id": "14c3b26d74614503b3b61afaf0175dff",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-20T11:53:09.632234Z",
+      "tool_calls": 22,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "6a4ebddee336eb657a1789ba2bc2b59a9c1c681a43a951b14a351e534abd1296",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-d33a7ff785e133425a2010a3ec05ffd3",
+            "classification": "introduced",
+            "findingId": "finding-d33a7ff785e133425a2010a3ec05ffd3",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-dc7905f2ae2f2db241b43cc4b475233d",
+            "classification": "introduced",
+            "findingId": "finding-dc7905f2ae2f2db241b43cc4b475233d",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "5680e5c4fcf08b8b16afb05144b9fbaa63a5c4bd",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 695,
+      "output_sha256": "e2fe1bb0e1a5464532a0df28454ae7ff7cc478f75982d1b2fe8ec20f12b60bcc",
+      "reservation_id": "ac9118cf1b304894a4538b45c9390904",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-20T11:53:54.427536Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-170-menu-sections-and-an-all-recordings.md",
+  "status": "open",
+  "title": "Menu sections and an All Recordings window",
+  "tracker": {
+    "baseHashFlow": "90a977a7da11807c13deb276f42adf39266ad28792b9b54d01015ba204c441bd",
+    "baseHashTracker": "b3cbf0060eb7b8f7fcb16772750bba1dc009075029a74e4e323778d476290b53",
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABYhuEBw",
+    "identifier": "#170",
+    "lastSyncedAt": "2026-10-20T11:56:17.524306Z",
+    "linkState": "linked",
+    "mergeBaseFlow": "# Menu sections and an All Recordings window\n\n## Conversation Evidence\n\n> owner (paraphrased, 2026-10-20): rearrange and split the menu with headings and sections. Microphone and output get their own section with a heading.\n> owner (paraphrased, 2026-10-20): the items from \"Record Microphone Only\" down to the file import form one group. Which heading fits them?\n> owner (paraphrased, 2026-10-20): the protocol management could move into one menu entry, maybe \"All Recordings\", that opens an overview of all recordings. Regenerating the protocol, transcribing again, diarizing again, opening the folder and similar actions live in that window.\n> owner (selected, 2026-10-20): \"A: Mockup + renames (Recommended)\", the menu mockup with the headings \"Record & Import\", \"Audio Devices\", \"Recordings\" and two renamed items.\n> owner (selected, 2026-10-20): \"Last Protocol + All Recordings (Recommended)\", the newest protocol stays one click away and the folder, regenerate and re-run actions move into the window.\n> owner (selected, 2026-10-20): \"Two specs, after #105 (Recommended)\", this spec moves today's actions into the menu sections and the window (with #156 and #140); transcribing again and identifying speakers again follow in #171 together with #97.\n> owner (selected, 2026-10-20): \"Mockup OK (Recommended)\", the four-board mockup of the All Recordings window, its row menu, the regenerate sheet and the menu.\n> issue #170: the accepted layout in words; #156 (one actions value instead of loose closures, one device picker) and #140 (menu code left unused) are done in the same change.\n\n## Goal & Context\n\n<!-- Source: 60% [paraphrase] / 25% owner-selected / 15% [inferred] -->\n\nThe menu bar menu lists about a dozen items with dividers but no headings. Recording, devices and results are mixed: \"Open Protocols Folder\" and \"Regenerate Protocol\u2026\" sit next to \"Open Last Protocol\" and \"All Transcriptions\u2026\", and every new result action would add another line. The owner wants headed sections, and one window that holds everything you can do with a finished recording. [paraphrase]\n\nThis spec does the first half: the menu gets its three headed sections, and today's Transcriptions window becomes \"All Recordings\" and takes over the result actions that leave the menu. Transcribing a recording again and identifying its speakers again are new capabilities. They follow in #171, together with showing and deleting the audio per meeting (#97), because both need the audio file per recording, which the list does not store yet.\n\nThe same change also does #156: the menu view stops taking about twenty loose callbacks and takes one actions value, and the microphone and output pickers share one implementation. It also settles #140's two leftovers from the last menu rework. Doing it here touches the menu once instead of twice. [paraphrase]\n\nWho it is for: everyone who uses the menu bar menu. Why now: the owner asked for it after looking for a result action in the menu. It comes after #105, as the direction check #154 asks.\n\nUpstream check (2026-10-20): the original project has no open issue or pull request about the menu layout, a recordings window or regenerating a protocol.\n\n## Architecture & Data Models\n\n<!-- Source: 50% owner-selected mockup / 50% [inferred] -->\n\n- **Menu, top to bottom** (accepted mockup): the open recording prompt when there is one (unchanged); the status block (status line and detail, the control under it, the meeting line, an error line), as #105 leaves it; then the section **Record & Import** with \"Record Microphone Only\" (\u2318M), \"Record with Options\u2026\" (\u2318R) and \"Import Audio/Video Files\u2026\" (\u2318P); the section **Audio Devices** with the Microphone and Output entries; the job groups \"In progress\" and \"Needs you\" as today; the section **Recordings** with \"Open Last Protocol\" (\u2318O) and \"All Recordings\u2026\" (\u2318T); then the update item when one is offered; \"Settings\u2026\" (\u2318,); \"Quit\" (\u2318Q).\n- A section heading is a non-interactive heading line inside the menu, not a clickable item. [inferred]\n- \"Name Speakers\u2026\" (\u2318N) appears as the first line of the \"Needs you\" group, which exists whenever a job waits for names. [inferred]\n- **The window** keeps its list source (the same entries the menu's job groups come from) and its search. It is titled \"All Recordings\". Its toolbar holds the search field, \"Open Protocols Folder\" and \"Regenerate from File\u2026\".\n- **Each row** keeps its text lines (title; app, date and time, duration; status; error or warnings) and gets one main button that depends on its state, plus a \"\u2026\" button whose menu also opens on a right-click on the row. The row's actions come from one pure decision (state and available files in, main action and menu items out), so they are tested without the view. [inferred]\n- **Regenerate Protocol** becomes a sheet of the All Recordings window. From a row it opens with that row's meeting filled in. From \"Regenerate from File\u2026\" it opens without a meeting and offers \"Choose File\u2026\" as today. The form inside (template, background info, the Trash note, Cancel and Generate) is today's form. The separate Regenerate Protocol window goes away. [paraphrase]\n- **One menu actions value** replaces the loose callbacks the menu view takes today, and one device picker serves both the microphone and the output entries (#156). [paraphrase]\n\n## API Contracts\n\n<!-- Source: 100% [inferred] -->\n\n- The automation API is unchanged. `/ui/tree` and `/ui/press` keep their window allowlist: the All Recordings window shows meeting titles and participants, so it stays off the allowlist like the Transcriptions window today. [inferred]\n\n## Edge Cases & Constraints\n\n<!-- Source: 100% [inferred] -->\n\n- \"Record Microphone Only\" keeps its disabled state and its reason (no microphone set, or a recording already running). [inferred]\n- \"Open Last Protocol\" is shown only while a finished job with a file exists, as today. The Recordings heading and \"All Recordings\u2026\" are always shown. [inferred]\n- The Audio Devices heading is left out when neither the Microphone nor the Output entry is shown. [inferred]\n- A row whose protocol or transcript file was moved or deleted shows today's \"The file was moved or deleted.\" message when an action on it fails. [inferred]\n- \"Regenerate Protocol\u2026\" on a row is disabled only when the row has no usable transcript source: neither a transcript file nor a protocol that contains the full transcript. With \"Save raw transcript separately\" off, the transcript file is deleted after the job, and today's regenerator then reads the full transcript from the protocol, so such a row stays enabled. The sheet's Generate stays disabled when protocol generation is off or the app is in record-only mode, as today. [inferred]\n\n## Acceptance Criteria\n\n- **R1:** The menu shows its items in the order of the accepted mockup, under the non-interactive headings \"Record & Import\", \"Audio Devices\" and \"Recordings\", with the shortcuts \u2318M, \u2318R, \u2318P, \u2318O, \u2318T, \u2318, and \u2318Q on the items named in Architecture. Errors: \"Record Microphone Only\" disabled with its reason when no microphone is set or a recording runs; \"Open Last Protocol\" absent while no finished job has a file; the Audio Devices heading absent when neither device entry is shown. [paraphrase]\n- **R2:** \"Process Audio/Video Files\u2026\" reads \"Import Audio/Video Files\u2026\" and \"Start Recording with Options\u2026\" reads \"Record with Options\u2026\". Each keeps its action and its shortcut. No error surface beyond R1. [paraphrase]\n- **R3:** The menu no longer contains \"Open Protocols Folder\" or \"Regenerate Protocol\u2026\". \"All Transcriptions\u2026\" reads \"All Recordings\u2026\" and opens the window titled \"All Recordings\". No error surface beyond R1. [paraphrase]\n- **R4:** \"Name Speakers\u2026\" (\u2318N) is the first line of the \"Needs you\" group and is shown exactly when a job waits for speaker names. No error surface beyond R1. [inferred]\n- **R5:** The All Recordings window's toolbar has the search field (same matching as today), \"Open Protocols Folder\" (opens the output folder as the old menu item did) and \"Regenerate from File\u2026\" (opens the regenerate sheet without a meeting, with \"Choose File\u2026\"). Errors: unchanged from the old menu item, which creates a missing output folder first and shows no message when the folder cannot be opened; this spec adds no new error surface there. [paraphrase]\n- **R6:** Each row has one main button by state: Cancel while the job waits or runs; Name Speakers while it waits for names; Open Protocol when finished with a protocol, Open Transcript when finished with only a transcript; Retry when it failed and can be retried, Remove when it failed and cannot. Errors: a finished job with neither file has no main button. [paraphrase]\n- **R7:** Each row has a \"\u2026\" button, and a right-click on the row opens the same menu. It lists, where they apply: Open Protocol, Open Transcript, Show in Finder, Regenerate Protocol\u2026, Retry, Remove (failed jobs only), Dismiss (jobs waiting for names only). Errors: an item whose file is missing is left out, and Regenerate Protocol\u2026 is disabled only when the row has no usable transcript source (no transcript file and no protocol that contains the full transcript). [paraphrase]\n- **R8:** \"Regenerate Protocol\u2026\" on a row opens the regenerate sheet over the window with that row's meeting (title, date and protocol file name) filled in and no \"Choose File\u2026\" step. Generate writes the new protocol as today, including moving the old one to the Trash. Errors: generation off or record-only mode keeps Generate disabled as today; a generation failure shows today's error in the sheet. [paraphrase]\n- **R9:** The menu view takes one actions value instead of separate callbacks, and the Microphone and Output entries are built by one shared picker; #140's two leftovers (`TranscriberStatus.protocolPath` and the negative-rank branch of the finish order) are removed, or kept with a comment that names their remaining reader. No error surface beyond R1. [paraphrase]\n- **R10:** The row decision of R6 and R7 is a pure function covered by unit tests for every job state and for the three transcript sources (a separate transcript file, only the transcript inside the protocol, neither), and each new or moved control has one ViewInspector wiring test located by an `A11yID` constant, per the repo's GUI testing rules. The All Recordings window stays off the `/ui/tree` window allowlist. [inferred]\n\n## Boundaries\n\n- No \"Transcribe Again\u2026\" or \"Identify Speakers Again\u2026\" actions (#171). [paraphrase]\n- No audio size, playback or deletion per meeting (#97). [paraphrase]\n- No change to the search itself (#67, #126). [inferred]\n- No change to the status block beyond what #105 does. [inferred]\n- The \"In progress\" and \"Needs you\" groups keep their rows and actions; only \"Name Speakers\u2026\" moves into \"Needs you\". [inferred]\n- No live audio levels in the Audio Devices section (#150). [inferred]\n\n## Decision Context\n\n### Motivation\n\n- **D1 \u00b7 The menu has three headed sections, \"Record & Import\", \"Audio Devices\" and \"Recordings\", and two items are renamed (\"Import Audio/Video Files\u2026\", \"Record with Options\u2026\").** why: the owner picked mockup A over keeping the old names, because \"Process\u2026\" under a record heading reads oddly \u00b7 status: active [owner-ratified 2026-10-20]\n- **D2 \u00b7 \"Open Last Protocol\" and \"All Recordings\u2026\" stay in the menu; the folder and regenerate actions move into the window.** why: the newest protocol stays one click away, everything else lives in one place \u00b7 status: active [owner-ratified 2026-10-20]\n- **D3 \u00b7 Two specs: this one moves today's actions; transcribing again and identifying speakers again follow in #171 with #97.** why: both new actions need the audio path per recording, which #97 has to settle first \u00b7 status: active [owner-ratified 2026-10-20]\n- **D4 \u00b7 The accepted mockup is the layout: rows with one main button and a \"\u2026\" menu that also opens on right-click; toolbar with search, \"Open Protocols Folder\" and \"Regenerate from File\u2026\"; regenerate as a sheet with the row's meeting filled in.** why: the owner accepted the four boards on 2026-10-20 (\"Mockup OK\") \u00b7 alternatives: every row action as a visible button, as today (with up to seven actions the rows get too wide and wrap on a small window) \u00b7 status: active [owner-ratified 2026-10-20]\n- **D5 \u00b7 Built after #105.** why: the direction check #154 puts #105 and #63 before more enhancements, and #105 changes the status block this menu builds on \u00b7 status: active [owner-ratified 2026-10-20]\n- **A1 \u00b7 \"Name Speakers\u2026\" moves into the \"Needs you\" group.** flip at: the menu layout \u00b7 test: R4's wiring test \u00b7 status: active [agent-inferred 2026-10-20]\n- **A2 \u00b7 The update item stays a group of its own, directly above \"Settings\u2026\".** flip at: the menu layout \u00b7 test: R1's order test \u00b7 status: active [agent-inferred 2026-10-20]\n- **A3 \u00b7 \"Regenerate from File\u2026\" opens the sheet without a meeting; only a row opens it with one.** flip at: the regenerate sheet's opening state \u00b7 test: R5 \u00b7 alternatives: dropping \"Regenerate from File\u2026\" (transcripts from before the list existed are not in it and could not get a new protocol anymore) \u00b7 status: active [agent-inferred 2026-10-20]\n- **A4 \u00b7 The separate Regenerate Protocol window is removed; the sheet replaces it.** flip at: the app's window scenes \u00b7 test: R3 \u00b7 status: active [agent-inferred 2026-10-20]\n",
+    "mergeBaseTracker": "## BACKGROUND\n\nThe menu bar menu shows its items in one long run with dividers but no headings. Recording, devices and results are mixed. The owner asked for headed sections and for one place that holds everything you can do with a finished recording (paraphrased, 2026-10-20).\n\n## NOTES\n\n- Accepted mockup, menu (2026-10-20): three headings, \"Record & Import\", \"Audio Devices\" and \"Recordings\". \"Process Audio/Video Files\u2026\" becomes \"Import Audio/Video Files\u2026\" and \"Start Recording with Options\u2026\" becomes \"Record with Options\u2026\". The \"In progress\" and \"Needs you\" groups stay as they are.\n- The Recordings group keeps only \"Open Last Protocol\" and \"All Recordings\u2026\". \"Open Protocols Folder\" and \"Regenerate Protocol\u2026\" leave the menu.\n- Accepted mockup, window (2026-10-20): the Transcriptions window from #13 becomes \"All Recordings\". Each row gets one main button that depends on its state (Open Protocol, Name Speakers, Retry, Cancel) and a \"\u2026\" button. That menu also opens on right-click and holds Open Protocol, Open Transcript, Show in Finder and Regenerate Protocol\u2026. The toolbar holds the search field, \"Open Protocols Folder\" and \"Regenerate from File\u2026\".\n- \"Regenerate Protocol\u2026\" on a row opens today's form as a sheet with that meeting filled in. \"Regenerate from File\u2026\" opens it with the file picker, for transcripts that are not in the list.\n- The same change also does #156 (one actions value instead of 21 closures, one device picker) and #140 (menu code left unused).\n- Comes after #105, as #154 asks. Transcribe again and identify speakers again follow in a second issue.\n\n## TASKS\n\n- [ ] Capture a flow-next spec from this issue and the mockup\n- [ ] Build the menu headings and the All Recordings window as in the mockup",
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/170"
+  },
+  "updated_at": "2026-10-20T11:56:17.524597Z"
+}

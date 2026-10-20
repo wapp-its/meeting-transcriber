@@ -58,34 +58,56 @@ enum DiarizerMode: String, CaseIterable, Codable {
     case sortformer
     case nemotron
 
-    var label: String {
-        switch self {
-        case .offline: "Offline (Clustering)"
-        case .sortformer: "Sortformer (Overlap-aware)"
-        case .nemotron: "Nemotron 3 (8 speakers)"
-        }
-    }
+    /// The order every method picker lists the methods in (Settings and the
+    /// naming dialog's re-run picker): the default first, then the two
+    /// overlap-aware models by size. One list, so the two pickers cannot
+    /// drift apart again (issue #163).
+    static let displayOrder: [Self] = [.offline, .sortformer, .nemotron]
 
-    /// Name without the qualifier, for the places that are too narrow for
-    /// `label` (the naming dialog's re-run picker) or that already state the
-    /// qualifier themselves (the speaker-cap hints).
-    var shortLabel: String {
+    /// The name the user sees. `offline` is the speech library's name for its
+    /// clustering diarizer; all three methods run on the Mac, so calling only
+    /// this one "Offline" told the user nothing true about the others. It is
+    /// "Standard" because it is the default and the only one without a hard
+    /// speaker cap. The raw values stay as they are: they are persisted in
+    /// settings, in recorded jobs and on `/state`.
+    var displayName: String {
         switch self {
-        case .offline: "Offline"
+        case .offline: "Standard"
         case .sortformer: "Sortformer"
         case .nemotron: "Nemotron 3"
         }
     }
 
-    /// Maximum selectable speaker count for this mode. Sortformer's cap
-    /// is a hard architectural limit (`SortformerConfig.numSpeakers = 4`
+    /// One line on what the method does, shown under its name in Settings.
+    /// "Per side" because a recorded call is two tracks (the call audio and
+    /// the microphone), each diarized on its own, so the cap applies to each
+    /// of them and not to the meeting.
+    var methodDescription: String {
+        switch self {
+        case .offline: "Any number of speakers. Groups similar voices."
+        case .sortformer: "Handles people talking at the same time. Up to \(speakerCap) speakers per side."
+        case .nemotron: "Handles people talking at the same time. Up to \(speakerCap) speakers per side."
+        }
+    }
+
+    /// Whether the model decides the speaker count itself. Sortformer and
+    /// Nemotron 3 have a fixed number of output slots and ignore
+    /// `AppSettings.numSpeakers` (and the dialog's re-run count); only the
+    /// clustering diarizer takes a count. Both the Settings count row and the
+    /// dialog's count control are shown only when this is false, because a
+    /// control the model never reads cannot do what it says.
+    var countsSpeakersItself: Bool {
+        self != .offline
+    }
+
+    /// Maximum speaker count per diarized track for this mode. Sortformer's
+    /// cap is a hard architectural limit (`SortformerConfig.numSpeakers = 4`
     /// in FluidAudio), and so is Nemotron 3's (`Nemotron3Config.numSpeakers
-    /// = 8`, the checkpoint's eight output slots). Offline's cap is the
+    /// = 8`, the checkpoint's eight output slots). Standard's cap is the
     /// upper bound of the Settings Stepper — the diarizer has no hard
     /// limit, but anything above 10 is past the useful range for typical
-    /// meetings. Surfaced as a
-    /// single source of truth so the Stepper ranges in Settings + the
-    /// SpeakerNamingView re-run UI + the cap-hint label all agree.
+    /// meetings. Per track, not per meeting: a two-track recording can carry
+    /// up to twice this many speakers, which is what the hints say.
     var speakerCap: Int {
         switch self {
         case .offline: 10
