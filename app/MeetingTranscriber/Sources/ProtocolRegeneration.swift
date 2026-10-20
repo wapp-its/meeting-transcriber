@@ -314,6 +314,26 @@ final class ProtocolRegenerator {
         }
     }
 
+    /// The meeting of a row of the All Recordings window. Its files are the two
+    /// beside the row's protocol, else beside its transcript, the same ones the
+    /// row's menu read (`AllRecordingsActions.readFilesOnDisk`); its title,
+    /// start and job are the row's own. The history is not asked: a failed job
+    /// stays listed after the history dropped its record, and `resolve` would
+    /// then take the title from the file name and know no start or job.
+    func target(for entry: TranscriptionEntry) throws -> ProtocolRegenerationTarget {
+        guard let file = entry.fileToOpen else { throw ProtocolRegenerationError.noTranscript }
+        let folder = file.deletingLastPathComponent()
+        let basename = file.deletingPathExtension().lastPathComponent
+        let files = withOutputScope {
+            ProtocolRegenerationTarget.readFiles(folder: folder, basename: basename, read: environment.fileOperations.read)
+        }
+        guard files.transcript != nil else { throw ProtocolRegenerationError.noTranscript }
+        return ProtocolRegenerationTarget(
+            folder: folder, basename: basename, title: entry.title,
+            meetingStartTime: entry.meetingStartTime, jobID: entry.id.uuidString, files: files,
+        )
+    }
+
     /// Generates, then replaces the meeting's protocol; the outcome lands in
     /// `phase` and a notification. Ignored while a run is going. `notes` join
     /// a success's warnings.
