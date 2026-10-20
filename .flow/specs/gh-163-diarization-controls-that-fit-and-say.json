@@ -11,9 +11,10 @@
   "impl_review_rounds": {},
   "next_task": 1,
   "no_plan": true,
-  "plan_review_rounds": 1,
-  "plan_review_status": "needs_work",
-  "plan_reviewed_at": "2026-10-20T10:49:30.363755Z",
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-20T10:50:42.178269Z",
+  "ready": true,
   "review_attempts": [
     {
       "artifact_sha256": "001b3e9b8f11356ff060918eda07443f850a54dc7c3ac876a10bd2bc2724f54d",
@@ -59,9 +60,56 @@
       "timestamp": "2026-10-20T10:49:30.325463Z",
       "tool_calls": 21,
       "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "d59d03a6847fa07db03db8a3096d1b09b5b6a9080a2e9500e713e7d3ad2610f3",
+      "backend": "codex",
+      "base_sha": "7e9bef4a2ca9eab2d3237252bb6f00d24c20fb24",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-1ffb409ac169728498f95d9d930eb121",
+            "classification": "introduced",
+            "findingId": "finding-1ffb409ac169728498f95d9d930eb121",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "55039fa87a625a33f6a1a4789e1bf7a3c5389bc4",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 533,
+      "output_sha256": "39b2c7c5aece7d2f8b9ee7a7d1febeee5f6749e025a10c64dd2e1e9be9a1f309",
+      "reservation_id": "4a1d306773c244a690b07688d956593a",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-20T10:50:42.146236Z",
+      "verdict": "SHIP"
     }
   ],
-  "review_hash_epoch": {},
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
@@ -82,5 +130,5 @@
     "mergeBaseTracker": "## Problem\n\nIn the Name Speakers dialog and in Settings \u2192 Speakers \u2192 Diarization:\n\n1. **The re-run row does not fit.** \"Wrong count?\", the 280 pt method picker, the count stepper and Re-run share one row that is wider than the dialog's 400 pt minimum, so the texts beside the picker are cut off.\n2. **The speaker cap hint is wrong for two-track recordings.** \"Sortformer caps at 4 speakers\" (8 for Nemotron 3) is a limit per track. The call audio and the microphone are diarized separately, so such a recording can have up to 8 (16) speakers.\n3. **The speaker count does nothing in Sortformer and Nemotron 3 mode.** Both models count speakers themselves, yet Settings and the dialog still offer a count. A re-run with the same method and another count gives the same result.\n4. **In \"Offline\" mode the count applies to the call audio only.** On a two-track recording the microphone track is always auto-detected (`runDualTrackDiarization`), but the UI reads \"N speakers\" as if it meant the whole meeting. Entering the total over-splits the remote side.\n5. **\"Offline\" is misleading.** All three methods run on this Mac; \"Offline\" is FluidAudio's name for its batch clustering pipeline.\n6. **The method order differs.** Settings: Offline, Sortformer, Nemotron 3. Dialog: Sortformer, Offline, Nemotron 3.\n\n## Open\n\nHow the count looks in the two overlap-aware modes, and the new names. The changed screens need an accepted mockup before the build.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/163"
   },
-  "updated_at": "2026-10-20T10:50:02.243344Z"
+  "updated_at": "2026-10-20T10:51:03.862656Z"
 }
