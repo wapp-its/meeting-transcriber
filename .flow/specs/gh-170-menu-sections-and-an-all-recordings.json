@@ -12,9 +12,9 @@
   "id": "gh-170-menu-sections-and-an-all-recordings",
   "impl_review_rounds": {},
   "next_task": 1,
-  "plan_review_rounds": 1,
-  "plan_review_status": "needs_work",
-  "plan_reviewed_at": "2026-10-20T19:07:18.504741Z",
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-10-20T19:14:15.927410Z",
   "ready": true,
   "review_attempts": [
     {
@@ -190,10 +190,78 @@
       "timestamp": "2026-10-20T19:07:18.464833Z",
       "tool_calls": 22,
       "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "b551d299bdcffa5a551053803010ad5343452809ccdd7933138eadeb8d2fbf50",
+      "backend": "codex",
+      "base_sha": "5978abbfa707d12efba0c3b6cd608e758f965e52",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-ec1940ad1b9af960994614ede247b1ac",
+            "classification": "introduced",
+            "findingId": "finding-ec1940ad1b9af960994614ede247b1ac",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-bdf1f81fe14c346038f0c462a401c4a9",
+            "classification": "introduced",
+            "findingId": "finding-bdf1f81fe14c346038f0c462a401c4a9",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-2da8bbd23c03f16b4de3ceee0486c752",
+            "classification": "introduced",
+            "findingId": "finding-2da8bbd23c03f16b4de3ceee0486c752",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-1b18d33dc15c434202db8df484a6c3bc",
+            "classification": "introduced",
+            "findingId": "finding-1b18d33dc15c434202db8df484a6c3bc",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "b9563ec2ae316b353ae9bdc9f10b935334311d9a",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 707,
+      "output_sha256": "46d812992e71629099e9248767a5fd6772605ff0328822a2a3da1c55e45b7297",
+      "reservation_id": "f203ee8243014706aa0ae03bb33119d1",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-20T19:14:15.907967Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
-    "plan": 1,
+    "plan": 2,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
@@ -216,5 +284,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nThe menu bar menu shows its items in one long run with dividers but no headings. Recording, devices and results are mixed. The owner asked for headed sections and for one place that holds everything you can do with a finished recording (paraphrased, 2026-10-20).\n\n## NOTES\n\n- Accepted mockup, menu (2026-10-20): three headings, \"Record & Import\", \"Audio Devices\" and \"Recordings\". \"Process Audio/Video Files\u2026\" becomes \"Import Audio/Video Files\u2026\" and \"Start Recording with Options\u2026\" becomes \"Record with Options\u2026\". The \"In progress\" and \"Needs you\" groups stay as they are.\n- The Recordings group keeps only \"Open Last Protocol\" and \"All Recordings\u2026\". \"Open Protocols Folder\" and \"Regenerate Protocol\u2026\" leave the menu.\n- Accepted mockup, window (2026-10-20): the Transcriptions window from #13 becomes \"All Recordings\". Each row gets one main button that depends on its state (Open Protocol, Name Speakers, Retry, Cancel) and a \"\u2026\" button. That menu also opens on right-click and holds Open Protocol, Open Transcript, Show in Finder and Regenerate Protocol\u2026. The toolbar holds the search field, \"Open Protocols Folder\" and \"Regenerate from File\u2026\".\n- \"Regenerate Protocol\u2026\" on a row opens today's form as a sheet with that meeting filled in. \"Regenerate from File\u2026\" opens it with the file picker, for transcripts that are not in the list.\n- The same change also does #156 (one actions value instead of 21 closures, one device picker) and #140 (menu code left unused).\n- Comes after #105, as #154 asks. Transcribe again and identify speakers again follow in a second issue.\n\n## TASKS\n\n- [ ] Capture a flow-next spec from this issue and the mockup\n- [ ] Build the menu headings and the All Recordings window as in the mockup",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/170"
   },
-  "updated_at": "2026-10-20T19:07:18.508551Z"
+  "updated_at": "2026-10-20T19:14:15.928776Z"
 }
