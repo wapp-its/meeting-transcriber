@@ -1,0 +1,33 @@
+{
+  "branch_name": "gh-169-a-microphone-that-is-not-ready-is-not-a",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-20T11:38:58.479798Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-169-a-microphone-that-is-not-ready-is-not-a",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 0,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/gh-169-a-microphone-that-is-not-ready-is-not-a.md",
+  "status": "open",
+  "title": "A microphone that is not ready is not a broken permission",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABYhdcJg",
+    "identifier": "#169",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/169"
+  },
+  "updated_at": "2026-10-20T11:41:19.126891Z"
+}
