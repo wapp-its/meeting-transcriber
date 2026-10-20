@@ -6,6 +6,7 @@
   "depends_on": [],
   "id": "gh-105-watching-pauses-during-a-recording-and.1",
   "priority": null,
+  "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-105-watching-pauses-during-a-recording-and",
   "spec_path": ".flow/tasks/gh-105-watching-pauses-during-a-recording-and.1.md",
   "status": "todo",
