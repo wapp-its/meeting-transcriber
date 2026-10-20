@@ -796,7 +796,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 
 **Conditional rendering rules:**
 - `noMic` hides the mic-device picker (Audio) and the Speaker Identity section (Speakers)
-- `diarize` hides the diarizer-mode picker and Expected Speakers stepper
+- `diarize` hides the diarization method picker and the Expected speakers stepper; `diarizerMode` hides the stepper, its hint and the tuning disclosure for Sortformer and Nemotron 3 (they count the speakers themselves)
 - `vadEnabled` hides the VAD threshold slider
 - `transcriptionEngine` switches between WhisperKit / Parakeet option panels
 - `vocabularySource` switches between the local vocabulary file row and the URL controls (address, token, "Update now", status)

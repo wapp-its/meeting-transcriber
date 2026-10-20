@@ -22,10 +22,9 @@ final class FluidDiarizerNemotronTests: XCTestCase {
         XCTAssertEqual(AppSettings(defaults: defaults).diarizerMode, .nemotron)
     }
 
-    func testNemotronShortLabels() {
-        XCTAssertEqual(DiarizerMode.offline.shortLabel, "Offline")
-        XCTAssertEqual(DiarizerMode.sortformer.shortLabel, "Sortformer")
-        XCTAssertEqual(DiarizerMode.nemotron.shortLabel, "Nemotron 3")
+    func testNemotronDisplayNameAndDescriptionCarryItsCap() {
+        XCTAssertEqual(DiarizerMode.nemotron.displayName, "Nemotron 3")
+        XCTAssertTrue(DiarizerMode.nemotron.methodDescription.contains("Up to \(DiarizerMode.nemotron.speakerCap) speakers per side"))
     }
 
     /// The UI cap and the model's output slots must agree: a Stepper that

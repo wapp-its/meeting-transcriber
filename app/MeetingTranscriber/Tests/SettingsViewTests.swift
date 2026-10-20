@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 @testable import MeetingTranscriber
 import ViewInspector
 import XCTest
@@ -236,15 +237,102 @@ final class SettingsViewTests: XCTestCase { // swiftlint:disable:this type_body_
     func testDiarizeEnabledShowsExpectedSpeakers() throws {
         let settings = makeSettings()
         settings.diarize = true
+        settings.diarizerMode = .offline
         let body = try makeSpeakers(settings: settings).inspect()
-        XCTAssertNoThrow(try body.find(text: "Expected Speakers"))
+        XCTAssertNoThrow(try body.find(text: "Expected speakers"))
+        XCTAssertNoThrow(try body.find(text: SpeakersSettingsView.expectedSpeakersHint))
     }
 
     func testDiarizerModeHiddenWhenDiarizeDisabled() throws {
         let settings = makeSettings()
         settings.diarize = false
         let body = try makeSpeakers(settings: settings).inspect()
-        XCTAssertThrowsError(try body.find(text: "Expected Speakers"))
+        XCTAssertThrowsError(try body.find(text: "Expected speakers"))
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.diarizationMethodPicker))
+    }
+
+    // MARK: - Diarization method picker
+
+    /// The picker lists the methods in `DiarizerMode.displayOrder` by their
+    /// user-facing names, each with its description, and none of it says
+    /// "Offline": that is the speech library's name for the clustering
+    /// diarizer, and all three methods run on the Mac.
+    func testMethodPickerListsMethodsInDisplayOrderWithDescriptions() throws {
+        let settings = makeSettings()
+        settings.diarize = true
+        let body = try makeSpeakers(settings: settings).inspect()
+        let picker = try body.find(viewWithAccessibilityIdentifier: A11yID.diarizationMethodPicker)
+        // The picker's own label ("Method") is the last text; the options come first.
+        let names = picker.findAll(ViewType.Text.self).compactMap { try? $0.string() }
+        XCTAssertEqual(names.last, "Method")
+        XCTAssertEqual(
+            Array(names.dropLast()),
+            [
+                "Standard",
+                "Any number of speakers. Groups similar voices.",
+                "Sortformer",
+                "Handles people talking at the same time. Up to 4 speakers per side.",
+                "Nemotron 3",
+                "Handles people talking at the same time. Up to 8 speakers per side.",
+            ],
+        )
+        XCTAssertFalse(names.contains { $0.localizedCaseInsensitiveContains("offline") })
+    }
+
+    /// The picker writes the method back. Standard is `.offline` on the wire:
+    /// the raw value is persisted and must not change with the display name.
+    func testMethodPickerSelectWritesBackDiarizerMode() throws {
+        let settings = makeSettings()
+        settings.diarize = true
+        settings.diarizerMode = .offline
+        let picker = try makeSpeakers(settings: settings).inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.diarizationMethodPicker)
+            .find(ViewType.Picker.self)
+        try picker.select(value: DiarizerMode.nemotron)
+        XCTAssertEqual(settings.diarizerMode, .nemotron)
+        try picker.select(value: DiarizerMode.offline)
+        XCTAssertEqual(settings.diarizerMode, .offline)
+    }
+
+    /// Switching the method no longer clamps the stored count: with the count
+    /// hidden in the overlap-aware modes a clamp there only destroyed a value
+    /// Standard needs when the user switches back.
+    func testSwitchingMethodKeepsStoredCount() throws {
+        let settings = makeSettings()
+        settings.diarize = true
+        settings.diarizerMode = .offline
+        settings.numSpeakers = 6
+        let view = makeSpeakers(settings: settings)
+        let picker = try view.inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.diarizationMethodPicker)
+            .find(ViewType.Picker.self)
+        try picker.select(value: DiarizerMode.sortformer)
+        XCTAssertEqual(settings.diarizerMode, .sortformer)
+        XCTAssertEqual(settings.numSpeakers, 6, "a count chosen for Standard must survive a switch to Sortformer")
+        // A fresh inspection, as the next body evaluation would be: the picker
+        // under Sortformer still writes back, and the count is still there.
+        let sortformerPicker = try view.inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.diarizationMethodPicker)
+            .find(ViewType.Picker.self)
+        try sortformerPicker.select(value: DiarizerMode.offline)
+        XCTAssertEqual(settings.diarizerMode, .offline)
+        XCTAssertEqual(settings.numSpeakers, 6, "and the switch back must find it unchanged")
+    }
+
+    func testExpectedSpeakersRangeIsStandardsCap() {
+        XCTAssertEqual(SpeakersSettingsView.expectedSpeakerRange, 0 ... 10)
+    }
+
+    func testExpectedSpeakersStepperWritesBackCount() throws {
+        let settings = makeSettings()
+        settings.diarize = true
+        settings.diarizerMode = .offline
+        settings.numSpeakers = 0
+        let stepper = try makeSpeakers(settings: settings).inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.expectedSpeakersStepper)
+            .find(ViewType.Stepper.self)
+        try stepper.increment()
+        XCTAssertEqual(settings.numSpeakers, 1)
     }
 
     func testMicSectionShownWhenMicEnabled() throws {
@@ -261,63 +349,68 @@ final class SettingsViewTests: XCTestCase { // swiftlint:disable:this type_body_
         XCTAssertThrowsError(try body.find(text: "Mic Speaker Name"))
     }
 
-    func testSortformerWarningShownWhenSelected() throws {
+    // MARK: - Method hint and count visibility per method
+
+    /// The hint for an overlap-aware method states the cap per call, which is
+    /// twice the per-track cap: a recorded call is two tracks, each diarized
+    /// on its own. The earlier "supports up to 4 speakers per meeting" was
+    /// contradicted by the recordings it described.
+    func testMethodHintTexts() {
+        XCTAssertNil(SpeakersSettingsView.methodHint(for: .offline))
+        XCTAssertEqual(
+            SpeakersSettingsView.methodHint(for: .sortformer),
+            "Sortformer counts the speakers itself. In a recorded call, the call audio and your microphone are two sides, so a call can have up to 8 speakers.",
+        )
+        XCTAssertEqual(
+            SpeakersSettingsView.methodHint(for: .nemotron),
+            "Nemotron 3 counts the speakers itself. In a recorded call, the call audio and your microphone are two sides, "
+                + "so a call can have up to 16 speakers.",
+        )
+    }
+
+    func testSortformerShowsMethodHintAndNoCount() throws {
         let settings = makeSettings()
         settings.diarize = true
         settings.diarizerMode = .sortformer
         let body = try makeSpeakers(settings: settings).inspect()
-        XCTAssertNoThrow(try body.find(
-            text: "Sortformer supports up to \(DiarizerMode.sortformer.speakerCap) speakers per meeting. Switch to Offline mode for meetings with more participants.",
-        ))
+        XCTAssertNoThrow(try body.find(viewWithAccessibilityIdentifier: A11yID.diarizationMethodHint))
+        XCTAssertNoThrow(try body.find(text: XCTUnwrap(SpeakersSettingsView.methodHint(for: .sortformer))))
+        XCTAssertThrowsError(try body.find(text: "Expected speakers"))
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.expectedSpeakersStepper))
+        XCTAssertThrowsError(try body.find(text: SpeakersSettingsView.expectedSpeakersHint))
     }
 
-    func testSortformerWarningHiddenForOfflineMode() throws {
-        let settings = makeSettings()
-        settings.diarize = true
-        settings.diarizerMode = .offline
-        let body = try makeSpeakers(settings: settings).inspect()
-        XCTAssertThrowsError(try body.find(
-            text: "Sortformer supports up to \(DiarizerMode.sortformer.speakerCap) speakers per meeting. Switch to Offline mode for meetings with more participants.",
-        ))
-    }
-
-    func testNemotronWarningShownWhenSelected() throws {
+    func testNemotronShowsMethodHintAndNoCount() throws {
         let settings = makeSettings()
         settings.diarize = true
         settings.diarizerMode = .nemotron
         let body = try makeSpeakers(settings: settings).inspect()
-        XCTAssertNoThrow(try body.find(
-            text: "Nemotron 3 supports up to 8 speakers per meeting. Switch to Offline mode for meetings with more participants.",
-        ))
+        XCTAssertNoThrow(try body.find(viewWithAccessibilityIdentifier: A11yID.diarizationMethodHint))
+        XCTAssertNoThrow(try body.find(text: XCTUnwrap(SpeakersSettingsView.methodHint(for: .nemotron))))
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.expectedSpeakersStepper))
     }
 
-    // MARK: - Speakers Settings ↔ Diarizer Mode coupling
-
-    func testSpeakerCountRangePerMode() {
-        XCTAssertEqual(SpeakersSettingsView.speakerCountRange(for: .sortformer), 0 ... 4)
-        XCTAssertEqual(SpeakersSettingsView.speakerCountRange(for: .offline), 0 ... 10)
-        XCTAssertEqual(SpeakersSettingsView.speakerCountRange(for: .nemotron), 0 ... 8)
+    func testStandardShowsCountAndNoMethodHint() throws {
+        let settings = makeSettings()
+        settings.diarize = true
+        settings.diarizerMode = .offline
+        let body = try makeSpeakers(settings: settings).inspect()
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.diarizationMethodHint))
+        XCTAssertNoThrow(try body.find(viewWithAccessibilityIdentifier: A11yID.expectedSpeakersStepper))
     }
 
-    func testClampSpeakerCountForNemotron() {
-        XCTAssertEqual(SpeakersSettingsView.clampSpeakerCount(0, for: .nemotron), 0)
-        XCTAssertEqual(SpeakersSettingsView.clampSpeakerCount(6, for: .nemotron), 6)
-        XCTAssertEqual(SpeakersSettingsView.clampSpeakerCount(8, for: .nemotron), 8)
-        XCTAssertEqual(SpeakersSettingsView.clampSpeakerCount(10, for: .nemotron), 8)
-    }
-
-    func testClampSpeakerCountPerMode() {
-        // Auto (0) is preserved across both modes.
-        XCTAssertEqual(SpeakersSettingsView.clampSpeakerCount(0, for: .sortformer), 0)
-        XCTAssertEqual(SpeakersSettingsView.clampSpeakerCount(0, for: .offline), 0)
-        // Sortformer caps at 4.
-        XCTAssertEqual(SpeakersSettingsView.clampSpeakerCount(2, for: .sortformer), 2)
-        XCTAssertEqual(SpeakersSettingsView.clampSpeakerCount(4, for: .sortformer), 4)
-        XCTAssertEqual(SpeakersSettingsView.clampSpeakerCount(10, for: .sortformer), 4)
-        // Offline preserves up to 10; out-of-band values still clamp.
-        XCTAssertEqual(SpeakersSettingsView.clampSpeakerCount(7, for: .offline), 7)
-        XCTAssertEqual(SpeakersSettingsView.clampSpeakerCount(10, for: .offline), 10)
-        XCTAssertEqual(SpeakersSettingsView.clampSpeakerCount(99, for: .offline), 10)
+    /// No text in the Speakers tab may call a method "Offline" or state a
+    /// per-meeting cap, whichever method is picked.
+    func testNoTextCallsAMethodOfflineOrStatesAPerMeetingCap() throws {
+        for mode in DiarizerMode.allCases {
+            let settings = makeSettings()
+            settings.diarize = true
+            settings.diarizerMode = mode
+            let texts = try makeSpeakers(settings: settings).inspect()
+                .findAll(ViewType.Text.self).compactMap { try? $0.string() }
+            XCTAssertFalse(texts.contains { $0.localizedCaseInsensitiveContains("offline") }, "\(mode): \(texts)")
+            XCTAssertFalse(texts.contains { $0.localizedCaseInsensitiveContains("per meeting") }, "\(mode): \(texts)")
+        }
     }
 
     // SpeakerMatcher.init reads + decodes speakers.json. It must run only
