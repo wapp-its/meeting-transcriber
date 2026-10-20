@@ -69,14 +69,10 @@ struct MenuBarView: View {
 
         Divider()
 
-        watchControls
-        microphoneSection
-        outputSection
+        recordAndImportSection
+        audioDevicesSection
         jobSections
-
-        Divider()
-
-        protocolActions
+        recordingsSection
         updateSection
 
         Divider()
@@ -204,31 +200,49 @@ struct MenuBarView: View {
         }
     }
 
-    @ViewBuilder private var watchControls: some View {
-        if actions.stopManualRecording == nil, state != .recording {
-            Button {
-                actions.recordMicrophone()
-            } label: {
-                Label("Record Microphone Only", systemImage: "mic.circle")
+    /// A section header is a heading line in the menu, not an item. The two
+    /// record items are hidden while a recording runs, when the status block
+    /// offers Stop Recording instead; the import is always there.
+    private var recordAndImportSection: some View {
+        Section("Record & Import") {
+            if actions.stopManualRecording == nil, state != .recording {
+                Button {
+                    actions.recordMicrophone()
+                } label: {
+                    Label("Record Microphone Only", systemImage: "mic.circle")
+                }
+                .keyboardShortcut("m")
+                .disabled(!microphoneAvailability.allowsStart)
+                .help(microphoneAvailability.disabledReason ?? "Record the system microphone, with no app audio")
+                .accessibilityIdentifier(A11yID.recordMicrophoneMenuItem)
+
+                Button {
+                    actions.recordApp()
+                } label: {
+                    Label("Record with Options…", systemImage: "record.circle")
+                }
+                .keyboardShortcut("r")
+                .accessibilityIdentifier(A11yID.recordWithOptionsMenuItem)
             }
-            .keyboardShortcut("m")
-            .disabled(!microphoneAvailability.allowsStart)
-            .help(microphoneAvailability.disabledReason ?? "Record the system microphone, with no app audio")
 
             Button {
-                actions.recordApp()
+                actions.processFiles()
             } label: {
-                Label("Start Recording with Options…", systemImage: "record.circle")
+                Label("Import Audio/Video Files…", systemImage: "doc.badge.plus")
             }
-            .keyboardShortcut("r")
+            .keyboardShortcut("p")
+            .accessibilityIdentifier(A11yID.importFilesMenuItem)
         }
+    }
 
-        Button {
-            actions.processFiles()
-        } label: {
-            Label("Process Audio/Video Files...", systemImage: "doc.badge.plus")
+    /// Left out with its heading when neither device entry is shown.
+    @ViewBuilder private var audioDevicesSection: some View {
+        if microphoneMenu != nil || outputMenu != nil {
+            Section("Audio Devices") {
+                microphoneSection
+                outputSection
+            }
         }
-        .keyboardShortcut("p")
     }
 
     /// The jobs under way and the jobs waiting on the user, each group under
@@ -282,46 +296,44 @@ struct MenuBarView: View {
         TranscriptionList.entries(liveJobs: pipelineQueue.jobs, records: history)
     }
 
-    /// Shown at all times, next to the protocols folder: finished jobs are
-    /// listed in the window, not in the menu.
-    private var allTranscriptionsItem: some View {
-        Button {
-            actions.showAllTranscriptions()
-        } label: {
-            Label("All Transcriptions...", systemImage: "list.bullet.rectangle")
-        }
-        .keyboardShortcut("t")
-        .accessibilityIdentifier(A11yID.allTranscriptionsMenuItem)
-    }
-
     /// The way to the results: the newest one, every job, and the folder they
     /// are written to. "Open Last Protocol" is the menu's one click to the
     /// newest result now that finished jobs are not listed, shown while the
-    /// history holds a finished job with a file.
-    @ViewBuilder private var protocolActions: some View {
-        if let url = TranscriptionList.lastFinished(transcriptionEntries)?.fileToOpen {
-            Button {
-                actions.openLastProtocol(url)
-            } label: {
-                Label("Open Last Protocol", systemImage: "doc.text")
+    /// history holds a finished job with a file. "All Recordings…" is shown
+    /// at all times: finished jobs are listed in the window, not in the menu.
+    private var recordingsSection: some View {
+        Section("Recordings") {
+            if let url = TranscriptionList.lastFinished(transcriptionEntries)?.fileToOpen {
+                Button {
+                    actions.openLastProtocol(url)
+                } label: {
+                    Label("Open Last Protocol", systemImage: "doc.text")
+                }
+                .keyboardShortcut("o")
+                .accessibilityIdentifier(A11yID.openLastProtocolMenuItem)
             }
-            .keyboardShortcut("o")
-        }
 
-        allTranscriptionsItem
+            Button {
+                actions.showAllTranscriptions()
+            } label: {
+                Label("All Recordings…", systemImage: "list.bullet.rectangle")
+            }
+            .keyboardShortcut("t")
+            .accessibilityIdentifier(A11yID.allRecordingsMenuItem)
 
-        Button {
-            actions.openProtocolsFolder()
-        } label: {
-            Label("Open Protocols Folder", systemImage: "folder")
-        }
+            Button {
+                actions.openProtocolsFolder()
+            } label: {
+                Label("Open Protocols Folder", systemImage: "folder")
+            }
 
-        Button {
-            actions.regenerateProtocol()
-        } label: {
-            Label("Regenerate Protocol…", systemImage: "arrow.triangle.2.circlepath")
+            Button {
+                actions.regenerateProtocol()
+            } label: {
+                Label("Regenerate Protocol…", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .accessibilityIdentifier(A11yID.regenerateProtocolMenuItem)
         }
-        .accessibilityIdentifier(A11yID.regenerateProtocolMenuItem)
     }
 
     @ViewBuilder private var updateSection: some View {

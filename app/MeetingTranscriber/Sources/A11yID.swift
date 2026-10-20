@@ -74,13 +74,21 @@ enum A11yID {
         "jobRemoveButton.\(index)"
     }
 
-    /// Menu bar item that opens the Transcriptions window.
-    static let allTranscriptionsMenuItem = "allTranscriptionsMenuItem"
+    /// Menu bar item that opens the Transcriptions window, "All Recordings…".
+    static let allRecordingsMenuItem = "allRecordingsMenuItem"
 
     /// The menu's "Name Speakers…", the first line of "Needs you". Tests find
     /// it by this value: the state line of a job waiting for names reads
     /// "Name Speakers..." too.
     static let nameSpeakersMenuItem = "nameSpeakersMenuItem"
+
+    /// The menu's items under "Record & Import" and "Open Last Protocol".
+    /// Tests find them by these values: the open recording prompt has a
+    /// "Record with Options…" button of its own.
+    static let recordMicrophoneMenuItem = "recordMicrophoneMenuItem"
+    static let recordWithOptionsMenuItem = "recordWithOptionsMenuItem"
+    static let importFilesMenuItem = "importFilesMenuItem"
+    static let openLastProtocolMenuItem = "openLastProtocolMenuItem"
 
     /// The menu's Pause Recording / Resume Recording item: one identifier for
     /// both labels, since it is one item whose label follows the state.

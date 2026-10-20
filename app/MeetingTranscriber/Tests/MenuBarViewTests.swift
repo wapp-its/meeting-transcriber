@@ -168,7 +168,7 @@ final class MenuBarViewTests: XCTestCase {
             history: [TerminalJobRecord(job: finished)],
         ).inspect()
 
-        try body.find(button: "Open Last Protocol").tap()
+        try body.find(viewWithAccessibilityIdentifier: A11yID.openLastProtocolMenuItem).button().tap()
 
         XCTAssertEqual(openedURL, URL(fileURLWithPath: "/tmp/Retro.md"))
     }
@@ -180,7 +180,7 @@ final class MenuBarViewTests: XCTestCase {
             status: makeStatus(state: .protocolReady),
             history: [TerminalJobRecord(job: failed)],
         ).inspect()
-        XCTAssertThrowsError(try body.find(text: "Open Last Protocol"))
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.openLastProtocolMenuItem))
     }
 
     // MARK: - Static buttons always present
@@ -207,8 +207,8 @@ final class MenuBarViewTests: XCTestCase {
 
     func testRecordMicrophoneButtonShownWhenIdle() throws {
         let sut = makeView(status: makeStatus(state: .idle))
-        let body = try sut.inspect()
-        XCTAssertNoThrow(try body.find(button: "Record Microphone Only"))
+        let item = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.recordMicrophoneMenuItem)
+        XCTAssertNoThrow(try item.find(text: "Record Microphone Only"))
     }
 
     func testRecordMicrophoneButtonCallsCallback() throws {
@@ -216,16 +216,16 @@ final class MenuBarViewTests: XCTestCase {
         // swiftlint:disable:next trailing_closure
         let sut = makeView(status: makeStatus(state: .idle), onRecordMicrophone: { called = true })
 
-        try sut.inspect().find(button: "Record Microphone Only").tap()
+        try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.recordMicrophoneMenuItem).button().tap()
 
         XCTAssertTrue(called)
     }
 
     func testRecordMicrophoneButtonHiddenWhileRecording() throws {
-        // Same rule as Start Recording with Options…: the menu offers Stop Recording instead.
+        // Same rule as Record with Options…: the menu offers Stop Recording instead.
         let sut = makeView(status: makeStatus(state: .recording))
         let body = try sut.inspect()
-        XCTAssertThrowsError(try body.find(button: "Record Microphone Only"))
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.recordMicrophoneMenuItem))
     }
 
     func testRecordMicrophoneButtonDisabledWhenNoMicIsSet() throws {
@@ -234,8 +234,9 @@ final class MenuBarViewTests: XCTestCase {
         // anyway would record nothing.
         let sut = makeView(status: makeStatus(state: .idle), noMic: true)
 
-        let button = try sut.inspect().find(button: "Record Microphone Only")
+        let button = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.recordMicrophoneMenuItem)
         XCTAssertTrue(button.isDisabled())
+        XCTAssertEqual(try button.help().string(), MicrophoneRecordingAvailability.blockedByNoMicSetting.disabledReason)
     }
 
     func testRecordMicrophoneButtonDisabledWhileAManualStartIsStillInFlight() throws {
@@ -244,8 +245,9 @@ final class MenuBarViewTests: XCTestCase {
         // enabled and the click silently dropped by the ownership guard.
         let sut = makeView(status: makeStatus(state: .idle), manualRecordingPendingOrActive: true)
 
-        let button = try sut.inspect().find(button: "Record Microphone Only")
+        let button = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.recordMicrophoneMenuItem)
         XCTAssertTrue(button.isDisabled())
+        XCTAssertEqual(try button.help().string(), MicrophoneRecordingAvailability.recordingActive.disabledReason)
     }
 
     func testRecordMicrophoneButtonEnabledWhenTheMicrophoneIsAllowed() throws {
@@ -253,8 +255,9 @@ final class MenuBarViewTests: XCTestCase {
         // disabled would pass just as well.
         let sut = makeView(status: makeStatus(state: .idle), noMic: false)
 
-        let button = try sut.inspect().find(button: "Record Microphone Only")
+        let button = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.recordMicrophoneMenuItem)
         XCTAssertFalse(button.isDisabled())
+        XCTAssertEqual(try button.help().string(), "Record the system microphone, with no app audio")
     }
 
     // MARK: - Button tap callbacks
@@ -351,7 +354,7 @@ final class MenuBarViewTests: XCTestCase {
 
     /// The way into the Transcriptions window is there whatever else the menu
     /// shows: while recording with a job line above it, and idle with none.
-    func testAllTranscriptionsItemIsAlwaysShownAndCallsItsCallback() throws {
+    func testAllRecordingsItemIsAlwaysShownAndCallsItsCallback() throws {
         let queue = PipelineQueue()
         var job = PipelineJob(
             meetingTitle: "Standup", appName: "Teams",
@@ -360,14 +363,14 @@ final class MenuBarViewTests: XCTestCase {
         job.state = .error
         queue.insertJobForTesting(job)
         let recording = try makeView(status: makeStatus(state: .recording), pipelineQueue: queue).inspect()
-        XCTAssertNoThrow(try recording.find(viewWithAccessibilityIdentifier: A11yID.allTranscriptionsMenuItem))
+        XCTAssertNoThrow(try recording.find(viewWithAccessibilityIdentifier: A11yID.allRecordingsMenuItem))
 
         var called = false
         // swiftlint:disable:next trailing_closure
         let item = try makeView(status: makeStatus(state: .idle), onShowAllTranscriptions: { called = true })
             .inspect()
-            .find(viewWithAccessibilityIdentifier: A11yID.allTranscriptionsMenuItem)
-        XCTAssertNoThrow(try item.find(text: "All Transcriptions..."))
+            .find(viewWithAccessibilityIdentifier: A11yID.allRecordingsMenuItem)
+        XCTAssertNoThrow(try item.find(text: "All Recordings…"))
         try item.button().tap()
         XCTAssertTrue(called)
     }
@@ -458,7 +461,7 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertEqual(openedURL, transcriptURL)
     }
 
-    func testProcessFilesButtonCallsCallback() throws {
+    func testImportFilesItemCallsCallback() throws {
         var called = false
         var actions = MenuActions.noop
         actions.processFiles = { called = true }
@@ -471,8 +474,9 @@ final class MenuBarViewTests: XCTestCase {
             manualRecordingPendingOrActive: false,
             actions: actions,
         )
-        let body = try sut.inspect()
-        try body.find(button: "Process Audio/Video Files...").tap()
+        let item = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.importFilesMenuItem)
+        XCTAssertNoThrow(try item.find(text: "Import Audio/Video Files…"))
+        try item.button().tap()
         XCTAssertTrue(called)
     }
 
@@ -585,18 +589,18 @@ final class MenuBarViewTests: XCTestCase {
         return url
     }
 
-    // MARK: - Start Recording with Options button
+    // MARK: - Record with Options button
 
     func testRecordAppButtonExistsWhenIdle() throws {
         let sut = makeView(status: makeStatus(state: .idle))
-        let body = try sut.inspect()
-        XCTAssertNoThrow(try body.find(text: "Start Recording with Options…"))
+        let item = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.recordWithOptionsMenuItem)
+        XCTAssertNoThrow(try item.find(text: "Record with Options…"))
     }
 
     func testRecordAppButtonHiddenDuringRecording() throws {
         let sut = makeView(status: makeStatus(state: .recording))
         let body = try sut.inspect()
-        XCTAssertThrowsError(try body.find(text: "Start Recording with Options…"))
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.recordWithOptionsMenuItem))
     }
 
     func testRecordAppButtonCallsCallback() throws {
@@ -613,7 +617,7 @@ final class MenuBarViewTests: XCTestCase {
             actions: actions,
         )
         let body = try sut.inspect()
-        try body.find(button: "Start Recording with Options…").tap()
+        try body.find(viewWithAccessibilityIdentifier: A11yID.recordWithOptionsMenuItem).button().tap()
         XCTAssertTrue(called)
     }
 
@@ -793,12 +797,13 @@ final class MenuBarViewTests: XCTestCase {
         }
     }
 
-    // MARK: - Process Files button
+    // MARK: - Import Files button
 
-    func testProcessFilesButtonAlwaysExists() throws {
-        let sut = makeView(status: makeStatus(state: .idle))
-        let body = try sut.inspect()
-        XCTAssertNoThrow(try body.find(text: "Process Audio/Video Files..."))
+    func testImportFilesItemAlwaysExists() throws {
+        for state in [TranscriberState.idle, .recording] {
+            let body = try makeView(status: makeStatus(state: state)).inspect()
+            XCTAssertNoThrow(try body.find(viewWithAccessibilityIdentifier: A11yID.importFilesMenuItem), "\(state)")
+        }
     }
 
     // MARK: - Error job display
@@ -832,7 +837,7 @@ final class MenuBarViewTests: XCTestCase {
     func testRecordAppAndStopBothHiddenDuringAutoRecording() throws {
         let sut = makeView(status: makeStatus(state: .recording), onStopManualRecording: nil)
         let body = try sut.inspect()
-        XCTAssertThrowsError(try body.find(text: "Start Recording with Options…"))
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.recordWithOptionsMenuItem))
         XCTAssertThrowsError(try body.find(text: "Stop Recording"))
     }
 
@@ -841,7 +846,7 @@ final class MenuBarViewTests: XCTestCase {
         let sut = makeView(status: makeStatus(state: .idle), onStopManualRecording: {})
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Stop Recording"))
-        XCTAssertThrowsError(try body.find(text: "Start Recording with Options…"))
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.recordWithOptionsMenuItem))
     }
 
     // MARK: - Job state labels
