@@ -124,7 +124,6 @@ final class MenuBarMenuOrderTests: XCTestCase {
             .heading("Recordings"),
             .item("Open Last Protocol"),
             .item("All Recordings…"),
-            .item("Open Protocols Folder"),
             .item("Regenerate Protocol…"),
             .divider,
             .item("Settings..."),

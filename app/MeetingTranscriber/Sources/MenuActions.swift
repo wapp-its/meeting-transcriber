@@ -5,14 +5,14 @@ import Foundation
 /// `MeetingTranscriberApp.menuBarContent`.
 ///
 /// An optional member is optional because nil changes the menu: it hides
-/// "Stop Recording", "Pause/Resume Recording" and "Name Speakers...", and
+/// "Stop Recording", "Pause/Resume Recording" and "Name Speakers…", and
 /// disables "Install Update".
 @MainActor
 struct MenuActions {
     /// Starts an mt-update install; nil disables the menu's install item.
     var installUpdate: (() -> Void)?
     var startStop: () -> Void
-    /// Opens the start dialog, "Start Recording with Options…".
+    /// Opens the start dialog, "Record with Options…".
     var recordApp: () -> Void
     var recordMicrophone: () -> Void
     /// Stops whatever is recording, a detected meeting included; set only while a recording runs.
@@ -24,14 +24,13 @@ struct MenuActions {
     var openProtocol: (URL) -> Void
     /// "Open Last Protocol": the newest finished job's protocol, else its
     /// transcript. Separate from a job line's Open because a file that is
-    /// gone is reported here, as the Transcriptions window reports it.
+    /// gone is reported here, as the All Recordings window reports it.
     var openLastProtocol: (URL) -> Void
-    var openProtocolsFolder: () -> Void
     var openSettings: () -> Void
     /// Opens the naming window; set only while a job waits for speaker names.
     var nameSpeakers: (() -> Void)?
     var processFiles: () -> Void
-    /// Opens the Transcriptions window.
+    /// Opens the All Recordings window.
     var showAllTranscriptions: () -> Void
     /// Opens the Regenerate Protocol window.
     var regenerateProtocol: () -> Void
@@ -59,7 +58,6 @@ struct MenuActions {
         recordMicrophone: {},
         openProtocol: { _ in },
         openLastProtocol: { _ in },
-        openProtocolsFolder: {},
         openSettings: {},
         processFiles: {},
         showAllTranscriptions: {},

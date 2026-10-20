@@ -290,17 +290,17 @@ struct MenuBarView: View {
         }
     }
 
-    /// The same list as the Transcriptions window, so the two cannot disagree
+    /// The same list as the All Recordings window, so the two cannot disagree
     /// about which jobs exist or what state they are in.
     private var transcriptionEntries: [TranscriptionEntry] {
         TranscriptionList.entries(liveJobs: pipelineQueue.jobs, records: history)
     }
 
-    /// The way to the results: the newest one, every job, and the folder they
-    /// are written to. "Open Last Protocol" is the menu's one click to the
-    /// newest result now that finished jobs are not listed, shown while the
-    /// history holds a finished job with a file. "All Recordings…" is shown
-    /// at all times: finished jobs are listed in the window, not in the menu.
+    /// The way to the results: the newest one and every job. "Open Last
+    /// Protocol" is the menu's one click to the newest result now that
+    /// finished jobs are not listed, shown while the history holds a finished
+    /// job with a file. "All Recordings…" is shown at all times: finished jobs
+    /// are listed in the window, not in the menu.
     private var recordingsSection: some View {
         Section("Recordings") {
             if let url = TranscriptionList.lastFinished(transcriptionEntries)?.fileToOpen {
@@ -320,12 +320,6 @@ struct MenuBarView: View {
             }
             .keyboardShortcut("t")
             .accessibilityIdentifier(A11yID.allRecordingsMenuItem)
-
-            Button {
-                actions.openProtocolsFolder()
-            } label: {
-                Label("Open Protocols Folder", systemImage: "folder")
-            }
 
             Button {
                 actions.regenerateProtocol()

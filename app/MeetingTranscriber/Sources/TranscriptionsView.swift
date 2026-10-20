@@ -53,12 +53,11 @@ struct TranscriptionsView: View {
     // the note on `MenuBarView.body`).
     var body: some View {
         VStack(spacing: 0) {
-            searchField
             fileMissingMessage
-            Divider()
             listOrPlaceholder
         }
         .frame(minWidth: 560, minHeight: 320)
+        .toolbar { toolbarItems }
         // The moments the rows' files are read again (see `RowAvailability`).
         .onAppear { availability.refresh() }
         .onChange(of: entries) { availability.refresh() }
@@ -69,11 +68,28 @@ struct TranscriptionsView: View {
 
     // MARK: - Sections
 
-    private var searchField: some View {
-        TextField("Search titles and participants", text: query)
-            .textFieldStyle(.roundedBorder)
-            .accessibilityIdentifier(A11yID.transcriptionsSearchField)
-            .padding()
+    /// The search, and the two actions that belong to no row: the folder the
+    /// protocols are written to, and a protocol made again from a file chosen
+    /// by hand, for a meeting the list does not hold.
+    private var toolbarItems: some ToolbarContent {
+        ToolbarItemGroup {
+            TextField("Search titles and participants", text: query)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 240)
+                .accessibilityIdentifier(A11yID.transcriptionsSearchField)
+            Button {
+                actions.openProtocolsFolder()
+            } label: {
+                Label("Open Protocols Folder", systemImage: "folder")
+            }
+            .accessibilityIdentifier(A11yID.recordingsOpenFolderButton)
+            Button {
+                actions.regenerate(nil)
+            } label: {
+                Label("Regenerate from File…", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .accessibilityIdentifier(A11yID.recordingsRegenerateFromFileButton)
+        }
     }
 
     @ViewBuilder private var fileMissingMessage: some View {
@@ -83,7 +99,7 @@ struct TranscriptionsView: View {
                 .foregroundStyle(.red)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
-                .padding(.bottom, 8)
+                .padding(.vertical, 8)
         }
     }
 

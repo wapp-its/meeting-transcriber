@@ -191,12 +191,6 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertNoThrow(try body.find(text: "Settings..."))
     }
 
-    func testOpenProtocolsFolderButtonExists() throws {
-        let sut = makeView(status: makeStatus())
-        let body = try sut.inspect()
-        XCTAssertNoThrow(try body.find(text: "Open Protocols Folder"))
-    }
-
     func testQuitButtonExists() throws {
         let sut = makeView(status: makeStatus())
         let body = try sut.inspect()
@@ -316,24 +310,6 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertTrue(called)
     }
 
-    func testProtocolsFolderButtonCallsCallback() throws {
-        var called = false
-        var actions = MenuActions.noop
-        actions.openProtocolsFolder = { called = true }
-        let sut = MenuBarView(
-            status: makeStatus(state: .idle),
-            isWatching: false,
-            pipelineQueue: PipelineQueue(),
-            updateChecker: nil,
-            noMic: false,
-            manualRecordingPendingOrActive: false,
-            actions: actions,
-        )
-        let body = try sut.inspect()
-        try body.find(button: "Open Protocols Folder").tap()
-        XCTAssertTrue(called)
-    }
-
     func testNameSpeakersButtonCallsCallback() throws {
         var called = false
         var actions = MenuActions.noop
@@ -352,7 +328,7 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertTrue(called)
     }
 
-    /// The way into the Transcriptions window is there whatever else the menu
+    /// The way into the All Recordings window is there whatever else the menu
     /// shows: while recording with a job line above it, and idle with none.
     func testAllRecordingsItemIsAlwaysShownAndCallsItsCallback() throws {
         let queue = PipelineQueue()

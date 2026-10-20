@@ -115,6 +115,33 @@ final class TranscriptionsViewTests: XCTestCase {
         XCTAssertThrowsError(try empty.find(text: "No transcriptions match"))
     }
 
+    // MARK: - Toolbar
+
+    /// "Open Protocols Folder", moved here from the menu, is there with or
+    /// without a recording, and opens the folder.
+    func testOpenProtocolsFolderCallsItsAction() throws {
+        var calls: [String] = []
+        let sut = makeView([], actions: recording { calls.append($0) })
+
+        let folder = try button(A11yID.recordingsOpenFolderButton, in: sut)
+        XCTAssertNoThrow(try folder.find(text: "Open Protocols Folder"))
+        try folder.tap()
+
+        XCTAssertEqual(calls, ["openProtocolsFolder"])
+    }
+
+    /// "Regenerate from File…" asks for a regeneration with no meeting.
+    func testRegenerateFromFileCallsRegenerateWithNoMeeting() throws {
+        var calls: [String] = []
+        let sut = makeView([entry("Retro", protocolPath: "/out/retro.md")], actions: recording { calls.append($0) })
+
+        let regenerate = try button(A11yID.recordingsRegenerateFromFileButton, in: sut)
+        XCTAssertNoThrow(try regenerate.find(text: "Regenerate from File…"))
+        try regenerate.tap()
+
+        XCTAssertEqual(calls, ["regenerate none"])
+    }
+
     // MARK: - Main button
 
     /// Each row shows the one button its state calls for, labelled by it, and
@@ -331,6 +358,8 @@ final class TranscriptionsViewTests: XCTestCase {
 
         XCTAssertEqual(Set(identifiers), [
             A11yID.transcriptionsSearchField,
+            A11yID.recordingsOpenFolderButton,
+            A11yID.recordingsRegenerateFromFileButton,
             A11yID.recordingMainButton(0),
             A11yID.recordingMoreButton(0),
             A11yID.recordingMenuOpenProtocol(0),

@@ -180,7 +180,6 @@ struct MeetingTranscriberApp: App {
             openLastProtocol: { url in
                 Self.openLastProtocol(url, scopeRoot: appState.settings.effectiveOutputDir, notifier: NotificationManager.shared)
             },
-            openProtocolsFolder: openProtocolsFolder,
             openSettings: { bringWindowToFront(id: "settings") },
             nameSpeakers: appState.hasPendingSpeakerNamingJobs ? {
                 bringWindowToFront(id: "speaker-naming")
@@ -370,7 +369,7 @@ struct MeetingTranscriberApp: App {
     }
 
     private var transcriptionsWindow: some Scene {
-        Window("Transcriptions", id: TranscriptionsView.windowID) {
+        Window("All Recordings", id: TranscriptionsView.windowID) {
             TranscriptionsView(
                 entries: appState.pipeline.transcriptionEntries,
                 query: $transcriptionsQuery,
@@ -517,14 +516,6 @@ struct MeetingTranscriberApp: App {
         for window in NSApp.windows where window.identifier?.rawValue == id {
             window.close()
         }
-    }
-
-    private func openProtocolsFolder() {
-        let protocols = appState.settings.effectiveOutputDir
-        let accessing = protocols.startAccessingSecurityScopedResource()
-        defer { if accessing { protocols.stopAccessingSecurityScopedResource() } }
-        try? FileManager.default.createDirectory(at: protocols, withIntermediateDirectories: true)
-        NSWorkspace.shared.open(protocols)
     }
 
     /// A job line's Open, inside the output folder's security scope: after a

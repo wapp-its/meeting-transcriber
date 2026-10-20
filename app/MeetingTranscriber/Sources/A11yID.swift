@@ -105,6 +105,10 @@ enum A11yID {
     // path.
     static let transcriptionsSearchField = "transcriptionsSearchField"
 
+    /// The toolbar's "Open Protocols Folder" and "Regenerate from File…".
+    static let recordingsOpenFolderButton = "recordingsOpenFolderButton"
+    static let recordingsRegenerateFromFileButton = "recordingsRegenerateFromFileButton"
+
     /// A row's one main button, whose label follows the row's state.
     static func recordingMainButton(_ index: Int) -> String {
         "recordingMainButton.\(index)"
