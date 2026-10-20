@@ -79,14 +79,14 @@ enum DiarizerMode: String, CaseIterable, Codable {
     }
 
     /// One line on what the method does, shown under its name in Settings.
-    /// "Per side" because a recorded call is two tracks (the call audio and
+    /// "Per input" because a recorded call is two tracks (the call audio and
     /// the microphone), each diarized on its own, so the cap applies to each
     /// of them and not to the meeting.
     var methodDescription: String {
         switch self {
         case .offline: "Any number of speakers. Groups similar voices."
-        case .sortformer: "Handles people talking at the same time. Up to \(speakerCap) speakers per side."
-        case .nemotron: "Handles people talking at the same time. Up to \(speakerCap) speakers per side."
+        case .sortformer: "Handles people talking at the same time. Up to \(speakerCap) speakers per input."
+        case .nemotron: "Handles people talking at the same time. Up to \(speakerCap) speakers per input."
         }
     }
 
