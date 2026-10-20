@@ -51,7 +51,7 @@ final class WatchingController {
     }
 
     let settings: AppSettings
-    private let notifier: any AppNotifying
+    let notifier: any AppNotifying
     let pipeline: PipelineController
     let channelHealth: ChannelHealthController
     private let permissions: PermissionsController
@@ -112,7 +112,7 @@ final class WatchingController {
     /// Meeting detector factory for the auto-detect path. Injectable so tests can
     /// supply a deterministic detector instead of the IOKit-backed
     /// `PowerAssertionDetector`.
-    private let makeDetector: () -> any MeetingDetecting
+    let makeDetector: () -> any MeetingDetecting
 
     /// Recorder factory, the `makeDetector` seam's counterpart for capture.
     ///
@@ -249,28 +249,7 @@ final class WatchingController {
                 syncEngines?()
                 pipeline.rebuild()
 
-                let loop = WatchLoop(
-                    detector: makeDetector(),
-                    recorderFactory: makeRecorderFactory(),
-                    pipelineQueue: pipeline.queue,
-                    pollInterval: settings.pollInterval,
-                    endGracePeriod: settings.endGrace,
-                    noMic: settings.noMic,
-                    micDeviceUID: { [settings] in settings.micDeviceUID.isEmpty ? nil : settings.micDeviceUID },
-                    verboseDiagnostics: { [settings] in settings.verboseDiagnostics },
-                    recordOnly: { [settings] in settings.recordOnly },
-                    // Decided per write, not per poll: the loop calls this once
-                    // when a record-only recording is persisted, so a folder that
-                    // cannot be reached is reported there (see the resolver).
-                    recordOnlyDestination: { [pipeline] in
-                        .production(parent: pipeline.outputDirectory.resolve())
-                    },
-                    recordWithoutAskingApps: { [settings] in settings.recordWithoutAskingApps },
-                    speechActivity: { [channelHealth] in channelHealth.speechActivity },
-                    silencePromptAfter: { [settings] in settings.silencePromptAfter },
-                    notifier: notifier,
-                    denyListStore: ConsentDenyListStore(settings: settings),
-                )
+                let loop = makeAutoWatchLoop()
 
                 attachStateChangeHandler(to: loop, notifyOnRecording: true)
 
@@ -476,30 +455,7 @@ final class WatchingController {
 
         pipeline.ensureQueue()
 
-        // Manual recording never polls the detector, so WatchLoop's default
-        // (unfiltered) detector here is inert, and so is the consent gate
-        // that hangs off it: a manual start never asks, so neither consent
-        // list is consulted and the defaults stand. If this path ever gains
-        // auto-detection, route it through `makeDetector()` like toggleWatching
-        // so the "Apps to Watch" filter still applies, and pass both
-        // `denyListStore:` and `recordWithoutAskingApps:`.
-        let loop = WatchLoop(
-            recorderFactory: makeRecorderFactory(),
-            pipelineQueue: pipeline.queue,
-            pollInterval: settings.pollInterval,
-            noMic: settings.noMic,
-            micDeviceUID: { [settings] in settings.micDeviceUID.isEmpty ? nil : settings.micDeviceUID },
-            verboseDiagnostics: { [settings] in settings.verboseDiagnostics },
-            recordOnly: { [settings] in settings.recordOnly },
-            // Same seam as the auto-watch loop above: per write, through the
-            // shared resolver.
-            recordOnlyDestination: { [pipeline] in
-                .production(parent: pipeline.outputDirectory.resolve())
-            },
-            speechActivity: { [channelHealth] in channelHealth.speechActivity },
-            silencePromptAfter: { [settings] in settings.silencePromptAfter },
-            notifier: notifier,
-        )
+        let loop = makeManualRecordingLoop()
         watchLoop = loop
 
         // Wire channel-health monitoring + error notification on state
