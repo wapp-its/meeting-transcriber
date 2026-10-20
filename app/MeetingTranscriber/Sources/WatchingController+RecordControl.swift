@@ -7,8 +7,13 @@ import Foundation
 /// Its own file because that one sits at the line cap; the handful of members it
 /// reaches into (`settings`, `watchLoop`, `manualStartTask`, `joinStarts`,
 /// `joinManualStart`, `join(while:)`, `beginManualRecording`,
-/// `stopManualRecording`, `startWatching`) are internal rather than private for
+/// `stopManualRecording`, `joinResume`) are internal rather than private for
 /// exactly that.
+///
+/// A manual recording that took meeting watching over resumes it when it ends
+/// (`WatchingController+ResumeWatching.swift`), and so does a start that
+/// recorded nothing. Every answer that follows such an ending waits for that
+/// resume, so the answer and a `GET /v1/watch` straight after it agree.
 ///
 /// `start`, `stop` and `toggle` are about one recording shape,
 /// `RecordingSource.micOnly`. Everything else the loop can be doing — an
@@ -61,10 +66,10 @@ extension WatchingController {
         switch action {
         case .start: return await applyRecordStart()
 
-        case .stop: return applyRecordStop()
+        case .stop: return await applyRecordStop()
 
         case .toggle:
-            return isRecordingMicrophoneOnly ? applyRecordStop() : await applyRecordStart()
+            return isRecordingMicrophoneOnly ? await applyRecordStop() : await applyRecordStart()
 
         case .pause: return applyRecordPause()
 
@@ -90,8 +95,6 @@ extension WatchingController {
         if isRecordingMicrophoneOnly { return .unchanged }
         if isRecordingOtherThanMicrophone { return .blocked }
         if settings.noMic { return .refused }
-        // Read before the start, because the start is what takes the loop away.
-        let wasWatching = isWatching
         // nil means an ownership guard refused between the check above and here.
         guard let start = beginManualRecording(.microphone) else { return .blocked }
         // Bound the start we just launched, not only the ones we found running.
@@ -103,22 +106,15 @@ extension WatchingController {
         // between the task finishing and this line would turn a recording that
         // started, and was then deliberately ended, into "did not settle".
         case .started: return .changed
-        case .blockedByActiveRecording: return .blocked
-        case .permissionRefused: await rearmWatching(wasWatching); return .refused
-        case .failed: await rearmWatching(wasWatching); return .failed
-        }
-    }
 
-    /// Put meeting watching back after a start that captured nothing.
-    ///
-    /// A manual start stops an active auto loop before it knows whether it can
-    /// record, so a refusal leaves detection off. That is survivable in the menu
-    /// bar, where the icon shows it. Over the API it is not: the answer says
-    /// "nothing changed, fix a setting and retry" while the machine has quietly
-    /// stopped watching for meetings, and nothing re-arms it until relaunch.
-    private func rearmWatching(_ wasWatching: Bool) async {
-        guard wasWatching, !isWatching else { return }
-        await startWatching()
+        case .blockedByActiveRecording: return .blocked
+
+        // A start that captured nothing has already scheduled the resume of
+        // the watching it took over; answer once watching is back.
+        case .permissionRefused: _ = await joinResume(); return .refused
+
+        case .failed: _ = await joinResume(); return .failed
+        }
     }
 
     /// Idempotent stop, and only of a microphone recording.
@@ -128,11 +124,13 @@ extension WatchingController {
     /// holds and there is nothing to refuse. Same asymmetry `stopWatching`
     /// documents, and the same reason — a stop that reached across and ended
     /// somebody else's meeting would be far worse than a 200 that did nothing.
-    private func applyRecordStop() -> RecordControlOutcome {
+    private func applyRecordStop() async -> RecordControlOutcome {
         guard isRecordingMicrophoneOnly, let loop = watchLoop else { return .unchanged }
         let errorBeforeStop = loop.lastError
         stopManualRecording()
-        return verdict(onStopOf: loop, errorBeforeStop: errorBeforeStop)
+        let outcome = verdict(onStopOf: loop, errorBeforeStop: errorBeforeStop)
+        _ = await joinResume()
+        return outcome
     }
 
     /// Stop whatever is recording, through the menu's "Stop Recording": the
@@ -152,7 +150,11 @@ extension WatchingController {
         if isDetectedMeeting, await !join(while: { loop.state == .recording }) {
             return .failed
         }
-        return verdict(onStopOf: loop, errorBeforeStop: errorBeforeStop)
+        let outcome = verdict(onStopOf: loop, errorBeforeStop: errorBeforeStop)
+        // A detected meeting's loop keeps watching; a manual recording's end
+        // resumes the watching it took over.
+        if !isDetectedMeeting { _ = await joinResume() }
+        return outcome
     }
 
     /// Whether a stop that has run handed its recording on, judged on the loop
