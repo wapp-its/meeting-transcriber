@@ -13,7 +13,7 @@
   "impl_review_rounds": {},
   "next_task": 1,
   "plan_review_rounds": 0,
-  "plan_review_status": "ship",
+  "plan_review_status": "stale",
   "plan_reviewed_at": "2026-10-20T11:53:54.462267Z",
   "ready": true,
   "review_attempts": [
@@ -147,5 +147,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nThe menu bar menu shows its items in one long run with dividers but no headings. Recording, devices and results are mixed. The owner asked for headed sections and for one place that holds everything you can do with a finished recording (paraphrased, 2026-10-20).\n\n## NOTES\n\n- Accepted mockup, menu (2026-10-20): three headings, \"Record & Import\", \"Audio Devices\" and \"Recordings\". \"Process Audio/Video Files\u2026\" becomes \"Import Audio/Video Files\u2026\" and \"Start Recording with Options\u2026\" becomes \"Record with Options\u2026\". The \"In progress\" and \"Needs you\" groups stay as they are.\n- The Recordings group keeps only \"Open Last Protocol\" and \"All Recordings\u2026\". \"Open Protocols Folder\" and \"Regenerate Protocol\u2026\" leave the menu.\n- Accepted mockup, window (2026-10-20): the Transcriptions window from #13 becomes \"All Recordings\". Each row gets one main button that depends on its state (Open Protocol, Name Speakers, Retry, Cancel) and a \"\u2026\" button. That menu also opens on right-click and holds Open Protocol, Open Transcript, Show in Finder and Regenerate Protocol\u2026. The toolbar holds the search field, \"Open Protocols Folder\" and \"Regenerate from File\u2026\".\n- \"Regenerate Protocol\u2026\" on a row opens today's form as a sheet with that meeting filled in. \"Regenerate from File\u2026\" opens it with the file picker, for transcripts that are not in the list.\n- The same change also does #156 (one actions value instead of 21 closures, one device picker) and #140 (menu code left unused).\n- Comes after #105, as #154 asks. Transcribe again and identify speakers again follow in a second issue.\n\n## TASKS\n\n- [ ] Capture a flow-next spec from this issue and the mockup\n- [ ] Build the menu headings and the All Recordings window as in the mockup",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/170"
   },
-  "updated_at": "2026-10-20T11:56:17.524597Z"
+  "updated_at": "2026-10-20T19:01:41.462655Z"
 }

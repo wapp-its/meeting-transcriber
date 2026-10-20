@@ -66,6 +66,10 @@ Upstream check (2026-10-20): the original project has no open issue or pull requ
 - **R9:** The menu view takes one actions value instead of separate callbacks, and the Microphone and Output entries are built by one shared picker; #140's two leftovers (`TranscriberStatus.protocolPath` and the negative-rank branch of the finish order) are removed, or kept with a comment that names their remaining reader. No error surface beyond R1. [paraphrase]
 - **R10:** The row decision of R6 and R7 is a pure function covered by unit tests for every job state and for the three transcript sources (a separate transcript file, only the transcript inside the protocol, neither), and each new or moved control has one ViewInspector wiring test located by an `A11yID` constant, per the repo's GUI testing rules. The All Recordings window stays off the `/ui/tree` window allowlist. [inferred]
 
+## Early proof point
+
+Task gh-170-menu-sections-and-an-all-recordings.3 validates the core approach (one pure row decision, `RecordingRowActions`, covers every job state and the three transcript sources, so the window's rows and the right-click menu are rendered from a tested list instead of per-view conditions). If it fails, re-evaluate whether a row needs state `TranscriptionEntry` does not carry before continuing with gh-170-menu-sections-and-an-all-recordings.4+.
+
 ## Boundaries
 
 - No "Transcribe Again…" or "Identify Speakers Again…" actions (#171). [paraphrase]
@@ -74,6 +78,20 @@ Upstream check (2026-10-20): the original project has no open issue or pull requ
 - No change to the status block beyond what #105 does. [inferred]
 - The "In progress" and "Needs you" groups keep their rows and actions; only "Name Speakers…" moves into "Needs you". [inferred]
 - No live audio levels in the Audio Devices section (#150). [inferred]
+
+## Quick commands
+
+The test classes the tasks change (112 tests at the spec base, 109 s with a warm build cache; the scratch home keeps model downloads out of `~/Documents`). Run from the repository root; the log is read from the file, never piped.
+
+```bash
+mkdir -p /private/tmp/mt-gh170/home && cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh170/home swift test --parallel --filter 'MenuBarViewTests|MenuBarViewSessionControlsTests|MenuBarViewConsentPromptTests|MenuBarJobMenuTests|MenuBarMicrophoneTests|MenuBarOutputTests|TranscriptionsViewTests|TranscriptionListTests|RegenerateProtocolViewTests|TranscriptionsWindowPrivacyTests|PipelineControllerTranscriptionsTests' > /private/tmp/mt-gh170/quick.log 2>&1; rc=$?; tail -n 3 /private/tmp/mt-gh170/quick.log; test "$rc" = 0
+```
+
+From task 3 on (the class does not exist before it):
+
+```bash
+cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh170/home swift test --parallel --filter 'RecordingRowActionsTests' > /private/tmp/mt-gh170/quick-rows.log 2>&1; rc=$?; tail -n 3 /private/tmp/mt-gh170/quick-rows.log; test "$rc" = 0
+```
 
 ## Decision Context
 
@@ -88,5 +106,25 @@ Upstream check (2026-10-20): the original project has no open issue or pull requ
 - **A2 · The update item stays a group of its own, directly above "Settings…".** flip at: the menu layout · test: R1's order test · status: active [agent-inferred 2026-10-20]
 - **A3 · "Regenerate from File…" opens the sheet without a meeting; only a row opens it with one.** flip at: the regenerate sheet's opening state · test: R5 · alternatives: dropping "Regenerate from File…" (transcripts from before the list existed are not in it and could not get a new protocol anymore) · status: active [agent-inferred 2026-10-20]
 - **A4 · The separate Regenerate Protocol window is removed; the sheet replaces it.** flip at: the app's window scenes · test: R3 · status: active [agent-inferred 2026-10-20]
+- **A5 · A row's "Name Speakers" selects that job in the naming window (`AppState.selectedNamingJobID`) before opening it.** alternatives: B - open the naming window as the menu item does, without selecting the row's job · flip at: `AllRecordingsActions.nameSpeakers`, built in `MeetingTranscriberApp` · test: the Name Speakers wiring test in `TranscriptionsViewTests` (task .4), which asserts the row's job id reaches the closure · status: active [agent-assumed 2026-10-20]
+- **A6 · The "…" menu leaves out a file item whose file is missing when the menu is built, while the main button follows the entry's recorded files as today's Open does, so a file removed after the menu was built still fails with "The file was moved or deleted.".** alternatives: B - check existence for the main button too, so it disappears with the file; C - no existence check, every file item stays and fails with the message · flip at: `RecordingRowActions.menuItems` and its `FilesOnDisk` input, resolved by `AllRecordingsActions.filesOnDisk` · test: `RecordingRowActionsTests`, the missing-file cases (task .3) · status: active [agent-assumed 2026-10-20]
 
 FIT: GO · 2026-10-20 · base 5978abbf · engine flow-next 9.1.1 · gh-105 only hid the watch toggle during a recording, which the spec already assumes; every other anchor is intact; three spots now say what stays hidden during a recording
+
+DIRECTION: GO · 2026-10-20 · plan drafted · five tasks in three waves, the pure row decision first; no existing tool or one-day version replaces an app menu; the next features (#171's two re-run actions, #97's audio per meeting) are one `MenuItem` case and one actions member each, so the seams carry them; a fresh agent can build from the tasks' anchors
+
+## Requirement coverage
+
+| Req | Description | Task(s) | Gap justification |
+| --- | --- | --- | --- |
+| R1 | The menu shows its items in the order of the accepted mockup, under the non-interactive headings "Record & Import", "Audio Devices" and "Recordings", with the shortcuts ⌘M, ⌘R, ⌘P, ⌘O, ⌘T, ⌘, and ⌘Q on the items named in Architecture. Errors: "Record Microphone Only" disabled with its reason when no microphone is set or a manual start is still registering, and hidden together with "Record with Options…" while a recording runs; "Open Last Protocol" absent while no finished job has a file; the Audio Devices heading absent when neither device entry is shown. | gh-170-menu-sections-and-an-all-recordings.2 | — |
+| R2 | "Process Audio/Video Files…" reads "Import Audio/Video Files…" and "Start Recording with Options…" reads "Record with Options…". Each keeps its action and its shortcut. No error surface beyond R1. | gh-170-menu-sections-and-an-all-recordings.2 | — |
+| R3 | The menu no longer contains "Open Protocols Folder" or "Regenerate Protocol…". "All Transcriptions…" reads "All Recordings…" and opens the window titled "All Recordings". No error surface beyond R1. | gh-170-menu-sections-and-an-all-recordings.2, gh-170-menu-sections-and-an-all-recordings.4, gh-170-menu-sections-and-an-all-recordings.5 | — |
+| R4 | "Name Speakers…" (⌘N) is the first line of the "Needs you" group and is shown exactly when a job waits for speaker names. No error surface beyond R1. | gh-170-menu-sections-and-an-all-recordings.2 | — |
+| R5 | The All Recordings window's toolbar has the search field (same matching as today), "Open Protocols Folder" (opens the output folder as the old menu item did) and "Regenerate from File…" (opens the regenerate sheet without a meeting, with "Choose File…"). Errors: unchanged from the old menu item, which creates a missing output folder first and shows no message when the folder cannot be opened; this spec adds no new error surface there. | gh-170-menu-sections-and-an-all-recordings.4, gh-170-menu-sections-and-an-all-recordings.5 | — |
+| R6 | Each row has one main button by state: Cancel while the job waits or runs; Name Speakers while it waits for names; Open Protocol when finished with a protocol, Open Transcript when finished with only a transcript; Retry when it failed and can be retried, Remove when it failed and cannot. Errors: a finished job with neither file has no main button. | gh-170-menu-sections-and-an-all-recordings.3, gh-170-menu-sections-and-an-all-recordings.4 | — |
+| R7 | Each row has a "…" button, and a right-click on the row opens the same menu. It lists, where they apply: Open Protocol, Open Transcript, Show in Finder, Regenerate Protocol…, Retry, Remove (failed jobs only), Dismiss (jobs waiting for names only). Errors: an item whose file is missing is left out, and Regenerate Protocol… is disabled only when the row has no usable transcript source (no transcript file and no protocol that contains the full transcript). | gh-170-menu-sections-and-an-all-recordings.3, gh-170-menu-sections-and-an-all-recordings.4 | — |
+| R8 | "Regenerate Protocol…" on a row opens the regenerate sheet over the window with that row's meeting (title, date and protocol file name) filled in and no "Choose File…" step. Generate writes the new protocol as today, including moving the old one to the Trash. Errors: generation off or record-only mode keeps Generate disabled as today; a generation failure shows today's error in the sheet. | gh-170-menu-sections-and-an-all-recordings.5 | — |
+| R9 | The menu view takes one actions value instead of separate callbacks, and the Microphone and Output entries are built by one shared picker; #140's two leftovers (`TranscriberStatus.protocolPath` and the negative-rank branch of the finish order) are removed, or kept with a comment that names their remaining reader. No error surface beyond R1. | gh-170-menu-sections-and-an-all-recordings.1 | — |
+| R10 | The row decision of R6 and R7 is a pure function covered by unit tests for every job state and for the three transcript sources (a separate transcript file, only the transcript inside the protocol, neither), and each new or moved control has one ViewInspector wiring test located by an `A11yID` constant, per the repo's GUI testing rules. The All Recordings window stays off the `/ui/tree` window allowlist. | gh-170-menu-sections-and-an-all-recordings.3, gh-170-menu-sections-and-an-all-recordings.4, gh-170-menu-sections-and-an-all-recordings.5 | — |
+
