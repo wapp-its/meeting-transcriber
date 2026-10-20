@@ -271,9 +271,9 @@ final class SettingsViewTests: XCTestCase { // swiftlint:disable:this type_body_
                 "Standard",
                 "Any number of speakers. Groups similar voices.",
                 "Sortformer",
-                "Handles people talking at the same time. Up to 4 speakers per side.",
+                "Handles people talking at the same time. Up to 4 speakers per input.",
                 "Nemotron 3",
-                "Handles people talking at the same time. Up to 8 speakers per side.",
+                "Handles people talking at the same time. Up to 8 speakers per input.",
             ],
         )
         XCTAssertFalse(names.contains { $0.localizedCaseInsensitiveContains("offline") })
@@ -351,20 +351,22 @@ final class SettingsViewTests: XCTestCase { // swiftlint:disable:this type_body_
 
     // MARK: - Method hint and count visibility per method
 
-    /// The hint for an overlap-aware method states the cap per call, which is
-    /// twice the per-track cap: a recorded call is two tracks, each diarized
-    /// on its own. The earlier "supports up to 4 speakers per meeting" was
-    /// contradicted by the recordings it described.
+    /// The hint for an overlap-aware method states the cap per input and the
+    /// call total as its sum (2 × the per-input cap): a recorded call is two
+    /// tracks, each diarized on its own. The earlier "supports up to 4
+    /// speakers per meeting" was contradicted by the recordings it described,
+    /// and a bare "up to 8" hid where the 8 comes from.
     func testMethodHintTexts() {
         XCTAssertNil(SpeakersSettingsView.methodHint(for: .offline))
         XCTAssertEqual(
             SpeakersSettingsView.methodHint(for: .sortformer),
-            "Sortformer counts the speakers itself. In a recorded call, the call audio and your microphone are two sides, so a call can have up to 8 speakers.",
+            "Sortformer counts the speakers itself: up to 4 per input. A recorded call has two inputs, the call audio and your microphone, "
+                + "so up to 8 speakers in total (2 × 4).",
         )
         XCTAssertEqual(
             SpeakersSettingsView.methodHint(for: .nemotron),
-            "Nemotron 3 counts the speakers itself. In a recorded call, the call audio and your microphone are two sides, "
-                + "so a call can have up to 16 speakers.",
+            "Nemotron 3 counts the speakers itself: up to 8 per input. A recorded call has two inputs, the call audio and your microphone, "
+                + "so up to 16 speakers in total (2 × 8).",
         )
     }
 
