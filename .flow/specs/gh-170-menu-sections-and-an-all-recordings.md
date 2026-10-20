@@ -29,7 +29,7 @@ Upstream check (2026-10-20): the original project has no open issue or pull requ
 
 <!-- Source: 50% owner-selected mockup / 50% [inferred] -->
 
-- **Menu, top to bottom** (accepted mockup): the open recording prompt when there is one (unchanged); the status block (status line and detail, the control under it, the meeting line, an error line), as #105 leaves it; then the section **Record & Import** with "Record Microphone Only" (⌘M), "Record with Options…" (⌘R) and "Import Audio/Video Files…" (⌘P); the section **Audio Devices** with the Microphone and Output entries; the job groups "In progress" and "Needs you" as today; the section **Recordings** with "Open Last Protocol" (⌘O) and "All Recordings…" (⌘T); then the update item when one is offered; "Settings…" (⌘,); "Quit" (⌘Q).
+- **Menu, top to bottom** (accepted mockup): the open recording prompt when there is one (unchanged); the status block (status line and detail, the controls under it: Stop Recording (⌘.) while a recording runs, otherwise the watch toggle (⌘S), and Pause/Resume; the meeting line, an error line), as #105 leaves it; then the section **Record & Import** with "Record Microphone Only" (⌘M), "Record with Options…" (⌘R) and "Import Audio/Video Files…" (⌘P); the section **Audio Devices** with the Microphone and Output entries; the job groups "In progress" and "Needs you" as today; the section **Recordings** with "Open Last Protocol" (⌘O) and "All Recordings…" (⌘T); then the update item when one is offered; "Settings…" (⌘,); "Quit" (⌘Q).
 - A section heading is a non-interactive heading line inside the menu, not a clickable item. [inferred]
 - "Name Speakers…" (⌘N) appears as the first line of the "Needs you" group, which exists whenever a job waits for names. [inferred]
 - **The window** keeps its list source (the same entries the menu's job groups come from) and its search. It is titled "All Recordings". Its toolbar holds the search field, "Open Protocols Folder" and "Regenerate from File…".
@@ -47,7 +47,7 @@ Upstream check (2026-10-20): the original project has no open issue or pull requ
 
 <!-- Source: 100% [inferred] -->
 
-- "Record Microphone Only" keeps its disabled state and its reason (no microphone set, or a recording already running). [inferred]
+- "Record Microphone Only" and "Record with Options…" keep today's visibility: both are hidden while a recording runs. "Record Microphone Only" keeps its disabled state and its reason (no microphone set, or a manual start still registering). [inferred]
 - "Open Last Protocol" is shown only while a finished job with a file exists, as today. The Recordings heading and "All Recordings…" are always shown. [inferred]
 - The Audio Devices heading is left out when neither the Microphone nor the Output entry is shown. [inferred]
 - A row whose protocol or transcript file was moved or deleted shows today's "The file was moved or deleted." message when an action on it fails. [inferred]
@@ -55,7 +55,7 @@ Upstream check (2026-10-20): the original project has no open issue or pull requ
 
 ## Acceptance Criteria
 
-- **R1:** The menu shows its items in the order of the accepted mockup, under the non-interactive headings "Record & Import", "Audio Devices" and "Recordings", with the shortcuts ⌘M, ⌘R, ⌘P, ⌘O, ⌘T, ⌘, and ⌘Q on the items named in Architecture. Errors: "Record Microphone Only" disabled with its reason when no microphone is set or a recording runs; "Open Last Protocol" absent while no finished job has a file; the Audio Devices heading absent when neither device entry is shown. [paraphrase]
+- **R1:** The menu shows its items in the order of the accepted mockup, under the non-interactive headings "Record & Import", "Audio Devices" and "Recordings", with the shortcuts ⌘M, ⌘R, ⌘P, ⌘O, ⌘T, ⌘, and ⌘Q on the items named in Architecture. Errors: "Record Microphone Only" disabled with its reason when no microphone is set or a manual start is still registering, and hidden together with "Record with Options…" while a recording runs; "Open Last Protocol" absent while no finished job has a file; the Audio Devices heading absent when neither device entry is shown. [paraphrase]
 - **R2:** "Process Audio/Video Files…" reads "Import Audio/Video Files…" and "Start Recording with Options…" reads "Record with Options…". Each keeps its action and its shortcut. No error surface beyond R1. [paraphrase]
 - **R3:** The menu no longer contains "Open Protocols Folder" or "Regenerate Protocol…". "All Transcriptions…" reads "All Recordings…" and opens the window titled "All Recordings". No error surface beyond R1. [paraphrase]
 - **R4:** "Name Speakers…" (⌘N) is the first line of the "Needs you" group and is shown exactly when a job waits for speaker names. No error surface beyond R1. [inferred]
@@ -88,3 +88,5 @@ Upstream check (2026-10-20): the original project has no open issue or pull requ
 - **A2 · The update item stays a group of its own, directly above "Settings…".** flip at: the menu layout · test: R1's order test · status: active [agent-inferred 2026-10-20]
 - **A3 · "Regenerate from File…" opens the sheet without a meeting; only a row opens it with one.** flip at: the regenerate sheet's opening state · test: R5 · alternatives: dropping "Regenerate from File…" (transcripts from before the list existed are not in it and could not get a new protocol anymore) · status: active [agent-inferred 2026-10-20]
 - **A4 · The separate Regenerate Protocol window is removed; the sheet replaces it.** flip at: the app's window scenes · test: R3 · status: active [agent-inferred 2026-10-20]
+
+FIT: GO · 2026-10-20 · base 5978abbf · engine flow-next 9.1.1 · gh-105 only hid the watch toggle during a recording, which the spec already assumes; every other anchor is intact; three spots now say what stays hidden during a recording
