@@ -363,7 +363,9 @@ When the recording took meeting watching over, watching comes back on after it
 waits for that: a `stop` that ended such a recording, with or without `scope`,
 and a `start` that took watching over and was then refused (`412`) or failed
 (`503`) answer once watching is back, so a `GET /v1/watch` straight after them
-reads `watching: true`.
+reads `watching: true`. Not when a `POST /v1/watch {"action":"stop"}` during the
+recording cancelled the return: then they answer without that wait and watching
+stays `false`.
 
 Responses:
 
