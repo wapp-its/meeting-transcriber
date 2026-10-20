@@ -43,8 +43,13 @@ extension WatchingController {
             if watchLoop?.isManualRecording == true { return }
             // A start someone else launched (Start Watching) is let finish first.
             guard await joinStart() else {
-                // The intent goes too: a manual recording started later, with
-                // watching off, must not bring watching back when it ends.
+                // A manual start that registered during the wait takes the
+                // intent with it: the parked start yields to it, and its
+                // recording's end, or its failure, schedules the resume again.
+                if isManualRecording { return }
+                // Otherwise the intent goes too: a manual recording started
+                // later, with watching off, must not bring watching back when
+                // it ends.
                 resumeWatchingPending = false
                 diagnostics.notice("watch_resume_failed reason=start_did_not_settle")
                 return

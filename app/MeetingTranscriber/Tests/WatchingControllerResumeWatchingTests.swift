@@ -288,6 +288,44 @@ final class WatchingControllerResumeWatchingTests: XCTestCase {
         XCTAssertFalse(controller.resumeWatchingPending, "the intent is dropped with the failure")
     }
 
+    /// The same unanswered press, and a second recording started before it
+    /// settles: the resume gives up on the press, but the intent stays with
+    /// that recording, whose end brings watching back. Dropped there, nothing
+    /// would, since the press yields to the recording.
+    func testASecondRecordingStartedWhileTheResumeWaitsOnAPressKeepsTheIntent() async throws {
+        let harness = Harness()
+        let gate = AsyncGate()
+        let controller = makeController(harness, startJoinTimeout: .milliseconds(300))
+        addTeardownBlock { await gate.open() }
+        await startWatchingThenRecord(controller, harness)
+
+        controller.stopRecording()
+        harness.micGate = gate
+        controller.toggleWatching()
+        await waitFor { await gate.hasWaiter }
+        controller.startMicrophoneRecording()
+        await waitFor(controller.resumeTask == nil, timeout: .seconds(3))
+
+        XCTAssertNil(controller.resumeTask, "precondition: the resume gave up on the press")
+        XCTAssertTrue(controller.isManualRecording, "precondition: the second start is registered")
+        XCTAssertTrue(controller.resumeWatchingPending, "the intent stays with the second recording")
+        XCTAssertEqual(harness.diagnostics.lines(.notice, startingWith: "watch_resume_failed"), [], "nothing failed")
+
+        await gate.open()
+        await waitFor(controller.isRecordingMicrophoneOnly, timeout: .seconds(3))
+        _ = await controller.joinStarts()
+
+        XCTAssertTrue(controller.isRecordingMicrophoneOnly, "precondition: the second recording runs")
+        XCTAssertFalse(controller.isWatching, "the press yielded to the recording")
+        XCTAssertEqual(harness.detectors.count, 1, "the bailed press built no loop")
+        XCTAssertTrue(controller.resumeWatchingPending, "the intent is still pending")
+
+        controller.stopRecording()
+        _ = await controller.joinResume()
+
+        try await assertResumedHoldingTheCall(controller, harness, "after the second recording")
+    }
+
     // MARK: - Helpers
 
     private func makeController(
