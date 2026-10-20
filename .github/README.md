@@ -24,7 +24,7 @@ again to update.
 - The menu bar is clearer. The icon shows whether the app is watching for meetings
   and whether a question waits for you. The menu shows the microphone in use and
   warns when the meeting app uses a different one.
-- A Transcriptions window (Cmd-T) lists all your transcriptions and searches them.
+- An All Recordings window (Cmd-T) lists all your transcriptions and searches them.
 - Your own voice is about as loud as the others in the saved recording. Before,
   it was often much quieter.
 - You can use your own Whisper model from Hugging Face or from a folder on your
