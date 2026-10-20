@@ -170,6 +170,21 @@ final class TranscriptionListTests: XCTestCase {
         XCTAssertEqual(TranscriptionList.menuSections([]), MenuJobSections(inProgress: [], needsYou: []))
     }
 
+    /// Failed jobs added at the same moment still list in a fixed order: the
+    /// ones the history no longer holds (their records evicted by its cap)
+    /// before the one it still records, and those among themselves in the
+    /// queue's order.
+    func testFailedJobsAddedTogetherListUnrecordedOnesFirstInQueueOrder() throws {
+        let recorded = try job("Recorded", addedAt: 0, state: .error)
+        let live = try [recorded, job("First unrecorded", addedAt: 0, state: .error), job("Second unrecorded", addedAt: 0, state: .error)]
+
+        let sections = TranscriptionList.menuSections(
+            TranscriptionList.entries(liveJobs: live, records: [TerminalJobRecord(job: recorded)]),
+        )
+
+        XCTAssertEqual(titles(sections.needsYou), ["First unrecorded", "Second unrecorded", "Recorded"])
+    }
+
     /// "Open Last Protocol" takes the job that finished last with a file, by
     /// finish order: a retried job added first and finished last is it. A
     /// later finish without a file and a later failure are passed over, and a
@@ -191,6 +206,34 @@ final class TranscriptionListTests: XCTestCase {
         XCTAssertNil(TranscriptionList.lastFinished(TranscriptionList.entries(liveJobs: [], records: [
             TerminalJobRecord(job: failed),
         ])))
+    }
+
+    /// A finished job the history does not hold ranks below every recorded
+    /// one, even one added before it.
+    func testTheLastFinishedJobIsARecordedOneBeforeALaterUnrecordedOne() throws {
+        var recorded = try job("Recorded", addedAt: 0, state: .done)
+        recorded.protocolPath = URL(fileURLWithPath: "/out/recorded.md")
+        var unrecorded = try job("Unrecorded", addedAt: 1, state: .done)
+        unrecorded.protocolPath = URL(fileURLWithPath: "/out/unrecorded.md")
+
+        let last = TranscriptionList.lastFinished(TranscriptionList.entries(
+            liveJobs: [unrecorded], records: [TerminalJobRecord(job: recorded)],
+        ))
+
+        XCTAssertEqual(last?.title, "Recorded")
+    }
+
+    /// Of two finished jobs the history does not hold, the one added later is
+    /// the last finished.
+    func testTheLastFinishedOfTwoUnrecordedJobsIsTheOneAddedLater() throws {
+        var older = try job("Older", addedAt: 0, state: .done)
+        older.protocolPath = URL(fileURLWithPath: "/out/older.md")
+        var newer = try job("Newer", addedAt: 1, state: .done)
+        newer.transcriptPath = URL(fileURLWithPath: "/out/newer.txt")
+
+        let last = TranscriptionList.lastFinished(TranscriptionList.entries(liveJobs: [older, newer], records: []))
+
+        XCTAssertEqual(last?.title, "Newer")
     }
 
     /// Right after it finished, after the queue dropped it a minute later, and
