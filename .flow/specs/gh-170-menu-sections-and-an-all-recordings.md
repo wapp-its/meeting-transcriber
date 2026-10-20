@@ -113,6 +113,8 @@ FIT: GO · 2026-10-20 · base 5978abbf · engine flow-next 9.1.1 · gh-105 only 
 
 DIRECTION: GO · 2026-10-20 · plan drafted · five tasks in three waves, the pure row decision first; no existing tool or one-day version replaces an app menu; the next features (#171's two re-run actions, #97's audio per meeting) are one `MenuItem` case and one actions member each, so the seams carry them; a fresh agent can build from the tasks' anchors
 
+FIT: GO · 2026-10-20 · base 1500e93d · engine flow-next 9.1.1 · since the 20:42 receipt only this spec's own plan and its SHIP review moved; gh-169 changed two permission-check lines in MeetingTranscriberApp.swift outside every task anchor (anchors past line 245 sit two lines higher)
+
 ## Requirement coverage
 
 | Req | Description | Task(s) | Gap justification |
