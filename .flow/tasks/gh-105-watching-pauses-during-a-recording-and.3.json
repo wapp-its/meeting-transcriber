@@ -11,7 +11,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-105-watching-pauses-during-a-recording-and",
   "spec_path": ".flow/tasks/gh-105-watching-pauses-during-a-recording-and.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "Automation API: cancel the resume on stop, answer after it, and document the behaviour",
   "updated_at": "2026-10-13T14:40:18.591021Z"
 }

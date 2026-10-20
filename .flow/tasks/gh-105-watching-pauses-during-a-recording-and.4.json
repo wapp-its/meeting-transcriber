@@ -9,7 +9,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-105-watching-pauses-during-a-recording-and",
   "spec_path": ".flow/tasks/gh-105-watching-pauses-during-a-recording-and.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "Hide the watch toggle in the menu while a recording runs",
   "updated_at": "2026-10-13T14:40:18.591101Z"
 }

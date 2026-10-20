@@ -400,7 +400,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-105-watching-pauses-during-a-recording-and.md",
-  "status": "open",
+  "status": "done",
   "title": "Watching pauses during a recording and resumes after it",
   "tracker": {
     "baseHashFlow": "b3dcdbd9a15724c36986047fdeaa8fe6d7abeb23f71631d15eeee2c6c6830388",
@@ -414,5 +414,5 @@
     "mergeBaseTracker": "## Problem\n\nStartet man bei laufender \u00dcberwachung eine **manuelle Aufnahme** (\u201eRecord App + Microphone\u2026\u201c, \u201eRecord Microphone Only\u201c), schaltet die App die \u00dcberwachung ab (`WatchingController.beginManualRecording`, Schritt \u201eStop auto-watch if active\u201c). Nach \u201eStop Recording\u201c bleibt sie **aus**: `stopManualRecording()` setzt nur `watchLoop = nil`. Sie kommt erst mit \u201eStart Watching for Meetings\u201c zur\u00fcck oder beim n\u00e4chsten App-Start, wenn \u201eBeim Start \u00fcberwachen\u201c an ist.\n\nIm Alltag: kurz eine Sprachnotiz oder ein Gespr\u00e4ch im Raum aufgenommen, danach wird das n\u00e4chste Teams-Meeting **weder erkannt noch aufgenommen**, ohne Hinweis. Bei erkannten Meetings ist es anders: nach deren Ende \u00fcberwacht die App von selbst weiter.\n\nDazu ein toter Men\u00fceintrag: w\u00e4hrend einer manuellen Aufnahme zeigt das Men\u00fc \u201eStart Watching for Meetings\u201c, ein Klick darauf wird still ignoriert (`toggleWatching` verweigert, solange eine manuelle Aufnahme die Schleife besitzt).\n\nOwner, 2026-10-08: \u201eactually watching should be paused while recording isn't it?\u201c\n\n## Wunsch\n\n- War die \u00dcberwachung **vor** der manuellen Aufnahme an, l\u00e4uft sie **nach** deren Ende wieder an, so wie nach einem erkannten Meeting. War sie aus, bleibt sie aus.\n- Damit eine Anruf-App, die noch im Anruf ist (die manuell aufgenommene App selbst oder Teams nach einer Mikrofon-Aufnahme), nicht sofort erkannt und aufgenommen oder nachgefragt wird, gilt die Sperre aus #94 (\u201eerst wieder erkennen, wenn das Signal einmal weg war\u201c) f\u00fcr die aufgenommene App.\n- Gilt auch, wenn die manuelle Aufnahme aus einem anderen Grund endet (Ziel-App beendet, 4-h-Grenze).\n\n## Abnahme\n\n- \u00dcberwachung an \u2192 \u201eRecord App + Microphone\u2026\u201c mit Teams \u2192 \u201eStop Recording\u201c \u2192 Symbol zeigt wieder \u201e\u00fcberwacht\u201c (#41); Teams noch im Anruf \u2192 keine neue Aufnahme, keine R\u00fcckfrage, bis der Anruf endet; n\u00e4chster Anruf \u2192 normal erkannt.\n- \u00dcberwachung aus \u2192 manuelle Aufnahme \u2192 Stopp \u2192 \u00dcberwachung bleibt aus.\n- Automation-API: `/v1/watch` meldet nach dem Stopp denselben Zustand wie vor dem Start.\n\n## Bezug\n\n#94 (Stopp von Hand, f\u00fchrt die wiederverwendbare Erkennungssperre `RedetectionHolds` ein), #98 (Men\u00fc w\u00e4hrend einer Aufnahme), #41 (\u00dcberwachung sichtbar am Symbol).\n\n",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/105"
   },
-  "updated_at": "2026-10-20T13:48:19.536745Z"
+  "updated_at": "2026-10-20T13:56:36.602343Z"
 }
