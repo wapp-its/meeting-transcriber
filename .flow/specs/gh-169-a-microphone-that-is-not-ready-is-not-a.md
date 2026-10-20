@@ -11,7 +11,7 @@
 
 The permission health check tests the microphone grant by opening the microphone for about half a second. When that test fails while the system reports the grant as allowed, the app calls the grant "broken": the menu bar icon gets the red warning badge, and a "Permission Problem" notification tells the user to toggle the microphone permission off and on in System Settings.
 
-On 2026-10-17 the test failed about three minutes after the Mac woke from sleep, because the input device reported no usable audio format yet (0 Hz, 0 channels). Both attempts failed the same way, the retry from #124 included. The grant was fine: bringing the app to the front three days later ran the check again and it passed at once. Until then the badge stayed, because the check runs again only at launch and when one of the app's windows comes to the front, which a menu bar app rarely does. The owner read the badge as "the app thinks there is no microphone input". [paraphrase]
+Once the test failed about three minutes after the Mac woke from sleep, because the input device reported no usable audio format yet (0 Hz, 0 channels). Both attempts failed the same way, the retry from #124 included. The grant was fine: bringing the app to the front three days later ran the check again and it passed at once. Until then the badge stayed, because the check runs again only at launch and when one of the app's windows comes to the front, which a menu bar app rarely does. The owner read the badge as "the app thinks there is no microphone input". [paraphrase]
 
 So two things are wrong: a device that is not ready is reported as a broken grant, and nothing clears a false verdict without a click. The advice the notification gives (toggle the permission) cannot help in that case.
 
