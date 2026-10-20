@@ -61,6 +61,7 @@ extension WatchingController {
             speechActivity: { [channelHealth] in channelHealth.speechActivity },
             silencePromptAfter: { [settings] in settings.silencePromptAfter },
             notifier: notifier,
+            nowProvider: manualRecordingClock,
         )
     }
 }
