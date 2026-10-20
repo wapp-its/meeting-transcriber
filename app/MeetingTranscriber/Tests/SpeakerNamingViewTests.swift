@@ -660,39 +660,181 @@ final class SpeakerNamingViewTests: XCTestCase { // swiftlint:disable:this type_
         XCTAssertFalse(skip.isDisabled())
     }
 
-    // MARK: - Mode↔Count coupling (Sortformer 4-speaker cap)
+    // MARK: - Re-run count: range, starting value, labels
 
-    func testRerunCountRangeIsOneToFourForSortformer() {
-        XCTAssertEqual(SpeakerNamingView.rerunCountRange(for: .sortformer), 1 ... 4)
+    /// Only Standard reads the count, so the range is Standard's and does not
+    /// move with the picked method.
+    func testRerunCountRangeIsStandardsCap() {
+        XCTAssertEqual(SpeakerNamingView.rerunCountRange, 1 ... 10)
     }
 
-    func testRerunCountRangeIsOneToTenForOffline() {
-        XCTAssertEqual(SpeakerNamingView.rerunCountRange(for: .offline), 1 ... 10)
+    /// With track-prefixed labels the count starts at the call-audio (`R_`)
+    /// speakers plus one, because that is the track the count applies to; the
+    /// microphone side is always diarized automatically.
+    func testInitialRerunCountCountsCallAudioSpeakersWhenLabelsArePrefixed() {
+        XCTAssertEqual(
+            SpeakerNamingView.initialRerunCount(labels: ["R_SPEAKER_00", "R_SPEAKER_01", "R_SPEAKER_02", "M_SPEAKER_00", "M_SPEAKER_01"]),
+            4,
+        )
     }
 
-    func testClampCountKeepsValueInsideSortformerCap() {
-        XCTAssertEqual(SpeakerNamingView.clampCount(2, for: .sortformer), 2)
-        XCTAssertEqual(SpeakerNamingView.clampCount(4, for: .sortformer), 4)
+    /// Unprefixed labels count every speaker: a single file, or a two-track
+    /// job where one track's diarization failed and the surviving labels were
+    /// kept bare (the naming data does not say which track survived).
+    func testInitialRerunCountCountsAllSpeakersWhenLabelsAreUnprefixed() {
+        XCTAssertEqual(SpeakerNamingView.initialRerunCount(labels: ["SPEAKER_00", "SPEAKER_01", "SPEAKER_02"]), 4)
     }
 
-    func testClampCountClampsValueAboveSortformerCap() {
-        XCTAssertEqual(SpeakerNamingView.clampCount(8, for: .sortformer), 4)
-        XCTAssertEqual(SpeakerNamingView.clampCount(10, for: .sortformer), 4)
+    func testInitialRerunCountIsAtLeastTwo() {
+        XCTAssertEqual(SpeakerNamingView.initialRerunCount(labels: []), 2)
+        XCTAssertEqual(SpeakerNamingView.initialRerunCount(labels: ["SPEAKER_00"]), 2)
+        // Prefixed, but nothing in the call audio: the microphone speakers
+        // are not what the count applies to.
+        XCTAssertEqual(SpeakerNamingView.initialRerunCount(labels: ["M_SPEAKER_00", "M_SPEAKER_01"]), 2)
     }
 
-    func testRerunCountRangeIsOneToEightForNemotron() {
-        XCTAssertEqual(SpeakerNamingView.rerunCountRange(for: .nemotron), 1 ... 8)
+    func testInitialRerunCountIsAtMostStandardsCap() {
+        let many = (0 ..< 12).map { "R_SPEAKER_\($0)" } + ["M_SPEAKER_00"]
+        XCTAssertEqual(SpeakerNamingView.initialRerunCount(labels: many), DiarizerMode.offline.speakerCap)
     }
 
-    func testClampCountClampsValueAboveNemotronCap() {
-        XCTAssertEqual(SpeakerNamingView.clampCount(8, for: .nemotron), 8)
-        XCTAssertEqual(SpeakerNamingView.clampCount(10, for: .nemotron), 8)
+    func testRerunCountLabelNamesTheCallAudioForATwoTrackJob() {
+        XCTAssertEqual(SpeakerNamingView.rerunCountLabel(count: 3, isDualSource: true), "Speakers in the call audio: 3")
+        XCTAssertEqual(SpeakerNamingView.rerunCountLabel(count: 3, isDualSource: false), "Speakers: 3")
     }
 
-    func testClampCountIsIdentityForOfflineMode() {
-        XCTAssertEqual(SpeakerNamingView.clampCount(2, for: .offline), 2)
-        XCTAssertEqual(SpeakerNamingView.clampCount(8, for: .offline), 8)
-        XCTAssertEqual(SpeakerNamingView.clampCount(10, for: .offline), 10)
+    func testRerunMethodHintTexts() {
+        XCTAssertNil(SpeakerNamingView.rerunMethodHint(mode: .offline, isDualSource: true))
+        XCTAssertNil(SpeakerNamingView.rerunMethodHint(mode: .offline, isDualSource: false))
+        XCTAssertEqual(
+            SpeakerNamingView.rerunMethodHint(mode: .sortformer, isDualSource: true),
+            "Sortformer counts the speakers itself: up to 4 in the call audio and 4 on your microphone.",
+        )
+        XCTAssertEqual(
+            SpeakerNamingView.rerunMethodHint(mode: .sortformer, isDualSource: false),
+            "Sortformer counts the speakers itself: up to 4.",
+        )
+        XCTAssertEqual(
+            SpeakerNamingView.rerunMethodHint(mode: .nemotron, isDualSource: true),
+            "Nemotron 3 counts the speakers itself: up to 8 in the call audio and 8 on your microphone.",
+        )
+        XCTAssertEqual(
+            SpeakerNamingView.rerunMethodHint(mode: .nemotron, isDualSource: false),
+            "Nemotron 3 counts the speakers itself: up to 8.",
+        )
+    }
+
+    // MARK: - Re-run area per method and job kind
+
+    private func makeDualSourceData(labels: [String]) -> PipelineQueue.SpeakerNamingData {
+        PipelineQueue.SpeakerNamingData(
+            jobID: UUID(),
+            meetingTitle: "Standup",
+            mapping: Dictionary(uniqueKeysWithValues: labels.map { ($0, $0) }),
+            speakingTimes: Dictionary(uniqueKeysWithValues: labels.map { ($0, 10.0) }),
+            embeddings: [:],
+            audioPath: nil,
+            segments: [],
+            participants: [],
+            isDualSource: true,
+        )
+    }
+
+    /// Standard, two-track: the count is labelled for the call audio, with
+    /// the microphone line under it, and no method hint.
+    func testStandardTwoTrackShowsCallAudioCountAndMicLine() throws {
+        let data = makeDualSourceData(labels: ["R_SPEAKER_00", "R_SPEAKER_01", "M_SPEAKER_00"])
+        let body = try SpeakerNamingView(data: data, currentDiarizerMode: .offline, gracePeriod: 0) { _ in }.inspect()
+        let stepper = try body.find(viewWithAccessibilityIdentifier: A11yID.rerunStepper)
+        XCTAssertNoThrow(try stepper.find(text: "Speakers in the call audio: 3"))
+        XCTAssertEqual(
+            try body.find(viewWithAccessibilityIdentifier: A11yID.rerunMicSideNote).text().string(),
+            SpeakerNamingView.micSideNote,
+        )
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.rerunMethodHint))
+    }
+
+    /// Standard, single file: a plain count, no microphone line.
+    func testStandardSingleFileShowsPlainCountAndNoMicLine() throws {
+        let data = makeData(
+            mapping: ["SPEAKER_00": "SPEAKER_00", "SPEAKER_01": "SPEAKER_01"],
+            speakingTimes: ["SPEAKER_00": 60, "SPEAKER_01": 30],
+        )
+        let body = try SpeakerNamingView(data: data, currentDiarizerMode: .offline, gracePeriod: 0) { _ in }.inspect()
+        let stepper = try body.find(viewWithAccessibilityIdentifier: A11yID.rerunStepper)
+        XCTAssertNoThrow(try stepper.find(text: "Speakers: 3"))
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.rerunMicSideNote))
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.rerunMethodHint))
+    }
+
+    /// Voice enrollment passes no method: the count stays, with the
+    /// single-file wording, and there is no picker.
+    func testEnrollmentKeepsCountWithSingleFileWording() throws {
+        let body = try SpeakerNamingView(data: makeData(), gracePeriod: 0) { _ in }.inspect()
+        XCTAssertNoThrow(try body.find(viewWithAccessibilityIdentifier: A11yID.rerunStepper).find(text: "Speakers: 2"))
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.rerunModePicker))
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.rerunMethodHint))
+    }
+
+    /// An overlap-aware method shows the per-track hint in place of the
+    /// count, and the count control is gone, not merely disabled.
+    func testSortformerTwoTrackShowsHintInsteadOfCount() throws {
+        let data = makeDualSourceData(labels: ["R_SPEAKER_00", "M_SPEAKER_00"])
+        let body = try SpeakerNamingView(data: data, currentDiarizerMode: .sortformer, gracePeriod: 0) { _ in }.inspect()
+        XCTAssertEqual(
+            try body.find(viewWithAccessibilityIdentifier: A11yID.rerunMethodHint).text().string(),
+            "Sortformer counts the speakers itself: up to 4 in the call audio and 4 on your microphone.",
+        )
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.rerunStepper))
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.rerunMicSideNote))
+    }
+
+    func testNemotronSingleFileShowsHintInsteadOfCount() throws {
+        let body = try SpeakerNamingView(data: makeData(), currentDiarizerMode: .nemotron, gracePeriod: 0) { _ in }.inspect()
+        XCTAssertEqual(
+            try body.find(viewWithAccessibilityIdentifier: A11yID.rerunMethodHint).text().string(),
+            "Nemotron 3 counts the speakers itself: up to 8.",
+        )
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.rerunStepper))
+    }
+
+    /// The hint wraps instead of truncating: it is the one flexible item on
+    /// its line, next to a button that never shrinks.
+    func testHintWrapsAndRerunButtonNeverShrinks() throws {
+        let data = makeDualSourceData(labels: ["R_SPEAKER_00", "M_SPEAKER_00"])
+        let body = try SpeakerNamingView(data: data, currentDiarizerMode: .nemotron, gracePeriod: 0) { _ in }.inspect()
+        let hint = try body.find(viewWithAccessibilityIdentifier: A11yID.rerunMethodHint)
+        let hintSizing = try hint.fixedSize()
+        XCTAssertFalse(hintSizing.horizontal, "the hint must be free to wrap")
+        XCTAssertTrue(hintSizing.vertical, "the hint must take the lines it needs")
+        let button = try body.find(viewWithAccessibilityIdentifier: A11yID.rerunButton)
+        let buttonSizing = try button.fixedSize()
+        XCTAssertTrue(buttonSizing.horizontal && buttonSizing.vertical, "Re-run must keep its ideal size")
+    }
+
+    /// The re-run picker lists the methods in the shared display order with
+    /// their user-facing names, so it cannot differ from Settings again.
+    func testRerunPickerListsMethodsInDisplayOrder() throws {
+        let body = try SpeakerNamingView(data: makeData(), currentDiarizerMode: .offline, gracePeriod: 0) { _ in }.inspect()
+        let picker = try body.find(viewWithAccessibilityIdentifier: A11yID.rerunModePicker)
+        // The picker's hidden label is an empty text; the segments are the rest.
+        let names = picker.findAll(ViewType.Text.self).compactMap { try? $0.string() }.filter { !$0.isEmpty }
+        XCTAssertEqual(names, ["Standard", "Sortformer", "Nemotron 3"])
+    }
+
+    /// No text in the dialog calls a method "Offline" or states a per-meeting
+    /// cap, whichever method produced the job and whatever kind of job it is.
+    func testNoDialogTextCallsAMethodOfflineOrStatesAPerMeetingCap() throws {
+        let twoTrack = makeDualSourceData(labels: ["R_SPEAKER_00", "M_SPEAKER_00"])
+        for data in [makeData(), twoTrack] {
+            for mode in DiarizerMode.allCases {
+                let texts = try SpeakerNamingView(data: data, currentDiarizerMode: mode, gracePeriod: 0) { _ in }
+                    .inspect().findAll(ViewType.Text.self).compactMap { try? $0.string() }
+                XCTAssertFalse(texts.contains { $0.localizedCaseInsensitiveContains("offline") }, "\(mode): \(texts)")
+                XCTAssertFalse(texts.contains { $0.localizedCaseInsensitiveContains("per meeting") }, "\(mode): \(texts)")
+                XCTAssertFalse(texts.contains { $0.localizedCaseInsensitiveContains("caps at") }, "\(mode): \(texts)")
+            }
+        }
     }
 
     func testRerunFiresLegacyShapeWhenCurrentModeIsNil() throws {
@@ -778,13 +920,13 @@ final class SpeakerNamingViewTests: XCTestCase { // swiftlint:disable:this type_
         XCTAssertEqual(mode, .sortformer)
     }
 
-    /// The re-run picker lists its modes by hand, so a new mode has to be
-    /// added there as well: a job diarized in Nemotron 3 mode opens the
-    /// dialog with that mode selected, and without its segment the picker
-    /// would hold a selection it cannot show. The picker's own write lands in
-    /// `@State` and cannot be read back here (see CLAUDE.md, GUI Testing), so
-    /// this pins the segment, the cap hint and the mode the Re-run carries.
-    func testRerunWithNemotronModeCarriesModeAndShowsCap() throws {
+    /// A job diarized in Nemotron 3 mode opens the dialog with that mode
+    /// selected; the picker must hold a segment for it, the hint must name
+    /// it, and Re-run must carry it even though no count control is shown
+    /// (the diarizer ignores the count in this mode). The picker's own write
+    /// lands in `@State` and cannot be read back here (see CLAUDE.md, GUI
+    /// Testing).
+    func testRerunWithNemotronModeCarriesModeAndShowsHint() throws {
         var captured: PipelineQueue.SpeakerNamingResult?
         let sut = SpeakerNamingView(
             data: makeData(),
@@ -793,17 +935,17 @@ final class SpeakerNamingViewTests: XCTestCase { // swiftlint:disable:this type_
         ) { result in captured = result }
         let body = try sut.inspect()
         let picker = try body.find(viewWithAccessibilityIdentifier: A11yID.rerunModePicker)
-        XCTAssertNoThrow(try picker.find(text: DiarizerMode.nemotron.shortLabel))
+        XCTAssertNoThrow(try picker.find(text: DiarizerMode.nemotron.displayName))
         XCTAssertEqual(
-            try body.find(viewWithAccessibilityIdentifier: A11yID.speakerCapHint).text().string(),
-            "Nemotron 3 caps at 8 speakers — switch to Offline for larger meetings.",
+            try body.find(viewWithAccessibilityIdentifier: A11yID.rerunMethodHint).text().string(),
+            "Nemotron 3 counts the speakers itself: up to 8.",
         )
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.rerunStepper))
         try body.find(button: "Re-run").tap()
-        guard case let .rerunWithMode(mode, count) = captured else {
+        guard case let .rerunWithMode(mode, _) = captured else {
             XCTFail("Expected .rerunWithMode, got \(String(describing: captured))")
             return
         }
         XCTAssertEqual(mode, .nemotron)
-        XCTAssertLessThanOrEqual(count, DiarizerMode.nemotron.speakerCap)
     }
 }

@@ -36,19 +36,30 @@ struct SpeakersSettingsView: View {
     // swiftlint:disable:next unused_declaration
     @State private var experimentalTuningExpanded = false
 
-    /// Stepper range for `numSpeakers` given the active diarizer mode.
-    /// Upper bound from `DiarizerMode.speakerCap` (single source of truth
-    /// shared with the SpeakerNamingView re-run UI). 0 = Auto.
-    static func speakerCountRange(for mode: DiarizerMode) -> ClosedRange<Int> {
-        0 ... mode.speakerCap
+    /// Stepper range for `numSpeakers`. 0 = Auto. The row exists only while
+    /// Standard is picked (the other two methods ignore the count, see
+    /// `DiarizerMode.countsSpeakersItself`), so the range is Standard's.
+    /// Switching the method no longer clamps the stored count: with the row
+    /// hidden in the overlap-aware modes a clamp there only destroyed a
+    /// value Standard needs when the user switches back.
+    static let expectedSpeakerRange = 0 ... DiarizerMode.offline.speakerCap
+
+    /// Hint under the method picker while an overlap-aware method is picked;
+    /// `nil` for Standard. The per-call figure is twice the per-track cap: a
+    /// recorded call is two tracks, each diarized on its own, so a "caps at
+    /// 4" hint read as a meeting limit was wrong by half (issue #163).
+    static func methodHint(for mode: DiarizerMode) -> String? {
+        guard mode.countsSpeakersItself else { return nil }
+        return "\(mode.displayName) counts the speakers itself. In a recorded call, the call audio and your microphone are two sides, so a call can have up to \(mode.speakerCap * 2) speakers."
     }
 
-    /// Clamp a desired `numSpeakers` to the cap that applies for the given
-    /// mode. 0 = Auto stays 0. Pure so unit tests can pin behaviour.
-    static func clampSpeakerCount(_ count: Int, for mode: DiarizerMode) -> Int {
-        guard count > 0 else { return 0 }
-        return min(count, mode.speakerCap)
-    }
+    /// What the Standard count does, including the part that misled a user
+    /// who entered the meeting total: in a two-track recording it applies to
+    /// the call audio only (`PipelineQueue` diarizes the microphone track
+    /// with `numSpeakers: nil`).
+    static let expectedSpeakersHint = "Auto finds the number. A fixed number forces exactly that many voices. "
+        + "In a recorded call it counts only the call audio, because your microphone side is always counted automatically. "
+        + "In an imported file it counts everyone."
 
     var body: some View {
         Form {
@@ -105,45 +116,48 @@ struct SpeakersSettingsView: View {
             Toggle("Speaker Diarization", isOn: $settings.diarize)
             if settings.diarize {
                 diarizationModePicker
-                if settings.diarizerMode != .offline {
-                    Label(
-                        "\(settings.diarizerMode.shortLabel) supports up to \(settings.diarizerMode.speakerCap) speakers per meeting. Switch to Offline mode for meetings with more participants.",
-                        systemImage: "info.circle",
-                    )
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
+                if let hint = Self.methodHint(for: settings.diarizerMode) {
+                    Label(hint, systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                        .accessibilityIdentifier(A11yID.diarizationMethodHint)
                 }
-                expectedSpeakersRow
-                Label(
-                    "Auto detects the count; a fixed value forces exactly that many speakers (and over-splits a smaller meeting).",
-                    systemImage: "info.circle",
-                )
-                .foregroundStyle(.secondary)
-                .font(.caption)
-                if settings.diarizerMode == .offline {
+                // The count and the tuning knobs belong to the clustering
+                // diarizer alone: the overlap-aware models read neither.
+                if !settings.diarizerMode.countsSpeakersItself {
+                    expectedSpeakersRow
+                    Label(Self.expectedSpeakersHint, systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
                     experimentalTuningDisclosure
                 }
             }
         }
     }
 
+    /// One row per method, name over description, in `DiarizerMode.displayOrder`.
+    /// A radio group rather than the segmented control it replaced: three
+    /// names alone did not say what the methods do, and a segment has no room
+    /// for a second line.
     private var diarizationModePicker: some View {
-        Picker("Diarizer", selection: $settings.diarizerMode) {
-            ForEach(DiarizerMode.allCases, id: \.self) { mode in
-                Text(mode.label).tag(mode)
+        Picker("Method", selection: $settings.diarizerMode) {
+            ForEach(DiarizerMode.displayOrder, id: \.self) { mode in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(mode.displayName)
+                    Text(mode.methodDescription)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .tag(mode)
             }
         }
-        .pickerStyle(.segmented)
-        .onChange(of: settings.diarizerMode) { _, newMode in
-            // Clamp K to the new mode's cap so the value visible in the
-            // Stepper agrees with what the diarizer will actually honour.
-            settings.numSpeakers = Self.clampSpeakerCount(settings.numSpeakers, for: newMode)
-        }
+        .pickerStyle(.radioGroup)
+        .accessibilityIdentifier(A11yID.diarizationMethodPicker)
     }
 
     private var expectedSpeakersRow: some View {
         HStack {
-            Text("Expected Speakers")
+            Text("Expected speakers")
             Spacer()
             Text(settings.numSpeakers == 0 ? "Auto" : "\(settings.numSpeakers)")
                 .frame(width: 40)
@@ -151,9 +165,10 @@ struct SpeakersSettingsView: View {
             Stepper(
                 "",
                 value: $settings.numSpeakers,
-                in: Self.speakerCountRange(for: settings.diarizerMode),
+                in: Self.expectedSpeakerRange,
             )
             .labelsHidden()
+            .accessibilityIdentifier(A11yID.expectedSpeakersStepper)
         }
     }
 

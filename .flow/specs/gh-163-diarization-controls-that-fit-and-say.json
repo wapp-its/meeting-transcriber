@@ -1,14 +1,16 @@
 {
   "branch_name": "gh-163-diarization-controls-that-fit-and-say",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-20T12:33:48.209989Z",
   "created_at": "2026-10-20T10:45:46.811907Z",
   "default_impl": null,
   "default_review": null,
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-163-diarization-controls-that-fit-and-say",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-163-diarization-controls-that-fit-and-say.1": 0
+  },
   "next_task": 1,
   "no_plan": true,
   "plan_review_rounds": 0,
@@ -104,19 +106,94 @@
       "task": null,
       "timestamp": "2026-10-20T10:50:42.146236Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "0a5e3eb38211ec51d7eb516cdab89dc3912645eaeeeccfd2c0ef90fb9bd236c1",
+      "backend": "codex",
+      "base_sha": "86daabeba4161ab527fc15020251513fbbb64d3f",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "cd3ba0d95c93954508ea9b443b38f8c7f98d9ad5",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 757148,
+      "output_sha256": "6ca079666c58dec275b1aa9fe3ffa2ef0ee115f3b0f2aedcf2dd97469c5c3756",
+      "reservation_id": "973035d3377944d2b578bb8da483cb05",
+      "round_consumed": true,
+      "scope": "impl:gh-163-diarization-controls-that-fit-and-say.1",
+      "superseded_by": null,
+      "task": "gh-163-diarization-controls-that-fit-and-say.1",
+      "timestamp": "2026-10-20T12:28:04.618315Z",
+      "tool_calls": 38,
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "03cb9ebac3a2e19b23eebe3fd8c3c1f0086e0b4ddb3ba38216d34b78161d46fd",
+      "backend": "codex",
+      "base_sha": "86daabeba4161ab527fc15020251513fbbb64d3f",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "cd3ba0d95c93954508ea9b443b38f8c7f98d9ad5",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 341228,
+      "output_sha256": "f36ed63f3ecc2c6fc85fd2fef5e21245117a715963dfefd9e6d9f6e92c74f693",
+      "reservation_id": "4a6ff14b62ff497d8b5db2c4a4805a03",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-20T12:33:48.182816Z",
+      "tool_calls": 28,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-163-diarization-controls-that-fit-and-say.1": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-163-diarization-controls-that-fit-and-say.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-163-diarization-controls-that-fit-and-say.md",
-  "status": "open",
+  "status": "done",
   "title": "Diarization controls that fit and say what they do",
   "tracker": {
     "baseHashFlow": "4bcb993c4b3f204334441f49a86d1effeced3dab74484e07b9f1578b1a9f84e5",
@@ -130,5 +207,5 @@
     "mergeBaseTracker": "## Problem\n\nIn the Name Speakers dialog and in Settings \u2192 Speakers \u2192 Diarization:\n\n1. **The re-run row does not fit.** \"Wrong count?\", the 280 pt method picker, the count stepper and Re-run share one row that is wider than the dialog's 400 pt minimum, so the texts beside the picker are cut off.\n2. **The speaker cap hint is wrong for two-track recordings.** \"Sortformer caps at 4 speakers\" (8 for Nemotron 3) is a limit per track. The call audio and the microphone are diarized separately, so such a recording can have up to 8 (16) speakers.\n3. **The speaker count does nothing in Sortformer and Nemotron 3 mode.** Both models count speakers themselves, yet Settings and the dialog still offer a count. A re-run with the same method and another count gives the same result.\n4. **In \"Offline\" mode the count applies to the call audio only.** On a two-track recording the microphone track is always auto-detected (`runDualTrackDiarization`), but the UI reads \"N speakers\" as if it meant the whole meeting. Entering the total over-splits the remote side.\n5. **\"Offline\" is misleading.** All three methods run on this Mac; \"Offline\" is FluidAudio's name for its batch clustering pipeline.\n6. **The method order differs.** Settings: Offline, Sortformer, Nemotron 3. Dialog: Sortformer, Offline, Nemotron 3.\n\n## Open\n\nHow the count looks in the two overlap-aware modes, and the new names. The changed screens need an accepted mockup before the build.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/163"
   },
-  "updated_at": "2026-10-20T10:51:03.862656Z"
+  "updated_at": "2026-10-20T13:23:18.077397Z"
 }

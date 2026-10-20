@@ -11,10 +11,39 @@ final class FluidDiarizerSortformerTests: XCTestCase {
         XCTAssertEqual(settings.diarizerMode, .offline)
     }
 
-    func testDiarizerModeLabels() {
-        XCTAssertEqual(DiarizerMode.offline.label, "Offline (Clustering)")
-        XCTAssertEqual(DiarizerMode.sortformer.label, "Sortformer (Overlap-aware)")
-        XCTAssertEqual(DiarizerMode.nemotron.label, "Nemotron 3 (8 speakers)")
+    /// The user-facing names. `offline` shows as "Standard": the raw value is
+    /// the speech library's name for its clustering diarizer and stays on the
+    /// wire (`AppSettingsTests.testDiarizerModeRawValuesPinJSONShape`), but
+    /// all three methods run on the Mac, so no name says "Offline".
+    func testDiarizerModeDisplayNames() {
+        XCTAssertEqual(DiarizerMode.offline.displayName, "Standard")
+        XCTAssertEqual(DiarizerMode.sortformer.displayName, "Sortformer")
+        XCTAssertEqual(DiarizerMode.nemotron.displayName, "Nemotron 3")
+    }
+
+    func testDiarizerModeDisplayOrderIsStandardFirstAndComplete() {
+        XCTAssertEqual(DiarizerMode.displayOrder, [.offline, .sortformer, .nemotron])
+        XCTAssertEqual(Set(DiarizerMode.displayOrder), Set(DiarizerMode.allCases), "every method must be pickable")
+    }
+
+    func testDiarizerModeDescriptions() {
+        XCTAssertEqual(DiarizerMode.offline.methodDescription, "Any number of speakers. Groups similar voices.")
+        XCTAssertEqual(
+            DiarizerMode.sortformer.methodDescription,
+            "Handles people talking at the same time. Up to 4 speakers per side.",
+        )
+        XCTAssertEqual(
+            DiarizerMode.nemotron.methodDescription,
+            "Handles people talking at the same time. Up to 8 speakers per side.",
+        )
+    }
+
+    /// Only the clustering diarizer reads a speaker count; the two
+    /// overlap-aware models have fixed output slots and ignore it.
+    func testOnlyStandardTakesASpeakerCount() {
+        XCTAssertFalse(DiarizerMode.offline.countsSpeakersItself)
+        XCTAssertTrue(DiarizerMode.sortformer.countsSpeakersItself)
+        XCTAssertTrue(DiarizerMode.nemotron.countsSpeakersItself)
     }
 
     func testFluidDiarizerDefaultModeIsOffline() {
