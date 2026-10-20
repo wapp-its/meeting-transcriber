@@ -43,9 +43,20 @@ extension WatchingController {
     /// requested end state already holds and there is nothing to refuse. That
     /// is the asymmetry with `startWatching`, where `.blocked` is right because
     /// starting would clobber the recording.
+    ///
+    /// The stop also cancels a pending resume (`WatchingController+ResumeWatching.swift`):
+    /// asked for watching off during a manual recording, the caller must not see
+    /// it come back on its own when that recording ends. Cancelled after the
+    /// join, so a start that settled meanwhile has consumed the intent by
+    /// installing its loop, which the stop below then ends, and is not logged
+    /// as a cancelled resume.
     @discardableResult
     func stopWatching() async -> WatchControlOutcome {
         guard await joinStart() else { return .failed }
+        if resumeWatchingPending {
+            resumeWatchingPending = false
+            diagnostics.notice("watch_resume_cancelled")
+        }
         guard isWatching else { return .unchanged }
         toggleWatching()
         return isWatching ? .failed : .changed

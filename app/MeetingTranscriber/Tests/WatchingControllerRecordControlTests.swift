@@ -153,7 +153,9 @@ final class WatchingControllerRecordControlTests: XCTestCase {
 
     /// A refused start must not leave the machine blind. The start stops an
     /// active auto loop before it knows whether it can record, so without the
-    /// re-arm a 412 answers "nothing changed" while detection is off for good.
+    /// resume that follows a start that recorded nothing, a 412 answers
+    /// "nothing changed" while detection is off for good. The answer waits for
+    /// that resume, so watching is back when it arrives.
     func testARefusedStartPutsMeetingWatchingBack() async {
         let controller = makeWatchingController(
             logDir: tmpDir,

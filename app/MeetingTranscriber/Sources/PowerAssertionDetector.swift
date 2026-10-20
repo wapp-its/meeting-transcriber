@@ -265,43 +265,14 @@ class PowerAssertionDetector: MeetingDetecting {
 
     func checkOnce(excluding excludedApps: Set<String>) -> DetectedMeeting? {
         let assertions = assertionProvider()
-        var hitsThisRound: Set<String> = []
-        var firstMatch: [String: (pid: Int32, processName: String, pattern: AssertionPattern)] = [:]
-
-        for (pid, pidAssertions) in assertions {
-            for assertion in pidAssertions {
-                guard let processName = assertion["Process Name"] as? String,
-                      let assertName = assertion["AssertName"] as? String else {
-                    continue
-                }
-                let assertType = assertion["AssertType"] as? String ?? ""
-
-                for pattern in patterns {
-                    // Every piece of per-app state below is filed under the
-                    // identity key, not the pattern name, so two browsers
-                    // sharing the browser pattern never share a slot.
-                    let key = pattern.identityKey(processName: processName)
-
-                    // Permanently refused: never confirm, so it cannot shadow
-                    // another meeting or force a counter-wiping reset.
-                    if isIdentityDenied(key) { continue }
-
-                    // Skip apps in cooldown
-                    if let until = cooldownUntil[key], Date() < until {
-                        continue
-                    }
-
-                    // Only count each identity once per poll
-                    guard !hitsThisRound.contains(key) else { continue }
-
-                    if matchAssertion(processName: processName, assertName: assertName, assertType: assertType, pattern: pattern) {
-                        if isAddedAppHit(pid: pid, pattern: pattern) { continue }
-                        hitsThisRound.insert(key)
-                        firstMatch[key] = (pid, processName, pattern)
-                        consecutiveHits[key, default: 0] += 1
-                    }
-                }
-            }
+        // Apps in cooldown are skipped; every other identity counts once per poll.
+        let firstMatch = signallingHits(in: assertions) { key in
+            if let until = cooldownUntil[key], Date() < until { return true }
+            return false
+        }
+        let hitsThisRound = Set(firstMatch.keys)
+        for key in hitsThisRound {
+            consecutiveHits[key, default: 0] += 1
         }
 
         logUnmatchedWatchedAssertions(assertions, hits: hitsThisRound)
@@ -310,17 +281,7 @@ class PowerAssertionDetector: MeetingDetecting {
         // above but is passed over here (see `MeetingDetecting`).
         for (key, hits) in consecutiveHits where !excludedApps.contains(key) {
             if hits >= confirmationCount, let match = firstMatch[key] {
-                let meetingPattern = Self.meetingIdentity(
-                    pattern: match.pattern, processName: match.processName,
-                )
-                let title = lookupWindowTitle(for: meetingPattern, pattern: match.pattern)
-                    ?? Self.placeholderTitle(appName: meetingPattern.appName)
-                return DetectedMeeting(
-                    pattern: meetingPattern,
-                    windowTitle: title,
-                    ownerName: match.processName,
-                    windowPID: match.pid,
-                )
+                return detectedMeeting(for: match)
             }
         }
 
@@ -330,6 +291,54 @@ class PowerAssertionDetector: MeetingDetecting {
         }
 
         return nil
+    }
+
+    /// See `MeetingDetecting`. Nothing here writes detector state, so taking
+    /// the list cannot advance or reset a confirmation.
+    func signallingMeetings() -> [DetectedMeeting] {
+        signallingHits(in: assertionProvider()).values.map(detectedMeeting(for:))
+    }
+
+    private typealias Hit = (pid: Int32, processName: String, pattern: AssertionPattern)
+
+    /// Each identity with a matching assertion, with the first assertion that
+    /// matched it: the one matching rule detection and `signallingMeetings`
+    /// share. Filed under the identity key, not the pattern name, so two
+    /// browsers sharing the browser pattern never share a slot. A denied
+    /// identity is never a hit, so it cannot shadow another meeting or force a
+    /// counter-wiping reset; `skip` passes over further identities (cooldowns).
+    private func signallingHits(
+        in assertions: [Int32: [[String: Any]]],
+        skipping skip: (String) -> Bool = { _ in false },
+    ) -> [String: Hit] {
+        var hits: [String: Hit] = [:]
+        for (pid, pidAssertions) in assertions {
+            for assertion in pidAssertions {
+                guard let processName = assertion["Process Name"] as? String,
+                      let assertName = assertion["AssertName"] as? String else {
+                    continue
+                }
+                let assertType = assertion["AssertType"] as? String ?? ""
+
+                for pattern in patterns {
+                    let key = pattern.identityKey(processName: processName)
+                    if isIdentityDenied(key) || skip(key) || hits[key] != nil { continue }
+                    if matchAssertion(processName: processName, assertName: assertName, assertType: assertType, pattern: pattern),
+                       !isAddedAppHit(pid: pid, pattern: pattern) {
+                        hits[key] = (pid, processName, pattern)
+                    }
+                }
+            }
+        }
+        return hits
+    }
+
+    /// The meeting a hit is reported as, by detection and by `signallingMeetings` alike.
+    private func detectedMeeting(for hit: Hit) -> DetectedMeeting {
+        let meetingPattern = Self.meetingIdentity(pattern: hit.pattern, processName: hit.processName)
+        let title = lookupWindowTitle(for: meetingPattern, pattern: hit.pattern)
+            ?? Self.placeholderTitle(appName: meetingPattern.appName)
+        return DetectedMeeting(pattern: meetingPattern, windowTitle: title, ownerName: hit.processName, windowPID: hit.pid)
     }
 
     /// The `AppMeetingPattern` a confirmed hit is carried under.

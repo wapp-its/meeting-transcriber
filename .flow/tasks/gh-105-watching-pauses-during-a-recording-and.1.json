@@ -6,9 +6,10 @@
   "depends_on": [],
   "id": "gh-105-watching-pauses-during-a-recording-and.1",
   "priority": null,
+  "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-105-watching-pauses-during-a-recording-and",
   "spec_path": ".flow/tasks/gh-105-watching-pauses-during-a-recording-and.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "List the meetings signalling now and hold them when a watch loop is started by a resume",
   "updated_at": "2026-10-13T14:40:18.590039Z"
 }

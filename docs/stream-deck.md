@@ -80,6 +80,13 @@ rather than one is the recommendation of this guide, not an accident — see
 key to spare, swap the verb for `toggle` and accept the caveat described there.
 Dropping `-X POST` and the `-d` line turns the same call into a status read.
 
+Watching pauses while a recording you started yourself runs (a room recording
+from the key below, or one started from the menu) and comes back on by itself
+when that recording ends, if it was on when the recording started. Press **Stop
+Meeting Watching** during such a recording to keep watching off afterwards: the
+key answers as usual and watching does not come back. **Start Meeting Watching**
+is refused (`409`) until the recording has ended.
+
 **2. Point a Stream Deck key at it.**
 
 Drag a **System → Website** action onto a key and set:
@@ -197,6 +204,10 @@ unrecorded.
 is not an error; the second press returns the same 200 with `watching: true`.
 Two keys, or one key per Stream Deck profile, will misfire less than one clever
 one. Use `toggle` when you genuinely have only one key to spare.
+
+During a recording you started yourself, watching is paused, so a `toggle` reads
+it as off, resolves to a start and is refused (`409`). Only `stop` keeps watching
+off after that recording.
 
 ## Reading state back
 

@@ -41,6 +41,15 @@ protocol MeetingDetecting {
     /// Check if a previously detected meeting is still active.
     func isMeetingActive(_ meeting: DetectedMeeting) -> Bool
 
+    /// Every meeting whose call signal is present right now, one per watched
+    /// identity (`AppMeetingPattern.identityKey`), each built as detection
+    /// builds it (the per-browser identity, the native-process exclusion,
+    /// deny-listed identities skipped) but without waiting for confirmation.
+    /// Read-only: confirmation counts, cooldowns and once-per-session logging
+    /// stay as they are, and a meeting in cooldown is listed too. A watch loop
+    /// started by a resume holds these (`WatchLoop.holdSignallingMeetings`).
+    func signallingMeetings() -> [DetectedMeeting]
+
     /// Reset confirmation counters and start cooldown for the given app.
     /// `appName` carries the app's identity key (`AppMeetingPattern.identityKey`),
     /// which is its name only for a built-in app or a browser.
@@ -60,5 +69,12 @@ extension MeetingDetecting {
     func checkOnce(excluding excludedApps: Set<String>) -> DetectedMeeting? {
         guard let meeting = checkOnce(), !excludedApps.contains(meeting.pattern.identityKey) else { return nil }
         return meeting
+    }
+
+    /// For a detector that cannot list what signals without confirming it:
+    /// the test doubles, and the window-title `MeetingDetector`, which is not
+    /// the production detector. It lists nothing, so a resume holds nothing.
+    func signallingMeetings() -> [DetectedMeeting] {
+        []
     }
 }

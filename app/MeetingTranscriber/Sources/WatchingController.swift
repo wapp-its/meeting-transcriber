@@ -50,8 +50,20 @@ final class WatchingController {
         didSet { recordingActivityChanged() }
     }
 
+    /// Watching was on when a manual recording took it over, so it comes back
+    /// once that recording has ended (`WatchingController+ResumeWatching.swift`).
+    /// Consumed where a watch loop is installed; never persisted.
+    @ObservationIgnored var resumeWatchingPending = false
+    /// The resume in flight, nil otherwise.
+    @ObservationIgnored var resumeTask: Task<Void, Never>?
+    /// Where the resume writes its diagnostics line. Settable so a test can read it.
+    @ObservationIgnored var diagnostics: any DiagnosticsLogging = OSLogDiagnostics(category: "Watching")
+    /// The manual recording loop's clock, `WatchLoop`'s own default. Settable so
+    /// a test can reach the four-hour limit without waiting it out.
+    @ObservationIgnored var manualRecordingClock: () -> Date = Date.init
+
     let settings: AppSettings
-    private let notifier: any AppNotifying
+    let notifier: any AppNotifying
     let pipeline: PipelineController
     let channelHealth: ChannelHealthController
     private let permissions: PermissionsController
@@ -112,7 +124,7 @@ final class WatchingController {
     /// Meeting detector factory for the auto-detect path. Injectable so tests can
     /// supply a deterministic detector instead of the IOKit-backed
     /// `PowerAssertionDetector`.
-    private let makeDetector: () -> any MeetingDetecting
+    let makeDetector: () -> any MeetingDetecting
 
     /// Recorder factory, the `makeDetector` seam's counterpart for capture.
     ///
@@ -226,61 +238,60 @@ final class WatchingController {
             loop.stop()
             watchLoop = nil
         } else {
-            guard !isManualRecording else { return }
-            // The start is async — mic access is awaited before `watchLoop` is
-            // assigned — so a second toggle in that window would otherwise launch
-            // a duplicate WatchLoop and rebuild the queue twice. Ignore it while
-            // a start is already in flight.
-            guard startTask == nil else { return }
-            startTask = Task { @MainActor in
-                defer { startTask = nil }
+            startWatchLoop(userInitiated: userInitiated)
+        }
+    }
+
+    /// `toggleWatching`'s start branch, with all its ownership checks. The
+    /// resume after a manual recording calls this directly and never
+    /// `toggleWatching`, whose other branch stops a running loop.
+    ///
+    /// - Parameters:
+    ///   - userInitiated: see `toggleWatching`.
+    ///   - requestingPermissions: false for the resume, which must raise no
+    ///     system prompt: a permission revoked during the session would bring
+    ///     its dialog back. A missing one surfaces when a recording would start.
+    ///   - holdingSignallingMeetings: true for the resume, so a call that ran
+    ///     through the manual recording is not recorded from its middle.
+    func startWatchLoop(userInitiated: Bool, requestingPermissions: Bool = true, holdingSignallingMeetings: Bool = false) {
+        guard !isManualRecording else { return }
+        // The start is async — mic access is awaited before `watchLoop` is
+        // assigned — so a second toggle in that window would otherwise launch
+        // a duplicate WatchLoop and rebuild the queue twice. Ignore it while
+        // a start is already in flight.
+        guard startTask == nil else { return }
+        startTask = Task { @MainActor in
+            defer { startTask = nil }
+            if requestingPermissions {
                 await requestStartPermissions(userInitiated: userInitiated)
-
-                // A manual start can register while this task is parked on the
-                // permission gate, and nothing below re-checks. Whichever side
-                // assigned `watchLoop` last would win and orphan the other loop
-                // — still running, with no reference left to stop it. Bailing
-                // here rather than at the assignment also keeps `pipeline.rebuild()`
-                // from replacing the queue the manual loop is already wired to.
-                // Nothing leaks: `loop.start()` has not run, so there is no
-                // self-retaining watch task yet.
-                guard !isManualRecording else { return }
-
-                syncEngines?()
-                pipeline.rebuild()
-
-                let loop = WatchLoop(
-                    detector: makeDetector(),
-                    recorderFactory: makeRecorderFactory(),
-                    pipelineQueue: pipeline.queue,
-                    pollInterval: settings.pollInterval,
-                    endGracePeriod: settings.endGrace,
-                    noMic: settings.noMic,
-                    micDeviceUID: { [settings] in settings.micDeviceUID.isEmpty ? nil : settings.micDeviceUID },
-                    verboseDiagnostics: { [settings] in settings.verboseDiagnostics },
-                    recordOnly: { [settings] in settings.recordOnly },
-                    // Decided per write, not per poll: the loop calls this once
-                    // when a record-only recording is persisted, so a folder that
-                    // cannot be reached is reported there (see the resolver).
-                    recordOnlyDestination: { [pipeline] in
-                        .production(parent: pipeline.outputDirectory.resolve())
-                    },
-                    recordWithoutAskingApps: { [settings] in settings.recordWithoutAskingApps },
-                    speechActivity: { [channelHealth] in channelHealth.speechActivity },
-                    silencePromptAfter: { [settings] in settings.silencePromptAfter },
-                    notifier: notifier,
-                    denyListStore: ConsentDenyListStore(settings: settings),
-                )
-
-                attachStateChangeHandler(to: loop, notifyOnRecording: true)
-
-                if let health = permissions.health {
-                    loop.permissionChecker = { health }
-                }
-
-                watchLoop = loop
-                loop.start()
             }
+
+            // A manual start can register while this task is parked on the
+            // permission gate, or before it first runs, and nothing below
+            // re-checks. Whichever side assigned `watchLoop` last would win and
+            // orphan the other loop — still running, with no reference left to
+            // stop it. Bailing here rather than at the assignment also keeps
+            // `pipeline.rebuild()` from replacing the queue the manual loop is
+            // already wired to. Nothing leaks: `loop.start()` has not run, so
+            // there is no self-retaining watch task yet.
+            guard !isManualRecording else { return }
+
+            syncEngines?()
+            pipeline.rebuild()
+
+            let loop = makeAutoWatchLoop()
+
+            attachStateChangeHandler(to: loop, notifyOnRecording: true)
+
+            if let health = permissions.health {
+                loop.permissionChecker = { health }
+            }
+            if holdingSignallingMeetings { loop.holdSignallingMeetings() }
+
+            watchLoop = loop
+            // Watching is on again, which is all a pending resume is owed.
+            resumeWatchingPending = false
+            loop.start()
         }
     }
 
@@ -432,7 +443,10 @@ final class WatchingController {
         guard watchLoop?.isManualRecording != true else { return nil }
         let task = Task { @MainActor in
             defer { manualStartTask = nil }
-            return await performManualRecording(request, protocolOptions: protocolOptions)
+            let result = await performManualRecording(request, protocolOptions: protocolOptions)
+            // A start that recorded nothing ends here; one that did ends at the loop's end signal.
+            if result != .started { scheduleResumeIfPending() }
+            return result
         }
         // Assigned after construction, not inline: the body is `@MainActor` and
         // so is this, so it cannot run before we return, and the field is set
@@ -441,8 +455,8 @@ final class WatchingController {
         return task
     }
 
-    /// Body of `beginManualRecording`, split out so the task closure stays a
-    /// two-liner and the work is readable on its own.
+    /// Body of `beginManualRecording`, split out so the task closure stays
+    /// short and the work is readable on its own.
     private func performManualRecording(
         _ request: ManualRecordingRequest,
         protocolOptions: MeetingProtocolOptions?,
@@ -470,37 +484,16 @@ final class WatchingController {
             }
             loop.stop()
             watchLoop = nil
+            resumeWatchingPending = true
         }
 
         _ = await ensureMicAccess()
 
         pipeline.ensureQueue()
 
-        // Manual recording never polls the detector, so WatchLoop's default
-        // (unfiltered) detector here is inert, and so is the consent gate
-        // that hangs off it: a manual start never asks, so neither consent
-        // list is consulted and the defaults stand. If this path ever gains
-        // auto-detection, route it through `makeDetector()` like toggleWatching
-        // so the "Apps to Watch" filter still applies, and pass both
-        // `denyListStore:` and `recordWithoutAskingApps:`.
-        let loop = WatchLoop(
-            recorderFactory: makeRecorderFactory(),
-            pipelineQueue: pipeline.queue,
-            pollInterval: settings.pollInterval,
-            noMic: settings.noMic,
-            micDeviceUID: { [settings] in settings.micDeviceUID.isEmpty ? nil : settings.micDeviceUID },
-            verboseDiagnostics: { [settings] in settings.verboseDiagnostics },
-            recordOnly: { [settings] in settings.recordOnly },
-            // Same seam as the auto-watch loop above: per write, through the
-            // shared resolver.
-            recordOnlyDestination: { [pipeline] in
-                .production(parent: pipeline.outputDirectory.resolve())
-            },
-            speechActivity: { [channelHealth] in channelHealth.speechActivity },
-            silencePromptAfter: { [settings] in settings.silencePromptAfter },
-            notifier: notifier,
-        )
+        let loop = makeManualRecordingLoop()
         watchLoop = loop
+        loop.onManualRecordingEnded = { [weak self] in self?.scheduleResumeIfPending() }
 
         // Wire channel-health monitoring + error notification on state
         // transitions — same hook the auto-detect path installs, so the

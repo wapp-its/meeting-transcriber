@@ -253,12 +253,23 @@ The response body is a [`WatchStatusDTO`](#watchstatusdto) describing the state
 **after** the action, so a controller can redraw from the response instead of
 racing a follow-up `GET`.
 
+**Watching during a manual recording.** A manual recording (`POST /v1/record`,
+the menu's *Record Microphone Only*, or the app picker) takes the watch loop
+over, so `watching` reads `false` while it runs. If watching was on when that
+recording started, it comes back on by itself once the recording has ended,
+whichever way it ended, and also after a start that was refused or failed. If
+watching was off, it stays off. A `stop` sent while the recording runs cancels
+that: it answers `200` as below, and watching stays off after the recording.
+`start`, and a `toggle` that resolves to a start, answer `409` during the
+recording and do not cancel it.
+
 Responses:
 
 - `200 OK` — the request was satisfied. This covers *both* "the state changed"
   and "it was already like that": asking an already-watching app to `start` is a
   satisfied request, not an error. A `stop` while a manual recording owns the
-  loop is also `200`: the app is not watching, which is what was asked for.
+  loop is also `200`: the app is not watching, which is what was asked for, and
+  watching then stays off after that recording instead of coming back.
   Read `manualRecording` in the body if you need to distinguish that case.
 - `409 Conflict` — refused because a manual (app-picker) recording owns the
   watch loop, and starting would clobber it. Stop that recording first. The body
@@ -346,6 +357,15 @@ poll, so the response waits for it, up to 20 seconds. `scope` with `start` or
 
 The response body is a [`RecordStatusDTO`](#recordstatusdto) describing the state
 **after** the action.
+
+When the recording took meeting watching over, watching comes back on after it
+(see *Watching during a manual recording* under `POST /v1/watch`), and the answer
+waits for that: a `stop` that ended such a recording, with or without `scope`,
+and a `start` that took watching over and was then refused (`412`) or failed
+(`503`) answer once watching is back, so a `GET /v1/watch` straight after them
+reads `watching: true`. Not when a `POST /v1/watch {"action":"stop"}` during the
+recording cancelled the return: then they answer without that wait and watching
+stays `false`.
 
 Responses:
 
@@ -747,18 +767,15 @@ side.
   when the app quits and a detected meeting ends when the meeting does, but a
   room has no process to watch, so `POST /v1/record` with `stop` is the only way
   it ends short of the duration cap. A caller that starts one owns stopping it.
-- **A refused start puts watching back, a successful one does not.** Taking the
-  loop for a recording stops meeting detection; when the start is then refused
-  (`412`) or fails (`503`), detection is restored, so a refusal really does
-  leave the machine as it found it. A start that succeeds does not, which is the
-  next bullet.
-- **Recording the microphone turns meeting watching off, and stopping does not
-  turn it back on.** A recording takes over the watch loop, so after a
-  `start`/`stop` pair the app is idle even on a machine set to watch
-  automatically. Same for the app-picker recording in the menu bar; it is just
-  easier to miss over the API, where nobody is looking at the menu bar icon.
-  Follow a `stop` with `POST /v1/watch {"action":"start"}` if the app should keep
-  watching.
+- **Recording the microphone pauses meeting watching, and its end resumes it.**
+  A recording takes over the watch loop, so meeting detection is off while it
+  runs. When it ends (a `stop`, the duration cap, or a start that was refused or
+  failed) watching comes back on by itself if it was on when the recording
+  started, and a call still running at that moment is not recorded or asked
+  about until it has ended, so no meeting is picked up from its middle. Same for
+  the app-picker recording in the menu bar. Send
+  `POST /v1/watch {"action":"stop"}` during the recording if watching should
+  stay off after it.
 - **A crash during a microphone recording loses the track.** Recovery on the
   next launch keys on artefacts an app-audio tap leaves behind, and a
   microphone-only recording leaves none. Known limitation, not a regression.

@@ -150,6 +150,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `WatchLoop+ManualRecording.swift` | The poll loop that decides when a manually started recording ends, split out of `WatchLoop` |
 | `WatchLoop+StopByHand.swift` | "Stop Recording" for a detected meeting: parks a request the meeting-end wait takes at its next poll, so the recording ends through the same stop, cut and enqueue as every other meeting end; split out of `WatchLoop` |
 | `WatchLoop+RedetectionHold.swift` | Keeps an app out of detection after its recording was ended while its call signal stayed, until the first watching poll finds that signal gone; split out of `WatchLoop` |
+| `WatchLoop+ResumeHold.swift` | When watching resumes after a manual recording, puts every meeting the detector reports signalling (`MeetingDetecting.signallingMeetings()`) under the re-detection hold, so a call that ran through the recording is not recorded or asked about from its middle; split out of `WatchLoop` |
 | `RedetectionHolds.swift` | Pure per-app hold set behind `WatchLoop+RedetectionHold`, keyed by the detector identity (`AppMeetingPattern.appName`) |
 | `WatchLoopEndPolicy.swift` | Pure decision logic for `waitForMeetingEnd` (grace-period / max-duration) |
 | `PendingRecordingCut.swift` | The meeting-end cut of one in-progress recording, stored while the "meeting seems to have ended" question is open in an owner-only `<stem>_pending_cut.json` beside the recording's in-progress marker, so a crash while asking does not lose it; every change is synced to disk, and a process-wide hold keeps recovery off a cut a live stop still owns |
@@ -234,6 +235,8 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `WatchingController+WatchControl.swift` | The `/v1/watch` control surface: meeting watching as an idempotent resource a remote caller can drive |
 | `WatchingController+RecordControl.swift` | The `/v1/record` control surface: microphone-only recording as an idempotent resource a remote caller can drive |
 | `WatchingController+StopRecording.swift` | The menu's "Stop Recording": ends whatever records, a manual recording as before and a detected meeting through its loop, which keeps watching |
+| `WatchingController+ResumeWatching.swift` | Turns meeting watching back on after a manual recording that took it over, however it ended (a refused or failed start included): one pending intent, consumed when the resumed loop is installed and cancelled by a `/v1/watch` stop; the resume asks for no permission and holds the calls already running |
+| `WatchingController+LoopFactory.swift` | Builds the two watch loops the controller runs, the one that watches for meetings and the one a manual recording runs on — line-cap split |
 | `WatchStatusDTO.swift` | Wire shape for `GET`/`POST /v1/watch` — the meeting-watching lifecycle as a small, stable projection |
 | `RecordStatusDTO.swift` | Wire shape for `GET`/`POST /v1/record` — the microphone-recording lifecycle, same audience as `WatchStatusDTO` (Stream Deck key, Shortcut, shell script) |
 | `WavHeaderRepair.swift` | Repairs unfinalized WAV files from crash-interrupted recordings (RIFF/data chunk size fix). Runs in the launch recovery of the staging folder, which also applies a stored meeting-end cut (`RecoveredCut`) before a recovered recording is queued |

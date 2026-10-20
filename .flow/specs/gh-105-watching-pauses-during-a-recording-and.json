@@ -1,14 +1,19 @@
 {
   "branch_name": "gh-105-watching-pauses-during-a-recording-and",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-10-20T13:48:19.531873Z",
   "created_at": "2026-10-13T14:17:52.453591Z",
   "default_impl": null,
   "default_review": null,
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-105-watching-pauses-during-a-recording-and",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-105-watching-pauses-during-a-recording-and.1": 0,
+    "gh-105-watching-pauses-during-a-recording-and.2": 0,
+    "gh-105-watching-pauses-during-a-recording-and.3": 0,
+    "gh-105-watching-pauses-during-a-recording-and.4": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -135,19 +140,267 @@
       "task": null,
       "timestamp": "2026-10-13T14:50:22.893075Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "c062aa55f85ba729f5e2371e24fd7d99ffc0d656149c80f128df4ded5abf0959",
+      "backend": "codex",
+      "base_sha": "fd9c8cb0f33e04d3985a4709fdc99b8414926224",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "a15ef503d22e86f79de71431ae53897300747eba",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "5f83435a386c47db9baab77cc47b138d",
+      "round_consumed": true,
+      "scope": "impl:gh-105-watching-pauses-during-a-recording-and.4",
+      "superseded_by": null,
+      "task": "gh-105-watching-pauses-during-a-recording-and.4",
+      "timestamp": "2026-10-20T11:38:54.050989Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "ecaaf05e52da33e6bb2c7b858dbd9bc01159198a56e29b9b9a4dabd335da0f08",
+      "backend": "codex",
+      "base_sha": "1cb45d6d17e87b30ada5349795fdb2dbee88ae6d",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "cb3f7db5b42d1f82f64782e5cd3dbe53e111c0e2",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "87072e5458474be6a52bff2ae24aa386",
+      "round_consumed": true,
+      "scope": "impl:gh-105-watching-pauses-during-a-recording-and.1",
+      "superseded_by": null,
+      "task": "gh-105-watching-pauses-during-a-recording-and.1",
+      "timestamp": "2026-10-20T11:51:58.346651Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "bdcb6c5c370983e08822e40d3f6dec7240a6558864a4f1889994777f97a21baf",
+      "backend": "codex",
+      "base_sha": "2903287ec2f0023ed6f1cedb2a29c608eca9853f",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-52c102e6104f8790156677ec9120f8d6",
+            "classification": "introduced",
+            "findingId": "finding-52c102e6104f8790156677ec9120f8d6",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "4dc7827b25728f966b71206556a8bc4f4d063f0c",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1072,
+      "output_sha256": "2ad38611a54a1d91a123072b3b10a25fcb73e50c4bdd3098e0262f590f6db6c0",
+      "reservation_id": "20f99b3555fc493c902ddaebc18034a2",
+      "round_consumed": true,
+      "scope": "impl:gh-105-watching-pauses-during-a-recording-and.2",
+      "superseded_by": null,
+      "task": "gh-105-watching-pauses-during-a-recording-and.2",
+      "timestamp": "2026-10-20T12:43:56.223971Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "5065dfe60602fc8aeae852be1a06aed1bd8bd4ebc5d0cdfe26478fd6890dd979",
+      "backend": "codex",
+      "base_sha": "2903287ec2f0023ed6f1cedb2a29c608eca9853f",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-52c102e6104f8790156677ec9120f8d6",
+            "classification": "introduced",
+            "findingId": "finding-52c102e6104f8790156677ec9120f8d6",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "e664ccd33271b2e527a021bbabcbdea83676c841",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1209,
+      "output_sha256": "f15c5761d105a055f5bcd3ca88cbe6a636f2ad6df6b6137e725dd2ca26de8a97",
+      "reservation_id": "d89a9e88c8fb4f54943fcfa02459f60a",
+      "round_consumed": true,
+      "scope": "impl:gh-105-watching-pauses-during-a-recording-and.2",
+      "superseded_by": null,
+      "task": "gh-105-watching-pauses-during-a-recording-and.2",
+      "timestamp": "2026-10-20T12:51:35.647236Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "5922dc60df7a81558529c27f4839559e738a0a6ee343b2527ec55ecd9b0e5296",
+      "backend": "codex",
+      "base_sha": "c176d7627d8b3fc2f060eff6764e6a8f52972c65",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-34494505685ee7375ed074321b6d4902",
+            "classification": "introduced",
+            "findingId": "finding-34494505685ee7375ed074321b6d4902",
+            "firstSeenThisRound": true,
+            "severity": "P3",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "9bbb5c363daa51788afb5b5a850ff8765da8e313",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 860,
+      "output_sha256": "8a4044055f7108d8d5ca7e3bf28c1fae5c9a9196a21398c8fb642c05f683276b",
+      "reservation_id": "cb31d1b2782944b8b7ad6d53bc4b3aa2",
+      "round_consumed": true,
+      "scope": "impl:gh-105-watching-pauses-during-a-recording-and.3",
+      "superseded_by": null,
+      "task": "gh-105-watching-pauses-during-a-recording-and.3",
+      "timestamp": "2026-10-20T13:28:21.717788Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "d530e4c4fb8695cceea65c5e463940f13e15387340fd4d89462c056e1ac65861",
+      "backend": "codex",
+      "base_sha": "86daabeba4161ab527fc15020251513fbbb64d3f",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "9555bf3e35975b72fafcb2f44c5b1902a19da42c",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 592283,
+      "output_sha256": "c06321838cd7c7af2f8be5d63a6b773ef9ed29562929be2429b78de0467b3f13",
+      "reservation_id": "4cc8a43a9e39473f85b8b6de68b6deda",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-10-20T13:48:19.482644Z",
+      "tool_calls": 31,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-105-watching-pauses-during-a-recording-and.1": 1,
+    "impl:gh-105-watching-pauses-during-a-recording-and.2": 1,
+    "impl:gh-105-watching-pauses-during-a-recording-and.3": 1,
+    "impl:gh-105-watching-pauses-during-a-recording-and.4": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-105-watching-pauses-during-a-recording-and.1": 0,
+    "impl:gh-105-watching-pauses-during-a-recording-and.2": 0,
+    "impl:gh-105-watching-pauses-during-a-recording-and.3": 0,
+    "impl:gh-105-watching-pauses-during-a-recording-and.4": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-105-watching-pauses-during-a-recording-and.md",
-  "status": "open",
+  "status": "done",
   "title": "Watching pauses during a recording and resumes after it",
   "tracker": {
     "baseHashFlow": "b3dcdbd9a15724c36986047fdeaa8fe6d7abeb23f71631d15eeee2c6c6830388",
@@ -161,5 +414,5 @@
     "mergeBaseTracker": "## Problem\n\nStartet man bei laufender \u00dcberwachung eine **manuelle Aufnahme** (\u201eRecord App + Microphone\u2026\u201c, \u201eRecord Microphone Only\u201c), schaltet die App die \u00dcberwachung ab (`WatchingController.beginManualRecording`, Schritt \u201eStop auto-watch if active\u201c). Nach \u201eStop Recording\u201c bleibt sie **aus**: `stopManualRecording()` setzt nur `watchLoop = nil`. Sie kommt erst mit \u201eStart Watching for Meetings\u201c zur\u00fcck oder beim n\u00e4chsten App-Start, wenn \u201eBeim Start \u00fcberwachen\u201c an ist.\n\nIm Alltag: kurz eine Sprachnotiz oder ein Gespr\u00e4ch im Raum aufgenommen, danach wird das n\u00e4chste Teams-Meeting **weder erkannt noch aufgenommen**, ohne Hinweis. Bei erkannten Meetings ist es anders: nach deren Ende \u00fcberwacht die App von selbst weiter.\n\nDazu ein toter Men\u00fceintrag: w\u00e4hrend einer manuellen Aufnahme zeigt das Men\u00fc \u201eStart Watching for Meetings\u201c, ein Klick darauf wird still ignoriert (`toggleWatching` verweigert, solange eine manuelle Aufnahme die Schleife besitzt).\n\nOwner, 2026-10-08: \u201eactually watching should be paused while recording isn't it?\u201c\n\n## Wunsch\n\n- War die \u00dcberwachung **vor** der manuellen Aufnahme an, l\u00e4uft sie **nach** deren Ende wieder an, so wie nach einem erkannten Meeting. War sie aus, bleibt sie aus.\n- Damit eine Anruf-App, die noch im Anruf ist (die manuell aufgenommene App selbst oder Teams nach einer Mikrofon-Aufnahme), nicht sofort erkannt und aufgenommen oder nachgefragt wird, gilt die Sperre aus #94 (\u201eerst wieder erkennen, wenn das Signal einmal weg war\u201c) f\u00fcr die aufgenommene App.\n- Gilt auch, wenn die manuelle Aufnahme aus einem anderen Grund endet (Ziel-App beendet, 4-h-Grenze).\n\n## Abnahme\n\n- \u00dcberwachung an \u2192 \u201eRecord App + Microphone\u2026\u201c mit Teams \u2192 \u201eStop Recording\u201c \u2192 Symbol zeigt wieder \u201e\u00fcberwacht\u201c (#41); Teams noch im Anruf \u2192 keine neue Aufnahme, keine R\u00fcckfrage, bis der Anruf endet; n\u00e4chster Anruf \u2192 normal erkannt.\n- \u00dcberwachung aus \u2192 manuelle Aufnahme \u2192 Stopp \u2192 \u00dcberwachung bleibt aus.\n- Automation-API: `/v1/watch` meldet nach dem Stopp denselben Zustand wie vor dem Start.\n\n## Bezug\n\n#94 (Stopp von Hand, f\u00fchrt die wiederverwendbare Erkennungssperre `RedetectionHolds` ein), #98 (Men\u00fc w\u00e4hrend einer Aufnahme), #41 (\u00dcberwachung sichtbar am Symbol).\n\n",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/105"
   },
-  "updated_at": "2026-10-13T14:50:23.411177Z"
+  "updated_at": "2026-10-20T13:56:36.602343Z"
 }

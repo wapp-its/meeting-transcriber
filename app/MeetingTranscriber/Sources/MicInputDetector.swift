@@ -176,51 +176,72 @@ class MicInputDetector: MeetingDetecting {
         // bundle on machines that never opted into this channel.
         guard !patterns.isEmpty else { return nil }
 
-        let processes = processProvider()
-        // Every piece of per-app state is filed under the identity key, so an
-        // added app never shares it with a same-named one; the name is only
-        // for the title and owner the person reads.
-        var hitsThisRound: Set<String> = []
-        var firstMatch: [String: pid_t] = [:]
-        // The pattern that matched, kept rather than looked up again by name:
-        // an added app can share a built-in's name, and a lookup by name
-        // returns the built-in one with its consent setting.
-        var matchedPattern: [String: AppMeetingPattern] = [:]
-
-        for process in processes where process.isRunningInput {
-            guard let pattern = mostSpecificPattern(for: process.bundleID) else {
-                logUnmatchedRunningInput(bundleID: process.bundleID)
-                continue
-            }
-            let key = pattern.meetingPattern.identityKey
-            if isIdentityDenied(key) { continue }
-            if let until = cooldownUntil[key], Date() < until { continue }
-            guard !hitsThisRound.contains(key) else { continue }
-            hitsThisRound.insert(key)
-            firstMatch[key] = tapRootPID(for: process, pattern: pattern)
-            matchedPattern[key] = pattern.meetingPattern
+        let firstMatch = signallingHits(
+            in: processProvider(),
+            skipping: { key in
+                if let until = cooldownUntil[key], Date() < until { return true }
+                return false
+            },
+            unmatched: { logUnmatchedRunningInput(bundleID: $0) },
+        )
+        for key in firstMatch.keys {
             consecutiveHits[key, default: 0] += 1
         }
 
         for (key, hits) in consecutiveHits where !excludedApps.contains(key) {
-            if hits >= confirmationCount, let pid = firstMatch[key],
-               let meetingPattern = matchedPattern[key] {
-                let title = matchers[key]?.selectWindowTitle(from: windowListProvider())
-                    ?? PowerAssertionDetector.placeholderTitle(appName: meetingPattern.appName)
-                return DetectedMeeting(
-                    pattern: meetingPattern,
-                    windowTitle: title,
-                    ownerName: meetingPattern.appName,
-                    windowPID: pid,
-                )
+            if hits >= confirmationCount, let match = firstMatch[key] {
+                return detectedMeeting(for: match)
             }
         }
 
-        for key in consecutiveHits.keys where !hitsThisRound.contains(key) {
+        for key in consecutiveHits.keys where firstMatch[key] == nil {
             consecutiveHits[key] = 0
         }
 
         return nil
+    }
+
+    /// See `MeetingDetecting`. Same early return as `checkOnce` for an install
+    /// that watches none of these apps: no Core Audio enumeration.
+    func signallingMeetings() -> [DetectedMeeting] {
+        guard !patterns.isEmpty else { return [] }
+        return signallingHits(in: processProvider()).values.map(detectedMeeting(for:))
+    }
+
+    /// The pattern that matched is kept rather than looked up again by name:
+    /// an added app can share a built-in's name, and a lookup by name returns
+    /// the built-in one with its consent setting.
+    private typealias Hit = (pid: pid_t, pattern: AppMeetingPattern)
+
+    /// Each identity holding the microphone, with its tap root: the one
+    /// matching rule detection and `signallingMeetings` share. Filed under the
+    /// identity key, so an added app never shares state with a same-named one;
+    /// the name is only for the title and owner the person reads. Denied
+    /// identities are never a hit; `skip` passes over further ones (cooldowns),
+    /// and `unmatched` hears every capturing bundle no pattern claims.
+    private func signallingHits(
+        in processes: [AudioProcessSnapshot],
+        skipping skip: (String) -> Bool = { _ in false },
+        unmatched: (String) -> Void = { _ in },
+    ) -> [String: Hit] {
+        var hits: [String: Hit] = [:]
+        for process in processes where process.isRunningInput {
+            guard let pattern = mostSpecificPattern(for: process.bundleID) else {
+                unmatched(process.bundleID)
+                continue
+            }
+            let key = pattern.meetingPattern.identityKey
+            if isIdentityDenied(key) || skip(key) || hits[key] != nil { continue }
+            hits[key] = (tapRootPID(for: process, pattern: pattern), pattern.meetingPattern)
+        }
+        return hits
+    }
+
+    /// The meeting a hit is reported as, by detection and by `signallingMeetings` alike.
+    private func detectedMeeting(for hit: Hit) -> DetectedMeeting {
+        let title = matchers[hit.pattern.identityKey]?.selectWindowTitle(from: windowListProvider())
+            ?? PowerAssertionDetector.placeholderTitle(appName: hit.pattern.appName)
+        return DetectedMeeting(pattern: hit.pattern, windowTitle: title, ownerName: hit.pattern.appName, windowPID: hit.pid)
     }
 
     func isMeetingActive(_ meeting: DetectedMeeting) -> Bool {
@@ -368,6 +389,13 @@ final class CompositeMeetingDetector: MeetingDetecting {
             }
         }
         return nil
+    }
+
+    /// Every strategy's list, each identity once: the strategy asked first
+    /// keeps it, the same priority detection gives them.
+    func signallingMeetings() -> [DetectedMeeting] {
+        var seen: Set<String> = []
+        return detectors.flatMap { $0.signallingMeetings() }.filter { seen.insert($0.pattern.identityKey).inserted }
     }
 
     func isMeetingActive(_ meeting: DetectedMeeting) -> Bool {

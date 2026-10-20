@@ -157,6 +157,8 @@ class WatchLoop {
     var onStateChange: ((State, State) -> Void)?
     /// Told true as a detected meeting's capture begins and false once its recorder stopped, also after `stop()` left `.recording`.
     var onMeetingCapture: ((Bool) -> Void)?
+    /// Told once a manual recording has ended, after `stopManualRecording` went idle; `stop()` (the app quitting) never tells it.
+    var onManualRecordingEnded: (() -> Void)?
 
     init(
         detector: any MeetingDetecting = WatchLoop.defaultDetector(),
@@ -356,6 +358,7 @@ class WatchLoop {
             next.detail = ""
             if let failureMessage { next.lastError = failureMessage }
         }
+        onManualRecordingEnded?()
     }
 
     private func cleanupManualRecording() {
@@ -575,25 +578,6 @@ class WatchLoop {
         if pausedSince != next.pausedSince { pausedSince = next.pausedSince }
         if oldPhase != next.phase {
             onStateChange?(oldPhase, next.phase)
-        }
-    }
-
-    /// Strip app suffixes from meeting titles for cleaner display.
-    static func cleanTitle(_ title: String) -> String {
-        let suffixes = [" | Microsoft Teams", " - Zoom", " - Webex"]
-        for suffix in suffixes where title.hasSuffix(suffix) {
-            return String(title.dropLast(suffix.count))
-        }
-        return title
-    }
-
-    /// Map WatchLoop state to TranscriberState for compatibility with existing UI.
-    var transcriberState: TranscriberState {
-        switch state {
-        case .idle: .idle
-        case .watching: .watching
-        case .recording: .recording
-        case .error: .error
         }
     }
 }
