@@ -65,6 +65,11 @@ final class MicrophoneController {
     /// meeting app on another microphone (`MicrophoneController+MeetingProbe.swift`).
     var meetingAppHint: String?
 
+    /// Called on the main queue after the macOS default input changes, from the
+    /// same listener that refreshes the list. `AppState` points it at the
+    /// permission check, which re-runs for a new input device.
+    @ObservationIgnored var onDefaultInputChanged: (@MainActor () -> Void)?
+
     let settings: AppSettings
     let notifier: any AppNotifying
     let log: any DiagnosticsLogging
@@ -171,7 +176,10 @@ final class MicrophoneController {
         let status = AudioObjectAddPropertyListenerBlock(
             AudioObjectID(kAudioObjectSystemObject), &address, .main,
         ) { [weak self] _, _ in
-            MainActor.assumeIsolated { self?.refreshDevices() }
+            MainActor.assumeIsolated {
+                self?.refreshDevices()
+                self?.onDefaultInputChanged?()
+            }
         }
         if status != noErr {
             logger.warning("Default input listener not installed (status: \(status))")

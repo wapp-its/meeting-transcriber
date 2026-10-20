@@ -242,15 +242,13 @@ struct MeetingTranscriberApp: App {
             appState.remoteVocabulary.start()
         }
         .task {
-            await appState.permissions.check()
+            await appState.startPermissionChecks()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // Re-check permissions when the user returns to the app (e.g. from System
             // Settings after toggling a permission). Debounced so rapid Cmd-Tab cycles
             // don't repeatedly churn the mic HAL via the 500 ms probe.
-            Task { @MainActor in
-                await appState.permissions.check(minimumInterval: 3)
-            }
+            appState.permissions.recheck()
         }
         .onChange(of: appState.shouldShowLiveCaptions, initial: true) { _, visible in
             let controller = captionsWindow ?? LiveCaptionsWindowController(

@@ -81,7 +81,7 @@ final class PermissionsControllerTests: XCTestCase {
 
     func testCheckRunsProbeAndStoresHealth() async {
         let probed = HealthCheckResult(screenRecording: .healthy, microphone: .healthy)
-        let controller = PermissionsController(notifier: RecordingNotifier()) { probed }
+        let controller = PermissionsController(notifier: RecordingNotifier()) { _ in probed }
         await controller.check()
         XCTAssertEqual(controller.health, probed)
         XCTAssertNotNil(controller.lastCheckAt)
@@ -89,7 +89,7 @@ final class PermissionsControllerTests: XCTestCase {
 
     func testRepeatedCheckWithinMinimumIntervalSkipsProbe() async {
         let counter = ProbeCounter()
-        let controller = PermissionsController(notifier: RecordingNotifier(), probe: counter.probe)
+        let controller = PermissionsController(notifier: RecordingNotifier()) { _ in counter.probe() }
         // First call: no prior timestamp → always runs.
         await controller.check(minimumInterval: 9999)
         // Second call: last check was milliseconds ago, well within 9999 s → skipped.
@@ -99,7 +99,7 @@ final class PermissionsControllerTests: XCTestCase {
 
     func testCheckWithNilIntervalAlwaysRunsProbe() async {
         let counter = ProbeCounter()
-        let controller = PermissionsController(notifier: RecordingNotifier(), probe: counter.probe)
+        let controller = PermissionsController(notifier: RecordingNotifier()) { _ in counter.probe() }
         await controller.check()
         await controller.check()
         XCTAssertEqual(counter.count, 2, "A nil minimum interval must never debounce")
@@ -165,20 +165,51 @@ final class PermissionsControllerTests: XCTestCase {
         XCTAssertEqual(Set(kinds.map(\.logToken)).count, kinds.count, "log tokens must tell the kinds apart")
     }
 
+    // MARK: - check: a microphone that is not ready
+
+    /// A missing input device, or one that reports no usable format yet (0 Hz or
+    /// 0 channels, seen for minutes after a wake from sleep), says nothing about
+    /// the grant: no broken verdict and no notification, while each attempt's
+    /// reason is still logged. No buffer before the timeout on both attempts
+    /// stays the signature of a broken grant, and when the two attempts fail
+    /// differently the retry's failure decides.
+    func testAMicrophoneThatIsNotReadyIsNotReportedAsABrokenGrant() async {
+        let cases: [(failures: [PermissionHealthCheck.MicProbeFailure], verdict: PermissionStatus)] = [
+            ([.invalidFormat, .invalidFormat], .healthy),
+            ([.noInputDevice, .noInputDevice], .healthy),
+            ([.noBufferBeforeTimeout, .invalidFormat], .healthy),
+            ([.invalidFormat, .noBufferBeforeTimeout], .broken),
+            ([.noBufferBeforeTimeout, .noBufferBeforeTimeout], .broken),
+        ]
+        for (failures, verdict) in cases {
+            let script = ScriptedMicProbe(failures.map { .failed($0) })
+            let notifier = RecordingNotifier()
+            let controller = makeMicrophoneController(script, notifier: notifier)
+            await controller.check()
+            XCTAssertEqual(controller.health?.microphone, verdict, "\(failures)")
+            XCTAssertEqual(notifier.calls.map(\.title), verdict == .broken ? ["Permission Problem"] : [], "\(failures)")
+            XCTAssertEqual(script.loggedFailures, [
+                LoggedMicProbeFailure(attempt: 1, failure: failures[0]),
+                LoggedMicProbeFailure(attempt: 2, failure: failures[1]),
+            ], "\(failures)")
+        }
+    }
+
     /// A controller whose check runs the real microphone check against `script`,
     /// with the other two permissions healthy.
     private func makeMicrophoneController(
         _ script: ScriptedMicProbe,
         notifier: RecordingNotifier,
     ) -> PermissionsController {
-        PermissionsController(notifier: notifier) {
+        PermissionsController(notifier: notifier) { mayRetry in
             let microphone = await PermissionHealthCheck.checkMicrophoneLive(
                 authStatus: .authorized,
                 probe: { script.probe() },
                 sleep: { script.pause($0) },
                 logFailure: { script.log(attempt: $0, failure: $1) },
+                mayRetry: mayRetry,
             )
-            return HealthCheckResult(screenRecording: .healthy, microphone: microphone, accessibility: .healthy)
+            return microphone.map { HealthCheckResult(screenRecording: .healthy, microphone: $0, accessibility: .healthy) }
         }
     }
 }
@@ -231,8 +262,8 @@ private final class ScriptedMicProbe: @unchecked Sendable {
 }
 
 /// Counts how many times the injected probe ran. `@MainActor` to match the
-/// controller's isolation; `probe` is synchronous and gets promoted to the
-/// `() async -> HealthCheckResult` seam when passed in.
+/// controller's isolation; `probe` is synchronous and is called from the
+/// controller's async `Probe` seam.
 @MainActor
 private final class ProbeCounter {
     private(set) var count = 0
