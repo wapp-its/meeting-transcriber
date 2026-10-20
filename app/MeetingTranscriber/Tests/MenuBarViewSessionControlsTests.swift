@@ -120,23 +120,23 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
         }
     }
 
-    // MARK: - Watching stays reachable while recording
+    // MARK: - No watch toggle while recording
 
-    func testWhileRecordingStopWatchingStaysBelowTheFirstDivider() throws {
-        let taps = Taps()
-        let sut = makeView(state: .recording, isWatching: true, recording: true, taps: taps)
+    func testWhileRecordingNoWatchToggleIsShown() throws {
+        let cases: [(name: String, isWatching: Bool)] = [
+            ("detected meeting", true),
+            ("manual recording, not watching", false),
+        ]
+        for testCase in cases {
+            let body = try makeView(state: .recording, isWatching: testCase.isWatching, recording: true).inspect()
 
-        let menu = try lines(of: sut, state: .recording)
-        let toggle = try XCTUnwrap(menu.firstIndex(of: .button(Self.stopWatching)))
-        let firstDivider = try XCTUnwrap(menu.firstIndex(of: .divider))
-        XCTAssertGreaterThan(toggle, firstDivider)
-
-        try sut.inspect().find(button: Self.stopWatching).tap()
-        XCTAssertEqual(taps.toggles, 1)
-        XCTAssertEqual(taps.stops, 0)
+            XCTAssertNoThrow(try body.find(button: Self.stopRecording), testCase.name)
+            XCTAssertThrowsError(try body.find(button: Self.stopWatching), testCase.name)
+            XCTAssertThrowsError(try body.find(button: Self.startWatching), testCase.name)
+        }
     }
 
-    func testTheWatchToggleAppearsExactlyOnceInEveryState() throws {
+    func testTheWatchToggleAppearsOnceWithoutARecordingAndNeverDuringOne() throws {
         let cases: [(name: String, state: TranscriberState, isWatching: Bool, recording: Bool)] = [
             ("idle", .idle, false, false),
             ("watching", .watching, true, false),
@@ -150,7 +150,7 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
             let menu = try lines(of: sut, state: testCase.state)
 
             let toggles = menu.filter { $0 == .button(Self.stopWatching) || $0 == .button(Self.startWatching) }
-            XCTAssertEqual(toggles.count, 1, testCase.name)
+            XCTAssertEqual(toggles.count, testCase.recording ? 0 : 1, testCase.name)
             XCTAssertEqual(menu.filter { $0 == .button(Self.stopRecording) }.count, testCase.recording ? 1 : 0, testCase.name)
         }
     }
@@ -160,7 +160,6 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
     func testKeyboardShortcutsAreUnchanged() throws {
         let recording = try shortcutKeys(of: makeView(state: .recording, isWatching: true, recording: true))
         XCTAssertEqual(recording[Self.stopRecording], ["."])
-        XCTAssertEqual(recording[Self.stopWatching], ["s"])
 
         let idle = try shortcutKeys(of: makeView(state: .idle, isWatching: false))
         XCTAssertEqual(idle[Self.startWatching], ["s"])

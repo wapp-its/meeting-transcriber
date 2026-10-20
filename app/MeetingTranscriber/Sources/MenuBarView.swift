@@ -242,11 +242,7 @@ struct MenuBarView: View {
     }
 
     @ViewBuilder private var watchControls: some View {
-        // While a recording holds the line under the status, watching stays
-        // reachable here; otherwise the toggle is already up there.
-        if onStopManualRecording != nil {
-            watchToggle
-        } else if state != .recording {
+        if onStopManualRecording == nil, state != .recording {
             Button {
                 onRecordMicrophone()
             } label: {
@@ -393,8 +389,8 @@ struct MenuBarView: View {
         }
     }
 
-    /// Rendered by `sessionControls` or `watchControls`, never both, so its
-    /// label, icon and shortcut have one definition.
+    /// Rendered by `sessionControls` only while no recording runs: a recording
+    /// pauses watching, so the menu offers no watch control during one.
     private var watchToggle: some View {
         Button {
             onStartStop()
