@@ -41,9 +41,29 @@ The detector side of R3 plus the loop entry point the resume (task .2) calls. A 
 - [ ] `PATH="$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH" ./scripts/lint.sh` reports 0 violations.
 
 ## Done summary
-TBD
+A watch loop can now hold every call that is signalling when it starts, which is what the resume after a manual recording (task .2) needs. `MeetingDetecting.signallingMeetings()` lists each watched identity whose call signal is present right now, without waiting for confirmation, and `WatchLoop.holdSignallingMeetings()` places the existing re-detection hold on each listed meeting and writes one `watch_resumed_after_manual_recording held=<n>` line. Task .2 calls it on the new loop before `start()`.
 
+`PowerAssertionDetector` and `MicInputDetector` each route `checkOnce(excluding:)` and the new query through one private matching helper (`signallingHits`). The helper applies the identity key, the deny list, the native-process exclusion (inside `matchAssertion`) and the added-app exclusion (`isAddedAppHit`). Detection passes its cooldowns in as a skip predicate. The query writes no confirmation count, cooldown or miss log, so a meeting in cooldown is still listed. `CompositeMeetingDetector` returns the union and keeps the first entry per `identityKey`. Detectors with no implementation (the test doubles and the window-title `MeetingDetector`) list nothing through the protocol default.
+
+Tests. `SignallingMeetingsTests` (6 tests) and `WatchLoopResumeHoldTests` (3 tests) cover the task's acceptance. R3's error case, where a detector cannot list signalling meetings and so holds nothing, is `WatchLoopResumeHoldTests.testADetectorThatCannotListHoldsNothing`. A mutation run that dropped the hold and made the query count as a poll turned 2 of the 3 `WatchLoopResumeHoldTests` and `SignallingMeetingsTests.testTakingTheListLeavesConfirmationAndCooldownsAsTheyWere` red. After the restore the tree was clean and the suite green.
+
+Gates. The task's focused Acceptance command exited 0 with 147 tests and 0 failure lines in its log. `./scripts/lint.sh` reported 0 violations in 896 files. baseline: green via handoff (the conductor's spec-base run at fd9c8cb0, focused tests exit 0 and lint 0 violations), and a pre-edit lint re-run also reported 0 violations.
+
+Line budget for later tasks. `WatchLoop.swift` is unchanged at 599 lines. `PowerAssertionDetector.swift` grew from 565 to 574 lines and `MicInputDetector.swift` from 382 to 410.
+
+Choices:
+- DECIDED: `held=<n>` counts the meetings the snapshot listed · on the fresh loop a resume starts, every listed meeting is newly held, so the count equals the holds placed; R7 asks for how many meetings were held.
+- DECIDED: the shared matching is one private helper per detector, with the cooldown check passed in by `checkOnce` only and the microphone miss log passed in as an `unmatched` callback · the task's Approach prefers one helper over a second loop, and `checkOnce` keeps its filter order (deny, cooldown, once per identity, match, added app).
+- DECIDED: within one detector the list has no defined order, and the composite keeps detector order · holds are keyed by identity, so nothing reads the order.
+- DECIDED: `SignallingMeetingsTests` checks an added app's process under the browser pattern next to the deny-listed and native-client rows the Acceptance names · the fit check names `isAddedAppHit` as a filter the shared helper must carry.
+
+Follow-ups: none found.
+
+Tier: implementer - opus (explicit invocation) (model: claude-opus-5-5)
+stage: impl-review - ran [2026-10-20T11:45Z..2026-10-20T11:51Z] SHIP, 1 round, 3 draws (correctness, contracts, integration) all SHIP, no findings, receipt /tmp/impl-review-receipt-0a7d6728fcc1-gh-105-watching-pauses-during-a-recording-and.1.json (model: gpt-6-astra:xhigh)
+stage: plan-sync - skipped(config: planSync.enabled=false)
+Integrated onto the spec branch by rebase (worker commit e88c1413 became cb3f7db5 on base 1cb45d6d); focused integrated verify on the branch: the task filter exit=0, 0 failures (/private/tmp/mt-gh105/verify-t1.log), lint 0 violations in 896 files.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: cb3f7db5b42d1f82f64782e5cd3dbe53e111c0e2
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh105-home swift test --parallel --filter "SignallingMeetings|WatchLoopResumeHold|PowerAssertionDetector|MicInputDetector|CompositeMeetingDetector|RedetectionHolds|WatchLoopStopByHand" (exit 0, 147 tests, 0 failures), PATH="$HOME/Library/Caches/MeetingTranscriber/lint-tools/bin:$PATH" ./scripts/lint.sh (exit 0, 0 violations), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh105-home swift test --parallel --filter "SignallingMeetings|WatchLoopResumeHold|PowerAssertionDetector|MicInputDetector|CompositeMeetingDetector|RedetectionHolds|WatchLoopStopByHand" > /private/tmp/mt-gh105/verify-t1.log 2>&1 (integrated spec branch at cb3f7db5: exit=0, 0 failures); PATH=lint-tools ./scripts/lint.sh (0 violations in 896 files), cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh105-home swift test --parallel --filter "SignallingMeetings|WatchLoopResumeHold|PowerAssertionDetector|MicInputDetector|CompositeMeetingDetector|RedetectionHolds|WatchLoopStopByHand" (exit=0, 147 tests); PATH=lint-tools ./scripts/lint.sh (0 violations)
 - PRs:
