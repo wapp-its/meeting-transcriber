@@ -9,7 +9,7 @@
   "priority": null,
   "spec": "gh-163-diarization-controls-that-fit-and-say",
   "spec_path": ".flow/tasks/gh-163-diarization-controls-that-fit-and-say.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement Diarization controls that fit and say what they do",
   "updated_at": "2026-10-20T11:58:02.409757Z"
 }
