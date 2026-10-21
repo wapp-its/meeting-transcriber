@@ -74,6 +74,7 @@ Today a job does not even keep the configuration it was recorded under. `Pipelin
 - Follow-up candidates not asked for: vocabulary file, terminology rules, diarization tuning and a custom model folder on disk per profile; live captions following the profile; exporting and importing profiles. [inferred]
 - Centrally distributed, read-only profiles and locked settings belong to the managed-settings spec for issue #11, which depends on this one. [paraphrase]
 - Changing a finished job's profile and regenerating its protocol is not part of this spec. [inferred]
+- From gh-189 (template rules by meeting title): whether a rule may pick a profile instead of a template, and how a rule's template ranks against a profile's own template, is settled when this spec's tasks are cut. [inferred]
 
 ## Decision Context
 
