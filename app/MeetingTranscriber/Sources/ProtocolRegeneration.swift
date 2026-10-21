@@ -170,19 +170,6 @@ struct ProtocolRegenerationTarget: Equatable {
         )
     }
 
-    /// The newest finished meeting whose transcript or protocol is still on
-    /// disk and still holds a transcript.
-    static func latest(
-        records: [TerminalJobRecord], fileExists: (URL) -> Bool, read: (URL) -> Data?,
-    ) -> Self? {
-        for record in records.reversed() {
-            let paths = [record.status.transcriptPath, record.status.protocolPath].compactMap(\.self)
-            guard let file = paths.map(URL.init(fileURLWithPath:)).first(where: fileExists) else { continue }
-            if let target = try? resolve(file: file, records: records, read: read) { return target }
-        }
-        return nil
-    }
-
     /// Whether `job` writes this meeting's files: the same job, basename or path.
     func isOwned(by job: PipelineJob) -> Bool {
         if job.id.uuidString == jobID || job.namingSlug == basename { return true }
@@ -291,19 +278,9 @@ final class ProtocolRegenerator {
         phase == .running
     }
 
-    /// Forget a finished run's result, so a window opened later does not show it.
+    /// Forget a finished run's result, so a sheet opened later does not show it.
     func clearResult() {
         if !isRunning { phase = .idle }
-    }
-
-    func latestTarget() -> ProtocolRegenerationTarget? {
-        withOutputScope {
-            ProtocolRegenerationTarget.latest(
-                records: environment.records(),
-                fileExists: environment.fileOperations.fileExists,
-                read: environment.fileOperations.read,
-            )
-        }
     }
 
     func target(for file: URL) throws -> ProtocolRegenerationTarget {
@@ -312,6 +289,26 @@ final class ProtocolRegenerator {
                 file: file, records: environment.records(), read: environment.fileOperations.read,
             )
         }
+    }
+
+    /// The meeting of a row of the All Recordings window. Its files are the two
+    /// beside the row's protocol, else beside its transcript, the same ones the
+    /// row's menu read (`AllRecordingsActions.readFilesOnDisk`); its title,
+    /// start and job are the row's own. The history is not asked: a failed job
+    /// stays listed after the history dropped its record, and `resolve` would
+    /// then take the title from the file name and know no start or job.
+    func target(for entry: TranscriptionEntry) throws -> ProtocolRegenerationTarget {
+        guard let file = entry.fileToOpen else { throw ProtocolRegenerationError.noTranscript }
+        let folder = file.deletingLastPathComponent()
+        let basename = file.deletingPathExtension().lastPathComponent
+        let files = withOutputScope {
+            ProtocolRegenerationTarget.readFiles(folder: folder, basename: basename, read: environment.fileOperations.read)
+        }
+        guard files.transcript != nil else { throw ProtocolRegenerationError.noTranscript }
+        return ProtocolRegenerationTarget(
+            folder: folder, basename: basename, title: entry.title,
+            meetingStartTime: entry.meetingStartTime, jobID: entry.id.uuidString, files: files,
+        )
     }
 
     /// Generates, then replaces the meeting's protocol; the outcome lands in

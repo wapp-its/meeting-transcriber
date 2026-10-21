@@ -85,12 +85,13 @@ private struct WindowAccessor: NSViewRepresentable {
 struct MeetingTranscriberApp: App {
     @State private var appState = AppState(notifier: NotificationManager.shared)
     @State private var captionsWindow: LiveCaptionsWindowController?
-    // The Transcriptions window's search text, kept while the window is closed.
+    // The All Recordings window's search text, kept while the window is closed.
     // Read only through `$transcriptionsQuery`. Built with Xcode 27, `swiftlint
     // analyze` does not see a reference made through the projected value and
     // reports the property as unused.
     // swiftlint:disable:next unused_declaration
     @State private var transcriptionsQuery = ""
+    @State private var regenerateSheet = RegenerateSheetState()
     @Environment(\.openWindow)
     private var openWindow
 
@@ -140,7 +141,6 @@ struct MeetingTranscriberApp: App {
         settingsWindow
         recordAppWindow
         transcriptionsWindow
-        regenerateProtocolWindow
         consentOptionsWindow
     }
 
@@ -153,48 +153,73 @@ struct MeetingTranscriberApp: App {
             pipelineQueue: appState.pipelineQueue,
             updateChecker: appState.updateChecker,
             updateInstallBlockedReason: appState.updateInstallBlockedReason,
-            onInstallUpdate: { appState.installUpdate() },
             history: appState.pipeline.terminalJobStore.records,
-            onStartStop: { appState.watching.toggleWatching() },
-            onRecordApp: { bringWindowToFront(id: "record-app") },
-            onRecordMicrophone: { appState.watching.startMicrophoneRecording() },
             noMic: appState.settings.noMic,
             manualRecordingPendingOrActive: appState.watching.isManualRecording,
-            onStopManualRecording: appState.canStopRecording ? {
+            isRecordingPaused: appState.isRecordingPaused,
+            consentQuestion: appState.pendingConsentQuestion,
+            microphoneMenu: appState.microphoneMenuState,
+            outputMenu: appState.outputMenuState,
+            actions: menuActions,
+        )
+    }
+
+    private var menuActions: MenuActions {
+        MenuActions(
+            installUpdate: { appState.installUpdate() },
+            startStop: { appState.watching.toggleWatching() },
+            recordApp: { bringWindowToFront(id: "record-app") },
+            recordMicrophone: { appState.watching.startMicrophoneRecording() },
+            stopManualRecording: appState.canStopRecording ? {
                 appState.watching.stopRecording()
             } : nil,
-            isRecordingPaused: appState.isRecordingPaused,
-            onTogglePause: appState.canPauseRecording ? {
+            togglePause: appState.canPauseRecording ? {
                 appState.watching.togglePause()
             } : nil,
-            onOpenProtocol: openJobFile,
-            onOpenLastProtocol: { url in
-                Self.openLastProtocol(
-                    url, scopeRoot: appState.settings.effectiveOutputDir, notifier: NotificationManager.shared,
-                )
+            openProtocol: openJobFile,
+            openLastProtocol: { url in
+                Self.openLastProtocol(url, scopeRoot: appState.settings.effectiveOutputDir, notifier: NotificationManager.shared)
             },
-            onOpenProtocolsFolder: openProtocolsFolder,
-            onOpenSettings: {
-                bringWindowToFront(id: "settings")
-            },
-            onNameSpeakers: appState.hasPendingSpeakerNamingJobs ? {
+            openSettings: { bringWindowToFront(id: "settings") },
+            nameSpeakers: appState.hasPendingSpeakerNamingJobs ? {
                 bringWindowToFront(id: "speaker-naming")
             } : nil,
-            onProcessFiles: processAudioFiles,
-            onShowAllTranscriptions: { bringWindowToFront(id: TranscriptionsView.windowID) },
-            onRegenerateProtocol: { bringWindowToFront(id: RegenerateProtocolView.windowID) },
-            onRemoveFailedJob: { id in appState.pipeline.removeFailedJob(id: id) },
-            onDismissJob: { id in appState.pipelineQueue.removeJob(id: id) },
-            consentQuestion: appState.pendingConsentQuestion,
-            onAnswerConsent: { question, granted in
-                appState.answerConsentQuestion(question, granted: granted)
+            processFiles: processAudioFiles,
+            showAllTranscriptions: { bringWindowToFront(id: TranscriptionsView.windowID) },
+            removeFailedJob: { id in appState.pipeline.removeFailedJob(id: id) },
+            dismissJob: { id in appState.pipelineQueue.removeJob(id: id) },
+            answerConsent: { question, granted in appState.answerConsentQuestion(question, granted: granted) },
+            recordConsentWithOptions: openConsentOptions,
+            quit: quit,
+            selectMicrophone: { appState.settings.micDeviceUID = $0 },
+            selectOutput: { appState.output.select(uid: $0) },
+        )
+    }
+
+    private var allRecordingsActions: AllRecordingsActions {
+        AllRecordingsActions(
+            openProtocol: { AllRecordingsActions.openFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
+            openTranscript: { AllRecordingsActions.openFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
+            reveal: { AllRecordingsActions.revealFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
+            regenerate: { regenerateSheet.present(entry: $0, using: appState.protocolRegenerator) },
+            retry: { appState.pipeline.retryJob(id: $0) },
+            remove: { appState.pipeline.removeFailedJob(id: $0) },
+            dismiss: { appState.pipelineQueue.removeJob(id: $0) },
+            cancel: { appState.pipelineQueue.cancelJob(id: $0) },
+            nameSpeakers: { id in
+                appState.selectedNamingJobID = id
+                bringWindowToFront(id: "speaker-naming")
             },
-            onRecordConsentWithOptions: openConsentOptions,
-            onQuit: quit,
-            onSelectMicrophone: { appState.settings.micDeviceUID = $0 },
-            microphoneMenu: appState.microphoneMenuState,
-            onSelectOutput: { appState.output.select(uid: $0) },
-            outputMenu: appState.outputMenuState,
+            openProtocolsFolder: { AllRecordingsActions.openFolder(appState.settings.effectiveOutputDir) },
+            canRetry: { appState.pipeline.canRetryJob(id: $0) },
+            filesOnDisk: { AllRecordingsActions.readFilesOnDisk(of: $0, scopeRoot: appState.settings.effectiveOutputDir) },
+            templateChoices: { appState.protocolTemplateChoices() },
+            optionsUse: { appState.protocolOptionsUse() },
+            chooseFile: { RegenerateProtocolView.chooseFile(startingIn: appState.settings.effectiveOutputDir) },
+            resolveFile: { try appState.protocolRegenerator.target(for: $0) },
+            generate: { target, options in
+                Task { await appState.protocolRegenerator.regenerate(target, options: options) }
+            },
         )
     }
 
@@ -348,15 +373,13 @@ struct MeetingTranscriberApp: App {
     }
 
     private var transcriptionsWindow: some Scene {
-        Window("Transcriptions", id: TranscriptionsView.windowID) {
+        Window("All Recordings", id: TranscriptionsView.windowID) {
             TranscriptionsView(
                 entries: appState.pipeline.transcriptionEntries,
                 query: $transcriptionsQuery,
-                canRetry: { appState.pipeline.canRetryJob(id: $0) },
-                onOpen: openTranscriptionFile,
-                onReveal: revealTranscriptionFile,
-                onRetry: { appState.pipeline.retryJob(id: $0) },
-                onRemove: { appState.pipeline.removeFailedJob(id: $0) },
+                actions: allRecordingsActions,
+                regenerateSheet: regenerateSheet,
+                regenerationPhase: appState.protocolRegenerator.phase,
             )
             // Starts the pipeline the way an import does, so failed jobs from an
             // earlier session are in the queue and can be retried. Also runs when
@@ -364,25 +387,6 @@ struct MeetingTranscriberApp: App {
             .onAppear { appState.pipeline.prepareTranscriptionsWindow() }
         }
         .defaultSize(width: 760, height: 520)
-    }
-
-    private var regenerateProtocolWindow: some Scene {
-        Window("Regenerate Protocol", id: RegenerateProtocolView.windowID) {
-            RegenerateProtocolView(
-                phase: appState.protocolRegenerator.phase,
-                templateChoices: { appState.protocolTemplateChoices() },
-                optionsUse: { appState.protocolOptionsUse() },
-                latestTarget: { appState.protocolRegenerator.latestTarget() },
-                chooseFile: { RegenerateProtocolView.chooseFile(startingIn: appState.settings.effectiveOutputDir) },
-                resolveFile: { try appState.protocolRegenerator.target(for: $0) },
-                onGenerate: { target, options in
-                    Task { await appState.protocolRegenerator.regenerate(target, options: options) }
-                },
-                onClose: { closeWindow(id: RegenerateProtocolView.windowID) },
-            )
-            .onAppear { appState.protocolRegenerator.clearResult() }
-        }
-        .windowResizability(.contentSize)
     }
 
     private var consentOptionsWindow: some Scene {
@@ -501,36 +505,12 @@ struct MeetingTranscriberApp: App {
         }
     }
 
-    private func openProtocolsFolder() {
-        let protocols = appState.settings.effectiveOutputDir
-        let accessing = protocols.startAccessingSecurityScopedResource()
-        defer { if accessing { protocols.stopAccessingSecurityScopedResource() } }
-        try? FileManager.default.createDirectory(at: protocols, withIntermediateDirectories: true)
-        NSWorkspace.shared.open(protocols)
-    }
-
     /// A job line's Open, inside the output folder's security scope: after a
     /// restart a history line can be opened before any queue holds that scope,
     /// which the App Store build needs. A file that is gone opens nothing.
     private func openJobFile(_ url: URL) {
         _ = TranscriptionFileOpener.perform(url, scopeRoot: appState.settings.effectiveOutputDir) { file in
             NSWorkspace.shared.open(file)
-        }
-    }
-
-    /// The Transcriptions window's Open, inside the output folder's security
-    /// scope like a job line's. False when the file is gone, so the window can
-    /// say so.
-    private func openTranscriptionFile(_ url: URL) -> Bool {
-        TranscriptionFileOpener.perform(url, scopeRoot: appState.settings.effectiveOutputDir) { file in
-            NSWorkspace.shared.open(file)
-        }
-    }
-
-    /// The Transcriptions window's Show in Finder, under the same rule as Open.
-    private func revealTranscriptionFile(_ url: URL) -> Bool {
-        TranscriptionFileOpener.perform(url, scopeRoot: appState.settings.effectiveOutputDir) { file in
-            NSWorkspace.shared.activateFileViewerSelecting([file])
         }
     }
 
@@ -584,7 +564,7 @@ struct MeetingTranscriberApp: App {
     }
 
     /// "Open Last Protocol": the file inside the output folder's security
-    /// scope, through the check the Transcriptions window's Open makes. When
+    /// scope, through the check the All Recordings window's Open makes. When
     /// the file is gone the window says "The file was moved or deleted."; the
     /// menu has closed by then, so the same sentence arrives as a notification.
     static func openLastProtocol(

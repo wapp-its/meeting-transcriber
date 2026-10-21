@@ -45,9 +45,38 @@ The menu the owner accepted in the mockup: three headed sections, two renamed it
 - [ ] TBD
 
 ## Done summary
-TBD
+The menu now shows the three headed sections of the accepted mockup ("Record & Import", "Audio Devices", "Recordings"), the renamed items "Record with Options…", "Import Audio/Video Files…" and "All Recordings…", and "Name Speakers…" (⌘N) as the first line of "Needs you". "Open Protocols Folder" and "Regenerate Protocol…" stay under Recordings until tasks .4 and .5 move them.
 
+- R1, order and shortcuts: `MenuBarMenuOrderTests/testTheMenuReadsInTheMockupsOrderWithItsShortcuts` pins the full line sequence (headings, items, dividers) for an idle menu with a finished recording, a naming job and both device entries, and pins the exact shortcut map (⌘S, ⌘M, ⌘R, ⌘P, ⌘N, ⌘O, ⌘T, ⌘, and ⌘Q, no other item carrying one).
+- R1, error cases: both record items hidden while recording (`MenuBarViewTests/testRecordMicrophoneButtonHiddenWhileRecording`, `testRecordAppButtonHiddenDuringRecording`, `testRecordAppAndStopBothHiddenDuringAutoRecording`). "Record Microphone Only" disabled with its reason, which is now asserted through `.help` (`testRecordMicrophoneButtonDisabledWhenNoMicIsSet`, `testRecordMicrophoneButtonDisabledWhileAManualStartIsStillInFlight`, control `testRecordMicrophoneButtonEnabledWhenTheMicrophoneIsAllowed`). "Open Last Protocol" absent without a finished file (`testOpenLastProtocolHiddenWithoutAFinishedJob`). Audio Devices heading absent with neither entry (`MenuBarMenuOrderTests/testTheAudioDevicesHeadingIsLeftOutWithoutADeviceEntry`).
+- R2 and R3, wiring by `A11yID`: `testImportFilesItemCallsCallback`, `testRecordAppButtonCallsCallback`, `testAllRecordingsItemIsAlwaysShownAndCallsItsCallback`, `testOpenLastProtocolOpensTheLastFinishedJobsProtocol`, `testRecordMicrophoneButtonCallsCallback`.
+- R4: `MenuBarMenuOrderTests/testNameSpeakersIsTheFirstLineOfNeedsYouAndShiftsNoRowIndex` (first line, row indexes unchanged, `jobRemoveButton(2)` still reaches its job), `testWithoutAJobWaitingForNamesNeedsYouOpensWithItsFirstJob`. `MenuBarViewTests/testNameSpeakersButtonCallsCallback` and `testNameSpeakersButtonHiddenWhenIdle` find the item by `A11yID.nameSpeakersMenuItem`.
+- `MenuBarViewSessionControlsTests` and the #105 status block are untouched. No assertion was removed. Every test that found a menu item by its text now finds it by id.
+
+baseline: green via handoff (green, verified at c58d11e9 by the conductor: both of the spec's Quick commands plus the notification suites, 183 tests, rc=0; c58d11e9..8a88c7a1 touched only .flow/). Lint baseline green (0 violations, 907 files).
+
+Gates at HEAD (40622719): `flowctl gate classify` said FULL. Spec Quick command (log path /private/tmp/mt-gh170/task2/quick.log) rc=0, 115 tests. `--filter 'MenuBarMenuOrderTests'` rc=0, 4 tests (log /private/tmp/mt-gh170/task2/order.log); that class is outside the Quick command's filter. `./scripts/lint.sh` rc=0, 0 violations in 908 files. Not run, per the dispatch: the clean `xcodebuild` build for `swiftlint analyze`. Every new `A11yID` constant is read in `MenuBarView` and the tests, `allTranscriptionsMenuItem` has no reader left, and every `MenuActions` member is still read.
+
+Tier: implementer - opus (explicit invocation) at xhigh effort (requested) (model: claude-opus-5-5)
+
+Feature routes: the menu items "Start Recording with Options…", "Process Audio/Video Files..." and "All Transcriptions..." are now "Record with Options…", "Import Audio/Video Files…" and "All Recordings…", and "Name Speakers…" moved into "Needs you". The routes to these features are unchanged.
+
+### Decisions
+
+- DECIDED: live header check skipped (installed app running, same bundle id); owner look-and-feel check needed after the PR builds
+- ASSUMED: the three headings are SwiftUI `Section` headers, which a macOS 14 menu shows as header lines that cannot be clicked · alternatives: B - a `Text` heading styled like the job groups' caption `Label`; C - no heading, dividers only · flip at: `MenuBarView.recordAndImportSection`, `audioDevicesSection`, `recordingsSection` · test: `MenuBarMenuOrderTests/testTheMenuReadsInTheMockupsOrderWithItsShortcuts`. The owner's look check should also cover separators: where an explicit `Divider` meets a section boundary (before "Record & Import", the job group divider after "Audio Devices", the Settings divider after "Recordings"), the menu might show two separators.
+- DECIDED: "Needs you" also shows when only `actions.nameSpeakers` is set and no naming row is listed - the task keys the item on that action alone, and in the app the two cannot disagree (both come from the queue's naming-pending jobs).
+- DECIDED: the sections stay in `MenuBarView.swift` (496 of 600 lines, type body about 366 of 400), so no `MenuBarView+Sections.swift` - the task made that file conditional on the body outgrowing the type.
+- DECIDED: "Settings..." keeps its three-dot label - R2 names only two renames, and the spec's prose ellipsis is not a third.
+- DECIDED: the old visibility tests were switched to ids in place in `MenuBarViewTests` instead of moved into `MenuBarMenuOrderTests` - a move would duplicate or delete them; the new class holds only what nothing covered before (order, shortcuts, Audio Devices heading, Needs-you position).
+- DECIDED: the shortcut walker is a copy of the private one in `MenuBarViewSessionControlsTests` - that file must stay untouched.
+- DECIDED: `MenuActions.swift:8` ("Name Speakers...") and `:15` ("Start Recording with Options…") still name old labels in comments - the file is outside this task's Touches; written to the run notes (`task2-integration.md`) for the conductor.
+
+stage: impl-review - ran [8a88c7a1..a4461bd5] (codex:gpt-6-astra:xhigh, three draws correctness/contracts/integration, all SHIP, 0 findings kept; one P3 FYI left out: MenuBarMenuOrderTests copies the private shortcut walker of MenuBarViewSessionControlsTests, which the task AC keeps untouched; receipt /tmp/impl-review-receipt-d1cb77e1af10-gh-170-menu-sections-and-an-all-recordings.2.json)
+stage: wave-join - ran (lane cb015d88,40622719 cherry-picked onto 8a88c7a1 as 5b0354ed,a4461bd5; focused verify both Quick commands plus MenuBarMenuOrderTests rc 0, 128 tests, log /private/tmp/mt-gh170/verify2/quick.log)
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 5b0354ed43bf3f7fa6ddf484a18d614e691e1436, a4461bd59bd8e2799cf9dc3e782daab6de254ddb
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh170/home swift test --parallel --filter '<spec Quick command 1 filter>|RecordingRowActionsTests|MenuBarMenuOrderTests' (rc 0, 128 tests); ./scripts/lint.sh (rc 0, 0 violations in 908 files)
 - PRs:

@@ -2,8 +2,9 @@
 import ViewInspector
 import XCTest
 
-/// Wiring of the Regenerate Protocol window. The decisions themselves are
-/// pinned in `ProtocolRegeneratorTests` and `ProtocolRegenerationTargetTests`.
+/// Wiring of the regenerate sheet's form. Which meeting it opens with is
+/// `RegenerateSheetStateTests`; the decisions themselves are pinned in
+/// `ProtocolRegeneratorTests` and `ProtocolRegenerationTargetTests`.
 @MainActor
 final class RegenerateProtocolViewTests: XCTestCase {
     private static let choices = ProtocolTemplateChoices(templates: [.builtIn, .file(name: "Board")], defaultTemplate: .builtIn)
@@ -26,16 +27,19 @@ final class RegenerateProtocolViewTests: XCTestCase {
         phase: ProtocolRegenerator.Phase = .idle,
         optionsUse: @escaping () -> ProtocolOptionsUse = { use },
         draft: RegenerateProtocolDraft = RegenerateProtocolDraft(target: target()),
+        initialTarget: ProtocolRegenerationTarget? = nil,
+        allowsChooseFile: Bool = true,
         chooseFile: @escaping () -> URL? = { nil },
         resolveFile: @escaping (URL) throws -> ProtocolRegenerationTarget = { _ in target() },
         onGenerate: @escaping (ProtocolRegenerationTarget, MeetingProtocolOptions) -> Void = { _, _ in },
+        onClose: @escaping () -> Void = {},
     ) -> RegenerateProtocolView {
-        let onClose: () -> Void = {}
-        return RegenerateProtocolView(
+        RegenerateProtocolView(
             phase: phase,
             templateChoices: { Self.choices },
             optionsUse: optionsUse,
-            latestTarget: { nil },
+            initialTarget: initialTarget,
+            allowsChooseFile: allowsChooseFile,
             chooseFile: chooseFile,
             resolveFile: resolveFile,
             draft: draft,
@@ -47,6 +51,50 @@ final class RegenerateProtocolViewTests: XCTestCase {
     private func generateButton(_ view: RegenerateProtocolView) throws -> InspectableView<ViewType.Button> {
         try view.inspect().find(viewWithAccessibilityIdentifier: A11yID.regenerateGenerateButton).button()
     }
+
+    // MARK: - Opening
+
+    /// Opened from a row: its meeting fills the meeting block (title, date and
+    /// the protocol's file name), and there is no "Choose File…" step.
+    func testOpenedForAMeetingShowsItAndOffersNoChooseFile() throws {
+        let start = Date(timeIntervalSinceReferenceDate: 780_000_000)
+        let sut = makeView(draft: RegenerateProtocolDraft(), initialTarget: Self.target(start: start), allowsChooseFile: false)
+        try sut.inspect().vStack().callOnAppear()
+        let body = try sut.inspect()
+
+        XCTAssertNoThrow(try body.find(text: "Standup"))
+        XCTAssertNoThrow(try body.find(text: RegenerateProtocolView.dateLine(start)))
+        XCTAssertNoThrow(try body.find(text: "20261013_0900_standup.md"))
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.regenerateChooseFileButton))
+        XCTAssertFalse(try generateButton(sut).isDisabled())
+    }
+
+    /// Opened from "Regenerate from File…": no meeting, not even one the form
+    /// held before, "Choose File…", and Generate disabled until a file is chosen.
+    func testOpenedWithoutAMeetingOffersChooseFileAndCannotGenerate() throws {
+        let sut = makeView(draft: RegenerateProtocolDraft(target: Self.target()))
+        try sut.inspect().vStack().callOnAppear()
+        let body = try sut.inspect()
+
+        XCTAssertNoThrow(try body.find(text: RegenerateProtocolView.noMeeting))
+        XCTAssertThrowsError(try body.find(text: "Standup"))
+        XCTAssertNoThrow(try body.find(viewWithAccessibilityIdentifier: A11yID.regenerateChooseFileButton))
+        XCTAssertTrue(try generateButton(sut).isDisabled())
+    }
+
+    func testCancelClosesTheSheet() throws {
+        var closed = false
+        // swiftlint:disable:next trailing_closure
+        let cancel = try makeView(onClose: { closed = true }).inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.regenerateCancelButton)
+            .button()
+
+        XCTAssertEqual(try cancel.labelView().text().string(), "Cancel")
+        try cancel.tap()
+        XCTAssertTrue(closed)
+    }
+
+    // MARK: - Generate
 
     func testGenerateIsDisabledWithoutATargetWhileRunningWithProviderOffAndInRecordOnlyMode() throws {
         // Locals, not closure literals: as the only argument one would be
@@ -66,16 +114,16 @@ final class RegenerateProtocolViewTests: XCTestCase {
         }
     }
 
-    /// Settings changed while the window is open: Generate and the notice
+    /// Settings changed while the sheet is open: Generate and the notice
     /// explaining it follow the current provider and record-only mode, as the
-    /// regeneration itself does, instead of what was true when the window opened.
-    func testGenerateAndItsExplanationFollowTheSettingsWhileTheWindowIsOpen() throws {
+    /// regeneration itself does, instead of what was true when the sheet opened.
+    func testGenerateAndItsExplanationFollowTheSettingsWhileTheSheetIsOpen() throws {
         var use = Self.use
         let currentUse: () -> ProtocolOptionsUse = { use }
         let draft = RegenerateProtocolDraft()
         let sut = makeView(optionsUse: currentUse, draft: draft)
         try sut.inspect().vStack().callOnAppear()
-        // Opening found no recent meeting here; one is chosen, as with Choose File.
+        // Opened without a meeting; one is chosen, as with Choose File.
         draft.target = Self.target()
         let notice = {
             try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.protocolOptionsDestinationNotice).text().string()
@@ -107,6 +155,13 @@ final class RegenerateProtocolViewTests: XCTestCase {
         XCTAssertEqual(generated.count, 1)
         XCTAssertEqual(generated.first?.0, Self.target())
         XCTAssertEqual(generated.first?.1, MeetingProtocolOptions(template: .file(name: "Board"), rawBackground: "Agenda"))
+    }
+
+    /// A failed run says why in the sheet, in the regenerator's own words.
+    func testAFailedRunShowsItsReason() throws {
+        let reason = ProtocolRegenerationError.generationFailed.localizedDescription
+
+        XCTAssertNoThrow(try makeView(phase: .failed(reason)).inspect().find(text: reason))
     }
 
     func testTheTrashAndUnknownDateLinesFollowTheTarget() throws {

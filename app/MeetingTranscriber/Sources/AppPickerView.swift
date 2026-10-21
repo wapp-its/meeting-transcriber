@@ -81,7 +81,7 @@ final class StartRecordingDraft {
     }
 }
 
-/// The start dialog ("Start Recording with Options…"): the microphone alone or
+/// The start dialog ("Record with Options…"): the microphone alone or
 /// a running app, an optional title, and the protocol options.
 @MainActor
 struct AppPickerView: View {

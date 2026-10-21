@@ -5,14 +5,12 @@ struct TranscriberStatus: Codable {
     let state: TranscriberState
     let detail: String
     let meeting: MeetingInfo?
-    let protocolPath: String?
     let error: String?
     let audioPath: String?
     let pid: Int?
 
     enum CodingKeys: String, CodingKey {
         case version, timestamp, state, detail, meeting, error, pid
-        case protocolPath = "protocol_path"
         case audioPath = "audio_path"
     }
 }

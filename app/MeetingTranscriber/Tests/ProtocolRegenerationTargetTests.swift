@@ -3,7 +3,7 @@ import XCTest
 
 /// Which transcript and which finished-job record a chosen protocol or
 /// transcript file resolves to. Real files in a temp directory, read through
-/// the injected reader the window uses.
+/// the injected reader the regenerate sheet uses.
 final class ProtocolRegenerationTargetTests: XCTestCase {
     // swiftlint:disable:previous balanced_xctest_lifecycle
     // swiftlint:disable:next implicitly_unwrapped_optional
@@ -121,29 +121,5 @@ final class ProtocolRegenerationTargetTests: XCTestCase {
         XCTAssertNil(target.meetingStartTime)
         XCTAssertNil(target.jobID)
         XCTAssertFalse(target.hasProtocol)
-    }
-
-    // MARK: - Latest
-
-    func testLatestSkipsRecordsWhoseFilesAreGone() throws {
-        try write("[Anna] Hello", to: txt)
-        let present = record(title: "Kept", transcriptPath: storedPath(txt), protocolPath: storedPath(md), start: nil)
-        let gone = record(
-            title: "Deleted",
-            transcriptPath: folder.appendingPathComponent("gone.txt").path,
-            protocolPath: folder.appendingPathComponent("gone.md").path,
-            start: nil,
-        )
-        let older = record(title: "Older", transcriptPath: storedPath(txt), protocolPath: nil, start: nil)
-
-        let latest = ProtocolRegenerationTarget.latest(
-            records: [older, present, gone],
-            fileExists: { FileManager.default.fileExists(atPath: $0.path) },
-            read: read,
-        )
-
-        XCTAssertEqual(latest?.title, "Kept")
-        XCTAssertEqual(latest?.jobID, present.status.jobID)
-        XCTAssertNil(ProtocolRegenerationTarget.latest(records: [gone], fileExists: { _ in false }, read: read))
     }
 }

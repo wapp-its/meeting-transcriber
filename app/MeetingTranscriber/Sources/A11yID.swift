@@ -74,8 +74,21 @@ enum A11yID {
         "jobRemoveButton.\(index)"
     }
 
-    /// Menu bar item that opens the Transcriptions window.
-    static let allTranscriptionsMenuItem = "allTranscriptionsMenuItem"
+    /// Menu bar item that opens the All Recordings window, "All Recordings…".
+    static let allRecordingsMenuItem = "allRecordingsMenuItem"
+
+    /// The menu's "Name Speakers…", the first line of "Needs you". Tests find
+    /// it by this value: the state line of a job waiting for names reads
+    /// "Name Speakers..." too.
+    static let nameSpeakersMenuItem = "nameSpeakersMenuItem"
+
+    /// The menu's items under "Record & Import" and "Open Last Protocol".
+    /// Tests find them by these values: the open recording prompt has a
+    /// "Record with Options…" button of its own.
+    static let recordMicrophoneMenuItem = "recordMicrophoneMenuItem"
+    static let recordWithOptionsMenuItem = "recordWithOptionsMenuItem"
+    static let importFilesMenuItem = "importFilesMenuItem"
+    static let openLastProtocolMenuItem = "openLastProtocolMenuItem"
 
     /// The menu's Pause Recording / Resume Recording item: one identifier for
     /// both labels, since it is one item whose label follows the state.
@@ -86,26 +99,52 @@ enum A11yID {
     /// allowlist like `updateInstallButton`.
     static let menuInstallUpdateButton = "menuInstallUpdateButton"
 
-    // Transcriptions window. Its rows show meeting titles and participants,
-    // so the per-row buttons are addressed by ROW INDEX in the filtered list,
+    // All Recordings window. Its rows show meeting titles and participants,
+    // so the per-row controls are addressed by ROW INDEX in the filtered list,
     // like `jobRetryButton`, and no identifier carries a title, participant or
     // path.
     static let transcriptionsSearchField = "transcriptionsSearchField"
 
-    static func transcriptionOpenButton(_ index: Int) -> String {
-        "transcriptionOpenButton.\(index)"
+    /// The toolbar's "Open Protocols Folder" and "Regenerate from File…".
+    static let recordingsOpenFolderButton = "recordingsOpenFolderButton"
+    static let recordingsRegenerateFromFileButton = "recordingsRegenerateFromFileButton"
+
+    /// A row's one main button, whose label follows the row's state.
+    static func recordingMainButton(_ index: Int) -> String {
+        "recordingMainButton.\(index)"
     }
 
-    static func transcriptionRevealButton(_ index: Int) -> String {
-        "transcriptionRevealButton.\(index)"
+    /// A row's "…" menu, whose items its right-click menu repeats.
+    static func recordingMoreButton(_ index: Int) -> String {
+        "recordingMoreButton.\(index)"
     }
 
-    static func transcriptionRetryButton(_ index: Int) -> String {
-        "transcriptionRetryButton.\(index)"
+    static func recordingMenuOpenProtocol(_ index: Int) -> String {
+        "recordingMenuOpenProtocol.\(index)"
     }
 
-    static func transcriptionRemoveButton(_ index: Int) -> String {
-        "transcriptionRemoveButton.\(index)"
+    static func recordingMenuOpenTranscript(_ index: Int) -> String {
+        "recordingMenuOpenTranscript.\(index)"
+    }
+
+    static func recordingMenuShowInFinder(_ index: Int) -> String {
+        "recordingMenuShowInFinder.\(index)"
+    }
+
+    static func recordingMenuRegenerate(_ index: Int) -> String {
+        "recordingMenuRegenerate.\(index)"
+    }
+
+    static func recordingMenuRetry(_ index: Int) -> String {
+        "recordingMenuRetry.\(index)"
+    }
+
+    static func recordingMenuRemove(_ index: Int) -> String {
+        "recordingMenuRemove.\(index)"
+    }
+
+    static func recordingMenuDismiss(_ index: Int) -> String {
+        "recordingMenuDismiss.\(index)"
     }
 
     /// The menu's answers to the open recording prompt. No app name, for the
@@ -154,10 +193,10 @@ enum A11yID {
     static let protocolOptionsBackgroundEditor = "protocolOptionsBackgroundEditor"
     static let protocolOptionsDestinationNotice = "protocolOptionsDestinationNotice"
 
-    /// "Regenerate Protocol…" in the menu, and its window's controls. The
-    /// window shows background text and stays off every RPC allowlist.
-    static let regenerateProtocolMenuItem = "regenerateProtocolMenuItem"
+    /// The regenerate sheet's controls (All Recordings window). The sheet shows
+    /// background text and stays off every RPC allowlist.
     static let regenerateChooseFileButton = "regenerateChooseFileButton"
+    static let regenerateCancelButton = "regenerateCancelButton"
     static let regenerateGenerateButton = "regenerateGenerateButton"
 
     static let includeFullTranscriptToggle = "includeFullTranscriptToggle"

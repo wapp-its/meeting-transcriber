@@ -11,27 +11,17 @@ final class MenuBarJobMenuTests: XCTestCase {
         history: [TerminalJobRecord] = [],
         onRemoveFailedJob: @escaping (UUID) -> Void = { _ in },
     ) -> MenuBarView {
-        MenuBarView(
+        var actions = MenuActions.noop
+        actions.removeFailedJob = onRemoveFailedJob
+        return MenuBarView(
             status: nil,
             isWatching: false,
             pipelineQueue: pipelineQueue,
             updateChecker: nil,
             history: history,
-            onStartStop: {},
-            onRecordApp: {},
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: nil,
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: {},
-            onOpenSettings: {},
-            onNameSpeakers: nil,
-            onProcessFiles: {},
-            onRemoveFailedJob: onRemoveFailedJob,
-            onDismissJob: { _ in },
-            onQuit: {},
+            actions: actions,
         )
     }
 

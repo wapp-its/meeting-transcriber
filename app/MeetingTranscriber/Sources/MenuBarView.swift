@@ -8,16 +8,10 @@ struct MenuBarView: View {
     /// Why "Install Update" is not possible right now (`UpdateInstallGate`);
     /// set, it disables the menu's install item.
     var updateInstallBlockedReason: String?
-    /// Starts an mt-update install; nil disables the menu's install item.
-    var onInstallUpdate: (() -> Void)?
     /// The finished-job history, read with the queue's jobs so a failed line
     /// and "Open Last Protocol" outlive the queue's one-minute reap and a
     /// restart.
     var history: [TerminalJobRecord] = []
-    let onStartStop: () -> Void
-    /// Opens the start dialog, "Start Recording with Options…".
-    let onRecordApp: () -> Void
-    let onRecordMicrophone: () -> Void
     /// Whether the user set "No Microphone (app audio only)". Only reaches the
     /// microphone item, which it disables with a reason.
     let noMic: Bool
@@ -27,49 +21,18 @@ struct MenuBarView: View {
     /// handing back a dead click, which is what `AppPickerStartState` was built
     /// to avoid on the picker.
     let manualRecordingPendingOrActive: Bool
-    /// Stops whatever is recording, a detected meeting included; set only while a recording runs.
-    let onStopManualRecording: (() -> Void)?
     /// Whether the running recording is paused, which picks the label of the
-    /// item `onTogglePause` drives.
+    /// item `MenuActions.togglePause` drives.
     var isRecordingPaused = false
-    /// Pauses a running recording or resumes a paused one, whatever kind it is;
-    /// set only while a recording's capture is running.
-    var onTogglePause: (() -> Void)?
-    /// A job line's Open: the job's protocol, else its transcript.
-    let onOpenProtocol: (URL) -> Void
-    /// "Open Last Protocol": the newest finished job's protocol, else its
-    /// transcript. Separate from a job line's Open because a file that is
-    /// gone is reported here, as the Transcriptions window reports it.
-    let onOpenLastProtocol: (URL) -> Void
-    let onOpenProtocolsFolder: () -> Void
-    let onOpenSettings: () -> Void
-    let onNameSpeakers: (() -> Void)?
-    let onProcessFiles: () -> Void
-    /// Opens the Transcriptions window.
-    var onShowAllTranscriptions: () -> Void = {}
-    /// Opens the Regenerate Protocol window.
-    var onRegenerateProtocol: () -> Void = {}
-    /// Remove on a failed job: off the menu and out of the history for good.
-    var onRemoveFailedJob: (UUID) -> Void = { _ in }
-    /// Dismiss on a job waiting for speaker names.
-    let onDismissJob: (UUID) -> Void
     /// The open "Record <App> meeting?" prompt, nil when none is open.
     var consentQuestion: ConsentQuestion?
-    /// Answers the question the menu displayed, true for Record. Handed the
-    /// question rather than reading the open one, so a click on a menu that
-    /// went stale answers nothing (`WatchLoop.answerParkedConsent`).
-    var onAnswerConsent: ((ConsentQuestion, Bool) -> Void)?
-    /// Opens the Record Meeting window for the question the menu displayed.
-    var onRecordConsentWithOptions: ((ConsentQuestion) -> Void)?
-    let onQuit: () -> Void
-    /// Stores a chosen microphone's UID, empty for System Default.
-    var onSelectMicrophone: (String) -> Void = { _ in }
     /// The Microphone entry; nil leaves it out.
     var microphoneMenu: MicrophoneMenuState?
-    /// Makes a chosen output the Mac's default output.
-    var onSelectOutput: (String) -> Void = { _ in }
     /// The Output entry; nil leaves it out.
     var outputMenu: OutputMenuState?
+    /// What the menu's items do; a nil optional action hides or disables its
+    /// item (see `MenuActions`).
+    let actions: MenuActions
 
     private var state: TranscriberState {
         status?.state ?? .idle
@@ -106,14 +69,10 @@ struct MenuBarView: View {
 
         Divider()
 
-        watchControls
-        microphoneSection
-        outputSection
+        recordAndImportSection
+        audioDevicesSection
         jobSections
-
-        Divider()
-
-        protocolActions
+        recordingsSection
         updateSection
 
         Divider()
@@ -143,21 +102,21 @@ struct MenuBarView: View {
             .padding(.horizontal, 4)
 
             Button {
-                onAnswerConsent?(question, true)
+                actions.answerConsent?(question, true)
             } label: {
                 Label("Record", systemImage: "record.circle")
             }
             .accessibilityIdentifier(A11yID.consentPromptRecord)
 
             Button {
-                onRecordConsentWithOptions?(question)
+                actions.recordConsentWithOptions?(question)
             } label: {
                 Label("Record with Options…", systemImage: "slider.horizontal.3")
             }
             .accessibilityIdentifier(A11yID.consentPromptRecordWithOptions)
 
             Button {
-                onAnswerConsent?(question, false)
+                actions.answerConsent?(question, false)
             } label: {
                 Label("Ignore", systemImage: "xmark.circle")
             }
@@ -212,9 +171,9 @@ struct MenuBarView: View {
     /// no divider in between. One item per line, like every menu item (see
     /// `jobRow`): a control added here goes on its own line under these.
     @ViewBuilder private var sessionControls: some View {
-        if let onStopManualRecording {
+        if let stopManualRecording = actions.stopManualRecording {
             Button {
-                onStopManualRecording()
+                stopManualRecording()
             } label: {
                 Label("Stop Recording", systemImage: "stop.circle.fill")
             }
@@ -227,9 +186,9 @@ struct MenuBarView: View {
 
     /// The line under "Stop Recording", for every kind of recording.
     @ViewBuilder private var pauseResumeItem: some View {
-        if let onTogglePause {
+        if let togglePause = actions.togglePause {
             Button {
-                onTogglePause()
+                togglePause()
             } label: {
                 if isRecordingPaused {
                     Label("Resume Recording", systemImage: "record.circle")
@@ -241,116 +200,127 @@ struct MenuBarView: View {
         }
     }
 
-    @ViewBuilder private var watchControls: some View {
-        if onStopManualRecording == nil, state != .recording {
-            Button {
-                onRecordMicrophone()
-            } label: {
-                Label("Record Microphone Only", systemImage: "mic.circle")
+    /// A section header is a heading line in the menu, not an item. The two
+    /// record items are hidden while a recording runs, when the status block
+    /// offers Stop Recording instead; the import is always there.
+    private var recordAndImportSection: some View {
+        Section("Record & Import") {
+            if actions.stopManualRecording == nil, state != .recording {
+                Button {
+                    actions.recordMicrophone()
+                } label: {
+                    Label("Record Microphone Only", systemImage: "mic.circle")
+                }
+                .keyboardShortcut("m")
+                .disabled(!microphoneAvailability.allowsStart)
+                .help(microphoneAvailability.disabledReason ?? "Record the system microphone, with no app audio")
+                .accessibilityIdentifier(A11yID.recordMicrophoneMenuItem)
+
+                Button {
+                    actions.recordApp()
+                } label: {
+                    Label("Record with Options…", systemImage: "record.circle")
+                }
+                .keyboardShortcut("r")
+                .accessibilityIdentifier(A11yID.recordWithOptionsMenuItem)
             }
-            .keyboardShortcut("m")
-            .disabled(!microphoneAvailability.allowsStart)
-            .help(microphoneAvailability.disabledReason ?? "Record the system microphone, with no app audio")
 
             Button {
-                onRecordApp()
+                actions.processFiles()
             } label: {
-                Label("Start Recording with Options…", systemImage: "record.circle")
+                Label("Import Audio/Video Files…", systemImage: "doc.badge.plus")
             }
-            .keyboardShortcut("r")
+            .keyboardShortcut("p")
+            .accessibilityIdentifier(A11yID.importFilesMenuItem)
         }
+    }
 
-        if let onNameSpeakers {
-            Button {
-                onNameSpeakers()
-            } label: {
-                Label("Name Speakers...", systemImage: "person.2.fill")
+    /// Left out with its heading when neither device entry is shown.
+    @ViewBuilder private var audioDevicesSection: some View {
+        if microphoneMenu != nil || outputMenu != nil {
+            Section("Audio Devices") {
+                microphoneSection
+                outputSection
             }
-            .keyboardShortcut("n")
         }
-
-        Button {
-            onProcessFiles()
-        } label: {
-            Label("Process Audio/Video Files...", systemImage: "doc.badge.plus")
-        }
-        .keyboardShortcut("p")
     }
 
     /// The jobs under way and the jobs waiting on the user, each group under
-    /// its own header and only when it has a job. Row indexes run on across
-    /// both groups, so every row's identifiers stay unique.
+    /// its own header and only when it has a line. Row indexes run on across
+    /// both groups and count only job rows, so every row's identifiers stay
+    /// unique and "Name Speakers…" shifts none of them.
     @ViewBuilder private var jobSections: some View {
         let sections = TranscriptionList.menuSections(transcriptionEntries)
-        jobSection("In progress", systemImage: "gearshape.2.fill", entries: sections.inProgress, firstIndex: 0)
-        jobSection(
-            "Needs you", systemImage: "exclamationmark.circle",
-            entries: sections.needsYou, firstIndex: sections.inProgress.count,
-        )
+        if !sections.inProgress.isEmpty {
+            jobGroupHeader("In progress", systemImage: "gearshape.2.fill")
+            jobRows(sections.inProgress, firstIndex: 0)
+        }
+        if !sections.needsYou.isEmpty || actions.nameSpeakers != nil {
+            jobGroupHeader("Needs you", systemImage: "exclamationmark.circle")
+            nameSpeakersItem
+            jobRows(sections.needsYou, firstIndex: sections.inProgress.count)
+        }
     }
 
     @ViewBuilder
-    private func jobSection(
-        _ title: String, systemImage: String, entries: [TranscriptionEntry], firstIndex: Int,
-    ) -> some View {
-        if !entries.isEmpty {
-            Divider()
-            Label(title, systemImage: systemImage)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private func jobGroupHeader(_ title: String, systemImage: String) -> some View {
+        Divider()
+        Label(title, systemImage: systemImage)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
 
-            ForEach(Array(entries.enumerated()), id: \.element.id) { offset, entry in
-                jobRow(entry, index: firstIndex + offset)
-            }
+    private func jobRows(_ entries: [TranscriptionEntry], firstIndex: Int) -> some View {
+        ForEach(Array(entries.enumerated()), id: \.element.id) { offset, entry in
+            jobRow(entry, index: firstIndex + offset)
         }
     }
 
-    /// The same list as the Transcriptions window, so the two cannot disagree
+    /// The first line of "Needs you" while a job waits for speaker names. A
+    /// hidden item registers no shortcut, so ⌘N exists only while it shows.
+    @ViewBuilder private var nameSpeakersItem: some View {
+        if let nameSpeakers = actions.nameSpeakers {
+            Button {
+                nameSpeakers()
+            } label: {
+                Label("Name Speakers…", systemImage: "person.2.fill")
+            }
+            .keyboardShortcut("n")
+            .accessibilityIdentifier(A11yID.nameSpeakersMenuItem)
+        }
+    }
+
+    /// The same list as the All Recordings window, so the two cannot disagree
     /// about which jobs exist or what state they are in.
     private var transcriptionEntries: [TranscriptionEntry] {
         TranscriptionList.entries(liveJobs: pipelineQueue.jobs, records: history)
     }
 
-    /// Shown at all times, next to the protocols folder: finished jobs are
-    /// listed in the window, not in the menu.
-    private var allTranscriptionsItem: some View {
-        Button {
-            onShowAllTranscriptions()
-        } label: {
-            Label("All Transcriptions...", systemImage: "list.bullet.rectangle")
-        }
-        .keyboardShortcut("t")
-        .accessibilityIdentifier(A11yID.allTranscriptionsMenuItem)
-    }
-
-    /// The way to the results: the newest one, every job, and the folder they
-    /// are written to. "Open Last Protocol" is the menu's one click to the
-    /// newest result now that finished jobs are not listed, shown while the
-    /// history holds a finished job with a file.
-    @ViewBuilder private var protocolActions: some View {
-        if let url = TranscriptionList.lastFinished(transcriptionEntries)?.fileToOpen {
-            Button {
-                onOpenLastProtocol(url)
-            } label: {
-                Label("Open Last Protocol", systemImage: "doc.text")
+    /// The way to the results: the newest one and every job. "Open Last
+    /// Protocol" is the menu's one click to the newest result now that
+    /// finished jobs are not listed, shown while the history holds a finished
+    /// job with a file. "All Recordings…" is shown at all times: finished jobs
+    /// are listed in the window, not in the menu.
+    private var recordingsSection: some View {
+        Section("Recordings") {
+            if let url = TranscriptionList.lastFinished(transcriptionEntries)?.fileToOpen {
+                Button {
+                    actions.openLastProtocol(url)
+                } label: {
+                    Label("Open Last Protocol", systemImage: "doc.text")
+                }
+                .keyboardShortcut("o")
+                .accessibilityIdentifier(A11yID.openLastProtocolMenuItem)
             }
-            .keyboardShortcut("o")
-        }
 
-        allTranscriptionsItem
-
-        Button {
-            onOpenProtocolsFolder()
-        } label: {
-            Label("Open Protocols Folder", systemImage: "folder")
+            Button {
+                actions.showAllTranscriptions()
+            } label: {
+                Label("All Recordings…", systemImage: "list.bullet.rectangle")
+            }
+            .keyboardShortcut("t")
+            .accessibilityIdentifier(A11yID.allRecordingsMenuItem)
         }
-
-        Button {
-            onRegenerateProtocol()
-        } label: {
-            Label("Regenerate Protocol…", systemImage: "arrow.triangle.2.circlepath")
-        }
-        .accessibilityIdentifier(A11yID.regenerateProtocolMenuItem)
     }
 
     @ViewBuilder private var updateSection: some View {
@@ -380,11 +350,11 @@ struct MenuBarView: View {
         } else if let summary = updateChecker.availableBuildSummary {
             Divider()
             Button {
-                onInstallUpdate?()
+                actions.installUpdate?()
             } label: {
                 Label("Install Update: \(summary)", systemImage: "arrow.down.circle.fill")
             }
-            .disabled(updateInstallBlockedReason != nil || updateChecker.isChecking || onInstallUpdate == nil)
+            .disabled(updateInstallBlockedReason != nil || updateChecker.isChecking || actions.installUpdate == nil)
             .accessibilityIdentifier(A11yID.menuInstallUpdateButton)
         }
     }
@@ -393,7 +363,7 @@ struct MenuBarView: View {
     /// pauses watching, so the menu offers no watch control during one.
     private var watchToggle: some View {
         Button {
-            onStartStop()
+            actions.startStop()
         } label: {
             if isWatching {
                 Label("Stop Watching for Meetings", systemImage: "stop.fill")
@@ -406,7 +376,7 @@ struct MenuBarView: View {
 
     private var settingsButton: some View {
         Button {
-            onOpenSettings()
+            actions.openSettings()
         } label: {
             Label("Settings...", systemImage: "gear")
         }
@@ -415,7 +385,7 @@ struct MenuBarView: View {
 
     private var quitButton: some View {
         Button {
-            onQuit()
+            actions.quit()
         } label: {
             Text("Quit")
         }
@@ -457,10 +427,10 @@ struct MenuBarView: View {
     @ViewBuilder
     private func jobActions(_ entry: TranscriptionEntry, index: Int) -> some View {
         if entry.state.isTerminal, let url = entry.fileToOpen {
-            Button("Open") { onOpenProtocol(url) }
+            Button("Open") { actions.openProtocol(url) }
         }
         if entry.state == .speakerNamingPending {
-            Button("Name Speakers") { onNameSpeakers?() }
+            Button("Name Speakers") { actions.nameSpeakers?() }
         }
         if entry.state == .waiting || entry.state == .transcribing
             || entry.state == .diarizing || entry.state == .generatingProtocol {
@@ -468,11 +438,11 @@ struct MenuBarView: View {
         }
         retryButton(entry, index: index)
         if entry.state == .error {
-            Button("Remove") { onRemoveFailedJob(entry.id) }
+            Button("Remove") { actions.removeFailedJob(entry.id) }
                 .accessibilityIdentifier(A11yID.jobRemoveButton(index))
         }
         if entry.state == .speakerNamingPending {
-            Button("Dismiss") { onDismissJob(entry.id) }
+            Button("Dismiss") { actions.dismissJob(entry.id) }
         }
     }
 

@@ -10,27 +10,17 @@ final class MenuBarOutputTests: XCTestCase {
         outputMenu: OutputMenuState,
         onSelectOutput: @escaping (String) -> Void = { _ in },
     ) -> MenuBarView {
-        MenuBarView(
+        var actions = MenuActions.noop
+        actions.selectOutput = onSelectOutput
+        return MenuBarView(
             status: nil,
             isWatching: false,
             pipelineQueue: PipelineQueue(),
             updateChecker: nil,
-            onStartStop: {},
-            onRecordApp: {},
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: nil,
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: {},
-            onOpenSettings: {},
-            onNameSpeakers: nil,
-            onProcessFiles: {},
-            onDismissJob: { _ in },
-            onQuit: {},
-            onSelectOutput: onSelectOutput,
             outputMenu: outputMenu,
+            actions: actions,
         )
     }
 

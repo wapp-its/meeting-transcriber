@@ -166,7 +166,7 @@ Responses:
   terminal record with it.
 
 A job in `error` is not necessarily final: the user can retry it from the menu
-bar or the Transcriptions window, which moves it back to `waiting` under the
+bar or the All Recordings window, which moves it back to `waiting` under the
 **same id**, and the stale `error` record is dropped from the terminal store at
 that moment. A poller that sees `error` and keeps polling may therefore see the
 job run again and end in `done`. If a retried job is then cancelled, the id

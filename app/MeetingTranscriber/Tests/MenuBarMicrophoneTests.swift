@@ -10,27 +10,17 @@ final class MenuBarMicrophoneTests: XCTestCase {
         microphoneMenu: MicrophoneMenuState,
         onSelectMicrophone: @escaping (String) -> Void = { _ in },
     ) -> MenuBarView {
-        MenuBarView(
+        var actions = MenuActions.noop
+        actions.selectMicrophone = onSelectMicrophone
+        return MenuBarView(
             status: nil,
             isWatching: false,
             pipelineQueue: PipelineQueue(),
             updateChecker: nil,
-            onStartStop: {},
-            onRecordApp: {},
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: nil,
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: {},
-            onOpenSettings: {},
-            onNameSpeakers: nil,
-            onProcessFiles: {},
-            onDismissJob: { _ in },
-            onQuit: {},
-            onSelectMicrophone: onSelectMicrophone,
             microphoneMenu: microphoneMenu,
+            actions: actions,
         )
     }
 

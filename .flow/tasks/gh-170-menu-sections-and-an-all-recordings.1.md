@@ -47,9 +47,38 @@ The behaviour-preserving half of the menu work (#156 and #140's leftovers), done
 - [ ] TBD
 
 ## Done summary
-TBD
+The menu view now takes one `MenuActions` value (21 members, built in `MeetingTranscriberApp.menuBarContent` through a separate `menuActions` getter) and renders the Microphone and Output entries with one `deviceSection`/`devicePicker` helper. `TranscriberStatus.protocolPath` and the negative finish rank in `TranscriptionList.finishOrders` are gone. No label, shortcut, order, icon or visibility in the menu changed.
 
+- R9, actions value: `MenuBarView` stores no `on...` closures. Stop Recording, Pause/Resume and Name Speakers still hide on a nil member, and Install Update still disables on a nil `installUpdate` (`MenuBarViewTests/testInstallItemIsDisabledWhileBlockedCheckingOrUnwired`, its "no callback" row). The six menu test files start from `MenuActions.noop`; only their constructors changed, and no assertion line was removed.
+- R9, shared picker: `MenuBarMicrophoneTests` and `MenuBarOutputTests` still find `A11yID.menuMicrophonePicker` / `A11yID.menuOutputPicker` on the `Picker` and select through it. A throwaway ViewInspector probe (deleted, not committed) read the entry icons as `mic`, `mic.slash`, `speaker.wave.2`, `exclamationmark.triangle` (Teams routing) and `speaker.slash` (no output), the same literals as before.
+- R9, leftovers: `TranscriberStatus.protocolPath` is removed from Sources and Tests, and the `JobStatus.protocolPath` reads are untouched. The app has no encode or decode site for `TranscriberStatus`, so the "plain `JSONDecoder`" check had nothing to check. The negative-rank branch is removed. `TranscriptionListTests` pins it with three new tests, committed first (417d794a) and green before and after the removal (8593eaf3).
+- `MenuBarView` type body is 350 of 400 lines. `./scripts/lint.sh` reports 0 violations in 905 files.
+
+baseline: green via handoff (green, verified at 79481cc5 by the conductor's baseline run of the spec's first Quick command: 112 tests, rc=0). Lint baseline green (0 violations, 904 files).
+
+Gates at HEAD: spec Quick command rc=0 with 115 tests (112 plus the three pins); `NotificationManagerTests|NotificationContentTests|TranscriberStatusTests` rc=0 with 59 tests; `flowctl gate classify` said FULL, so the focused Quick commands ran. Not run, per the dispatch: the clean `xcodebuild` build for `swiftlint analyze` (`unused_declaration`). Every `MenuActions` member is read in `MenuBarView` or `MenuBarView+Devices`, and `noop` is read by the tests.
+
+Tier: implementer - opus (explicit invocation) at xhigh effort (requested) (model: claude-opus-5-5)
+
+Feature routes: none changed.
+
+### Decisions
+
+- DECIDED: every closure keeps the type it had in `MenuBarView`, so six members are optional (`installUpdate`, `stopManualRecording`, `togglePause`, `nameSpeakers`, `answerConsent`, `recordConsentWithOptions`), three more than the task named. The move preserves behaviour this way, and a non-optional `installUpdate` would need the "no callback" assertion changed.
+- DECIDED: `MenuActions` is a `@MainActor` struct with plain closure types, which makes `static let noop` legal. The `DebugRPCServer.SpeakerDBActions` pattern (`@MainActor`-typed closures) was rejected because Swift 6.2 fails with "failed to produce diagnostic for expression" on an optional `@MainActor` closure chosen by a ternary (measured with `swiftc -swift-version 6 -typecheck`), which is how the stop, pause and name actions are built.
+- DECIDED: the six test helpers keep their `on...` parameters and copy them onto `MenuActions.noop`, so no call site or assertion changed. The 12 inline constructors in `MenuBarViewTests` set only the action they assert.
+- DECIDED: `menuActions` is its own getter in `MeetingTranscriberApp`, so it gets its own type-check budget like the scenes. Three closures moved to one line each to keep the file at 597 lines, because `file_length` warns at 600 and `lint.sh` runs `--strict`.
+- DECIDED: the device helper takes two small protocols (`DeviceMenuState`, plus `DeviceMenuItem` for the item fields), declared with their conformances in `MenuBarView+Devices.swift`. The state files sit outside this task's Touches, and the picker reads the item fields.
+- DECIDED: the icons travel as one `(enabled:, disabled:)` pair because SwiftLint's `function_parameter_count` caps at 5. The picker label is a `LocalizedStringKey`, so `Picker` takes the same initializer the old string literal did.
+- ASSUMED: removed the negative-rank branch, since all three pinned cases keep their result. It also settled two ties between jobs added at the identical instant. For `lastFinished` between two unrecorded finished jobs, the earlier one in queue order now wins (before, the later one did). In "Needs you", an unrecorded failed job and a job waiting for names now keep queue order (before, the naming job came first). Production cannot reach either tie, because each job's `enqueuedAt` is its own `Date()` and the snapshot keeps full precision · alternatives: B - keep the branch with a comment naming `menuSections` and `lastFinished` as its readers · flip at: `TranscriptionList.finishOrders` · test: `TranscriptionListTests/testFailedJobsAddedTogetherListUnrecordedOnesFirstInQueueOrder`, `testTheLastFinishedJobIsARecordedOneBeforeALaterUnrecordedOne`, `testTheLastFinishedOfTwoUnrecordedJobsIsTheOneAddedLater`
+
+stage: impl-review - ran [04204eab..c58d11e9] (codex:gpt-6-astra:xhigh, three draws correctness/contracts/integration, all SHIP; one P2 follow-up kept, not fixed: equal-enqueuedAt ties after the negative-rank removal, see Decisions; receipt /tmp/impl-review-receipt-d1cb77e1af10-gh-170-menu-sections-and-an-all-recordings.1.json)
+stage: wave-join - ran (lane 417d794a..2ec35265 cherry-picked onto 04204eab as 464703da..c58d11e9; focused verify both Quick commands plus notification suites rc 0, 183 tests, log /private/tmp/mt-gh170/verify1/quick.log)
+
+Follow-up (review P2, not fixed, reviewers kept SHIP): with two jobs enqueued at the identical instant and no history record, the removed negative rank used to decide the tie; now queue order does. The task defines the contract as the three pinned cases, which keep their result, and lets R9 choose removal; production gives every job its own enqueuedAt.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 464703da46aebc486f7b3724e590c7b22e779448, 58a2115e84d2b28fffdaf25bb3836269d5d852d3, 46009ecbb749cb105b2605cd731c0149af0c96d2, e6483593540bacfde2e0d17b77c4d3c5ce0dbb00, c58d11e932c16fabae5e9b209db1f79d191d0380
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh170/home swift test --parallel --filter '<spec Quick command 1 filter>|RecordingRowActionsTests|NotificationManagerTests|NotificationContentTests|TranscriberStatusTests' (rc 0, 183 tests); ./scripts/lint.sh (rc 0, 0 violations)
 - PRs:

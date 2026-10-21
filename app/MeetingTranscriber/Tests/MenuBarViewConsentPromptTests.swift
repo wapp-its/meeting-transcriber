@@ -28,14 +28,16 @@ final class MenuBarViewConsentPromptTests: XCTestCase {
     )
 
     private func makeView(question: ConsentQuestion?, answers: Answers = Answers()) -> MenuBarView {
-        MenuBarView(
+        var actions = MenuActions.noop
+        actions.answerConsent = { question, granted in answers.calls.append((question, granted)) }
+        actions.recordConsentWithOptions = { answers.optionsOpened.append($0) }
+        return MenuBarView(
             status: TranscriberStatus(
                 version: 1,
                 timestamp: "2024-01-01T00:00:00",
                 state: .watching,
                 detail: "",
                 meeting: nil,
-                protocolPath: nil,
                 error: nil,
                 audioPath: nil,
                 pid: nil,
@@ -43,23 +45,10 @@ final class MenuBarViewConsentPromptTests: XCTestCase {
             isWatching: true,
             pipelineQueue: PipelineQueue(),
             updateChecker: nil,
-            onStartStop: {},
-            onRecordApp: {},
-            onRecordMicrophone: {},
             noMic: false,
             manualRecordingPendingOrActive: false,
-            onStopManualRecording: nil,
-            onOpenProtocol: { _ in },
-            onOpenLastProtocol: { _ in },
-            onOpenProtocolsFolder: {},
-            onOpenSettings: {},
-            onNameSpeakers: nil,
-            onProcessFiles: {},
-            onDismissJob: { _ in },
             consentQuestion: question,
-            onAnswerConsent: { question, granted in answers.calls.append((question, granted)) },
-            onRecordConsentWithOptions: { answers.optionsOpened.append($0) },
-            onQuit: {},
+            actions: actions,
         )
     }
 

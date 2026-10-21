@@ -2,7 +2,7 @@
     @testable import MeetingTranscriber
     import XCTest
 
-    /// The Transcriptions window lists meeting titles and participants, so no
+    /// The All Recordings window lists meeting titles and participants, so no
     /// debug RPC endpoint may capture it, walk its accessibility tree, press its
     /// buttons or type into it. Adding its id to any of these allowlists is the
     /// change this test exists to stop.
@@ -17,7 +17,7 @@
             for allowlist in allowlists {
                 XCTAssertFalse(
                     allowlist.windowIDs.contains(TranscriptionsView.windowID),
-                    "\(allowlist.endpoint) admits the Transcriptions window",
+                    "\(allowlist.endpoint) admits the All Recordings window",
                 )
             }
         }

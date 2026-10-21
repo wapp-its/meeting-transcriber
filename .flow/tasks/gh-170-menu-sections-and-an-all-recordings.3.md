@@ -47,9 +47,34 @@ The early proof point: one pure decision that turns a row's job state, its files
 - [ ] TBD
 
 ## Done summary
-TBD
+The All Recordings window (task .4) can now render each row's main button and its "…" menu from one tested list. `RecordingRowActions` (new, `app/MeetingTranscriber/Sources/RecordingRowActions.swift`) turns a row's `JobState`, its recorded files, its files on disk and whether the pipeline would take a retry into a `MainAction?` and an ordered `[MenuItem]`. It imports nothing and reads no file. `RecordingRowActionsTests` (9 tests, written first and committed red against a signature stub) covers every `JobState` case crossed with seven on-disk situations (protocol present or missing; transcript present, missing, or present but blank or not UTF-8; the sources `.transcriptFile`, `.protocolOnly`, `.none`) and `canRetry` both ways, asserting each exact list so order and no-duplicates are pinned.
 
+Error cases and the tests that cover them:
+- R6, finished job with neither recorded file has no main button: `testMainActionOfAFinishedJobOpensItsProtocolElseItsTranscriptElseNothing` (last assertion), and its menu holds only a disabled Regenerate: the `neither` row of `testMenuOfAFinishedJobLeavesOutMissingFilesAndDisablesRegenerateWithoutASource`.
+- R7, a file missing on disk leaves its item out: the `protocolHoldingTranscript`, `protocolWithoutTranscript`, `transcriptOnly` and `neither` rows of the four menu tests.
+- R7, Regenerate disabled exactly when there is no usable source, and a blank transcript alone does not enable it: the `unusableTranscript` row (disabled) and the `unusableTranscriptBesideFullProtocol` row (enabled through the protocol) of the finished-job and failed-job menu tests.
+
+Gates: `swift test --parallel --filter 'RecordingRowActionsTests'` rc 0 with 9 of 9 tests (log `/private/tmp/mt-gh170/task3/quick-rows.log`); the red-first run against the stub was rc 1 with 8 of 9 failing on assertions (`/private/tmp/mt-gh170/task3/quick-rows-red.log`; the live-job empty-menu test passes against a stub that returns `[]`). `./scripts/lint.sh` with the pinned tools rc 0, 0 violations in 906 files. `gate classify` returned FULL (Swift code), so no GATE_SKIPPED line. Baseline: green via handoff (conductor run at 79481cc5, 112 tests, rc 0); every path changed since that SHA is this task's two new files. Not run here: `swiftlint analyze` (the conductor runs it on the integrated branch). Every new declaration has a reader in the tests or the implementation.
+
+Integration notes for task .4 are in the run-notes directory as `task-3-row-actions.md`.
+
+Tier: implementer - opus (explicit invocation) at xhigh effort (requested) (model: claude-opus-5-5)
+
+stage: impl-review - ran [79481cc5..8a4b851f] (codex:gpt-6-astra:xhigh, one draw correctness, SHIP, 0 findings; receipt /tmp/impl-review-receipt-d1cb77e1af10-gh-170-menu-sections-and-an-all-recordings.3.json)
+stage: wave-join - ran (lane b0dd74aa,e7eb4ecd cherry-picked onto 79481cc5 as c06bc2a3,8a4b851f; focused verify RecordingRowActionsTests rc 0, 9 of 9, log /private/tmp/mt-gh170/verify3/quick-rows.log)
+
+### Decisions
+
+- DECIDED: `TranscriptSource` keeps the case name `none`, with `// swiftlint:disable:this discouraged_none_name`. The opted-in lint rule flags it, and the task's Approach, its Acceptance and task .4's plan all name `.none`. The repository already suppresses the rule the same way in `SilencePromptPolicy.swift:55`, `AppSettings.swift:128` and `LiveCaptionsGate.swift:33` (rule 1, repo convention).
+- DECIDED: a `.speakerNamingPending` row lists Open Protocol, Open Transcript and Show in Finder for the files on disk, then Dismiss. The task's menu rule excludes only `.waiting` to `.generatingProtocol` from file items (rule 1). Today's window also offers Open on any row with a file. During naming the transcript on disk is normally the unlabelled stage-1 draft.
+- DECIDED: Cancel and Name Speakers do not appear in the "…" menu. R7's item list does not name them, and the task repeats only Open Protocol, Retry and Remove (rule 1).
+- DECIDED: no `TranscriptSource` mapping helper from `ProtocolRegenerationFiles` in this task. Task .4's plan puts that mapping in `AllRecordingsActions.filesOnDisk` (nil is `.none`, `fromProtocol` is `.protocolOnly`, else `.transcriptFile`), and the task's Approach leaves resolution to the view's owner. Adding it here would be scope past the ACs.
+- DECIDED: the test's red step is a commit with the final signatures and wrong bodies (nil and `[]`), so the run fails on assertions instead of on a missing type. That is the stated reason for failure, which a test-only commit that does not compile cannot show.
+
+Finding (no action taken): the plan's note that a live entry "exposes no files" is inaccurate. Stage 1 sets `PipelineJob.transcriptPath` to an unlabelled draft (`PipelineQueue+Stages.swift:140-149`), so a diarizing or protocol-generating entry has a transcript URL. The decision gates live rows to an empty menu by state anyway, as the task asks. Today's window shows Open on such a row, so the change removes that, by design.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: c06bc2a3ed58818cc807fc9ec933f8292217eb65, 8a4b851f07c2e14ab76c7840e832c7112148f274
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=/private/tmp/mt-gh170/home swift test --parallel --filter 'RecordingRowActionsTests' (rc 0, 9/9); ./scripts/lint.sh (rc 0)
 - PRs:
