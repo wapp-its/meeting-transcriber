@@ -420,7 +420,7 @@ final class SpeakerNamingSession {
 
     /// The in-memory half of `removeNamingData`: the naming data and the
     /// recognition stashes, no files.
-    private func forgetNamingData(jobID: UUID) {
+    func forgetNamingData(jobID: UUID) {
         speakerNamingDataByJob.removeValue(forKey: jobID)
         lateRerunFailures.removeValue(forKey: jobID)
         stashedSuggestedAtDialog.removeValue(forKey: jobID)

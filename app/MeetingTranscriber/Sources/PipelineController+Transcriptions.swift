@@ -152,7 +152,7 @@ extension PipelineController {
     /// the pending mark, so a crash before that is finished at the next launch.
     private func removeMovedMeeting(jobID: UUID) {
         if queue.jobs.contains(where: { $0.id == jobID }) {
-            queue.removeJob(id: jobID)
+            queue.removeJob(id: jobID, keepingFiles: true)
         } else if queue.engine == nil {
             guard forgetInUnreadSnapshot(jobID: jobID) else { return }
         }

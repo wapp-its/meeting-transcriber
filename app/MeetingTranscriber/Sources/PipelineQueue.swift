@@ -737,7 +737,11 @@ class PipelineQueue {
         allSidecarDirs(of: job).reversed()
     }
 
-    func removeJob(id: UUID) {
+    ///
+    /// - Parameter keepingFiles: for a job whose files have already gone one by
+    ///   one through `MeetingFileRemover`'s checks. The cleanup below goes by name,
+    ///   and would take whatever sits at those paths now, folders included.
+    func removeJob(id: UUID, keepingFiles: Bool = false) {
         // An export-only retry still needs its job to retain a created page's
         // ID if the remote request completes after the menu closes.
         guard !jobs.contains(where: { $0.id == id && $0.state == .done && $0.notionExportStatus == .inProgress }) else { return }
@@ -758,9 +762,13 @@ class PipelineQueue {
             // to the same one: the discard path next door has to pass it (its
             // jobs are not in the list any more), and spelling it out at every
             // queue-side call keeps the three readable side by side.
-            naming.removeNamingData(
-                jobID: id, slug: jobs[index].namingSlug, in: allSidecarDirs(of: jobs[index]),
-            )
+            if keepingFiles {
+                naming.forgetNamingData(jobID: id)
+            } else {
+                naming.removeNamingData(
+                    jobID: id, slug: jobs[index].namingSlug, in: allSidecarDirs(of: jobs[index]),
+                )
+            }
             noteLeftQueue(jobID: id)
             jobs.remove(at: index)
         }

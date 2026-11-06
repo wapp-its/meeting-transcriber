@@ -24,7 +24,9 @@ extension PipelineControllerTranscriptionsTests {
         return (harness.controller(queue: queue), queue, job)
     }
 
-    /// Everything the run left must go, and nothing may read as replaced.
+    /// Everything the run left must go, and nothing may read as replaced. The mover
+    /// is the only thing removing a file here, so a sidecar the record never listed
+    /// would stay behind for good.
     private func assertMovesToTheTrashCompletely(
         _ job: PipelineJob, _ harness: MeetingDeletionHarness, _ controller: PipelineController,
         file: StaticString = #filePath, line: UInt = #line,
@@ -38,6 +40,12 @@ extension PipelineControllerTranscriptionsTests {
         XCTAssertNil(harness.store.record(for: job.id), "the deletion did not complete", file: file, line: line)
         XCTAssertEqual(listed.filter(harness.isOnDisk), [], file: file, line: line)
         XCTAssertEqual(harness.fakeTrash.moved.count, listed.count, file: file, line: line)
+        let left = try FileManager.default.subpathsOfDirectory(atPath: harness.outputDir.path).filter { path in
+            var isFolder: ObjCBool = false
+            FileManager.default.fileExists(atPath: harness.outputDir.appendingPathComponent(path).path, isDirectory: &isFolder)
+            return !isFolder.boolValue
+        }
+        XCTAssertEqual(left, [], "a file the record did not list stayed behind", file: file, line: line)
     }
 
     func testAMeetingWhoseTranscriptWasRewrittenOnConfirmedNamesMovesCompletely() async throws {
