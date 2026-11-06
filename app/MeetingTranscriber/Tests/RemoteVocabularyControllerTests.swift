@@ -73,7 +73,7 @@ final class RemoteVocabularyControllerTests: XCTestCase {
         tokenAccount = "RemoteVocabularyControllerTests-token-\(getpid())-\(UUID().uuidString)"
         cacheDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("RemoteVocabularyControllerTests-\(UUID().uuidString)", isDirectory: true)
-        defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults = try XCTUnwrap(DefaultsSuite.open(suiteName))
         settings = makeSettings()
         settings.customVocabularyEnabled = true
         settings.vocabularySource = .url

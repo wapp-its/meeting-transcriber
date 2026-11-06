@@ -181,7 +181,7 @@
             let navigation = SettingsNavigation()
             navigation.requestedTab = .output
             let settings = try SettingsView(
-                settings: AppSettings(defaults: XCTUnwrap(UserDefaults(suiteName: suite))),
+                settings: AppSettings(defaults: XCTUnwrap(DefaultsSuite.open(suite))),
                 whisperKitEngine: WhisperKitEngine(), parakeetEngine: ParakeetEngine(),
                 recognitionStatsLog: RecognitionStatsLog(), stageTimingLog: StageTimingLog(), navigation: navigation,
             )

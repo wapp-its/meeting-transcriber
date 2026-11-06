@@ -311,7 +311,7 @@ final class UpdateCheckerMtUpdateTests: XCTestCase {
     private func makeStore() throws -> PendingUpdateInstallStore {
         let suite = "UpdateCheckerMtUpdateTests-\(getpid())-\(UUID().uuidString)"
         addTeardownBlock { DefaultsSuite.remove(suite) }
-        return try PendingUpdateInstallStore(defaults: XCTUnwrap(UserDefaults(suiteName: suite)))
+        return try PendingUpdateInstallStore(defaults: XCTUnwrap(DefaultsSuite.open(suite)))
     }
 
     private func pendingRecord(for installer: MockMtUpdateInstaller, wasWatching: Bool) -> PendingUpdateInstall {
@@ -331,7 +331,7 @@ final class UpdateCheckerMtUpdateTests: XCTestCase {
         let suite = "UpdateCheckerMtUpdateTests-state-\(getpid())-\(UUID().uuidString)"
         addTeardownBlock { DefaultsSuite.remove(suite) }
         let settings = try AppSettings(
-            defaults: XCTUnwrap(UserDefaults(suiteName: suite)),
+            defaults: XCTUnwrap(DefaultsSuite.open(suite)),
             defaultOutputDir: directory.appendingPathComponent("output", isDirectory: true),
         )
         let queue = PipelineQueue(

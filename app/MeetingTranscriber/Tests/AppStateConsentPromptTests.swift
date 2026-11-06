@@ -30,7 +30,7 @@ final class AppStateConsentPromptTests: XCTestCase {
         testLogDir = try makeTempDirectory(prefix: "AppStateConsentPromptTests")
         let suite = "AppStateConsentPromptTests-\(getpid())-\(UUID().uuidString)"
         settings = try AppSettings(
-            defaults: XCTUnwrap(UserDefaults(suiteName: suite)),
+            defaults: XCTUnwrap(DefaultsSuite.open(suite)),
             defaultOutputDir: testLogDir.appendingPathComponent("output", isDirectory: true),
         )
         addTeardownBlock { DefaultsSuite.remove(suite) }

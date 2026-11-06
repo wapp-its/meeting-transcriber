@@ -228,7 +228,7 @@ final class LocalModelGeneratorTests: XCTestCase {
             }
             let suite = "LocalModelGeneratorTests-\(getpid())-\(UUID().uuidString)"
             addTeardownBlock { DefaultsSuite.remove(suite) }
-            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            let defaults = try XCTUnwrap(DefaultsSuite.open(suite))
             let settings = AppSettings(defaults: defaults, defaultOutputDir: scratch.appendingPathComponent("output"))
             settings.protocolProvider = .localModel
             settings.setLocalModelFolder(first)

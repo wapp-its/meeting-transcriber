@@ -20,7 +20,7 @@ final class PipelineControllerLevelBalanceTests: XCTestCase {
         let suiteName = "PipelineControllerLevelBalanceTests-\(getpid())-\(UUID().uuidString)"
         addTeardownBlock { DefaultsSuite.remove(suiteName) }
         let settings = try AppSettings(
-            defaults: XCTUnwrap(UserDefaults(suiteName: suiteName)),
+            defaults: XCTUnwrap(DefaultsSuite.open(suiteName)),
             apiKeyAccount: "\(suiteName)-openAI", claudeAPIKeyAccount: "\(suiteName)-claude",
             defaultOutputDir: tmpDir.appendingPathComponent("default-output", isDirectory: true),
         )

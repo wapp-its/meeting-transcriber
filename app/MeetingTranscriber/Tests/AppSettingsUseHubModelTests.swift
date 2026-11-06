@@ -18,7 +18,7 @@ final class AppSettingsUseHubModelTests: XCTestCase {
     override func setUp() {
         super.setUp()
         suiteName = "AppSettingsUseHubModelTests-\(UUID().uuidString)"
-        defaults = UserDefaults(suiteName: suiteName)
+        defaults = DefaultsSuite.open(suiteName)
         settings = AppSettings(defaults: defaults)
     }
 

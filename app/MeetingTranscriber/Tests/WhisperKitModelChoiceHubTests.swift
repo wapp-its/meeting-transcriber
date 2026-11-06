@@ -25,7 +25,7 @@ final class WhisperKitModelChoiceHubTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         suiteName = "WhisperKitModelChoiceHubTests-\(UUID().uuidString)"
-        defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults = try XCTUnwrap(DefaultsSuite.open(suiteName))
         settings = AppSettings(defaults: defaults, huggingFaceTokenStore: HuggingFaceTokenStoreFake().store)
     }
 

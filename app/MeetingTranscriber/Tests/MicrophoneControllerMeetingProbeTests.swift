@@ -24,7 +24,7 @@ final class MicrophoneControllerMeetingProbeTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         suiteName = "MicrophoneControllerMeetingProbeTests-\(getpid())-\(UUID().uuidString)"
-        settings = try AppSettings(defaults: XCTUnwrap(UserDefaults(suiteName: suiteName)))
+        settings = try AppSettings(defaults: XCTUnwrap(DefaultsSuite.open(suiteName)))
         settings.verboseDiagnostics = false
         notifier = RecordingNotifier()
         log = RecordingDiagnostics()

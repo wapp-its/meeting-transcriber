@@ -16,7 +16,7 @@ final class AdvancedSettingsPermissionsTests: XCTestCase {
         requestAccess: @escaping @MainActor (PermissionKind) async -> Void,
     ) throws -> AdvancedSettingsView {
         let suiteName = "AdvancedSettingsPermissionsTests.\(UUID().uuidString)"
-        let suite = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let suite = try XCTUnwrap(DefaultsSuite.open(suiteName))
         addTeardownBlock { DefaultsSuite.remove(suiteName) }
         return AdvancedSettingsView(settings: AppSettings(defaults: suite), requestAccess: requestAccess)
     }

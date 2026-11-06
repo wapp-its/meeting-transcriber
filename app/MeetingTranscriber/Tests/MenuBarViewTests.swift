@@ -833,7 +833,7 @@ final class MenuBarViewTests: XCTestCase {
         let checker = try UpdateChecker(
             provider: MockUpdateProvider(),
             installer: MockMtUpdateInstaller(),
-            pendingStore: PendingUpdateInstallStore(defaults: XCTUnwrap(UserDefaults(suiteName: suite))),
+            pendingStore: PendingUpdateInstallStore(defaults: XCTUnwrap(DefaultsSuite.open(suite))),
         )
         checker.availableBuildSummary = summary
         return checker

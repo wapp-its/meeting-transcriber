@@ -110,7 +110,7 @@ final class PowerAssertionDetectorAddedAppTests: XCTestCase {
         func detector(customApps: [String]) throws -> PowerAssertionDetector {
             let suite = "AddedAppBrowserWiring-\(getpid())-\(UUID().uuidString)"
             addTeardownBlock { DefaultsSuite.remove(suite) }
-            let settings = try AppSettings(defaults: XCTUnwrap(UserDefaults(suiteName: suite)))
+            let settings = try AppSettings(defaults: XCTUnwrap(DefaultsSuite.open(suite)))
             settings.watchBrowserMeetings = true
             settings.watchCustomApps = customApps
             let assertions = try XCTUnwrap(

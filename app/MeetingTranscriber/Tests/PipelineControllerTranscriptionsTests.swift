@@ -18,7 +18,7 @@ final class PipelineControllerTranscriptionsTests: XCTestCase {
         tmpDir = try makeTempDirectory(prefix: "PipelineControllerTranscriptionsTests")
         let suite = "PipelineControllerTranscriptionsTests-\(getpid())-\(UUID().uuidString)"
         settings = try AppSettings(
-            defaults: XCTUnwrap(UserDefaults(suiteName: suite)),
+            defaults: XCTUnwrap(DefaultsSuite.open(suite)),
             defaultOutputDir: tmpDir.appendingPathComponent("output", isDirectory: true),
         )
         addTeardownBlock { DefaultsSuite.remove(suite) }

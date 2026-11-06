@@ -174,7 +174,7 @@
             let suite = "LocalModelOutcomeMappingTests-\(UUID().uuidString)"
             addTeardownBlock { DefaultsSuite.remove(suite) }
             return try AppSettings(
-                defaults: XCTUnwrap(UserDefaults(suiteName: suite)),
+                defaults: XCTUnwrap(DefaultsSuite.open(suite)),
                 defaultOutputDir: makeTempDirectory(prefix: "LocalModelOutcomeOutput"),
             )
         }

@@ -200,7 +200,7 @@ final class WatchLoopMeetingEndDeadlineTests: XCTestCase {
         let suite = "WatchLoopMeetingEndDeadlineTests-\(getpid())-\(UUID().uuidString)"
         addTeardownBlock { DefaultsSuite.remove(suite) }
         let settings = try AppSettings(
-            defaults: XCTUnwrap(UserDefaults(suiteName: suite)),
+            defaults: XCTUnwrap(DefaultsSuite.open(suite)),
             defaultOutputDir: dir.appendingPathComponent("output", isDirectory: true),
         )
         let state = AppState(

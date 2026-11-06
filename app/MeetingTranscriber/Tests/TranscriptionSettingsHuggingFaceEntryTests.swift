@@ -23,7 +23,7 @@ final class TranscriptionSettingsHuggingFaceEntryTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         suiteName = "TranscriptionSettingsHuggingFaceEntryTests-\(UUID().uuidString)"
-        defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults = try XCTUnwrap(DefaultsSuite.open(suiteName))
         tokenStore = HuggingFaceTokenStoreFake()
         settings = AppSettings(defaults: defaults, huggingFaceTokenStore: tokenStore.store)
         settings.transcriptionEngine = .whisperKit

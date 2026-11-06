@@ -217,7 +217,7 @@
         private func makeSettings() throws -> AppSettings {
             let suite = "LocalModelSettingsTests-\(getpid())-\(UUID().uuidString)"
             addTeardownBlock { DefaultsSuite.remove(suite) }
-            let settings = try AppSettings(defaults: XCTUnwrap(UserDefaults(suiteName: suite)))
+            let settings = try AppSettings(defaults: XCTUnwrap(DefaultsSuite.open(suite)))
             settings.protocolProvider = .localModel
             return settings
         }

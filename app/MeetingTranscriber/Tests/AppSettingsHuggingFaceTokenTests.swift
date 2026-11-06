@@ -46,7 +46,7 @@ final class AppSettingsHuggingFaceTokenTests: XCTestCase {
         super.setUp()
         suiteName = "AppSettingsHuggingFaceTokenTests-\(getpid())-\(UUID().uuidString)"
         keychainAccount = "AppSettingsHuggingFaceTokenTests-huggingFaceToken-\(getpid())-\(UUID().uuidString)"
-        guard let suite = UserDefaults(suiteName: suiteName) else {
+        guard let suite = DefaultsSuite.open(suiteName) else {
             XCTFail("Could not create test UserDefaults suite")
             return
         }

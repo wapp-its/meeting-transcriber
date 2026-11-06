@@ -15,7 +15,7 @@ final class ProtocolTemplatesSettingsTests: XCTestCase {
     private func makeSettings() throws -> AppSettings {
         let suite = "ProtocolTemplatesSettingsTests-\(getpid())-\(UUID().uuidString)"
         addTeardownBlock { DefaultsSuite.remove(suite) }
-        return try AppSettings(defaults: XCTUnwrap(UserDefaults(suiteName: suite)))
+        return try AppSettings(defaults: XCTUnwrap(DefaultsSuite.open(suite)))
     }
 
     private func makeModel(
