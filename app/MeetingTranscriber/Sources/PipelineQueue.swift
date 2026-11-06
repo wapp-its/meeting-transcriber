@@ -64,6 +64,13 @@ class PipelineQueue {
     /// the state it was derived from, for no gain.
     var protocolResumeDispositions: [UUID: ProtocolResumeDisposition] = [:]
 
+    /// Whether the protocol stage found a generator for a job, kept until the
+    /// job's terminal state hands it to the meeting's outcome. The setting can
+    /// change while the call runs, and a meeting is judged by the attempt it got.
+    ///
+    /// Not persisted: a quit restarts the stage, which decides again.
+    var protocolGenerationOn: [UUID: Bool] = [:]
+
     // Dependencies for processing
     let engine: (any TranscribingEngine)?
     let diarizationFactory: (() -> any DiarizationProvider)?
@@ -759,6 +766,7 @@ class PipelineQueue {
         // A restored job marked for a protocol-only resume keeps no claim on
         // that once it is gone.
         protocolResumeDispositions.removeValue(forKey: id)
+        protocolGenerationOn.removeValue(forKey: id)
         saveSnapshot()
     }
 
@@ -1330,17 +1338,18 @@ extension PipelineQueue {
     /// The outcome a terminal state stands for. A state in between changes
     /// nothing here: a job only gets there with its outcome still in progress.
     ///
-    /// Whether generation is on is asked here, not recorded by the protocol
-    /// stage, because a naming skipped with no generator or lost at a restore
-    /// reaches `.done` without that stage ever running.
+    /// Whether generation was on is what the protocol stage found when it ran.
+    /// A naming skipped with no generator or lost at a restore reaches `.done`
+    /// without that stage, so it asks now, the moment it passed the stage by.
     private func noteOutcome(jobID: UUID, of state: JobState) {
         guard let meetingFileStore else { return }
         switch state {
         case .done:
-            let generationOn = protocolGeneratorFactory?() != nil
+            let generationOn = protocolGenerationOn.removeValue(forKey: jobID) ?? (protocolGeneratorFactory?() != nil)
             meetingFileStore.update(jobID: jobID) { $0.outcome = .finished(protocolExpected: generationOn) }
 
         case .error:
+            protocolGenerationOn.removeValue(forKey: jobID)
             meetingFileStore.update(jobID: jobID) { $0.outcome = .failed }
 
         default:

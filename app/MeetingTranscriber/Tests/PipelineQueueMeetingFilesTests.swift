@@ -43,6 +43,7 @@ final class PipelineQueueMeetingFilesTests: XCTestCase {
         store: MeetingFileStore,
         engine: MockEngine? = nil,
         protocolGen: MockProtocolGen? = MockProtocolGen(),
+        protocolGeneratorFactory: (() -> (any ProtocolGenerating)?)? = nil,
         outputDir: URL? = nil,
         stagingDir: URL? = nil,
         parksForNaming: Bool = false,
@@ -57,7 +58,7 @@ final class PipelineQueueMeetingFilesTests: XCTestCase {
         return PipelineQueue(
             engine: engine ?? makeEngine(),
             diarizationFactory: { diarization },
-            protocolGeneratorFactory: { protocolGen },
+            protocolGeneratorFactory: protocolGeneratorFactory ?? { protocolGen },
             outputDir: outputDir ?? self.outputDir,
             logDir: tmpDir.appendingPathComponent("logs"),
             stagingDir: stagingDir ?? self.stagingDir,
@@ -187,9 +188,19 @@ final class PipelineQueueMeetingFilesTests: XCTestCase {
     /// A skipped naming with no generator goes straight to `.done`, without the
     /// protocol stage.
     func testASkippedNamingWithNoGeneratorFinishesWithoutExpectingAProtocol() async throws {
+        try await assertNamingFinishesWithoutExpectingAProtocol(answer: .skipped)
+    }
+
+    /// A confirm hops through `.generatingProtocol` before the stage finds no
+    /// generator, so having been in that state does not mean generation was on.
+    func testAConfirmedNamingWithNoGeneratorFinishesWithoutExpectingAProtocol() async throws {
+        try await assertNamingFinishesWithoutExpectingAProtocol(answer: .confirmed(["SPEAKER_0": "Alice"]))
+    }
+
+    private func assertNamingFinishesWithoutExpectingAProtocol(answer: PipelineQueue.SpeakerNamingResult) async throws {
         let store = MeetingFileStore(path: storePath)
         let queue = makeQueue(store: store, protocolGen: nil, parksForNaming: true)
-        queue.speakerNamingHandler = { _ in .skipped }
+        queue.speakerNamingHandler = { _ in answer }
         let done = expectation(description: "job reaches done")
         var parked = false
         queue.onJobStateChange = { _, _, newState in
@@ -220,6 +231,26 @@ final class PipelineQueueMeetingFilesTests: XCTestCase {
         let record = try XCTUnwrap(store.record(for: job.id))
         XCTAssertEqual(record.outcome, .finished(protocolExpected: true))
         XCTAssertNil(path(of: .protocol, in: record))
+    }
+
+    /// The setting can change while the call runs. An attempt that failed left
+    /// no notes however the setting reads by the time the job finishes, so the
+    /// meeting must not pass for one that had generation off, whose audio may go.
+    func testAGeneratorSwitchedOffDuringAFailedCallStillExpectsAProtocol() async throws {
+        let store = MeetingFileStore(path: storePath)
+        let generator = MockProtocolGen()
+        generator.shouldThrow = true
+        var generationOn = true
+        generator.onGenerate = { generationOn = false }
+        let settings: () -> (any ProtocolGenerating)? = { generationOn ? generator : nil }
+        let queue = makeQueue(store: store, protocolGeneratorFactory: settings)
+        let job = try makeRecording()
+
+        await run(job, in: queue)
+
+        XCTAssertTrue(generator.generateCalled, "test premise: generation was attempted")
+        XCTAssertFalse(generationOn, "test premise: the setting changed during the call")
+        XCTAssertEqual(store.record(for: job.id)?.outcome, .finished(protocolExpected: true))
     }
 
     func testAFailedRunEndsWithOutcomeFailed() async throws {

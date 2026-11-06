@@ -1093,11 +1093,13 @@ extension PipelineQueue {
         try ensureStillQueued(jobID)
         guard let job = job(withID: jobID) else { return }
         guard let protocolGeneratorFactory, let generator = protocolGeneratorFactory() else {
+            protocolGenerationOn[jobID] = false
             // No protocol, so no export, but an export that is switched on and
             // cannot run is still worth a reason on the job.
             resolveNotionExport(jobID: jobID)
             return
         }
+        protocolGenerationOn[jobID] = true
         let shortID = PipelineJob.shortID(for: jobID)
         // Reuse the basename fixed when the transcript was saved (persisted as
         // namingSlug), so the .md shares the .txt/audio stem exactly. This runs
