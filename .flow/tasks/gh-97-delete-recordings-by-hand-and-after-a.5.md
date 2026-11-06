@@ -35,7 +35,7 @@ Puts the manual slice in front of the user: each row in All Recordings shows its
 - The window shows meeting titles; it must stay off `/ui/tree`, `/ui/press`, `/ui/type` and `/screenshot` (`TranscriptionsWindowPrivacyTests.swift`).
 ## Acceptance
 - [ ] Each row with a record shows its audio line, and a kept meeting its Keep badge, from task .4's decision and cached disk sizes; a row without a record shows neither; a disconnected drive shows the not-connected line and keeps the Keep and Trash items; a record changed while the window is open (automatic deletion) updates the row without reopening the window (R2, R4, A2).
-- [ ] The "…" menu and the right-click menu list Keep (Never Delete Automatically) with its check mark, Move Audio to Trash… and Move Meeting to Trash… after Regenerate Protocol…, present and enabled as task .4 decides; the gh-170 menu test is updated to the new list (R4).
+- [ ] The "…" menu and the right-click menu list Keep (Never Delete Automatically) with its check mark, Move Audio to Trash… and Move Meeting to Trash… after Regenerate Notes…, present and enabled as task .4 decides; the gh-170 menu test is updated to the new list (R4).
 - [ ] Each Trash item asks first with task .4's text; Cancel changes nothing; confirming runs the action and the row then shows the new audio line, disappears (Move Meeting) or shows "Deletion incomplete" with a Retry Deletion main button (R5, R6, D7).
 - [ ] Keep toggles the meeting's Keep mark (R8).
 - [ ] Every new control has one ViewInspector wiring test located by an `A11yID` constant; All Recordings stays off every `/ui` and screenshot allowlist (R14).

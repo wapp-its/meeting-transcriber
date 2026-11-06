@@ -25,7 +25,7 @@ Today the default is stamped onto a job without a template of its own when the q
 - **Rule list:** ordered, kept with the app's settings next to the default template, survives a restart. [inferred]
 - **Resolver:** one pure function from (meeting title, rule list, templates present, default template) to the chosen template, what chose it (a rule by position, or the default) and the positions of the rules that ran out of time on this title, also when a later rule matched or the default won. Every consumer goes through it; nothing else matches titles against rules. [inferred]
 - **Consumers:** (1) queue admission: a job without a template of its own gets the resolver's template for its meeting title, where it gets the default today; (2) the start dialog ("Record with Options…") and the Record Meeting window start their template choice from the resolver for their meeting's title; (3) the try-a-title field in Settings. [paraphrase]
-- **Settings (accepted mockup):** in Settings → Output, a group "Template Rules" directly under the group "Protocol Templates", which stays as it is. From top to bottom: [paraphrase]
+- **Settings (accepted mockup):** in Settings → Output, a group "Template Rules" directly under the group "Meeting Notes Templates" (the mockup's "Protocol Templates", renamed by the app since), which stays as it is. From top to bottom: [paraphrase]
   - the caption "A new meeting whose title matches a pattern gets that rule's template. Rules are tried from the top, and the first match wins. When no rule matches, the meeting gets the default template. A pattern is a regular expression and ignores upper and lower case: “daily” matches “Team Daily”.";
   - the column headings "Meeting title contains" and "Template";
   - one row per rule: its position number, the pattern field in a fixed-width font, a template picker with the same choices as "Default template", and the buttons move up, move down and delete (move up disabled on the first row, move down on the last);
@@ -81,7 +81,7 @@ Test first, from the criteria, in this order, at the cheapest layer that can fai
 - A rule that picks a profile (gh-6) instead of a template, and how a rule ranks against a profile's own template: decided in gh-6. [inferred]
 - Rules on anything but the meeting title (app, participants, calendar). [inferred]
 - Rules delivered from a central URL (#69). [inferred]
-- The Regenerate Protocol sheet keeps opening on the default template and shows no line under Template. [inferred]
+- The Regenerate Notes sheet keeps opening on the default template and shows no line under Template. [inferred]
 
 ## Decision Context
 
@@ -102,3 +102,5 @@ Test first, from the criteria, in this order, at the cheapest layer that can fai
 Mockup gate: accepted by the owner on 2026-10-28. The boards are on a private design canvas, so this spec writes out their layout and wording; the example names in them (rule 1, "Team Daily") are examples.
 
 Related: #2 (templates, shipped), #190 (sibling spec), gh-6 (profiles), #155 (shared options-window code), #69 (templates from a URL). Upstream check 2026-10-21: the original has no open issue or pull request about protocol templates or template rules; templates exist only in this fork.
+
+FIT: GO · 2026-11-06 · base c9951a52 · engine flow-next 9.6.0 · the merged Notion export reads the same per-job template field a rule writes, nothing upstream chooses a template by title, and only screen names moved
