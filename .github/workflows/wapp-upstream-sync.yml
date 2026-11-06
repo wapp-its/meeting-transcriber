@@ -100,7 +100,9 @@ jobs:
             {
               echo "### Das Original mischt nicht in \`$HOME_BRANCH\` (Konflikt)"; echo
               echo "Neue Commits im Original bis \`${up:0:7}\`:"
-              git log --no-merges --format='- `%h` %s' "$home..refs/sync/upstream" | head -40; echo
+              # -n, not `| head`: under pipefail a reader that stops early kills
+              # git log with SIGPIPE and the step with exit 141.
+              git log -n 40 --no-merges --format='- `%h` %s' "$home..refs/sync/upstream"; echo
               echo "Betroffene Dateien:"
               git diff --name-only --diff-filter=U | sed 's/^/- `/; s/$/`/'; echo
             } >> "$RUNNER_TEMP/problems.md"
@@ -167,7 +169,9 @@ jobs:
           # error fails again.
           echo "::warning::build failed, retrying once"
           if (cd app/MeetingTranscriber && swift build) 2>&1 | tee "$RUNNER_TEMP/build.log"; then exit 0; fi
-          { echo "errors<<WAPP_EOF"; grep -E 'error:' "$RUNNER_TEMP/build.log" | sed -E 's#/Users/runner/work/[^/]+/[^/]+/##' | sort -u | head -15; echo "WAPP_EOF"; } >> "$GITHUB_OUTPUT"
+          # Read to the end (sed -n, not head) and allow no matches: under
+          # pipefail either one would end the step before WAPP_EOF is written.
+          { echo "errors<<WAPP_EOF"; { grep -E 'error:' "$RUNNER_TEMP/build.log" || true; } | sed -E 's#/Users/runner/work/[^/]+/[^/]+/##' | sort -u | sed -n '1,15p'; echo "WAPP_EOF"; } >> "$GITHUB_OUTPUT"
           exit 1
       - name: Push
         id: push
