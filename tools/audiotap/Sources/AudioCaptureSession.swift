@@ -415,7 +415,8 @@ public class AudioCaptureSession {
     }
 
     /// The microphone the running capture reports it records from, nil
-    /// without a microphone capture. See `MicCaptureHandler.activeInputDevice`.
+    /// without a microphone capture and while it is stalled. See
+    /// `MicCaptureHandler.activeInputDevice`.
     public var micInputDevice: MicInputDevice? {
         micCapture?.activeInputDevice
     }

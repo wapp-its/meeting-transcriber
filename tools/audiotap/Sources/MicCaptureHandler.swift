@@ -148,8 +148,8 @@ public class MicCaptureHandler: @unchecked Sendable {
     /// testable on a runner that has no audio device at all.
     let isDevicePresent: @Sendable (String) -> Bool
     /// The microphone the running engine session reports it records from,
-    /// published at the first start and at each adoption; nil before the
-    /// first start and after a stop or a give-up. See `+DeviceSelection`.
+    /// published at the first start and at each adoption; nil before the first
+    /// start, while stalled, and after a stop or a give-up. See `+DeviceSelection`.
     public internal(set) var activeInputDevice: MicInputDevice?
     /// A selection the arbiter could not launch at once, because a restart
     /// was outstanding. See `+DeviceSelection`.

@@ -245,6 +245,8 @@ extension MicCaptureHandler {
     }
 
     /// Release the engine and tell the user, keeping the file for a revival.
+    /// No device is reported while stalled, since nothing records from the one
+    /// released; a revival's adoption reports the device it came back on.
     ///
     /// Unlike the two give-ups of the restart path, nothing is in flight here:
     /// the arbiter only allows it from `.capturing`, so the current engine is
@@ -259,6 +261,7 @@ extension MicCaptureHandler {
         )
         removeConfigChangeObserver()
         session.teardown()
+        activeInputDevice = nil
         onStall?(stallDetails)
     }
 }

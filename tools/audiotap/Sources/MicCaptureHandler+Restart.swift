@@ -306,12 +306,13 @@ extension MicCaptureHandler {
                 // A rebuild or revival whose attempts kept failing until the
                 // budget ran out: nothing is wedged and the engines are
                 // released, so it stalls and waits for the next device change
-                // with a fresh budget.
+                // with a fresh budget, reporting no device meanwhile.
                 logger.error(
                     "Mic: restarting the microphone failed \(self.restartRetryCount) times without audio for the whole budget, releasing it until the input device changes",
                 )
                 restartRetryCount = 0
                 selectionRestartOutstanding = false
+                activeInputDevice = nil
                 onStall?(stallDetails)
 
             default:
