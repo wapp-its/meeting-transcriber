@@ -334,6 +334,7 @@ extension PipelineQueue {
                 jobID: job.id, event: "discarded_missing_audio",
                 from: interruptedIn[job.id], to: job.state,
             )
+            noteLeftQueue(jobID: job.id)
         }
     }
 
@@ -469,10 +470,23 @@ extension PipelineQueue {
             )
             stampTranscriptOutputOptions(on: &job)
             jobs.append(job)
+            createRecord(ofRecovered: job, mix: mixURL)
             eventLog.append(jobID: job.id, event: "recovered", from: nil, to: .waiting)
         }
         saveSnapshot()
         logger.info("Recovered \(candidates.count) orphaned recording(s)")
         triggerProcessing()
+    }
+
+    /// Recorded, as only the recorder writes to staging, and dated when it entered
+    /// processing, which only keeps its audio longer. A recording from before this
+    /// feature can still arrive here after an upgrade, and is never deleted
+    /// automatically. A date that cannot be read counts as that, the safe side.
+    private func createRecord(ofRecovered job: PipelineJob, mix: URL) {
+        guard let meetingFileStore else { return }
+        var record = MeetingFileRecord(job: job, origin: .recorded)
+        let created = (try? FileManager.default.attributesOfItem(atPath: mix.path))?[.creationDate] as? Date
+        record.excludedFromAutomaticDeletion = created.map { $0 < meetingFileStore.since } ?? true
+        meetingFileStore.create(record)
     }
 }

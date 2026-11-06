@@ -439,6 +439,7 @@ class PipelineQueue {
             speakerMatcherFactory: speakerMatcherFactory,
         )
         naming.delegate = self
+        naming.onFilesChanged = { [weak self] in self?.noteNamingFiles(jobID: $0, $1) }
     }
 
     // MARK: - Known speaker names (issue #155)
@@ -593,6 +594,7 @@ class PipelineQueue {
             recognitionStatsLog: recognitionStatsLog,
         )
         naming.delegate = self
+        naming.onFilesChanged = { [weak self] in self?.noteNamingFiles(jobID: $0, $1) }
         // Read here, not in a Task: a job the restore resumes enters its stage
         // right at launch, and a finish missed when a stage starts is never
         // filled in later. A small local file, read like the snapshot is.
@@ -759,6 +761,7 @@ class PipelineQueue {
             naming.removeNamingData(
                 jobID: id, slug: jobs[index].namingSlug, in: allSidecarDirs(of: jobs[index]),
             )
+            noteLeftQueue(jobID: id)
             jobs.remove(at: index)
         }
         cancelWork(of: id, endingLocalGeneration: wasInWork)
@@ -959,6 +962,7 @@ class PipelineQueue {
                 jobs[index].warnings.append(warning)
             }
         }
+        meetingFileStore?.markGone(jobID: jobs[index].id, roles: [.transcript, .segments])
     }
 
     func addWarning(id: UUID, _ message: String) {
@@ -1335,8 +1339,32 @@ extension PipelineQueue {
         }
     }
 
-    /// The outcome a terminal state stands for. A state in between changes
-    /// nothing here: a job only gets there with its outcome still in progress.
+    /// What the speaker naming session did to a meeting's files.
+    private func noteNamingFiles(jobID: UUID, _ change: SpeakerNamingSession.FileChange) {
+        switch change {
+        case let .namingSaved(path):
+            noteWritten(jobID: jobID, role: .naming, path: path)
+
+        case let .transcriptRewritten(path):
+            noteWritten(jobID: jobID, role: .transcript, path: path)
+
+        case .sidecarsRemoved:
+            meetingFileStore?.markGone(jobID: jobID, roles: [.naming, .mix16k, .app16k, .mic16k, .segments])
+        }
+    }
+
+    /// The job left the queue. A job that had reached an outcome keeps it: the
+    /// queue's own removal of a finished one says nothing about how it ended.
+    func noteLeftQueue(jobID: UUID) {
+        meetingFileStore?.update(jobID: jobID) { record in
+            if record.outcome == .inProgress { record.outcome = .leftUnfinished }
+        }
+    }
+
+    /// The outcome a state stands for: a terminal one, or `.waiting`, which only
+    /// a Retry enters as a change, so the meeting is judged by the new run. The
+    /// states in between change nothing here: a job only gets there with its
+    /// outcome still in progress.
     ///
     /// Whether generation was on is what the protocol stage found when it ran.
     /// A naming skipped with no generator or lost at a restore reaches `.done`
@@ -1351,6 +1379,9 @@ extension PipelineQueue {
         case .error:
             protocolGenerationOn.removeValue(forKey: jobID)
             meetingFileStore.update(jobID: jobID) { $0.outcome = .failed }
+
+        case .waiting:
+            meetingFileStore.update(jobID: jobID) { $0.outcome = .inProgress }
 
         default:
             break

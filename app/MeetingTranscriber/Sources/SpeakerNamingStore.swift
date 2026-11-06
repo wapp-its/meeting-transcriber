@@ -75,13 +75,17 @@ struct SpeakerNamingStore {
         return decoder
     }
 
+    /// Where `save` writes `<slug>_naming.json`; nil when `outputDir` is `nil`.
+    func namingFile(slug: String) -> URL? {
+        recordingsDir?.appendingPathComponent("\(slug)\(Self.namingJSONSuffix)")
+    }
+
     /// Persist naming data as `<slug>_naming.json`. Throws on encode/write
     /// failure so the caller can surface a job warning — the store itself stays
     /// I/O-only and queue-state-free. No-op when `outputDir` is `nil`.
     func save(_ data: PipelineQueue.SpeakerNamingData, slug: String) throws {
-        guard let recordingsDir else { return }
+        guard let recordingsDir, let path = namingFile(slug: slug) else { return }
         try? FileManager.default.createDirectory(at: recordingsDir, withIntermediateDirectories: true)
-        let path = recordingsDir.appendingPathComponent("\(slug)\(Self.namingJSONSuffix)")
         let json = try Self.makeEncoder().encode(data)
         try json.write(to: path, options: .atomic)
         // Carries per-speaker voice embeddings — restrict to owner-only.

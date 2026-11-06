@@ -1037,6 +1037,8 @@ extension PipelineQueue {
         if let cachedSegments = transcription.cachedSegments {
             let segPath = recordingsDir.appendingPathComponent("\(ctx.slug)_segments.json")
             if let data = try? JSONEncoder().encode(cachedSegments), (try? data.write(to: segPath, options: .atomic)) != nil {
+                // The meeting's words, so owner-only like the transcript.
+                try? FileManager.default.restrictToOwner(segPath)
                 noteWritten(jobID: ctx.jobID, role: .segments, path: segPath)
             }
         }
@@ -1438,12 +1440,14 @@ extension PipelineQueue {
         let ctx = Self.makeContext(for: job)
         let staging = stagingDir
         lastRecordingRelocation = Task.detached(priority: .utility) { [self] in
-            withExtendedLifetime(self) {
-                _ = Self.persistAudioToOutput(ctx: ctx, outputDir: destination, stagingDir: staging)
+            let moved = withExtendedLifetime(self) {
+                let paths = Self.persistAudioToOutput(ctx: ctx, outputDir: destination, stagingDir: staging)
                 if staged.contains(where: { FileManager.default.fileExists(atPath: $0.path) }) {
                     logger.warning("[\(ctx.shortID, privacy: .public)] cancelled_recording_left_in_staging")
                 }
+                return paths
             }
+            await noteWritten(jobID: ctx.jobID, [(.mix, moved.mix), (.appTrack, moved.app), (.micTrack, moved.mic)])
         }
     }
 
