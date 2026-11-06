@@ -92,6 +92,7 @@ final class QuitFinishesRecordingTests: XCTestCase {
             pollInterval: 0.05,
             endGracePeriod: 0.1,
             recordWithoutAskingApps: { [testMeetingApp] },
+            notifier: SilentNotifier(),
         )
         loop.permissionChecker = { .allHealthy }
         return loop
@@ -105,7 +106,7 @@ final class QuitFinishesRecordingTests: XCTestCase {
     func testAnAutoRecordingIsEnqueuedBeforeFinishForQuitReturns() async throws {
         let queue = try PipelineQueue(logDir: makeTempDirectory(prefix: "quit_auto"))
         let (loop, recorder) = makeTestWatchLoop(
-            detector: FixedMeetingDetector(), pipelineQueue: queue, recordWithoutAskingApps: { [testMeetingApp] },
+            detector: FixedMeetingDetector(), pipelineQueue: queue, recordWithoutAskingApps: [testMeetingApp],
         )
         loop.start()
         await waitFor(loop.state == .recording, timeout: .seconds(3))
@@ -147,7 +148,7 @@ final class QuitFinishesRecordingTests: XCTestCase {
         let dir = try makeTempDirectory(prefix: "quit_race")
         let pipeline = try makeIsolatedPipelineController(initialQueue: makeSlowSnapshotQueue(in: dir))
         let (loop, _) = makeTestWatchLoop(
-            detector: FixedMeetingDetector(), pipelineQueue: pipeline.queue, recordWithoutAskingApps: { [testMeetingApp] },
+            detector: FixedMeetingDetector(), pipelineQueue: pipeline.queue, recordWithoutAskingApps: [testMeetingApp],
         )
         loop.start()
         await waitFor(loop.state == .recording, timeout: .seconds(3))

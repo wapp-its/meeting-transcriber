@@ -51,6 +51,7 @@ final class QuitStartRefusalTests: XCTestCase {
             pollInterval: 0.02,
             endGracePeriod: 0.05,
             recordWithoutAskingApps: { [testMeetingApp] },
+            notifier: SilentNotifier(),
         )
         loop.permissionChecker = { .allHealthy }
         loop.start()
@@ -105,6 +106,7 @@ final class QuitStartRefusalTests: XCTestCase {
         let loop = WatchLoop(
             detector: FixedMeetingDetector(), recorderFactory: { recorder }, pipelineQueue: queue,
             pollInterval: 0.02, endGracePeriod: 0.05, recordWithoutAskingApps: { [testMeetingApp] },
+            notifier: SilentNotifier(),
         )
         loop.permissionChecker = { .allHealthy }
         var phases: [WatchLoop.State] = []
