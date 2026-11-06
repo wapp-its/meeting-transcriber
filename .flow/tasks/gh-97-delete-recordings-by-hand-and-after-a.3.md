@@ -53,9 +53,68 @@ The part that removes files: a mover that sends a list of a meeting's files to t
 - [ ] A path another record lists is never removed, stays listed, is reported as blocked, and is removed by a retry once no other record lists it (R1).
 - [ ] `MeetingFileRemoverTests` and the new `PipelineControllerTranscriptionsTests` cases were written before the implementation and pass.
 ## Done summary
-TBD
+A meeting in All Recordings can now have its audio or all of its files moved to the Trash, be kept, and have a stopped deletion retried, through four `PipelineController` actions that task .5's menu will call. `MeetingFileRemover` moves one file at a time and keeps the record in step, a refused Trash leaves the file with a reason on the record, and a launch turns a deletion a crash stopped into a retry of the same kind.
 
+Tier: implementer - opus (explicit invocation) at xhigh effort (requested) (model: claude-opus-5-5)
+
+baseline: green via handoff (green (verified at ad990b70 by the conductor; only .flow/ paths moved since))
+gate classify: FULL (code changed), so the focused Quick commands ran on this tree: 69 tests in `MeetingFileRemoverTests` and `PipelineControllerTranscriptionsTests`; the spec's quick command, 134 tests; 190 neighbouring tests over the record, store, queue, regeneration, controller, Notion export and termination classes; `lint.sh` with the pinned tools, clean. All exit 0. The 134 and the 190 ran before one test was sharpened; only that test file changed since, and the 69 and lint ran after it.
+
+Not run here: the App Store variant build, CI's `swiftlint analyze`, the full suite and the sanitizers. The new code has no `#if` and uses nothing the App Store variant lacks, but no build has checked that. The real `FileManager.trashItem` was never called, by design: every test goes through a fake Trash that moves into a temp folder.
+
+Tests written first: 58 new tests existed before the implementation. 50 ran red against compile-only stubs, and one more crashed its test process on an empty result (`testEachFileHasItsOwnResult`, since rewritten to compare the whole list). The other 7 passed on the stubs because a stub that refuses everything satisfies a refusal test. Six tests came after the implementation, while checking guards: `testAFolderTheRecordListsIsNotRemoved`, `testAnActionAsksAboutAJobStillOnlyInTheSnapshot`, `testAPendingDeletionThatChangedDuringTheCheckIsLeftAlone`, `testMoveAudioRefusesAMeetingWhoseOwnDeletionIsIncomplete`, `testMoveMeetingKeepsAJobFromTheSnapshotGone`, `testAnInterruptedAutomaticDeletionWithNothingLeftIsFinished`.
+
+Guards checked by breaking them: 20 single-line breaks, one at a time, each against a named test. 19 went red at once. One survived (Move Audio without its origin check, on an import), because an import with only its source has no audio to cover, so `testAudioAndKeepRefuseAnImport` now lists an owned 16 kHz copy and goes red on that break. Not broken this way: `testEveryActionRefusesAMeetingWithoutARecord`, which has no single line to remove, and `testAPendingWriteThatFailsStartsNothing`, which rests on `transact`'s existing failed-write path.
+
+Split files of my own, inside Touches by the brief: `Tests/MeetingFileRemoverTests+Reconcile.swift`, `Tests/MeetingDeletionHarness.swift`, `Tests/PipelineControllerTranscriptionsTests+MeetingDeletion.swift` and `Tests/PipelineControllerTranscriptionsTests+MeetingDeletionFlows.swift`. `Tests/PipelineControllerTranscriptionsTests.swift` is unchanged, as the new cases reach no private helper of it. `PipelineController.settings` went from private to internal so the actions can resolve the output folder.
+
+Similar code search: reused `MeetingFilePresence`, `FileIdentity` and `SecurityScopeAccess`. Followed `removeFailedJob` for the queue and history removal, `ProtocolTemplateStore.trash` for the injected Trash and `MtUpdateProvider` for the process start time. No mover existed, so `MeetingFileRemover` is new.
+
+### Decisions
+
+DECIDED: `PendingDeletion.process` defaults to the current process, because `MeetingFileStoreTests`, outside Touches, builds one without it (rule 6).
+DECIDED: a pending deletion names its process by ID and kernel start time, and a refused read counts as running. `LivenessMarker` goes by bundle ID, which is what tells the two builds apart, so another build's deletion would read as abandoned. `NSRunningApplication.launchDate` is nil for a process LaunchServices did not start (rule 1: spec "One writer").
+DECIDED: only outcome `.finished` is actionable. `.inProgress` also covers another build's run and an unread snapshot, and `.leftUnfinished` keeps its audio (rule 1: A3, R4, spec edge cases).
+DECIDED: every action builds the queue first, as `removeFailedJob` does, so a job only the snapshot knows is seen. The launch reconcile does not, as building it would resume other saved jobs (rule 1: `docs/architecture/pipeline.md`, `restorePendingNotionExports`).
+DECIDED: the launch reconcile runs from `PipelineController.activate`, because the launch hooks in `MeetingTranscriberApp` are outside Touches (rule 6).
+DECIDED: a meeting with nothing left to move and only an unread snapshot is taken out of that file directly. `removeJob` on the bare queue would save its empty list over the snapshot, and leaving the meeting incomplete would contradict the acceptance. A failed snapshot write keeps the pending mark, so the next launch tries again (rule 1: A12).
+DECIDED: the shared-path check and the one-deletion-at-a-time check run under the record file's lock (rule 1: spec "One writer").
+DECIDED: a path a not-owned entry of the same record also lists is never moved, and each path is covered once (rule 1: R1).
+DECIDED: Retry derives its files from the record, so a file listed since the failure is not left behind and a retry with nothing left completes (rule 6).
+DECIDED: Move Audio refuses when no audio entry is left, so the date of an earlier deletion stays (rule 1: R4). It also refuses while the meeting's own Move Meeting is incomplete, because finishing there would replace the record of what is left of the meeting (rule 6). Task .5's menu needs to match this.
+DECIDED: an interrupted automatic deletion that had removed everything records `audioDeletion = automatic(now)`. Clearing the mark alone would leave the row reading "Audio not found", and the next check has no file left to act on. With files left, it only clears the mark, as the spec says (rule 6).
+ASSUMED: the unreachable reason reads "on a drive or in a folder that is not available" · alternatives: B — the mockup's "on a drive that is not connected", which a permission error or a deleted folder would misreport; C — separate texts for each · flip at: `MeetingFileRemover.failureReason` · test: `testTheReasonCountsItsFilesAndKeepsTheRefusalsText`.
+
+### For later tasks
+
+Used only by tests until task .5 wires the menu: `moveAudioToTrash`, `moveMeetingToTrash`, `retryDeletion`, `setKeep`. Reached only through the mode task .6 passes: `MeetingFileRemover.Mode.forGood` and `removeForGood`. `MeetingFileRecord.filesCovered(by:)`, `MeetingFileRemover.failureReason(of:)` and `DeletionProcess.isRunning(_:)` are pure or safe to call for tasks .4 and .6. The automatic kind is reconciled here, and task .6 starts it with `beginDeletion(jobID:kind:paths:)`.
+
+The actions run on the main actor and call `FileManager.trashItem` directly, so a slow network volume holds the interface for that time. Task .5 may want to say so in its confirmation or move the call off the main actor.
+
+No route a user takes to a mapped feature changed: no view changed in this task.
+
+FOLLOW-UP: Regenerate Notes running on a done job is not visible to these actions, so Move Meeting during one can leave a stray protocol file. Task .5's menu rule should cover it.
+FOLLOW-UP: the no-Trash error mapping (`NSFeatureUnsupportedError`, `ENOTSUP`) comes from reports and is not measured on a real volume without a Trash. The App Store sandbox's answer to `sysctl` and `kill` for another process is not measured either; the code treats a refusal as still running.
+FOLLOW-UP: this is the third copy of the kernel start-time read, beside `MtUpdateProvider` and `DualSourceRecorder`.
+
+stage: impl-review - ran (model: gpt-6-astra xhigh (codex:gpt-6-astra:xhigh)); verdict SHIP after 2 round(s)
+DECIDED: findings 1 to 3 (P1, each reproduced by the reviewers, validator kept all) and finding 4 (P2, same) are all fixed; the receipt marks all four `fixed` (rule 1: spec R1, R6, "Pending deletion"). None declined.
+DECIDED: `moveMeetingToTrash` and `retryDeletion` stay synchronous. The row leaves the queue, the history and the automation API at once. The record goes when the snapshot write has landed, in a Task when one is still in flight. An async action would have made the launch reconcile end after the queue is built (rule 6). This changes the worker's summary: right after the action, a record with a pending mark can still be there for a moment. Task .5 must not read that record as "the meeting is still listed"; the row is gone already.
+DECIDED: after a failed snapshot or history write the record and its pending mark stay until the next launch, which finishes the removal through the existing reconcile. No retry in the running session, as the flush already retried once (rule 1: spec "Pending deletion").
+DECIDED: a synchronous snapshot write was rejected, as a stalled rename would freeze the interface, which is why `PipelineSnapshotStore` writes off the main actor (rule 6: the reason is in that store's `writeActor` comment; `docs/architecture/pipeline.md` does not cover this and needed no change).
+DECIDED: `removeJob(id:keepingFiles:)` with the default unchanged, `SpeakerNamingSession.forgetNamingData` made internal, `TerminalJobStore.remove` returns whether its write landed. These three files are outside the task's Touches because the causes sit there; every other caller behaves as before (rule 1: R1).
+DECIDED: `MeetingFileStore.finishDeletion(jobID:outcomes:_:)` is how a deletion ends: each file's state and the pending mark in one write. Task .6 should end an automatic deletion through it (rule 6).
+DECIDED: `assertMovesToTheTrashCompletely` now also fails when any file stays under the output folder, as the queue's cleanup no longer covers for an unlisted sidecar. It passes for a run with confirmed names and for a late re-diarization (rule 6).
+DECIDED: five existing assertions of this task's own tests that the record is gone now wait for it (`waitFor`, 5 s), because the record goes after the flush. What they assert is unchanged. The tests changed are `testMoveMeetingMovesEveryFileAndTheMeetingLeavesEveryList`, `assertMovesToTheTrashCompletely`, `testAMeetingWhoseExportRunsIsLeftUntouchedAndAMeetingWithAPageMakesNoNotionCall`, `testAMeetingWithAFailedExportMovesAndLeavesTheQueue`, `testMoveMeetingKeepsAJobFromTheSnapshotGone` (rule 6).
+DECIDED: new split test file of my own, inside Touches by the brief: `Tests/PipelineControllerTranscriptionsTests+MeetingRemoval.swift`. `Tests/MeetingDeletionHarness.swift` gained `snapshotWriter:` and `history:` parameters (rule 6).
+DECIDED: evidence for the fixes. Tests written first: 5 of the 6 new tests ran red on the unfixed code; `testMoveMeetingForgetsTheNamingDataOfItsJob` passed there and guards the new branch. Guards broken one at a time: 8 of 9 went red at once; the 9th ("the record never goes after the flush") did not build as written and was not rerun. Focused run: 88 tests, then the spec's Quick set plus neighbours, 358 tests, both rc=0. `lint.sh` with the pinned tools: rc=0, 0 violations. The committed tree is byte-identical to the tested one. Not run: App Store build, `swiftlint analyze`, full suite, sanitizers (the step runs them).
+DECIDED: the two bookmark tests the reviewers reported red (`testAnActionRunsInsideTheScopeOfTheChosenFolderAndClosesIt`, `testALaunchReconcilesInsideTheScopeOfTheChosenFolderAndNotWithoutAPendingDeletion`) fail only inside the reviewer's sandbox, where no bookmark can be created. Both pass in the runs above, so they are not findings. The re-review left them out and says R14 is partial for that reason (rule 6).
+FOLLOW-UP: PipelineController.removeMovedMeeting (spec gh-97): a write that keeps failing across launches leaves a pending record, and nothing tells the user. Matters if a full disk or a damaged history file outlasts several launches; the row may then return from the file at each launch while actions refuse it.
+FOLLOW-UP: PipelineQueue.removeJob default path (spec gh-97): the reaper of done jobs, Cancel and Dismiss still remove sidecars by name with `removeItem`, so a folder at such a path goes with them. This predates the task. Matters if R1's "a replacement is never removed" is meant to cover these paths too.
+FOLLOW-UP: PipelineController.forgetInUnreadSnapshot (spec gh-97): it writes the snapshot on the main actor at launch, where a stalled rename would hold the launch. Matters if that stall is seen during a reconcile; it runs only when a meeting was left with a pending mark and is listed in the snapshot.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: acf7d4cb9c44480be91140adc662d49f2fee465a, ed154b7714900d45811ae347ef425e0d07620c28, d19815dc8dcc5689dc7f4d9d64b449d6d257c487, a93962b14d74a435eef57bfa10c43c962512d43b
+- Tests: CFFIXED_USER_HOME=<scratch> swift test --parallel --filter 'MeetingFileRemoverTests|PipelineControllerTranscriptionsTests', CFFIXED_USER_HOME=<scratch> swift test --parallel --filter 'MeetingFileRemoverTests|MeetingFileStoreTests|MeetingFilePresenceTests|MeetingFileRecordTests|PipelineQueueMeetingFiles|ProtocolRegenerationMeetingFilesTests|PipelineControllerTests|PipelineControllerOutputFolderTests|PipelineControllerNotionExportTests|TerminationFlushTests', CFFIXED_USER_HOME=<scratch> swift test --parallel --filter 'TranscriptionsViewTests|TranscriptionListTests|RecordingRowActionsTests|RowAvailabilityTests|PipelineControllerTranscriptionsTests|TranscriptionsWindowPrivacyTests|TerminalJobStoreTests|TerminalJobRecordTests|AudioPersistencePolicyTests|OutputSettingsViewTests|SpeakerNamingStoreTests|ProcessedRecordingsLedgerTests', ./scripts/lint.sh
 - PRs:
