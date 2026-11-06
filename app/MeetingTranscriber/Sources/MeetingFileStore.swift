@@ -89,6 +89,43 @@ final class MeetingFileStore {
         }
     }
 
+    /// Mark the listed files in `roles` the pipeline has just removed. Only a file
+    /// the disk answers for: a file on a volume that is not connected stays listed
+    /// as present. The probe runs outside the lock, which is never held while the
+    /// disk is asked, and the mark goes by path, as `records` can be a write behind.
+    func markGone(jobID: UUID, roles: Set<MeetingFile.Role>) {
+        guard let record = record(for: jobID) else { return }
+        let gone = Set(record.files.filter { file in
+            roles.contains(file.role) && file.state == .present && MeetingFilePresence.of(file.path) == .gone
+        }.map(\.path))
+        guard !gone.isEmpty else { return }
+        update(jobID: jobID) { record in
+            for index in record.files.indices where gone.contains(record.files[index].path) {
+                record.files[index].state = .gone
+            }
+        }
+    }
+
+    /// What a regeneration left of a meeting's protocol. `current` is nil when the
+    /// new one did not go in place and the old one did not go back; `keptPrevious`
+    /// is a previous protocol still on disk under a name of its own.
+    func noteProtocolReplaced(jobID: UUID, current: URL?, keptPrevious: URL?) {
+        // Read from memory and outside `update`, as `PipelineQueue.noteWritten` does.
+        guard let origin = record(for: jobID)?.origin else { return }
+        let currentFile = current.map { MeetingFile(role: .protocol, url: $0, owned: origin.owns(.protocol)) }
+        let keptFile = keptPrevious.map { MeetingFile(role: .previousProtocol, url: $0, owned: origin.owns(.previousProtocol)) }
+        update(jobID: jobID) { record in
+            if let currentFile { record.list(currentFile) }
+            // Never `list`: each run the Trash refuses leaves one more copy, and
+            // deleting the meeting has to find them all.
+            if let keptFile {
+                record.files.removeAll { $0.path == keptFile.path }
+                record.files.append(keptFile)
+            }
+        }
+        if current == nil { markGone(jobID: jobID, roles: [.protocol]) }
+    }
+
     /// Read the file again. Creates it when there is none yet.
     func reload() {
         transact { _ in true }
