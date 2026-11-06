@@ -71,8 +71,18 @@ final class TranscriptionSettingsHuggingFaceEntryTests: XCTestCase {
         return try view.inspect().find(ViewType.Sheet.self)
     }
 
+    /// What the custom field carrying `identifier` shows once it is on screen. The
+    /// fields edit a draft that starts from the setting when the field appears
+    /// (`DraftTextField`), and a view inspected outside a window never appears, so
+    /// this does what appearing does before reading the text.
     private func customField(_ identifier: String, in view: TranscriptionSettingsView) throws -> String {
-        try view.inspect().find(ViewType.TextField.self) { try $0.accessibilityIdentifier() == identifier }.input()
+        func field() throws -> InspectableView<ViewType.TextField> {
+            try view.inspect()
+                .find(DraftTextField.self) { try $0.accessibilityIdentifier() == identifier }
+                .find(ViewType.TextField.self)
+        }
+        try field().callOnAppear()
+        return try field().input()
     }
 
     func testFromHuggingFaceOpensTheBrowserAndChangesNoSetting() throws {
