@@ -274,12 +274,29 @@ extension MeetingFileStore {
     }
 
     /// Save a deletion before it touches its first file. False starts nothing: the
-    /// save failed, the meeting has no record, or a deletion of it is already pending.
-    func beginDeletion(jobID: UUID, kind: MeetingFileRecord.DeletionKind, paths: [String]) -> Bool {
+    /// save failed, the meeting has no record, a deletion of it is already pending, or
+    /// the file's copy differs from `read`, the record the caller decided on, which is
+    /// the last look, under the lock another build also takes.
+    func beginDeletion(
+        jobID: UUID, kind: MeetingFileRecord.DeletionKind, paths: [String], unchangedFrom read: MeetingFileRecord? = nil,
+    ) -> Bool {
         transact { document in
             guard let index = document.records.firstIndex(where: { $0.jobID == jobID }),
-                  document.records[index].pending == nil else { return false }
+                  document.records[index].pending == nil,
+                  read == nil || document.records[index] == read else { return false }
             document.records[index].pending = .init(kind: kind, paths: paths)
+            return true
+        }
+    }
+
+    /// Remove a record the caller found nothing left of, as long as the file's copy
+    /// still is the one it looked at. `remove(jobID:)` is for a meeting already gone.
+    @discardableResult
+    func remove(unchanged read: MeetingFileRecord) -> Bool {
+        transact { document in
+            guard let index = document.records.firstIndex(where: { $0.jobID == read.jobID }),
+                  document.records[index] == read else { return false }
+            document.records.remove(at: index)
             return true
         }
     }

@@ -303,6 +303,9 @@ struct MeetingTranscriberApp: App {
             appState.remoteVocabulary.start()
         }
         .task {
+            appState.recordingRetention.start()
+        }
+        .task {
             await appState.startPermissionChecks()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in

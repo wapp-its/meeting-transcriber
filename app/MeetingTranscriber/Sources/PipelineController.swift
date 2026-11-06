@@ -104,6 +104,10 @@ final class PipelineController {
     /// through a queue nothing else shows.
     @ObservationIgnored var onQueueReplaced: ((PipelineQueue) -> Void)?
 
+    /// Called when a meeting reaches `.done` and when a Notion export ends, which is
+    /// what the automatic deletion waits for. Read at each call, so it reaches every queue.
+    @ObservationIgnored var onMeetingSettled: (() -> Void)?
+
     /// The output-folder bookmark the current queue was built from, so a change
     /// of folder can be noticed without resolving the bookmark again.
     @ObservationIgnored private var queueBuiltFromBookmark: Data?
@@ -442,6 +446,7 @@ final class PipelineController {
         #if !APPSTORE
             LocalModelJobNotices(notifier: notifier, settings: settings).install(on: queue)
         #endif
+        chainRetentionTriggers() // Last: the notices above can end a job's callback early.
     }
 
     // MARK: - File enqueue
