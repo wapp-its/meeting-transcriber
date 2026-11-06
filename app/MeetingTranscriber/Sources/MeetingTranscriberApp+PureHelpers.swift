@@ -7,7 +7,7 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Launch"
 
 // Split out of `MeetingTranscriberApp.swift`, which the menu's and the All
 // Recordings window's wiring took past the file and type length limits. Static
-// and free of the scene's state, so they move without any change.
+// and free of the scene's state: what they need of it is passed in.
 extension MeetingTranscriberApp {
     /// Tell the user when the previous run ended without a quit (issue #703),
     /// the one outcome they cannot see for themselves: a menu bar app that is
@@ -49,6 +49,30 @@ extension MeetingTranscriberApp {
         autoWatchSetting: Bool = UserDefaults.standard.bool(forKey: "autoWatch"),
     ) -> Bool {
         commandLineArgs.contains("--auto-watch") || autoWatchSetting
+    }
+
+    /// A job line's Open. A file inside the output folder's security scope:
+    /// after a restart a history line can be opened before any queue holds
+    /// that scope, which the App Store build needs, and a file that is gone
+    /// opens nothing. A Notion page through `openInNotion`.
+    static func openJob(_ target: JobOpenTarget, scopeRoot: URL) {
+        switch target {
+        case let .file(url):
+            _ = TranscriptionFileOpener.perform(url, scopeRoot: scopeRoot) { NSWorkspace.shared.open($0) }
+
+        case .notion:
+            openInNotion(target)
+        }
+    }
+
+    /// A Notion page through `ProtocolOpener`, which hands it to a running
+    /// Notion app.
+    static func openInNotion(_ target: JobOpenTarget) {
+        logger.info("Menu protocol open requested")
+        Task {
+            let opened = await ProtocolOpener().open(target)
+            logger.info("Menu protocol open accepted: \(opened)")
+        }
     }
 
     /// "Open Last Protocol": the file inside the output folder's security

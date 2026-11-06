@@ -132,6 +132,23 @@ final class RecordingRowActionsTests: XCTestCase {
         )
     }
 
+    /// A finished job whose notes went only to Notion opens its page; a
+    /// recorded file still wins, since the button names what it opens.
+    func testMainActionOfAFinishedJobWithOnlyANotionPageOpensThePage() {
+        assertMainAction(
+            states: [.done], files: [RecordedFiles(hasProtocol: false, hasTranscript: false, hasNotionPage: true)],
+            canRetry: eitherRetry, .openInNotion,
+        )
+        assertMainAction(
+            states: [.done], files: [RecordedFiles(hasProtocol: true, hasTranscript: false, hasNotionPage: true)],
+            canRetry: eitherRetry, .openProtocol,
+        )
+        assertMainAction(
+            states: [.done], files: [RecordedFiles(hasProtocol: false, hasTranscript: true, hasNotionPage: true)],
+            canRetry: eitherRetry, .openTranscript,
+        )
+    }
+
     func testMainActionOfAFailedJobIsRetryWhenThePipelineWouldTakeItElseRemove() {
         assertMainAction(states: [.error], files: everyRecordedFiles, canRetry: [true], .retry)
         assertMainAction(states: [.error], files: everyRecordedFiles, canRetry: [false], .remove)
@@ -174,6 +191,21 @@ final class RecordingRowActionsTests: XCTestCase {
                 [.openProtocol, .openTranscript, .showInFinder, .regenerate(enabled: true)],
             ),
         ])
+    }
+
+    /// A finished job with a Notion page lists "Open in Notion" after its
+    /// files and before Regenerate, also when no file is left.
+    func testMenuOfAFinishedJobWithANotionPageListsItAfterTheFiles() {
+        for retry in eitherRetry {
+            XCTAssertEqual(
+                RecordingRowActions.menuItems(state: .done, onDisk: protocolAndTranscript, canRetry: retry, hasNotionPage: true),
+                [.openProtocol, .openTranscript, .showInFinder, .openInNotion, .regenerate(enabled: true)],
+            )
+            XCTAssertEqual(
+                RecordingRowActions.menuItems(state: .done, onDisk: neither, canRetry: retry, hasNotionPage: true),
+                [.openInNotion, .regenerate(enabled: false)],
+            )
+        }
     }
 
     /// Regenerate appears on a failed job only when there is a source, Retry

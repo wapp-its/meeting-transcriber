@@ -40,7 +40,7 @@ final class MenuBarViewTests: XCTestCase {
         noMic: Bool = false,
         manualRecordingPendingOrActive: Bool = false,
         onShowAllTranscriptions: @escaping () -> Void = {},
-        onOpenProtocol: @escaping (URL) -> Void = { _ in },
+        onOpenJob: @escaping (JobOpenTarget) -> Void = { _ in },
         onOpenLastProtocol: @escaping (URL) -> Void = { _ in },
         history: [TerminalJobRecord] = [],
         isRecordingPaused: Bool = false,
@@ -53,7 +53,7 @@ final class MenuBarViewTests: XCTestCase {
         actions.recordMicrophone = onRecordMicrophone
         actions.stopManualRecording = onStopManualRecording
         actions.togglePause = onTogglePause
-        actions.openProtocol = onOpenProtocol
+        actions.openJob = onOpenJob
         actions.openLastProtocol = { onOpenLastProtocol($0.url) }
         actions.quit = onQuit
         actions.nameSpeakers = onNameSpeakers
@@ -518,14 +518,14 @@ final class MenuBarViewTests: XCTestCase {
         job.state = .error
         queue.insertJobForTesting(job)
 
-        var openedURL: URL?
+        var opened: JobOpenTarget?
         // swiftlint:disable:next trailing_closure
-        let body = try makeView(status: makeStatus(), pipelineQueue: queue, onOpenProtocol: { openedURL = $0 }).inspect()
+        let body = try makeView(status: makeStatus(), pipelineQueue: queue, onOpenJob: { opened = $0 }).inspect()
 
         XCTAssertNoThrow(try body.find(text: "Needs you"))
         XCTAssertThrowsError(try body.find(button: "Dismiss"))
         try body.find(button: "Open").tap()
-        XCTAssertEqual(openedURL, transcriptURL)
+        XCTAssertEqual(opened, .file(transcriptURL))
     }
 
     func testImportFilesItemCallsCallback() throws {

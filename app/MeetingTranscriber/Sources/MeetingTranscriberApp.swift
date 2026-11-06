@@ -202,7 +202,7 @@ struct MeetingTranscriberApp: App {
             togglePause: appState.canPauseRecording ? {
                 appState.watching.togglePause()
             } : nil,
-            openProtocol: openJobFile,
+            openJob: { Self.openJob($0, scopeRoot: appState.settings.effectiveOutputDir) },
             openLastProtocol: openLastNotes,
             openSettings: { bringWindowToFront(id: "settings") },
             nameSpeakers: appState.hasPendingSpeakerNamingJobs ? {
@@ -225,6 +225,7 @@ struct MeetingTranscriberApp: App {
             openProtocol: { AllRecordingsActions.openFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
             openTranscript: { AllRecordingsActions.openFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
             reveal: { AllRecordingsActions.revealFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
+            openInNotion: { Self.openInNotion(.notion($0)) },
             regenerate: { regenerateSheet.present(entry: $0, using: appState.protocolRegenerator) },
             retry: { appState.pipeline.retryJob(id: $0) },
             remove: { appState.pipeline.removeFailedJob(id: $0) },
@@ -557,29 +558,12 @@ struct MeetingTranscriberApp: App {
         }
     }
 
-    /// A job line's Open, inside the output folder's security scope: after a
-    /// restart a history line can be opened before any queue holds that scope,
-    /// which the App Store build needs. A file that is gone opens nothing.
-    private func openJobFile(_ url: URL) {
-        _ = TranscriptionFileOpener.perform(url, scopeRoot: appState.settings.effectiveOutputDir) { file in
-            NSWorkspace.shared.open(file)
-        }
-    }
-
     /// Only asks to terminate: stopping watching and finishing a recording
     /// happen in `AppDelegate`, which every quit path goes through, and this
     /// one alone used to do them.
     private func quit() {
         logger.info("Menu Quit requested")
         NSApplication.shared.terminate(nil)
-    }
-
-    private func openProtocol(_ target: JobOpenTarget) {
-        logger.info("Menu protocol open requested")
-        Task {
-            let opened = await ProtocolOpener().open(target)
-            logger.info("Menu protocol open accepted: \(opened)")
-        }
     }
 
     /// "Open Last Notes": a local file through the output folder's scope and
@@ -591,7 +575,7 @@ struct MeetingTranscriberApp: App {
             Self.openLastProtocol(url, scopeRoot: appState.settings.effectiveOutputDir, notifier: NotificationManager.shared)
 
         case .notion:
-            openProtocol(target)
+            Self.openInNotion(target)
         }
     }
 }

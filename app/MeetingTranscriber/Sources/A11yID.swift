@@ -134,6 +134,10 @@ enum A11yID {
         "recordingMenuOpenTranscript.\(index)"
     }
 
+    static func recordingMenuOpenInNotion(_ index: Int) -> String {
+        "recordingMenuOpenInNotion.\(index)"
+    }
+
     static func recordingMenuShowInFinder(_ index: Int) -> String {
         "recordingMenuShowInFinder.\(index)"
     }

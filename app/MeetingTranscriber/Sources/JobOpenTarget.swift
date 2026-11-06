@@ -1,6 +1,7 @@
 import Foundation
 
-/// Where a finished job's Open action should go.
+/// Where a finished job's Open action should go, as
+/// `resolve(forEntry:preferNotion:)` decides it.
 ///
 /// A Notion export leaves the local protocol file absent when the user chose
 /// "skip local markdown on success", so the page URL is the only usable target
@@ -9,21 +10,6 @@ import Foundation
 enum JobOpenTarget: Equatable {
     case notion(URL)
     case file(URL)
-
-    static func resolve(for job: PipelineJob?, preferNotion: Bool) -> Self? {
-        guard let job else { return nil }
-
-        if preferNotion, job.hasCompletedNotionExport, let notionURL = job.notionPageURL {
-            return .notion(notionURL)
-        }
-        if let path = job.protocolPath ?? job.transcriptPath {
-            return .file(path)
-        }
-        if job.hasCompletedNotionExport, let notionURL = job.notionPageURL {
-            return .notion(notionURL)
-        }
-        return nil
-    }
 
     var url: URL {
         switch self {

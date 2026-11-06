@@ -42,6 +42,7 @@ final class TranscriptionsViewTests: XCTestCase {
         actions.openProtocol = { calls("openProtocol \($0.path)"); return true }
         actions.openTranscript = { calls("openTranscript \($0.path)"); return true }
         actions.reveal = { calls("reveal \($0.path)"); return true }
+        actions.openInNotion = { calls("openInNotion \($0.absoluteString)") }
         actions.regenerate = { calls("regenerate \($0?.id.uuidString ?? "none")"); return true }
         actions.retry = { calls("retry \($0)") }
         actions.remove = { calls("remove \($0)") }
@@ -239,6 +240,29 @@ final class TranscriptionsViewTests: XCTestCase {
         XCTAssertEqual(calls, expected.map(\.call))
         XCTAssertNoThrow(try sut.inspect().find(text: "Audio file missing"))
         XCTAssertThrowsError(try button(A11yID.recordingMainButton(6), in: sut), "a finished job with neither file")
+    }
+
+    /// A finished job whose notes went only to Notion opens its page from
+    /// the row's button and from its "…" menu.
+    func testANotionOnlyRowOpensItsPage() throws {
+        var job = PipelineJob(
+            meetingTitle: "Notion only", appName: "Teams",
+            mixPath: URL(fileURLWithPath: "/rec/n_mix.wav"), appPath: nil, micPath: nil, micDelay: 0,
+        )
+        job.state = .done
+        job.recordNotionPage(NotionPageResult(pageID: "page-1", url: "https://www.notion.so/page-1"), databaseID: "db")
+        job.finishNotionExport(succeeded: true)
+        var calls: [String] = []
+        let sut = makeView([TranscriptionEntry(job: job, finishOrder: nil)], actions: recording { calls.append($0) })
+
+        let main = try button(A11yID.recordingMainButton(0), in: sut)
+        XCTAssertEqual(try main.labelView().text().string(), "Open in Notion")
+        try main.tap()
+        let item = try button(A11yID.recordingMenuOpenInNotion(0), in: sut)
+        XCTAssertEqual(try item.labelView().text().string(), "Open in Notion")
+        try item.tap()
+
+        XCTAssertEqual(calls, Array(repeating: "openInNotion https://www.notion.so/page-1", count: 2))
     }
 
     // MARK: - The "…" menu

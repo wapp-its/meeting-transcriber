@@ -20,8 +20,9 @@ struct MenuActions {
     /// Pauses a running recording or resumes a paused one, whatever kind it is;
     /// set only while a recording's capture is running.
     var togglePause: (() -> Void)?
-    /// A job line's Open: the job's protocol, else its transcript.
-    var openProtocol: (URL) -> Void
+    /// A job line's Open: the job's protocol, else its transcript, or its
+    /// Notion page as `JobOpenTarget` decides ("Open in Notion").
+    var openJob: (JobOpenTarget) -> Void
     /// "Open Last Notes": the newest finished job's protocol, else its
     /// transcript, or its Notion page as `JobOpenTarget` decides. Separate
     /// from a job line's Open because a file that is gone is reported here,
@@ -56,7 +57,7 @@ struct MenuActions {
         startStop: {},
         recordApp: {},
         recordMicrophone: {},
-        openProtocol: { _ in },
+        openJob: { _ in },
         openLastProtocol: { _ in },
         openSettings: {},
         processFiles: {},

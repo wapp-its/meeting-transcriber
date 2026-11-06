@@ -92,8 +92,8 @@ extension MenuBarView {
     /// export (`notionExportActions`).
     @ViewBuilder
     private func jobActions(_ entry: TranscriptionEntry, index: Int) -> some View {
-        if entry.state.isTerminal, let url = entry.fileToOpen {
-            Button("Open") { actions.openProtocol(url) }
+        if entry.state.isTerminal, let target = openTarget(entry) {
+            Button(target.jobActionLabel) { actions.openJob(target) }
         }
         if entry.state == .speakerNamingPending {
             Button("Name Speakers") { actions.nameSpeakers?() }
@@ -132,6 +132,12 @@ extension MenuBarView {
             Button(export == .failed ? "Discard Notion Retry" : "Dismiss") { actions.dismissJob(entry.id) }
                 .disabled(export == .inProgress)
         }
+    }
+
+    /// Hoisted out of the `ViewBuilder` for the type-check budget (see the
+    /// note on `body`).
+    private func openTarget(_ entry: TranscriptionEntry) -> JobOpenTarget? {
+        JobOpenTarget.resolve(forEntry: entry, preferNotion: notionExportEnabled)
     }
 
     /// Runs a failed job again from its audio, instead of the user having to
