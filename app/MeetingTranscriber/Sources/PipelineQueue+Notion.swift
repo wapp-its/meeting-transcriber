@@ -287,8 +287,13 @@ extension PipelineQueue {
         } catch {
             guard let index = liveJobIndex(of: jobID) else { return false }
             jobs[index].finishNotionExport(succeeded: false)
-            logger.warning("[\(job.shortID, privacy: .public)] notion_export_failed error=\(error.localizedDescription, privacy: .private)")
             let reason = NotionClientError.exportFailureReason(for: error)
+            // The fixed category and the status only: Notion's error message can
+            // quote the page content, which is the meeting notes.
+            let status = (error as? NotionClientError)?.httpStatusCode.map(String.init) ?? "none"
+            logger.warning(
+                "[\(job.shortID, privacy: .public)] notion_export_failed reason=\(reason, privacy: .public) status=\(status, privacy: .public)",
+            )
             recordNotionExportFailure(jobID: jobID, reason: reason)
             persistNotionExportChange(jobID: jobID)
             onNotionExportFinished?(jobs[index], reason)
