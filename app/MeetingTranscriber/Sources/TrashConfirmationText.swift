@@ -1,41 +1,51 @@
 import Foundation
 
 /// What the confirmation of a Trash action on one meeting says. Pure: the files come
-/// from the record, which names what the action covers, and what the disk answered
-/// about the audio comes in.
+/// from the record, which names what the action covers, less what the disk answered
+/// gone, and that answer and what the regenerator could read come in.
 struct TrashConfirmationText: Equatable, Sendable {
     let title: String
     /// One paragraph each; the last holds the file names, one per line.
     let lines: [String]
     let confirmButton = "Move to Trash"
 
-    static func moveAudio(meetingTitle: String, record: MeetingFileRecord, audio: RecordingAudioLine.AudioOnDisk) -> Self {
-        let files = record.filesCovered(by: .audioToTrash)
+    static func moveAudio(
+        meetingTitle: String, record: MeetingFileRecord, audio: RecordingAudioLine.AudioOnDisk,
+        transcriptSource: RecordingRowActions.TranscriptSource,
+    ) -> Self {
+        let files = record.filesCovered(by: .audioToTrash).filter { !audio.gonePaths.contains($0.path) }
         let size = audio.bytes > 0 ? " (\(audio.size))" : ""
         let going = files.count == 1 ? "1 audio file\(size) goes to the Trash." : "\(files.count) audio files\(size) go to the Trash."
         return Self(title: "Move the audio of “\(meetingTitle)” to the Trash?", lines: [
-            ([going] + whatStays(of: record)).joined(separator: " "),
+            ([going] + whatStays(of: record, audio: audio, transcriptSource: transcriptSource)).joined(separator: " "),
             "Without the audio you cannot transcribe this meeting again or identify its speakers again. Voice profiles learned from it stay.",
             names(of: files),
         ])
     }
 
-    /// Regenerate Notes reads a transcript, so without one nothing is promised about it.
-    private static func whatStays(of record: MeetingFileRecord) -> [String] {
-        let isThere = { (role: MeetingFile.Role) in record.files.contains { $0.role == role && $0.state != .gone } }
-        return switch (isThere(.transcript), isThere(.protocol)) {
-        case (true, true): ["The transcript and the meeting notes stay, and Regenerate Notes keeps working."]
-        case (true, false): ["The transcript stays, and Regenerate Notes keeps working."]
-        case (false, true): ["The meeting notes stay."]
-        case (false, false): []
+    /// Regenerate Notes is promised exactly when the regenerator has a transcript to
+    /// read, by its own rule: a usable transcript file, or the one the notes hold.
+    private static func whatStays(
+        of record: MeetingFileRecord, audio: RecordingAudioLine.AudioOnDisk, transcriptSource: RecordingRowActions.TranscriptSource,
+    ) -> [String] {
+        let isThere = { (role: MeetingFile.Role) in
+            record.files.contains { $0.role == role && $0.state != .gone && !audio.gonePaths.contains($0.path) }
         }
+        let staying = switch (isThere(.transcript), isThere(.protocol)) {
+        case (true, true): "The transcript and the meeting notes stay"
+        case (true, false): "The transcript stays"
+        case (false, true): "The meeting notes stay"
+        case (false, false): ""
+        }
+        guard !staying.isEmpty else { return [] }
+        return [staying + (transcriptSource == .none ? "." : ", and Regenerate Notes keeps working.")]
     }
 
     static func moveMeeting(
         meetingTitle: String, record: MeetingFileRecord, audio: RecordingAudioLine.AudioOnDisk,
         hasNotionPage: Bool, hasFailedExport: Bool,
     ) -> Self {
-        let files = record.filesCovered(by: .meetingToTrash).filter { !$0.role.isAudio || audio.isAnyLeft }
+        let files = record.filesCovered(by: .meetingToTrash).filter { !audio.gonePaths.contains($0.path) }
         var lines = [whatGoes(of: files, origin: record.origin, audio: audio)]
         if record.origin == .imported { lines.append("The imported file stays where it is.") }
         if hasNotionPage { lines.append("The page in Notion stays.") }

@@ -15,6 +15,10 @@ struct RecordingAudioLine: Equatable, Sendable {
         let totalCount: Int
         /// Of the present files only.
         let bytes: Int64
+        /// Files of the meeting, audio or not, that the record still lists and the
+        /// disk answered gone: a file removed by hand, which the record learns only
+        /// when an action finds it gone. The confirmations leave them out.
+        var gonePaths: Set<String> = []
 
         /// False only when the disk confirmed that none is there.
         var isAnyLeft: Bool {

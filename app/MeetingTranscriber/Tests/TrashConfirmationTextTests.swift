@@ -5,6 +5,7 @@ import XCTest
 /// case, so a line lost or reordered fails.
 final class TrashConfirmationTextTests: XCTestCase {
     private typealias AudioOnDisk = RecordingAudioLine.AudioOnDisk
+    private typealias TranscriptSource = RecordingRowActions.TranscriptSource
     private typealias Fixture = RetentionFixture
 
     private let title = "Budget review"
@@ -12,13 +13,19 @@ final class TrashConfirmationTextTests: XCTestCase {
     private let audioLost =
         "Without the audio you cannot transcribe this meeting again or identify its speakers again. Voice profiles learned from it stay."
     private let threeFiles = "b_mix.wav\nb_app.wav\nb_mic.wav"
+    private let everyTrack = ["b_mix.wav", "b_app.wav", "b_mic.wav"]
 
-    private func audio(bytes: Int64 = 286_000_000, present: Int = 3, unreachable: Int = 0) -> AudioOnDisk {
-        AudioOnDisk(presentCount: present, unreachableCount: unreachable, totalCount: 3, bytes: bytes)
+    private func audio(bytes: Int64 = 286_000_000, present: Int = 3, unreachable: Int = 0, gone: [String] = []) -> AudioOnDisk {
+        AudioOnDisk(
+            presentCount: present, unreachableCount: unreachable, totalCount: 3, bytes: bytes,
+            gonePaths: Set(gone.map { Fixture.file(.mix, $0).path }),
+        )
     }
 
-    private func moveAudio(_ record: MeetingFileRecord, audio: AudioOnDisk? = nil) -> TrashConfirmationText {
-        TrashConfirmationText.moveAudio(meetingTitle: title, record: record, audio: audio ?? self.audio())
+    private func moveAudio(
+        _ record: MeetingFileRecord, audio: AudioOnDisk? = nil, source: TranscriptSource = .transcriptFile,
+    ) -> TrashConfirmationText {
+        TrashConfirmationText.moveAudio(meetingTitle: title, record: record, audio: audio ?? self.audio(), transcriptSource: source)
     }
 
     private func moveMeeting(
@@ -53,23 +60,61 @@ final class TrashConfirmationTextTests: XCTestCase {
         ])
     }
 
-    /// It only says what is there. Regenerate works from a transcript, so without
-    /// one it promises nothing.
+    /// It only says what is there, and promises Regenerate Notes exactly when the
+    /// regenerator has something to read, which can be the transcript the notes hold.
     func testMoveAudioNamesOnlyTheTextThatIsStillThere() {
-        let rows: [(String, (inout MeetingFileRecord) -> Void, String)] = [
-            ("no transcript", { $0.setFiles(.transcript, to: nil) }, "The meeting notes stay."),
-            ("transcript gone", { $0.setFiles(.transcript, to: .gone) }, "The meeting notes stay."),
-            ("no protocol", { $0.setFiles(.protocol, to: nil) }, "The transcript stays, and Regenerate Notes keeps working."),
-            ("protocol gone", { $0.setFiles(.protocol, to: .gone) }, "The transcript stays, and Regenerate Notes keeps working."),
+        let rows: [(String, (inout MeetingFileRecord) -> Void, TranscriptSource, String)] = [
+            ("no transcript", { $0.setFiles(.transcript, to: nil) }, .none, "The meeting notes stay."),
+            ("transcript gone", { $0.setFiles(.transcript, to: .gone) }, .none, "The meeting notes stay."),
+            (
+                "notes holding the transcript",
+                { $0.setFiles(.transcript, to: nil) },
+                .protocolOnly,
+                "The meeting notes stay, and Regenerate Notes keeps working.",
+            ),
+            (
+                "transcript gone, notes holding it",
+                { $0.setFiles(.transcript, to: .gone) },
+                .protocolOnly,
+                "The meeting notes stay, and Regenerate Notes keeps working.",
+            ),
+            ("no protocol", { $0.setFiles(.protocol, to: nil) }, .transcriptFile, "The transcript stays, and Regenerate Notes keeps working."),
+            ("protocol gone", { $0.setFiles(.protocol, to: .gone) }, .transcriptFile, "The transcript stays, and Regenerate Notes keeps working."),
+            ("blank transcript, no protocol", { $0.setFiles(.protocol, to: nil) }, .none, "The transcript stays."),
+            ("blank transcript, notes not holding it", { _ in }, .none, "The transcript and the meeting notes stay."),
+            ("blank transcript, notes holding it", { _ in }, .protocolOnly, "The transcript and the meeting notes stay, and Regenerate Notes keeps working."),
         ]
-        for (name, change, stays) in rows {
-            XCTAssertEqual(moveAudio(Fixture.record(change)).lines.first, "3 audio files (286 MB) go to the Trash. \(stays)", name)
+        for (name, change, source, stays) in rows {
+            XCTAssertEqual(
+                moveAudio(Fixture.record(change), source: source).lines.first, "3 audio files (286 MB) go to the Trash. \(stays)", name,
+            )
         }
         let neither = Fixture.record { record in
             record.setFiles(.transcript, to: nil)
             record.setFiles(.protocol, to: nil)
         }
-        XCTAssertEqual(moveAudio(neither).lines.first, "3 audio files (286 MB) go to the Trash.")
+        for source: TranscriptSource in [.none, .protocolOnly, .transcriptFile] {
+            XCTAssertEqual(moveAudio(neither, source: source).lines.first, "3 audio files (286 MB) go to the Trash.")
+        }
+    }
+
+    /// A file removed by hand stays in the record until an action finds it gone. What
+    /// the disk answered wins, so the number, the size and the names tell one story.
+    func testMoveAudioLeavesOutWhatTheDiskAnsweredGone() {
+        let text = moveAudio(Fixture.record(), audio: audio(bytes: 48_000_000, present: 1, gone: ["b_app.wav", "b_mic.wav"]))
+        XCTAssertEqual(text.lines, [
+            "1 audio file (48 MB) goes to the Trash. The transcript and the meeting notes stay, and Regenerate Notes keeps working.",
+            audioLost,
+            "b_mix.wav",
+        ])
+        XCTAssertEqual(
+            moveAudio(Fixture.record(), audio: audio(gone: ["b.txt"]), source: .protocolOnly).lines.first,
+            "3 audio files (286 MB) go to the Trash. The meeting notes stay, and Regenerate Notes keeps working.",
+        )
+        XCTAssertEqual(
+            moveAudio(Fixture.record(), audio: audio(gone: ["b.md"])).lines.first,
+            "3 audio files (286 MB) go to the Trash. The transcript stays, and Regenerate Notes keeps working.",
+        )
     }
 
     /// Only files on disk add to the size, and a drive not connected adds none.
@@ -134,7 +179,7 @@ final class TrashConfirmationTextTests: XCTestCase {
             ),
             (
                 "audio removed by hand, not noticed by the record",
-                Fixture.record { $0.setFiles(.protocol, to: nil) }, noAudio,
+                Fixture.record { $0.setFiles(.protocol, to: nil) }, audio(bytes: 0, present: 0, gone: everyTrack),
                 "Its transcript goes to the Trash, and the meeting leaves this list.",
             ),
             (
@@ -159,6 +204,24 @@ final class TrashConfirmationTextTests: XCTestCase {
         for (name, record, audio, expected) in rows {
             XCTAssertEqual(moveMeeting(record, audio: audio).lines.first, expected, name)
         }
+    }
+
+    /// The same for the meeting: what the disk answered gone is neither named nor listed.
+    func testMoveMeetingLeavesOutWhatTheDiskAnsweredGone() {
+        let partOfTheAudio = moveMeeting(Fixture.record(), audio: audio(bytes: 48_000_000, present: 1, gone: ["b_app.wav", "b_mic.wav"]))
+        XCTAssertEqual(partOfTheAudio.lines, [
+            "Its audio (48 MB), transcript and meeting notes go to the Trash, and the meeting leaves this list.",
+            voiceProfilesStay,
+            "b_mix.wav\nb.txt\nb.md",
+        ])
+        let theTranscript = moveMeeting(Fixture.record(), audio: audio(gone: ["b.txt"]))
+        XCTAssertEqual(theTranscript.lines, [
+            "Its audio (286 MB) and meeting notes go to the Trash, and the meeting leaves this list.",
+            voiceProfilesStay,
+            "b_mix.wav\nb_app.wav\nb_mic.wav\nb.md",
+        ])
+        let everything = moveMeeting(Fixture.record(), audio: audio(bytes: 0, present: 0, gone: everyTrack + ["b.txt", "b.md"]))
+        XCTAssertEqual(everything.lines, ["No file of this meeting is left to move, so it only leaves this list.", voiceProfilesStay])
     }
 
     func testAMeetingWithNoLocalFileLeftOnlyLeavesTheList() {
