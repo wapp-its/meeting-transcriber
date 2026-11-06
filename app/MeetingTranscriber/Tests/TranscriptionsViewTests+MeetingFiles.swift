@@ -14,6 +14,15 @@ extension TranscriptionsViewTests {
     static let threeTracks = AudioOnDisk(presentCount: 3, unreachableCount: 0, totalCount: 3, bytes: 48_000_000)
     static let noAudioLeft = AudioOnDisk(presentCount: 0, unreachableCount: 0, totalCount: 3, bytes: 0)
     static let unpluggedAudio = AudioOnDisk(presentCount: 0, unreachableCount: 3, totalCount: 3, bytes: 0)
+    static let nothingMoved = "Nothing was moved: the meeting's files changed while the dialog was open. Choose the action again to see what it moves now."
+
+    /// Each Trash item of a first row, and what confirming it calls.
+    static func trashItems(_ row: TranscriptionEntry) -> [(item: String, call: String)] {
+        [
+            (A11yID.recordingMenuMoveAudioToTrash(0), "moveAudioToTrash \(row.id)"),
+            (A11yID.recordingMenuMoveMeetingToTrash(0), "moveMeetingToTrash \(row.id)"),
+        ]
+    }
 
     /// What `RecordingRowActions` says the row's menu may offer now.
     static func isDisabled(_ item: RecordingRowActions.RowMenuItem) -> Bool {
@@ -58,7 +67,7 @@ extension TranscriptionsViewTests {
         entry(title, protocolPath: "/out/\(title).md", transcriptPath: "/out/\(title).txt")
     }
 
-    private func texts(in view: TranscriptionsView) throws -> [String] {
+    func texts(in view: TranscriptionsView) throws -> [String] {
         try view.inspect().findAll(ViewType.Text.self).map { try $0.string() }
     }
 
@@ -66,11 +75,11 @@ extension TranscriptionsViewTests {
         try view.inspect().find(viewWithAccessibilityIdentifier: A11yID.recordingMenuKeep(index)).toggle()
     }
 
-    private func trashAlert(in view: TranscriptionsView) throws -> InspectableView<ViewType.Alert> {
+    func trashAlert(in view: TranscriptionsView) throws -> InspectableView<ViewType.Alert> {
         try view.inspect().find(ViewType.Alert.self)
     }
 
-    private func tapInTrashAlert(_ identifier: String, in view: TranscriptionsView) throws {
+    func tapInTrashAlert(_ identifier: String, in view: TranscriptionsView) throws {
         try trashAlert(in: view).actions().find(viewWithAccessibilityIdentifier: identifier).button().tap()
     }
 
@@ -282,6 +291,15 @@ extension TranscriptionsViewTests {
         job.beginNotionExport(speakerNames: [])
         job.finishNotionExport(succeeded: false)
         let failedExport = TranscriptionEntry(job: job, finishOrder: nil)
+        var noPageJob = PipelineJob(
+            meetingTitle: "No page", appName: "Teams",
+            mixPath: URL(fileURLWithPath: "/rec/y_mix.wav"), appPath: nil, micPath: nil, micDelay: 0,
+        )
+        noPageJob.state = .done
+        noPageJob.protocolPath = URL(fileURLWithPath: "/out/y.md")
+        noPageJob.beginNotionExport(speakerNames: [])
+        noPageJob.finishNotionExport(succeeded: false)
+        let failedBeforeAPage = TranscriptionEntry(job: noPageJob, finishOrder: nil)
         var gone = meeting(failedExport)
         gone = Meeting(
             record: gone.record, notionExportRunning: false,
@@ -299,7 +317,8 @@ extension TranscriptionsViewTests {
             ).lines.joined(separator: "\n\n"),
         )
 
-        for (row, page, failed) in [(exported, true, false), (failedExport, false, true)] {
+        // A failed export can leave its page behind, which nothing opens but which stays.
+        for (row, page, failed) in [(exported, true, false), (failedExport, true, true), (failedBeforeAPage, false, true)] {
             let meeting = meeting(row)
             let sut = makeView([row], actions: actions([(row, meeting)]))
             try button(A11yID.recordingMenuMoveMeetingToTrash(0), in: sut).tap()
@@ -335,9 +354,31 @@ extension TranscriptionsViewTests {
 
         try button(A11yID.recordingMenuMoveAudioToTrash(0), in: sut).tap()
         try tapInTrashAlert(A11yID.recordingTrashConfirmButton, in: sut)
+        XCTAssertEqual([fileReads, audioReads], [1, 2], "the confirmation checks the audio itself")
         _ = try sut.inspect().find(text: "Retro")
 
-        XCTAssertEqual([fileReads, audioReads], [2, 2])
+        XCTAssertEqual([fileReads, audioReads], [2, 3])
+    }
+
+    /// A dialog answers for the files it named, and fewer is no harm: a file gone since
+    /// it opened does not stop the rest.
+    func testConfirmingStillRunsWhenAFileWentSinceTheDialogOpened() throws {
+        let row = finished()
+        let mic = "/rec/\(row.id)_mic.wav"
+        for (item, call) in Self.trashItems(row) {
+            var gone: Set<String> = []
+            var calls: [String] = []
+            var actions = actions([(row, meeting(row))], base: recording { calls.append($0) })
+            actions.audioOnDisk = { _ in AudioOnDisk(presentCount: 3, unreachableCount: 0, totalCount: 3, bytes: 1000, gonePaths: gone) }
+            let sut = makeView([row], actions: actions)
+
+            try button(item, in: sut).tap()
+            gone = [mic]
+            try tapInTrashAlert(A11yID.recordingTrashConfirmButton, in: sut)
+
+            XCTAssertEqual(calls, [call])
+            XCTAssertThrowsError(try sut.inspect().find(text: Self.nothingMoved))
+        }
     }
 
     // MARK: - Retry Deletion
@@ -394,105 +435,6 @@ extension TranscriptionsViewTests {
             XCTAssertFalse(try button(A11yID.recordingMenuMoveAudioToTrash(0), in: sut).isDisabled(), "\(phase)")
             XCTAssertFalse(try keepToggle(0, in: sut).isDisabled(), "\(phase)")
             XCTAssertFalse(try button(A11yID.recordingRetryDeletionButton(2), in: sut).isDisabled(), "\(phase)")
-        }
-    }
-
-    // MARK: - Through the controller
-
-    private func makeHarness() throws -> MeetingDeletionHarness {
-        let suite = "TranscriptionsView-\(getpid())-\(UUID().uuidString)"
-        let root = try makeTempDirectory(prefix: "transcriptions-view")
-        let settings = try AppSettings(
-            defaults: XCTUnwrap(DefaultsSuite.open(suite)), defaultOutputDir: root.appendingPathComponent("output"),
-        )
-        addTeardownBlock { DefaultsSuite.remove(suite) }
-        return try MeetingDeletionHarness(root: root, settings: settings)
-    }
-
-    /// The window over the real controller and record, wired as the App wires it, as
-    /// it stands now.
-    private func window(over controller: PipelineController, scopeRoot: URL) -> TranscriptionsView {
-        var actions = AllRecordingsActions.noop
-        actions.filesOnDisk = { AllRecordingsActions.readFilesOnDisk(of: $0, scopeRoot: scopeRoot) }
-        actions.meetingFiles = { controller.meetingFileStore.record(for: $0) }
-        actions.audioOnDisk = { entry in
-            controller.meetingFileStore.record(for: entry.id).map { AllRecordingsActions.readAudioOnDisk(of: $0, scopeRoot: scopeRoot) }
-        }
-        actions.moveAudioToTrash = { controller.moveAudioToTrash(jobID: $0) }
-        actions.moveMeetingToTrash = { controller.moveMeetingToTrash(jobID: $0) }
-        actions.retryDeletion = { controller.retryDeletion(jobID: $0) }
-        actions.setKeep = { controller.setKeep(jobID: $0, $1) }
-        return makeView(controller.transcriptionEntries, actions: actions)
-    }
-
-    private func confirm(_ item: String, in view: TranscriptionsView) throws {
-        try button(item, in: view).tap()
-        try tapInTrashAlert(A11yID.recordingTrashConfirmButton, in: view)
-    }
-
-    private func audioLine(in view: TranscriptionsView) throws -> String? {
-        try texts(in: view).first { $0.hasPrefix("Audio") }
-    }
-
-    /// Move Audio: the row shows where the audio went, and has nothing more to move.
-    func testConfirmedMoveAudioThenTheRowSaysWhereTheAudioWent() throws {
-        let harness = try makeHarness()
-        let controller = harness.controller(queue: harness.makeQueue())
-        _ = try harness.recordedMeeting()
-
-        try confirm(A11yID.recordingMenuMoveAudioToTrash(0), in: window(over: controller, scopeRoot: harness.outputDir))
-
-        let after = window(over: controller, scopeRoot: harness.outputDir)
-        let line = try XCTUnwrap(audioLine(in: after))
-        XCTAssertTrue(line.hasPrefix("Audio moved to the Trash on "), line)
-        XCTAssertThrowsError(try button(A11yID.recordingMenuMoveAudioToTrash(0), in: after))
-        XCTAssertEqual(harness.fakeTrash.moved.count, 3)
-    }
-
-    /// Move Meeting: the row is gone, with no record needed to say so.
-    func testConfirmedMoveMeetingThenTheRowIsGone() throws {
-        let harness = try makeHarness()
-        let controller = harness.controller(queue: harness.makeQueue())
-        _ = try harness.recordedMeeting()
-
-        try confirm(A11yID.recordingMenuMoveMeetingToTrash(0), in: window(over: controller, scopeRoot: harness.outputDir))
-
-        XCTAssertEqual(controller.transcriptionEntries, [])
-        XCTAssertNoThrow(try window(over: controller, scopeRoot: harness.outputDir).inspect().find(text: "No transcriptions yet"))
-    }
-
-    /// A file the Trash refuses: for each Trash item the row says so, counts what went
-    /// and offers Retry Deletion, which finishes the job once the Trash takes the file.
-    func testARefusedFileLeavesDeletionIncompleteAndRetryFinishes() throws {
-        let cases: [(item: (Int) -> String, finishes: (MeetingDeletionHarness, PipelineController, TranscriptionsView) throws -> Void)] = [
-            (A11yID.recordingMenuMoveAudioToTrash, { _, _, view in
-                let line = try XCTUnwrap(self.audioLine(in: view))
-                XCTAssertTrue(line.hasPrefix("Audio moved to the Trash on "), line)
-                XCTAssertThrowsError(try self.button(A11yID.recordingRetryDeletionButton(0), in: view))
-            }),
-            (A11yID.recordingMenuMoveMeetingToTrash, { _, controller, _ in
-                XCTAssertEqual(controller.transcriptionEntries, [])
-            }),
-        ]
-        for testCase in cases {
-            let harness = try makeHarness()
-            let controller = harness.controller(queue: harness.makeQueue())
-            let job = try harness.recordedMeeting()
-            let refused = try XCTUnwrap(job.appPath).lastPathComponent
-            harness.fakeTrash.refusal = { $0.lastPathComponent == refused ? CocoaError(.featureUnsupported) : nil }
-
-            try confirm(testCase.item(0), in: window(over: controller, scopeRoot: harness.outputDir))
-
-            let stopped = window(over: controller, scopeRoot: harness.outputDir)
-            XCTAssertEqual(try audioLine(in: stopped), "Audio · 2 of 3 files moved to the Trash")
-            XCTAssertNoThrow(try stopped.inspect().find(text: "Deletion incomplete: this volume has no Trash"))
-            XCTAssertEqual(try button(A11yID.recordingRetryDeletionButton(0), in: stopped).labelView().text().string(), "Retry Deletion")
-            XCTAssertThrowsError(try button(A11yID.recordingMainButton(0), in: stopped))
-
-            harness.fakeTrash.refusal = { _ in nil }
-            try button(A11yID.recordingRetryDeletionButton(0), in: stopped).tap()
-
-            try testCase.finishes(harness, controller, window(over: controller, scopeRoot: harness.outputDir))
         }
     }
 

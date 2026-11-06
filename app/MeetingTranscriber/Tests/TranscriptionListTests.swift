@@ -253,6 +253,38 @@ final class TranscriptionListTests: XCTestCase {
         ])))
     }
 
+    /// A page exists as soon as an export made it, also when the export then failed:
+    /// nothing opens that page, but deleting the meeting leaves it in Notion. From the
+    /// queue and from the history alike.
+    func testAnEntryKnowsOfANotionPageAFailedExportLeftBehind() throws {
+        var partial = try job("Partial", addedAt: 0, state: .done)
+        partial.beginNotionExport(speakerNames: [])
+        partial.recordNotionPage(NotionPageResult(pageID: "page-1", url: "https://www.notion.so/page-1"), databaseID: "db")
+        partial.finishNotionExport(succeeded: false)
+        var noPage = try job("No page", addedAt: 1, state: .done)
+        noPage.beginNotionExport(speakerNames: [])
+        noPage.finishNotionExport(succeeded: false)
+        var completed = try job("Completed", addedAt: 2, state: .done)
+        completed.beginNotionExport(speakerNames: [])
+        completed.recordNotionPage(NotionPageResult(pageID: "page-2", url: "https://www.notion.so/page-2"), databaseID: "db")
+        completed.finishNotionExport(succeeded: true)
+        let neverExported = try job("Never", addedAt: 3, state: .done)
+
+        let cases: [(job: PipelineJob, hasPage: Bool, opensPage: Bool)] = [
+            (partial, true, false), (noPage, false, false), (completed, true, true), (neverExported, false, false),
+        ]
+        for testCase in cases {
+            for (moment, live, records) in [
+                ("in the queue", [testCase.job], []),
+                ("from the history", [], [TerminalJobRecord(job: testCase.job)]),
+            ] as [(String, [PipelineJob], [TerminalJobRecord])] {
+                let entry = try XCTUnwrap(TranscriptionList.entries(liveJobs: live, records: records).first)
+                XCTAssertEqual(entry.hasNotionPage, testCase.hasPage, "\(testCase.job.meetingTitle) \(moment)")
+                XCTAssertEqual(entry.notionPageURL != nil, testCase.opensPage, "\(testCase.job.meetingTitle) \(moment)")
+            }
+        }
+    }
+
     /// A finished job whose notes went to Notion and left no local file is
     /// still the last finished one, from the queue and from the history, and
     /// "Open Last Notes" opens its page. With a file, the page wins only while

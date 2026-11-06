@@ -10,6 +10,8 @@ import SwiftUI
 @MainActor
 final class TranscriptionsFileNotice {
     var fileMissing = false
+    /// A Trash confirmation stopped because it no longer named every file to move.
+    var trashStopped = false
 }
 
 /// The Trash confirmation the window is showing, if any: which action, on which
@@ -21,12 +23,21 @@ final class TrashConfirmationPrompt {
     enum Action {
         case moveAudio
         case moveMeeting
+
+        var kind: MeetingFileRecord.DeletionKind {
+            switch self {
+            case .moveAudio: .audioToTrash
+            case .moveMeeting: .meetingToTrash
+            }
+        }
     }
 
     struct Request {
         let action: Action
-        let jobID: UUID
+        let entry: TranscriptionEntry
         let text: TrashConfirmationText
+        /// The paths the dialog names, which are all its confirmation answers for.
+        let named: Set<String>
     }
 
     var request: Request?
@@ -167,14 +178,19 @@ struct TranscriptionsView: View {
     }
 
     @ViewBuilder private var fileMissingMessage: some View {
-        if notice.fileMissing {
-            Text("The file was moved or deleted.")
-                .font(.callout)
-                .foregroundStyle(.red)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
-                .padding(.vertical, 8)
+        if notice.fileMissing { windowMessage("The file was moved or deleted.") }
+        if notice.trashStopped {
+            windowMessage("Nothing was moved: the meeting's files changed while the dialog was open. Choose the action again to see what it moves now.")
         }
+    }
+
+    private func windowMessage(_ text: String) -> some View {
+        Text(text)
+            .font(.callout)
+            .foregroundStyle(.red)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal)
+            .padding(.vertical, 8)
     }
 
     @ViewBuilder private var listOrPlaceholder: some View {
@@ -432,10 +448,12 @@ struct TranscriptionsView: View {
         case .moveMeeting:
             TrashConfirmationText.moveMeeting(
                 meetingTitle: entry.title, record: meeting.record, audio: meeting.audio,
-                hasNotionPage: entry.notionPageURL != nil, hasFailedExport: entry.liveNotionExport == .failed,
+                hasNotionPage: entry.hasNotionPage, hasFailedExport: entry.liveNotionExport == .failed,
             )
         }
-        trashPrompt.request = .init(action: action, jobID: entry.id, text: text)
+        let named = TrashConfirmationText.files(of: action.kind, record: meeting.record, audio: meeting.audio)
+        notice.trashStopped = false
+        trashPrompt.request = .init(action: action, entry: entry, text: text, named: Set(named.map(\.path)))
     }
 
     @ViewBuilder
@@ -446,13 +464,27 @@ struct TranscriptionsView: View {
             .accessibilityIdentifier(A11yID.recordingTrashConfirmButton)
     }
 
+    /// The action works out its files anew, and the disk can have moved on since the
+    /// dialog opened: a file back from where it was would go without having been named.
+    /// That stops here, with the row as it was, and choosing the item again names it.
+    /// Fewer files than named is no harm.
     private func confirm(_ request: TrashConfirmationPrompt.Request) {
-        switch request.action {
-        case .moveAudio: actions.moveAudioToTrash(request.jobID)
-        case .moveMeeting: actions.moveMeetingToTrash(request.jobID)
+        if namesEveryFileToMove(request) {
+            switch request.action {
+            case .moveAudio: actions.moveAudioToTrash(request.entry.id)
+            case .moveMeeting: actions.moveMeetingToTrash(request.entry.id)
+            }
+        } else {
+            notice.trashStopped = true
         }
         availability.refresh()
         trashPrompt.request = nil
+    }
+
+    /// Without a record the action refuses by itself.
+    private func namesEveryFileToMove(_ request: TrashConfirmationPrompt.Request) -> Bool {
+        guard let record = actions.meetingFiles(request.entry.id), let audio = actions.audioOnDisk(request.entry) else { return true }
+        return request.named.isSuperset(of: TrashConfirmationText.files(of: request.action.kind, record: record, audio: audio).map(\.path))
     }
 
     // MARK: - Performing

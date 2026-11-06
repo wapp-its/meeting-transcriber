@@ -9,11 +9,19 @@ struct TrashConfirmationText: Equatable, Sendable {
     let lines: [String]
     let confirmButton = "Move to Trash"
 
+    /// What a confirmation of `kind` has to name: what the action covers, less what
+    /// the disk answered gone.
+    static func files(
+        of kind: MeetingFileRecord.DeletionKind, record: MeetingFileRecord, audio: RecordingAudioLine.AudioOnDisk,
+    ) -> [MeetingFile] {
+        record.filesCovered(by: kind).filter { !audio.gonePaths.contains($0.path) }
+    }
+
     static func moveAudio(
         meetingTitle: String, record: MeetingFileRecord, audio: RecordingAudioLine.AudioOnDisk,
         transcriptSource: RecordingRowActions.TranscriptSource,
     ) -> Self {
-        let files = record.filesCovered(by: .audioToTrash).filter { !audio.gonePaths.contains($0.path) }
+        let files = Self.files(of: .audioToTrash, record: record, audio: audio)
         let size = audio.bytes > 0 ? " (\(audio.size))" : ""
         let going = files.count == 1 ? "1 audio file\(size) goes to the Trash." : "\(files.count) audio files\(size) go to the Trash."
         return Self(title: "Move the audio of “\(meetingTitle)” to the Trash?", lines: [
@@ -45,7 +53,7 @@ struct TrashConfirmationText: Equatable, Sendable {
         meetingTitle: String, record: MeetingFileRecord, audio: RecordingAudioLine.AudioOnDisk,
         hasNotionPage: Bool, hasFailedExport: Bool,
     ) -> Self {
-        let files = record.filesCovered(by: .meetingToTrash).filter { !audio.gonePaths.contains($0.path) }
+        let files = Self.files(of: .meetingToTrash, record: record, audio: audio)
         var lines = [whatGoes(of: files, origin: record.origin, audio: audio)]
         if record.origin == .imported { lines.append("The imported file stays where it is.") }
         if hasNotionPage { lines.append("The page in Notion stays.") }

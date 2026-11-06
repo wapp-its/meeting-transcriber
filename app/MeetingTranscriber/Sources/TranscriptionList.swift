@@ -31,6 +31,10 @@ struct TranscriptionEntry: Identifiable, Equatable {
     /// page. `JobOpenTarget.resolve(forEntry:preferNotion:)` decides between it
     /// and the local file.
     let notionPageURL: URL?
+    /// Whether the job has a page in Notion at all: from the moment an export made
+    /// it, so also one a failed export left behind, which `notionPageURL` leaves out
+    /// for nothing to open it. What a deletion has to say stays in Notion.
+    let hasNotionPage: Bool
     /// The Notion export of a job in the pipeline's queue: running, failed or
     /// completed. Nil when the job was not exported, and for an entry known
     /// only from the history: only the queue can retry or discard an export,
@@ -77,6 +81,7 @@ struct TranscriptionEntry: Identifiable, Equatable {
         protocolURL = job.protocolPath
         transcriptURL = job.transcriptPath
         notionPageURL = job.hasCompletedNotionExport ? job.notionPageURL : nil
+        hasNotionPage = job.notionPageID != nil
         liveNotionExport = job.notionExportStatus
         isLive = true
         self.finishOrder = job.state.isTerminal ? finishOrder : nil
@@ -101,6 +106,7 @@ struct TranscriptionEntry: Identifiable, Equatable {
         transcriptURL = status.transcriptPath.map { URL(fileURLWithPath: $0) }
         // `JobExportDTO.url` is set only once the export completed.
         notionPageURL = status.export?.url.flatMap { URL(string: $0) }
+        hasNotionPage = status.export?.id != nil || status.export?.url != nil
         liveNotionExport = nil
         isLive = false
         self.finishOrder = status.state.isTerminal ? finishOrder : nil
