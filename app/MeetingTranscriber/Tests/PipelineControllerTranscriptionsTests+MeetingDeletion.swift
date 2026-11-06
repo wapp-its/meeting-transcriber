@@ -80,7 +80,7 @@ extension PipelineControllerTranscriptionsTests {
 
     // MARK: - Move Meeting
 
-    func testMoveMeetingMovesEveryFileAndTheMeetingLeavesEveryList() throws {
+    func testMoveMeetingMovesEveryFileAndTheMeetingLeavesEveryList() async throws {
         let harness = try makeDeletionHarness()
         let controller = harness.controller(queue: harness.makeQueue())
         let job = try harness.recordedMeeting()
@@ -90,6 +90,7 @@ extension PipelineControllerTranscriptionsTests {
         XCTAssertTrue(controller.moveMeetingToTrash(jobID: job.id))
 
         XCTAssertEqual(harness.fakeTrash.moved, harness.names(files))
+        await waitFor(harness.store.record(for: job.id) == nil, timeout: .seconds(5))
         XCTAssertNil(harness.store.record(for: job.id))
         XCTAssertNil(MeetingFileStore(path: harness.recordPath).record(for: job.id), "the record came back after a restart")
         XCTAssertNil(harness.history.lookup(jobID: job.id), "the finished-job entry stayed")

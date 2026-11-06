@@ -78,14 +78,14 @@ final class MeetingDeletionHarness {
 
     /// A controller wired to `queue`, or, without one, in the state a launch
     /// leaves it in: a bare queue that has not read the snapshot.
-    func controller(queue: PipelineQueue? = nil) -> PipelineController {
+    func controller(queue: PipelineQueue? = nil, history: TerminalJobStore? = nil) -> PipelineController {
         var environment = IsolatedQueueEnvironment.make(logDir: logDir, initialQueue: queue)
         environment.securityScope = scopes.access
         return PipelineController(
             settings: settings,
             notifier: RecordingNotifier(),
             queueEnvironment: environment,
-            terminalJobStore: history,
+            terminalJobStore: history ?? self.history,
             meetingFileStore: store,
             fileRemover: MeetingFileRemover(
                 trash: { [fakeTrash] in try fakeTrash.take($0) },
@@ -99,7 +99,11 @@ final class MeetingDeletionHarness {
 
     /// A queue on this harness's stores. A job it runs goes straight to `.done`,
     /// or parks for its speaker names.
-    func makeQueue(parksForNaming: Bool = false, notion: NotionExportConfiguration? = nil) -> PipelineQueue {
+    func makeQueue(
+        parksForNaming: Bool = false,
+        notion: NotionExportConfiguration? = nil,
+        snapshotWriter: @escaping @Sendable ([PipelineJob], URL) throws -> Void = PipelineSnapshot.save,
+    ) -> PipelineQueue {
         let engine = MockEngine()
         engine.segmentsToReturn = [TimestampedSegment(start: 0, end: 5, text: "Hello world")]
         let diarization = MockDiarization()
@@ -118,6 +122,7 @@ final class MeetingDeletionHarness {
             stagingDir: stagingDir,
             diarizeEnabled: true,
             echoDedupEnabled: false,
+            snapshotWriter: snapshotWriter,
             notionExportConfigurationProvider: notion.map { configuration in { .ready(configuration) } },
             terminalJobStore: history,
             meetingFileStore: store,

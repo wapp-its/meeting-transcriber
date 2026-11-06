@@ -148,16 +148,29 @@ extension PipelineController {
         return true
     }
 
-    /// Take a meeting whose files are gone off every list, the record last: it holds
-    /// the pending mark, so a crash before that is finished at the next launch.
+    /// Take a meeting whose files are gone off every list. The row leaves at once,
+    /// the record last: it holds the pending mark, and a snapshot or a history that
+    /// still lists the meeting would bring it back with nothing to finish it by. So
+    /// the record goes only once both are on disk. A failed write or a crash leaves
+    /// the mark, and the next launch ends up here again.
     private func removeMovedMeeting(jobID: UUID) {
         if queue.jobs.contains(where: { $0.id == jobID }) {
             queue.removeJob(id: jobID, keepingFiles: true)
         } else if queue.engine == nil {
             guard forgetInUnreadSnapshot(jobID: jobID) else { return }
         }
-        terminalJobStore.remove(jobID: jobID)
-        meetingFileStore.remove(jobID: jobID)
+        guard terminalJobStore.remove(jobID: jobID) else { return }
+        guard queue.isSnapshotWorkerActive else {
+            meetingFileStore.remove(jobID: jobID)
+            return
+        }
+        // The queue writes its snapshot off the main actor.
+        Task { [queue, meetingFileStore] in
+            await queue.awaitSnapshotFlush()
+            // Still active after a flush means the write failed and is still owed.
+            guard !queue.isSnapshotWorkerActive else { return }
+            meetingFileStore.remove(jobID: jobID)
+        }
     }
 
     /// A queue that has not read the snapshot must not be told to remove a job:

@@ -30,13 +30,14 @@ extension PipelineControllerTranscriptionsTests {
     private func assertMovesToTheTrashCompletely(
         _ job: PipelineJob, _ harness: MeetingDeletionHarness, _ controller: PipelineController,
         file: StaticString = #filePath, line: UInt = #line,
-    ) throws {
+    ) async throws {
         let listed = try harness.paths(of: job) { $0.state != .gone }
         XCTAssertTrue(listed.contains { $0.hasSuffix(".txt") }, "test premise: a transcript is listed", file: file, line: line)
 
         XCTAssertTrue(controller.moveMeetingToTrash(jobID: job.id), file: file, line: line)
 
         XCTAssertNil(harness.store.record(for: job.id)?.incomplete?.reason, file: file, line: line)
+        await waitFor(harness.store.record(for: job.id) == nil, timeout: .seconds(5))
         XCTAssertNil(harness.store.record(for: job.id), "the deletion did not complete", file: file, line: line)
         XCTAssertEqual(listed.filter(harness.isOnDisk), [], file: file, line: line)
         XCTAssertEqual(harness.fakeTrash.moved.count, listed.count, file: file, line: line)
@@ -55,7 +56,7 @@ extension PipelineControllerTranscriptionsTests {
         queue.completeSpeakerNaming(jobID: job.id, result: .confirmed(["SPEAKER_0": "Alice"]))
         await waitFor(queue.job(withID: job.id)?.state == .done, timeout: .seconds(10))
 
-        try assertMovesToTheTrashCompletely(job, harness, controller)
+        try await assertMovesToTheTrashCompletely(job, harness, controller)
     }
 
     func testAMeetingWithALateRediarizationMovesCompletely() async throws {
@@ -67,7 +68,7 @@ extension PipelineControllerTranscriptionsTests {
         queue.completeSpeakerNaming(jobID: job.id, result: .confirmed(["SPEAKER_0": "Alice"]))
         await waitFor(queue.job(withID: job.id)?.state == .done, timeout: .seconds(10))
 
-        try assertMovesToTheTrashCompletely(job, harness, controller)
+        try await assertMovesToTheTrashCompletely(job, harness, controller)
     }
 
     // MARK: - Notion
@@ -99,6 +100,7 @@ extension PipelineControllerTranscriptionsTests {
 
         XCTAssertTrue(controller.moveMeetingToTrash(jobID: job.id))
 
+        await waitFor(harness.store.record(for: job.id) == nil, timeout: .seconds(5))
         XCTAssertNil(harness.store.record(for: job.id))
         let exports = await exporter.startedExports
         XCTAssertEqual(exports, 1, "the deletion called Notion")
@@ -106,7 +108,7 @@ extension PipelineControllerTranscriptionsTests {
 
     /// A failed export holds nothing back (A9), and its job is one the queue keeps
     /// for good, so the removal has to take it out too.
-    func testAMeetingWithAFailedExportMovesAndLeavesTheQueue() throws {
+    func testAMeetingWithAFailedExportMovesAndLeavesTheQueue() async throws {
         let harness = try makeDeletionHarness()
         let controller = harness.controller(queue: harness.makeQueue())
         var job = try harness.recordedMeeting()
@@ -117,6 +119,7 @@ extension PipelineControllerTranscriptionsTests {
         XCTAssertTrue(controller.moveMeetingToTrash(jobID: job.id))
 
         XCTAssertFalse(controller.queue.jobs.contains { $0.id == job.id })
+        await waitFor(harness.store.record(for: job.id) == nil, timeout: .seconds(5))
         XCTAssertNil(harness.store.record(for: job.id))
     }
 
@@ -156,6 +159,7 @@ extension PipelineControllerTranscriptionsTests {
         XCTAssertTrue(controller.moveMeetingToTrash(jobID: job.id))
         await controller.queue.awaitSnapshotFlush()
 
+        await waitFor(harness.store.record(for: job.id) == nil, timeout: .seconds(5))
         XCTAssertNil(harness.store.record(for: job.id))
         let saved = try XCTUnwrap(PipelineSnapshot.load(from: harness.logDir))
         XCTAssertFalse(saved.contains { $0.id == job.id }, "the job would come back")

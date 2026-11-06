@@ -61,11 +61,15 @@ final class TerminalJobStore {
     /// Drop a job's record and persist, for a job that is no longer finished:
     /// a retried job answers from the live queue, and if it then leaves the
     /// queue without a new record, the old outcome must not be served for it.
-    func remove(jobID: UUID) {
+    ///
+    /// False when the write failed, so the file still lists the job and it comes
+    /// back at the next launch; `records` has let go of it either way.
+    @discardableResult
+    func remove(jobID: UUID) -> Bool {
         let key = jobID.uuidString
-        guard records.contains(where: { $0.status.jobID == key }) else { return }
+        guard records.contains(where: { $0.status.jobID == key }) else { return true }
         records.removeAll { $0.status.jobID == key }
-        save()
+        return save()
     }
 
     func lookup(jobID: UUID) -> JobStatusDTO? {
@@ -74,7 +78,8 @@ final class TerminalJobStore {
 
     // MARK: - Persistence
 
-    private func save() {
+    @discardableResult
+    private func save() -> Bool {
         do {
             let data = try JSONEncoder().encode(records)
             let staging = path.deletingLastPathComponent()
@@ -88,8 +93,10 @@ final class TerminalJobStore {
             // paths — keep owner-only, matching the other sensitive-JSON
             // writers (SpeakerMatcher, RecordingSidecar).
             try? FileManager.default.restrictToOwner(path)
+            return true
         } catch {
             logger.error("Failed to persist terminal job records: \(error.localizedDescription, privacy: .public)")
+            return false
         }
     }
 
