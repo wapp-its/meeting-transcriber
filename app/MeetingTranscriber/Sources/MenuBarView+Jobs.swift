@@ -76,16 +76,20 @@ extension MenuBarView {
     private func jobMenuTitle(_ entry: TranscriptionEntry) -> String {
         let status = JobMenuSummary.status(
             state: entry.state, hasWarnings: !entry.warnings.isEmpty, progress: stageProgress(entry),
+            notionExport: entry.openNotionExport,
         )
         return "\(entry.title) — \(status)"
     }
 
     private func jobSymbol(_ entry: TranscriptionEntry) -> String {
-        JobMenuSummary.symbol(state: entry.state, hasWarnings: !entry.warnings.isEmpty)
+        JobMenuSummary.symbol(
+            state: entry.state, hasWarnings: !entry.warnings.isEmpty, notionExport: entry.openNotionExport,
+        )
     }
 
     /// A failed line is taken off for good by Remove; Dismiss is left to a
-    /// job waiting for speaker names.
+    /// job waiting for speaker names, and to a finished job's open Notion
+    /// export (`notionExportActions`).
     @ViewBuilder
     private func jobActions(_ entry: TranscriptionEntry, index: Int) -> some View {
         if entry.state.isTerminal, let url = entry.fileToOpen {
@@ -105,6 +109,28 @@ extension MenuBarView {
         }
         if entry.state == .speakerNamingPending {
             Button("Dismiss") { actions.dismissJob(entry.id) }
+        }
+        notionExportActions(entry, index: index)
+    }
+
+    /// A finished job whose Notion export failed retries it from the local
+    /// backup, or gives the retry up ("Discard Notion Retry"), which takes the
+    /// job off the menu. While the export runs, both are shown disabled: the
+    /// job cannot leave the queue under a running export. Whether the retry
+    /// can run is read from the job's state only, never from the disk, since
+    /// the menu asks on every redraw and the output folder can be a network
+    /// volume; the retry reads the backup itself and says when it is gone.
+    @ViewBuilder
+    private func notionExportActions(_ entry: TranscriptionEntry, index: Int) -> some View {
+        if let export = entry.openNotionExport {
+            Button("Retry Notion Export") {
+                Task { await pipelineQueue.retryNotionExport(id: entry.id) }
+            }
+            .accessibilityIdentifier(A11yID.jobNotionRetryButton(index))
+            .disabled(!notionExportEnabled || !pipelineQueue.canRetryNotionExport(id: entry.id))
+            .help(notionExportEnabled ? "" : "Enable Notion export in Settings → Output to retry.")
+            Button(export == .failed ? "Discard Notion Retry" : "Dismiss") { actions.dismissJob(entry.id) }
+                .disabled(export == .inProgress)
         }
     }
 
@@ -128,12 +154,22 @@ extension MenuBarView {
             } else if entry.state == .error, let msg = entry.error {
                 Text(msg)
                     .foregroundStyle(.red)
+            } else if entry.state == .done {
+                Text(doneLine(entry))
+                    .foregroundStyle(.secondary)
             } else {
                 Text(entry.state.label)
                     .foregroundStyle(.secondary)
             }
         }
         .font(.caption2)
+    }
+
+    /// A finished job is in the menu only while its Notion export is open:
+    /// the export running, else why it failed, which the job's warnings say.
+    private func doneLine(_ entry: TranscriptionEntry) -> String {
+        if entry.openNotionExport == .inProgress { return JobMenuSummary.notionExportRunning }
+        return entry.warnings.isEmpty ? entry.state.label : entry.warnings.joined(separator: "; ")
     }
 
     /// The running stage's start and expected finish, read from the queue's

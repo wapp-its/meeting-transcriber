@@ -238,4 +238,23 @@ final class MenuBarJobMenuTests: XCTestCase {
         }
         XCTAssertEqual(symbols.count, 7)
     }
+
+    /// A finished job is in the menu only while its Notion export is open,
+    /// and the export is what its line says, with a symbol of its own; a
+    /// completed export reads like any finished job.
+    func testAFinishedJobsOpenNotionExportIsWhatItsLineSays() {
+        let cases: [(NotionExportStatus?, String, String)] = [
+            (.inProgress, "Exporting to Notion…", "icloud.and.arrow.up"),
+            (.failed, "Notion export failed", "exclamationmark.icloud"),
+            (.completed, "Done", "checkmark.circle"),
+            (nil, "Done", "checkmark.circle"),
+        ]
+        for (export, status, symbol) in cases {
+            let label = String(describing: export)
+            XCTAssertEqual(
+                JobMenuSummary.status(state: .done, hasWarnings: false, progress: "", notionExport: export), status, label,
+            )
+            XCTAssertEqual(JobMenuSummary.symbol(state: .done, hasWarnings: false, notionExport: export), symbol, label)
+        }
+    }
 }

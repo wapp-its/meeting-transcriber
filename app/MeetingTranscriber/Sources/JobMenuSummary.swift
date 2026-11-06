@@ -5,31 +5,56 @@ import Foundation
 /// menu cannot draw. The full error or warning text sits in the job's
 /// submenu, so the line itself stays short.
 ///
-/// Keyed on the state and whether there are warnings, not on a live job, so
-/// the Transcriptions window and a job known only from the history read the
-/// same as the menu.
+/// Keyed on the state, whether there are warnings and an open Notion export,
+/// not on a live job, so the Transcriptions window and a job known only from
+/// the history read the same as the menu.
 enum JobMenuSummary {
     /// `progress` is the running stage's line (`stageProgress` in the menu),
     /// used while the job is transcribing, diarizing or generating its protocol.
-    static func status(state: JobState, hasWarnings: Bool, progress: String) -> String {
+    /// `notionExport` is a finished job's export still open
+    /// (`TranscriptionEntry.openNotionExport`), which is what such a job's
+    /// line is about.
+    static func status(
+        state: JobState, hasWarnings: Bool, progress: String, notionExport: NotionExportStatus? = nil,
+    ) -> String {
         switch state {
         case .waiting: state.label
         case .transcribing, .diarizing, .generatingProtocol: progress
         case .speakerNamingPending: "Speaker names needed"
-        case .done: hasWarnings ? "Done, with warnings" : "Done"
+        case .done: doneStatus(hasWarnings: hasWarnings, notionExport: notionExport)
         case .error: "Failed"
         }
     }
 
-    static func symbol(state: JobState, hasWarnings: Bool) -> String {
+    private static func doneStatus(hasWarnings: Bool, notionExport: NotionExportStatus?) -> String {
+        switch notionExport {
+        case .inProgress: notionExportRunning
+        case .failed: "Notion export failed"
+        case .completed, nil: hasWarnings ? "Done, with warnings" : "Done"
+        }
+    }
+
+    /// The line of a finished job while its Notion export runs, in the
+    /// submenu as well as after the title.
+    static let notionExportRunning = "Exporting to Notion…"
+
+    static func symbol(state: JobState, hasWarnings: Bool, notionExport: NotionExportStatus? = nil) -> String {
         switch state {
         case .waiting: "clock"
         case .transcribing: "waveform"
         case .diarizing: "person.2"
         case .generatingProtocol: "doc.text"
         case .speakerNamingPending: "person.crop.circle.badge.questionmark"
-        case .done: hasWarnings ? "exclamationmark.triangle" : "checkmark.circle"
+        case .done: doneSymbol(hasWarnings: hasWarnings, notionExport: notionExport)
         case .error: "xmark.octagon"
+        }
+    }
+
+    private static func doneSymbol(hasWarnings: Bool, notionExport: NotionExportStatus?) -> String {
+        switch notionExport {
+        case .inProgress: "icloud.and.arrow.up"
+        case .failed: "exclamationmark.icloud"
+        case .completed, nil: hasWarnings ? "exclamationmark.triangle" : "checkmark.circle"
         }
     }
 

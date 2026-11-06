@@ -31,6 +31,12 @@ struct TranscriptionEntry: Identifiable, Equatable {
     /// page. `JobOpenTarget.resolve(forEntry:preferNotion:)` decides between it
     /// and the local file.
     let notionPageURL: URL?
+    /// The Notion export of a job in the pipeline's queue: running, failed or
+    /// completed. Nil when the job was not exported, and for an entry known
+    /// only from the history: only the queue can retry or discard an export,
+    /// and a record keeps the status it was written with, also after the
+    /// retry was discarded.
+    let liveNotionExport: NotionExportStatus?
     /// Whether the job is in the pipeline's queue. Only a live job can be
     /// retried; one known only from the history waits for the pipeline to load
     /// it from the snapshot.
@@ -48,6 +54,14 @@ struct TranscriptionEntry: Identifiable, Equatable {
         protocolURL ?? transcriptURL
     }
 
+    /// The export a finished job still has open, running or failed, which
+    /// keeps the job in the menu until the export completes or its retry is
+    /// discarded. Nil otherwise.
+    var openNotionExport: NotionExportStatus? {
+        guard state == .done, let export = liveNotionExport, export != .completed else { return nil }
+        return export
+    }
+
     init(job: PipelineJob, finishOrder: Int?) {
         id = job.id
         title = job.meetingTitle
@@ -63,6 +77,7 @@ struct TranscriptionEntry: Identifiable, Equatable {
         protocolURL = job.protocolPath
         transcriptURL = job.transcriptPath
         notionPageURL = job.hasCompletedNotionExport ? job.notionPageURL : nil
+        liveNotionExport = job.notionExportStatus
         isLive = true
         self.finishOrder = job.state.isTerminal ? finishOrder : nil
     }
@@ -86,6 +101,7 @@ struct TranscriptionEntry: Identifiable, Equatable {
         transcriptURL = status.transcriptPath.map { URL(fileURLWithPath: $0) }
         // `JobExportDTO.url` is set only once the export completed.
         notionPageURL = status.export?.url.flatMap { URL(string: $0) }
+        liveNotionExport = nil
         isLive = false
         self.finishOrder = status.state.isTerminal ? finishOrder : nil
     }
@@ -158,8 +174,11 @@ enum TranscriptionList {
 
     /// The menu's share, in two groups: jobs waiting or running ("In
     /// progress") and jobs waiting on the user, for speaker names or because
-    /// they failed ("Needs you"). Finished jobs, with or without warnings, are
-    /// left to the Transcriptions window. Each group lists its jobs in the
+    /// they failed ("Needs you"). A finished job whose Notion export is still
+    /// open counts as one of them: in progress while the export runs, needing
+    /// the user once it failed, since only the menu offers its retry. Other
+    /// finished jobs, with or without warnings, are left to the Transcriptions
+    /// window. Each group lists its jobs in the
     /// order they were added (oldest first), so the menu reads top to bottom
     /// as it always has; entries without an enqueue time predate every other
     /// and come first, in the order they were stored.
@@ -172,9 +191,12 @@ enum TranscriptionList {
                 return (lhs.element.finishOrder ?? .min, lhs.offset) < (rhs.element.finishOrder ?? .min, rhs.offset)
             }
             .map(\.element)
+        let running: [JobState] = [.waiting, .transcribing, .diarizing, .generatingProtocol]
         return MenuJobSections(
-            inProgress: oldestFirst.filter { [.waiting, .transcribing, .diarizing, .generatingProtocol].contains($0.state) },
-            needsYou: oldestFirst.filter { $0.state == .speakerNamingPending || $0.state == .error },
+            inProgress: oldestFirst.filter { running.contains($0.state) || $0.openNotionExport == .inProgress },
+            needsYou: oldestFirst.filter { entry in
+                entry.state == .speakerNamingPending || entry.state == .error || entry.openNotionExport == .failed
+            },
         )
     }
 

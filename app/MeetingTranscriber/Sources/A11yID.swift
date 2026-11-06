@@ -62,6 +62,12 @@ enum A11yID {
         "jobRetryButton.\(index)"
     }
 
+    /// Menu bar job row's "Retry Notion Export" on a finished job whose
+    /// export failed, by ROW INDEX like `jobRetryButton`.
+    static func jobNotionRetryButton(_ index: Int) -> String {
+        "jobNotionRetryButton.\(index)"
+    }
+
     /// The device picker in the menu bar's Microphone submenu. One fixed
     /// value: no device UID or name in it, for the reason the job rows give.
     static let menuMicrophonePicker = "menuMicrophonePicker"

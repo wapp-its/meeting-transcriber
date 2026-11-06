@@ -186,6 +186,35 @@ final class TranscriptionListTests: XCTestCase {
         XCTAssertEqual(TranscriptionList.menuSections([]), MenuJobSections(inProgress: [], needsYou: []))
     }
 
+    /// A finished job whose Notion export is still open stays in the menu:
+    /// in progress while the export runs, needing the user once it failed,
+    /// since the menu is where its retry is. A completed export leaves the job
+    /// to the window like any finished job, and so does a failed export known
+    /// only from the history, whose record keeps that status after the retry
+    /// was discarded.
+    func testAFinishedJobWithAnOpenNotionExportStaysInTheMenu() throws {
+        var exporting = try job("Exporting", addedAt: 0, state: .done)
+        exporting.beginNotionExport(speakerNames: [])
+        var failed = try job("Export failed", addedAt: 1, state: .done)
+        failed.beginNotionExport(speakerNames: [])
+        failed.finishNotionExport(succeeded: false)
+        var exported = try job("Exported", addedAt: 2, state: .done)
+        exported.beginNotionExport(speakerNames: [])
+        exported.finishNotionExport(succeeded: true)
+        var discarded = try job("Discarded", addedAt: 3, state: .done)
+        discarded.beginNotionExport(speakerNames: [])
+        discarded.finishNotionExport(succeeded: false)
+
+        let entries = TranscriptionList.entries(
+            liveJobs: [exporting, failed, exported], records: [TerminalJobRecord(job: discarded)],
+        )
+        let sections = TranscriptionList.menuSections(entries)
+
+        XCTAssertEqual(titles(sections.inProgress), ["Exporting"])
+        XCTAssertEqual(titles(sections.needsYou), ["Export failed"])
+        XCTAssertNil(entries.first { $0.title == "Discarded" }?.openNotionExport)
+    }
+
     /// Failed jobs added at the same moment still list in a fixed order: the
     /// ones the history no longer holds (their records evicted by its cap)
     /// before the one it still records, and those among themselves in the

@@ -35,7 +35,8 @@ struct MenuActions {
     var showAllTranscriptions: () -> Void
     /// Remove on a failed job: off the menu and out of the history for good.
     var removeFailedJob: (UUID) -> Void
-    /// Dismiss on a job waiting for speaker names.
+    /// Dismiss on a job waiting for speaker names, and "Discard Notion Retry"
+    /// on a finished job whose Notion export failed.
     var dismissJob: (UUID) -> Void
     /// Answers the question the menu displayed, true for Record. Handed the
     /// question rather than reading the open one, so a click on a menu that

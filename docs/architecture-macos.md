@@ -99,6 +99,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `LivenessMarker.swift` | Process-lifetime marker (issue #703): written at launch, touched once a minute, removed by a clean AppKit quit; the next launch reads it as `PreviousExit` to tell a crash, kill or power loss from a quit, which the per-recording marker cannot do for an idle app |
 | `PreviousExitNotice.swift` | Wording of the launch-time notification for a run that ended without a quit: the window in which nothing was watching for meetings |
 | `MenuBarView.swift` | Menu bar dropdown (state, actions, meeting info, the Microphone entry: a submenu whose inline picker checks the chosen microphone and stores a choice in `AppSettings.micDeviceUID`; at the top, the open recording prompt with Record / Record with Options… / Ignore; "Open Last Notes", which opens the newest finished job's notes file or, while Notion export is on, its Notion page, as `JobOpenTarget` resolves it) |
+| `MenuBarView+Jobs.swift` | The dropdown's job lines under "In progress" and "Needs you", one line per job with its actions in a submenu; a finished job whose Notion export runs or failed keeps a line there with "Retry Notion Export" and "Discard Notion Retry" |
 | `JobMenuSummary.swift` | Status text and symbol of a job's single line in the menu bar dropdown |
 | `MicrophoneMenuState.swift` | Pure decision for the menu bar's Microphone entry: its title (the device a recording reports, otherwise the chosen device or `System Default (<name>)`, a chosen device that is not connected, no microphone available, the "No Microphone" off line), the items (`System Default (<name>)` then the Settings list) and the checked choice, and every string the entry shows |
 | `ProtocolOpener.swift` | Opens local protocols with the default handler and prefers an already-running Notion desktop app for Notion pages, falling back to the default handler |
@@ -743,7 +744,9 @@ queue cleanup and app restarts, even if the original audio is no longer present.
 The menu's **Retry Notion Export** action is available when export is enabled and
 the backup file exists; it reads the saved protocol and reuses the recorded page
 ID for the same database, plus saved speaker names when tags are enabled. It does
-not transcribe audio or generate a new protocol. Success clears the export-failure
+not transcribe audio or generate a new protocol. In the menu the job is a line
+under "Needs you" (under "In progress" while an export runs), and **Discard
+Notion Retry** takes it off. Success clears the export-failure
 warning and starts the normal 60-second completed-job lifetime. If a completed
 job's in-progress export is interrupted, recovery marks it failed with an
 "interrupted when the app quit" warning for this same retry path; see
