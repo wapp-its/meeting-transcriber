@@ -119,13 +119,17 @@ final class PermissionsControllerTests: XCTestCase {
         // is written after the probe returns), so a check arriving while one is
         // out used to open a second engine on the same microphone. It joins the
         // running check instead, as the one follow-up that starts after it.
+        // The second check is asked for only once the first probe is out: one
+        // asked for before that probe starts is answered by it, with no
+        // follow-up, so issuing both at once would leave the count to the
+        // scheduler.
         let gate = MainActorGate()
         let counter = ProbeCounter()
         let controller = PermissionsController(notifier: RecordingNotifier(), probe: gatedProbe(gate, counter))
 
         async let first: Void = controller.check()
-        async let second: Void = controller.check(minimumInterval: 3)
         await waitFor(gate.hasWaiter)
+        async let second: Void = controller.check(minimumInterval: 3)
         // Both callers are inside `check()` now; only one probe may be out.
         try? await Task.sleep(for: .milliseconds(50))
         XCTAssertEqual(gate.waiterCount, 1, "the second check must join the running check, not probe beside it")
@@ -144,8 +148,9 @@ final class PermissionsControllerTests: XCTestCase {
         let counter = ProbeCounter()
         let controller = PermissionsController(notifier: RecordingNotifier(), probe: gatedProbe(gate, counter))
         async let first: Void = controller.check()
-        async let second: Void = controller.check()
         await waitFor(gate.hasWaiter)
+        async let second: Void = controller.check()
+        try? await Task.sleep(for: .milliseconds(50))
         gate.open()
         _ = await (first, second)
         XCTAssertEqual(counter.count, 2, "precondition: the first probe and its one follow-up")
