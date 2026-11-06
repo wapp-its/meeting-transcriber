@@ -27,7 +27,7 @@ struct MenuActions {
     /// transcript, or its Notion page as `JobOpenTarget` decides. Separate
     /// from a job line's Open because a file that is gone is reported here,
     /// as the All Recordings window reports it.
-    var openLastProtocol: (JobOpenTarget) -> Void
+    var openLastNotes: (JobOpenTarget) -> Void
     var openSettings: () -> Void
     /// Opens the naming window; set only while a job waits for speaker names.
     var nameSpeakers: (() -> Void)?
@@ -58,7 +58,7 @@ struct MenuActions {
         recordApp: {},
         recordMicrophone: {},
         openJob: { _ in },
-        openLastProtocol: { _ in },
+        openLastNotes: { _ in },
         openSettings: {},
         processFiles: {},
         showAllTranscriptions: {},

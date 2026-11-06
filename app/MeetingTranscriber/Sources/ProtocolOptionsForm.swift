@@ -8,7 +8,7 @@ import SwiftUI
 /// identifiers are set here, never a template name or the text.
 struct ProtocolOptionsForm: View {
     static let backgroundHint = "Participants, agenda, goal (optional)"
-    static let recordOnlyNote = "Record-only mode is on: no protocol is made on this Mac, so these options are not used."
+    static let recordOnlyNote = "Record-only mode is on: no meeting notes are made on this Mac, so these options are not used."
 
     let context: ProtocolOptionsContext
     @Bindable var draft: ProtocolOptionsDraft

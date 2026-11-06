@@ -44,7 +44,7 @@ final class ProtocolDestinationTests: XCTestCase {
     func testNoticeSentences() {
         XCTAssertEqual(
             ProtocolDestination.remote(name: "Anthropic (Claude)").notice,
-            "Background info is sent with the transcript to Anthropic (Claude) to write the protocol.",
+            "Background info is sent with the transcript to Anthropic (Claude) to write the meeting notes.",
         )
         XCTAssertEqual(
             ProtocolDestination.local(host: "localhost").notice,
@@ -52,7 +52,7 @@ final class ProtocolDestinationTests: XCTestCase {
         )
         XCTAssertEqual(
             ProtocolDestination.off.notice,
-            "Protocol generation is off (Settings → Output), so the template and background info are not used.",
+            "Meeting notes generation is off (Settings → Output), so the template and background info are not used.",
         )
     }
 }

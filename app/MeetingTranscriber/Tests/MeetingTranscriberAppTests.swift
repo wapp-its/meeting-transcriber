@@ -29,12 +29,12 @@ final class MeetingTranscriberAppTests: XCTestCase {
         XCTAssertFalse(result)
     }
 
-    // MARK: - openLastProtocol
+    // MARK: - openLastNotesFile
 
     /// A file that is there is opened and nothing is reported; one that is
     /// gone opens nothing and is reported with the sentence the Transcriptions
     /// window shows for it.
-    func testOpenLastProtocolReportsAMissingFileAsTheWindowDoes() throws {
+    func testOpenLastNotesReportsAMissingFileAsTheWindowDoes() throws {
         let dir = try makeTempDirectory(prefix: "open_last_protocol")
         let present = dir.appendingPathComponent("Retro.md")
         try Data().write(to: present)
@@ -42,11 +42,12 @@ final class MeetingTranscriberAppTests: XCTestCase {
         for (url, isThere) in [(present, true), (gone, false)] {
             let notifier = RecordingNotifier()
             var opened: [URL] = []
-            MeetingTranscriberApp.openLastProtocol(url, scopeRoot: dir, notifier: notifier) { opened.append($0) }
+            MeetingTranscriberApp.openLastNotesFile(url, scopeRoot: dir, notifier: notifier) { opened.append($0) }
             XCTAssertEqual(opened, isThere ? [url] : [], url.lastPathComponent)
             XCTAssertEqual(
                 notifier.calls.map(\.body), isThere ? [] : ["The file was moved or deleted."], url.lastPathComponent,
             )
+            XCTAssertEqual(notifier.calls.map(\.title), isThere ? [] : ["Open Last Notes"], url.lastPathComponent)
         }
     }
 

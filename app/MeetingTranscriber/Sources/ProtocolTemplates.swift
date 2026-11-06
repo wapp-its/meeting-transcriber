@@ -143,6 +143,7 @@ struct ProtocolTemplateStore {
         return Resolution(
             text: ProtocolGenerator.protocolPrompt,
             used: .builtIn,
+            // Matched by /v1 clients and persisted jobs; keep the text stable.
             warning: "Protocol template \"\(id.storedValue)\" was not found or is empty, so the built-in template was used",
         )
     }

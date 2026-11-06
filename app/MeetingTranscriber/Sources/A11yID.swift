@@ -95,7 +95,7 @@ enum A11yID {
     static let recordMicrophoneMenuItem = "recordMicrophoneMenuItem"
     static let recordWithOptionsMenuItem = "recordWithOptionsMenuItem"
     static let importFilesMenuItem = "importFilesMenuItem"
-    static let openLastProtocolMenuItem = "openLastProtocolMenuItem"
+    static let openLastNotesMenuItem = "openLastNotesMenuItem"
 
     /// The menu's Pause Recording / Resume Recording item: one identifier for
     /// both labels, since it is one item whose label follows the state.
@@ -112,7 +112,7 @@ enum A11yID {
     // path.
     static let transcriptionsSearchField = "transcriptionsSearchField"
 
-    /// The toolbar's "Open Protocols Folder" and "Regenerate from File…".
+    /// The toolbar's "Open Notes Folder" and "Regenerate from File…".
     static let recordingsOpenFolderButton = "recordingsOpenFolderButton"
     static let recordingsRegenerateFromFileButton = "recordingsRegenerateFromFileButton"
 

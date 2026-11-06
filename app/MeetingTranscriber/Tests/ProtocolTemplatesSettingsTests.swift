@@ -2,7 +2,7 @@
 import ViewInspector
 import XCTest
 
-/// Settings → Output → Protocol Templates: what each model operation does to
+/// Settings → Output → Meeting Notes Templates: what each model operation does to
 /// the folder and the default setting, then one wiring test per control. Every
 /// test runs against a temp folder and a throwaway defaults suite, and records
 /// opened and trashed files instead of reaching the Finder or the real Trash.

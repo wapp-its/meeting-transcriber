@@ -41,7 +41,7 @@ final class MenuBarViewTests: XCTestCase {
         manualRecordingPendingOrActive: Bool = false,
         onShowAllTranscriptions: @escaping () -> Void = {},
         onOpenJob: @escaping (JobOpenTarget) -> Void = { _ in },
-        onOpenLastProtocol: @escaping (URL) -> Void = { _ in },
+        onOpenLastNotes: @escaping (URL) -> Void = { _ in },
         history: [TerminalJobRecord] = [],
         isRecordingPaused: Bool = false,
         onTogglePause: (() -> Void)? = nil,
@@ -54,7 +54,7 @@ final class MenuBarViewTests: XCTestCase {
         actions.stopManualRecording = onStopManualRecording
         actions.togglePause = onTogglePause
         actions.openJob = onOpenJob
-        actions.openLastProtocol = { onOpenLastProtocol($0.url) }
+        actions.openLastNotes = { onOpenLastNotes($0.url) }
         actions.quit = onQuit
         actions.nameSpeakers = onNameSpeakers
         actions.showAllTranscriptions = onShowAllTranscriptions
@@ -161,31 +161,31 @@ final class MenuBarViewTests: XCTestCase {
     /// "Open Last Notes" follows the finished-job history rather than the
     /// status file, so it is there for a job that has left the queue or
     /// finished before a restart, and it opens that job's protocol.
-    func testOpenLastProtocolOpensTheLastFinishedJobsProtocol() throws {
+    func testOpenLastNotesOpensTheLastFinishedJobsProtocol() throws {
         let finished = finishedJob(.done, protocolPath: "/tmp/Retro.md", transcriptPath: "/tmp/Retro.txt")
         var openedURL: URL?
         let body = try makeView(
             status: makeStatus(state: .idle),
-            onOpenLastProtocol: { openedURL = $0 },
+            onOpenLastNotes: { openedURL = $0 },
             history: [TerminalJobRecord(job: finished)],
         ).inspect()
 
-        try body.find(viewWithAccessibilityIdentifier: A11yID.openLastProtocolMenuItem).button().tap()
+        try body.find(viewWithAccessibilityIdentifier: A11yID.openLastNotesMenuItem).button().tap()
 
         XCTAssertEqual(openedURL, URL(fileURLWithPath: "/tmp/Retro.md"))
     }
 
     /// No finished job, no item: a failed job does not count.
-    func testOpenLastProtocolHiddenWithoutAFinishedJob() throws {
+    func testOpenLastNotesHiddenWithoutAFinishedJob() throws {
         let failed = finishedJob(.error, protocolPath: nil, transcriptPath: "/tmp/Retro.txt")
         let body = try makeView(
             status: makeStatus(state: .protocolReady),
             history: [TerminalJobRecord(job: failed)],
         ).inspect()
-        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.openLastProtocolMenuItem))
+        XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.openLastNotesMenuItem))
     }
 
-    func testOpenLastProtocolIsOfferedForACompletedJobWithoutNotion() throws {
+    func testOpenLastNotesIsOfferedForACompletedJobWithoutNotion() throws {
         let dir = try makeTempDirectory(prefix: "menu_open_last_test")
         let markdown = dir.appendingPathComponent("protocol.md")
         try "# Protocol".write(to: markdown, atomically: true, encoding: .utf8)
@@ -217,7 +217,7 @@ final class MenuBarViewTests: XCTestCase {
         return job
     }
 
-    func testOpenLastProtocolInNotionCallsOpenCallbackWithoutQuitting() throws {
+    func testOpenLastNotesInNotionCallsOpenCallbackWithoutQuitting() throws {
         let queue = try makeIsolatedQueue()
         let job = notionExportedJob(title: "Sprint", mix: "/tmp/mix.wav", pageID: "page-1", completed: true)
         queue.enqueue(job)
@@ -228,7 +228,7 @@ final class MenuBarViewTests: XCTestCase {
         let sut = try makeView(
             status: makeStatus(),
             pipelineQueue: queue,
-            onOpenLastProtocol: { openedURL = $0 },
+            onOpenLastNotes: { openedURL = $0 },
             onQuit: { quitCalled = true },
             notionExportEnabled: true,
         )
@@ -238,7 +238,7 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertFalse(quitCalled)
     }
 
-    func testOpenLastProtocolInNotionUsesTheDisplayedTargetAfterQueueChanges() throws {
+    func testOpenLastNotesInNotionUsesTheDisplayedTargetAfterQueueChanges() throws {
         let queue = try makeIsolatedQueue()
         let displayedJob = notionExportedJob(title: "First", mix: "/tmp/first.wav", pageID: "page-1", completed: true)
         queue.enqueue(displayedJob)
@@ -249,7 +249,7 @@ final class MenuBarViewTests: XCTestCase {
         let sut = try makeView(
             status: makeStatus(),
             pipelineQueue: queue,
-            onOpenLastProtocol: { openedURL = $0 },
+            onOpenLastNotes: { openedURL = $0 },
             onQuit: { quitCalled = true },
             notionExportEnabled: true,
         )
@@ -450,7 +450,7 @@ final class MenuBarViewTests: XCTestCase {
         for view in views {
             let body = try view.inspect()
             XCTAssertNoThrow(try body.find(text: "All Recordings…"), "the Recordings section is searched")
-            XCTAssertThrowsError(try body.find(text: "Regenerate Protocol…"))
+            XCTAssertThrowsError(try body.find(text: "Regenerate Notes…"))
         }
     }
 

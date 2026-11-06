@@ -24,7 +24,7 @@ enum RecordingRowActions {
         case openInNotion
         /// Reveals the protocol, else the transcript.
         case showInFinder
-        /// "Regenerate Protocol…", disabled while the regenerator has no
+        /// "Regenerate Notes…", disabled while the regenerator has no
         /// transcript to send.
         case regenerate(enabled: Bool)
         case retry

@@ -35,7 +35,7 @@
 
         var text: String {
             switch self {
-            case .noFolder: "No model chosen. Protocols are not written until one is set."
+            case .noFolder: "No model chosen. Meeting notes are not written until one is set."
             case .notChecked: "Not checked yet."
             case .checking: "Checking the model folder\u{2026}"
             case let .checked(.ready(report)): Self.readyText(report)

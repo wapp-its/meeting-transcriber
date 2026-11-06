@@ -82,7 +82,7 @@
         func testStatusLineNamesWhatTheCheckFound() {
             let tiny = LocalModelCheckReport(usable: true, name: "tiny-model", modelType: "qwen3", quantization: nil, sizeBytes: 500_000_000, problems: [])
             let cases: [(status: LocalModelStatus, text: String)] = [
-                (.noFolder, "No model chosen. Protocols are not written until one is set."),
+                (.noFolder, "No model chosen. Meeting notes are not written until one is set."),
                 (.checked(.ready(Self.readyReport)), "Qwen3.8-27B \u{00B7} 4-bit \u{00B7} 16.1 GB \u{00B7} ready"),
                 (.checked(.ready(tiny)), "tiny-model \u{00B7} 0.5 GB \u{00B7} ready"),
                 (.checked(.unusable(Self.unusable([("config.json", "missing")]))), "Not a usable model. Missing: config.json."),
@@ -179,7 +179,7 @@
             XCTAssertTrue(try view.find(viewWithAccessibilityIdentifier: A11yID.localModelCheckButton).button().isDisabled())
             XCTAssertNoThrow(
                 try view.find(viewWithAccessibilityIdentifier: A11yID.localModelStatus)
-                    .find(text: "No model chosen. Protocols are not written until one is set."),
+                    .find(text: "No model chosen. Meeting notes are not written until one is set."),
             )
         }
 

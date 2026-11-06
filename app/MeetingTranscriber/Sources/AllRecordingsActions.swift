@@ -14,7 +14,7 @@ struct AllRecordingsActions {
     var reveal: (URL) -> Bool
     /// "Open in Notion": the row's Notion page, which no file check guards.
     var openInNotion: (URL) -> Void
-    /// Opens the regenerate sheet: "Regenerate Protocol…" on a row, with the
+    /// Opens the regenerate sheet: "Regenerate Notes…" on a row, with the
     /// row's meeting, and "Regenerate from File…" in the toolbar, with none.
     /// False when the row's files are gone, like Open.
     var regenerate: (TranscriptionEntry?) -> Bool
@@ -88,7 +88,7 @@ struct AllRecordingsActions {
         }
     }
 
-    /// "Open Protocols Folder": creates the output folder when it is missing
+    /// "Open Notes Folder": creates the output folder when it is missing
     /// and opens it, saying nothing when it cannot be opened.
     static func openFolder(_ protocols: URL) {
         let accessing = protocols.startAccessingSecurityScopedResource()

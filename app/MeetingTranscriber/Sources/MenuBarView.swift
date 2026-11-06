@@ -260,12 +260,12 @@ struct MenuBarView: View {
         Section("Recordings") {
             if let target = lastNotesTarget {
                 Button {
-                    actions.openLastProtocol(target)
+                    actions.openLastNotes(target)
                 } label: {
-                    Label(target.lastProtocolLabel, systemImage: target.systemImage)
+                    Label(target.lastNotesLabel, systemImage: target.systemImage)
                 }
                 .keyboardShortcut("o")
-                .accessibilityIdentifier(A11yID.openLastProtocolMenuItem)
+                .accessibilityIdentifier(A11yID.openLastNotesMenuItem)
             }
 
             Button {

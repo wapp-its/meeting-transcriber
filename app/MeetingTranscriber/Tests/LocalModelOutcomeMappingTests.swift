@@ -101,7 +101,7 @@
             XCTAssertEqual(Set(scheduler.added.map(\.identifier)).count, 1, "\(scheduler.added.map(\.identifier))")
             let shown = try XCTUnwrap(scheduler.added.last?.content)
             XCTAssertEqual(shown.categoryIdentifier, NotificationManager.localModelLowMemoryCategoryID)
-            XCTAssertEqual(shown.title, "Protocol not written: low memory")
+            XCTAssertEqual(shown.title, "Meeting notes not written: low memory")
             XCTAssertEqual(
                 shown.body,
                 "Third and 2 more meetings: there was not enough free memory for the local model. The transcripts are saved.",

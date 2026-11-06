@@ -535,7 +535,7 @@ enum ProtocolError: LocalizedError {
 
             case let .commandTimedOut(tool): "\(tool) took too long (>10 min)"
 
-            case let .commandProducedNoProtocol(tool): "\(tool) produced no protocol"
+            case let .commandProducedNoProtocol(tool): "\(tool) produced no meeting notes"
 
             case let .commandNotConfigured(message): message
         #endif

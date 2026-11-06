@@ -75,15 +75,15 @@ extension MeetingTranscriberApp {
         }
     }
 
-    /// "Open Last Protocol": the file inside the output folder's security
+    /// "Open Last Notes" for a file: the file inside the output folder's security
     /// scope, through the check the All Recordings window's Open makes. When
     /// the file is gone the window says "The file was moved or deleted."; the
     /// menu has closed by then, so the same sentence arrives as a notification.
-    static func openLastProtocol(
+    static func openLastNotesFile(
         _ url: URL, scopeRoot: URL, notifier: any AppNotifying,
         open: (URL) -> Void = { NSWorkspace.shared.open($0) },
     ) {
         guard !TranscriptionFileOpener.perform(url, scopeRoot: scopeRoot, action: open) else { return }
-        notifier.notify(title: "Open Last Protocol", body: "The file was moved or deleted.", urgency: .standard)
+        notifier.notify(title: "Open Last Notes", body: "The file was moved or deleted.", urgency: .standard)
     }
 }

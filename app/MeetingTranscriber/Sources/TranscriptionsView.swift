@@ -95,7 +95,7 @@ struct TranscriptionsView: View {
             Button {
                 actions.openProtocolsFolder()
             } label: {
-                Label("Open Protocols Folder", systemImage: "folder")
+                Label("Open Notes Folder", systemImage: "folder")
                     .labelStyle(.titleAndIcon)
             }
             .accessibilityIdentifier(A11yID.recordingsOpenFolderButton)
@@ -301,7 +301,7 @@ struct TranscriptionsView: View {
         switch action {
         case .cancel: "Cancel"
         case .nameSpeakers: "Name Speakers"
-        case .openProtocol: "Open Protocol"
+        case .openProtocol: "Open Notes"
         case .openTranscript: "Open Transcript"
         case .openInNotion: "Open in Notion"
         case .retry: "Retry"
@@ -311,11 +311,11 @@ struct TranscriptionsView: View {
 
     static func title(of item: MenuItem) -> String {
         switch item {
-        case .openProtocol: "Open Protocol"
+        case .openProtocol: "Open Notes"
         case .openTranscript: "Open Transcript"
         case .openInNotion: "Open in Notion"
         case .showInFinder: "Show in Finder"
-        case .regenerate: "Regenerate Protocol…"
+        case .regenerate: "Regenerate Notes…"
         case .retry: "Retry"
         case .remove: "Remove"
         case .dismiss: "Dismiss"

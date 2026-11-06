@@ -100,6 +100,7 @@ extension PipelineQueue {
     private static let notionExportBackupMissingNote = "local backup could not be saved"
     static let notionExportInterruptedReason = "interrupted when the app quit"
     private static let notionRetryConfigurationWarning = "Configure and enable Notion export in Settings before retrying"
+    // The two below are matched by /v1 clients and persisted jobs; keep the text stable.
     private static let notionRetryReadWarning = "Could not read the local protocol backup; Notion export was not retried"
     private static let notionRetryTranscriptWarning =
         "The local protocol backup no longer has the transcript; Notion export was not retried"

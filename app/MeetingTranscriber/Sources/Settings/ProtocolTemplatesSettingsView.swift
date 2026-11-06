@@ -5,7 +5,7 @@ import AppKit
 import Observation
 import SwiftUI
 
-/// What the Protocol Templates section shows and every write it makes, held as
+/// What the Meeting Notes Templates section shows and every write it makes, held as
 /// a reference type so a test reads back the object the view writes to (as
 /// with `SpeakerNamingRowState`, CLAUDE.md, GUI Testing, rung 2).
 ///
@@ -117,7 +117,7 @@ final class ProtocolTemplatesModel {
     }
 }
 
-/// The Protocol Templates section. Rows and their buttons are addressed by row
+/// The Meeting Notes Templates section. Rows and their buttons are addressed by row
 /// index, never by template name, because a name is user input and `/ui/tree`
 /// publishes identifiers unredacted.
 struct ProtocolTemplatesSettingsView: View {
@@ -136,7 +136,7 @@ struct ProtocolTemplatesSettingsView: View {
     }
 
     var body: some View {
-        Section("Protocol Templates") {
+        Section("Meeting Notes Templates") {
             defaultPicker
             templateRows
             createRow

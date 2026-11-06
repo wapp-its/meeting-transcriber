@@ -203,7 +203,7 @@ struct MeetingTranscriberApp: App {
                 appState.watching.togglePause()
             } : nil,
             openJob: { Self.openJob($0, scopeRoot: appState.settings.effectiveOutputDir) },
-            openLastProtocol: openLastNotes,
+            openLastNotes: openLastNotes,
             openSettings: { bringWindowToFront(id: "settings") },
             nameSpeakers: appState.hasPendingSpeakerNamingJobs ? {
                 showNamingWindow()
@@ -572,7 +572,7 @@ struct MeetingTranscriberApp: App {
     private func openLastNotes(_ target: JobOpenTarget) {
         switch target {
         case let .file(url):
-            Self.openLastProtocol(url, scopeRoot: appState.settings.effectiveOutputDir, notifier: NotificationManager.shared)
+            Self.openLastNotesFile(url, scopeRoot: appState.settings.effectiveOutputDir, notifier: NotificationManager.shared)
 
         case .notion:
             Self.openInNotion(target)

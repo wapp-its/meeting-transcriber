@@ -283,7 +283,7 @@
             // Keeps App Nap from slowing the app's side of the run; idle sleep
             // stays allowed, and the deadlines do not count it.
             let activity = ProcessInfo.processInfo.beginActivity(
-                options: .userInitiatedAllowingIdleSystemSleep, reason: "Writing a meeting protocol with the local model",
+                options: .userInitiatedAllowingIdleSystemSleep, reason: "Writing meeting notes with the local model",
             )
             defer { ProcessInfo.processInfo.endActivity(activity) }
             let runner = try startHelper(job, requestFile: requestFile, tag: tag)
