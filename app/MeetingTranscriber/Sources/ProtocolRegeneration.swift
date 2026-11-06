@@ -347,7 +347,7 @@ final class ProtocolRegenerator {
         guard let transcript = files.transcript else { throw ProtocolRegenerationError.noTranscript }
         // The only copy of the transcript is never left in the Trash alone.
         let includeFullTranscript = environment.includeFullTranscript() || transcript.fromProtocol
-        let (instructions, templateWarning) = environment.templateStore.instructions(
+        let (instructions, _, templateWarning) = environment.templateStore.instructions(
             for: options.template, background: options.background,
         )
         let (protocolMarkdown, incompleteWarning) = try await makeProtocol(

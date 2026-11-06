@@ -1106,7 +1106,7 @@ extension PipelineQueue {
         // A job from a snapshot written before templates takes the current
         // default.
         let templateID = job.protocolTemplate ?? defaultProtocolTemplateProvider()
-        let (instructions, templateWarning) = protocolTemplateStore.instructions(
+        let (instructions, usedTemplate, templateWarning) = protocolTemplateStore.instructions(
             for: templateID, background: job.protocolBackground,
         )
         if let templateWarning { addWarning(id: jobID, templateWarning) }
@@ -1133,12 +1133,10 @@ extension PipelineQueue {
         try ensureStillQueued(jobID)
 
         let outputOptions = transcriptOutputOptions(forJobID: jobID)
-        // A title is only taken from a top-level `# ` heading
-        // (`ProtocolGenerator.extractTitle`). A template whose output has none
-        // yields nil here, and the files keep their timestamped names.
         var basename = initialBasename
-        if outputOptions.useAITitleForFilenames,
-           let titleSlug = ProtocolGenerator.extractTitle(from: protocolMD).flatMap(ProtocolGenerator.toSnakeCase) {
+        if let titleSlug = ProtocolGenerator.fileTitleSlug(
+            from: protocolMD, enabled: outputOptions.useAITitleForFilenames, template: usedTemplate,
+        ) {
             basename = renameJobArtifacts(
                 jobID: jobID, from: initialBasename, titleSlug: titleSlug, protocolsDir: protocolsDir,
             )

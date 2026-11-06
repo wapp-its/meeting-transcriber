@@ -156,4 +156,17 @@ final class ProtocolGeneratorTitleTests: XCTestCase {
         let text = "Just plain text without any markdown headings."
         XCTAssertNil(ProtocolGenerator.extractTitle(from: text))
     }
+
+    /// Notes from a template that writes only section headings have no title:
+    /// a `## ` heading is a section, never the meeting's name.
+    func testExtractTitleIgnoresSectionHeadings() {
+        let notes = """
+        ## Action items
+        - Alice sends the budget
+
+        ### Decisions
+        Ship on Friday.
+        """
+        XCTAssertNil(ProtocolGenerator.extractTitle(from: notes))
+    }
 }

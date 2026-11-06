@@ -684,9 +684,11 @@ prefix scan, because a bare-title stem is a prefix of other jobs' stems. A title
 is taken only if none of its artifacts exist, otherwise `_<shortID>` is
 appended, and nothing is overwritten. If any move fails, the ones already done
 are undone and the job keeps its old stem and paths.
-With a protocol template, the title comes from the first top-level `# `
-heading in what the model wrote, so a template whose output has none keeps
-the timestamped names.
+The title comes from the first top-level `# ` heading in what the model
+wrote, and only for a job that ran the built-in template (after a fallback
+too): a custom template's first heading is whatever it writes, a section such
+as "Action items" as often as a title, so its files keep the timestamped
+names (`ProtocolGenerator.fileTitleSlug`).
 
 `AppSettings.protocolLanguage` (default `"German"`) is substituted into the prompt as `{LANGUAGE}`. Every template can also use `{MEETING_DATE}` (`YYYY-MM-DD`) and `{MEETING_TIME}` (`HH:mm`), derived from the captured recording start time. Imports and recovery jobs resolve those time placeholders to `Unknown` rather than their enqueue or processing time. Only recordings with a captured start receive the authoritative meeting-metadata block, so templates receive reliable temporal context without needing to add the placeholders.
 
