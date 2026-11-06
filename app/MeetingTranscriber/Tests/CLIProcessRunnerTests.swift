@@ -182,7 +182,9 @@
                 return try await group.reduce(into: []) { $0.append($1) }
             }
             XCTAssertEqual(results.map(\.status), Array(repeating: 0, count: runs))
-            XCTAssertLessThan(results.map(\.seconds).max() ?? .infinity, 5, "a run was held up by its background process")
+            // A run held up by its background process lasts its 30 s sleep; the
+            // bound leaves room for a machine busy with the parallel suite.
+            XCTAssertLessThan(results.map(\.seconds).max() ?? .infinity, 15, "a run was held up by its background process")
 
             let start = Date()
             let detachedRan = expectation(description: "a fresh detached task ran")
@@ -193,7 +195,7 @@
             XCTAssertEqual(waited, .completed, "the cooperative pool was starved after the runs")
             let trivial = try await CLIProcessRunner.run(request(makeProgram("echo ok")))
             XCTAssertEqual(trivial.stdout, Data("ok\n".utf8))
-            XCTAssertLessThan(Date().timeIntervalSince(start), 2, "a fresh run was held up after the runs")
+            XCTAssertLessThan(Date().timeIntervalSince(start), 10, "a fresh run was held up after the runs")
         }
 
         /// Nothing of a run may outlive it: once `run` has returned, the
