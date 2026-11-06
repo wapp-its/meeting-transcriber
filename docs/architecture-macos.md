@@ -119,9 +119,9 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `WhisperKitStockModel.swift` | The six stock WhisperKit variants in picker order, each with its label and approximate download size (measured 2026-10-06) for the load offer |
 | `Settings/VocabularySourceSettingsView.swift` | "Vocabulary source" picker (Local file / URL), shown in the Vocabulary section while "Use custom vocabulary" is on; for URL the address, the Keychain-backed access token, "Update now" and the status line from `RemoteVocabularyController` |
 | `Settings/SpeakersSettingsView.swift` | Diarization · Mic Speaker Name · Known Voices · Recognition Stats · Experimental Diarization Tuning |
-| `Settings/OutputSettingsView.swift` | Output folder · Notion export · Meeting Notes (transcript options, AI-title file names, LLM provider, notes language) · Protocol Templates section |
+| `Settings/OutputSettingsView.swift` | Output folder · Notion export · Meeting Notes (transcript options, AI-title file names, LLM provider, notes language) · Meeting Notes Templates section |
 | `Settings/LocalModelSettingsView.swift` | The local model provider's panel in Settings → Output: the model folder with Choose…, the status line with Check Model (runs the helper's `check` mode, no weights loaded), and the memory and recording notes (`#if !APPSTORE`) |
-| `Settings/ProtocolTemplatesSettingsView.swift` | Protocol Templates section: default template picker, Edit and Delete per template file, Create Template, Open Templates Folder; its state and writes live in the `@Observable` `ProtocolTemplatesModel` |
+| `Settings/ProtocolTemplatesSettingsView.swift` | Meeting Notes Templates section: default template picker, Edit and Delete per template file, Create Template, Open Templates Folder; its state and writes live in the `@Observable` `ProtocolTemplatesModel` |
 | `Settings/CommandProviderSettingsView.swift` | Codex CLI note · custom command editor, model and placeholder notes (`#if !APPSTORE`) |
 | `Settings/AdvancedSettingsView.swift` | Permissions · Diagnostics |
 | `Settings/AboutSettingsView.swift` | Version · bundle identifier · build date · ffmpeg status · project link · Updates |
@@ -366,7 +366,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `NotificationUrgency.swift` | How urgently a notification must reach the user — two cases (vs. the five `UNNotificationInterruptionLevel` offers) mapped to whether a given notification should pierce Focus |
 | `NotificationScheduling.swift` | Port over the `UNUserNotificationCenter` slice `NotificationManager` uses, so posting/registration is testable against a fake scheduler |
 | `NotificationRingBuffer.swift` | Bounded, thread-safe log of recently-posted notifications (`#if !APPSTORE`) |
-| `NotificationManager+LocalModel.swift` | The local model's notices: "Protocol paused for your recording", "Protocol not written: low memory" (Try Again, Show Transcript) and "Protocol not written: no local model" (Open Settings), one notice per episode naming every meeting it covers (`#if !APPSTORE`) |
+| `NotificationManager+LocalModel.swift` | The local model's notices: "Meeting notes paused for your recording", "Meeting notes not written: low memory" (Try Again, Show Transcript) and "Meeting notes not written: no local model" (Open Settings), one notice per episode naming every meeting it covers (`#if !APPSTORE`) |
 | `DateFormatter+FilenameStamp.swift` | `DateFormatter` pinned to Gregorian calendar + POSIX locale for filename timestamp stamps |
 | `KeychainHelper.swift` | Legacy keychain CRUD (token now file-based) |
 | `RecognitionStats.swift` | Recognition event model + `recognition_log.jsonl` reader/writer — backs `RecognitionStatsView` |
@@ -704,7 +704,7 @@ The Claude CLI provider runs on `BoundedProcess` instead (see [Claude CLI Invoca
 `LocalModelProtocolGenerator` sends the prompt every provider sends (the system prompt, the transcript as the user prompt) to `tools/local-llm-helper`, a program the app starts for that one protocol and that exits afterwards. The model's memory (about 17 GB at peak for the tested 27B 4-bit model) and any crash therefore stay out of the app's process. The helper is its own SwiftPM package, so the app's package, its tests and the App Store build never compile MLX. The two share no code; the contract is the process boundary in the helper's `README.md`: the request as one JSON object on stdin, the private run directory as working directory, the protocol appended to `protocol.md` there as it is generated, progress and lifecycle lines on stderr, and a fixed table of exit statuses.
 
 - **One door.** Every local protocol (queued jobs, every speaker-naming path, a regeneration, Try Again) goes through the single `LocalModelGate` that `PipelineController` owns. It runs one helper at a time, in arrival order, from the memory check until the helper's exit is confirmed.
-- **Memory guard.** A helper starts only at normal memory pressure with free plus inactive memory of at least the weights' size plus 6 GB, and is ended at warning pressure or below 4 GB, checked every second while it runs (`LocalModelMemoryGuard`). A refusal or a stop becomes "Protocol not written: low memory" with Try Again.
+- **Memory guard.** A helper starts only at normal memory pressure with free plus inactive memory of at least the weights' size plus 6 GB, and is ended at warning pressure or below 4 GB, checked every second while it runs (`LocalModelMemoryGuard`). A refusal or a stop becomes "Meeting notes not written: low memory" with Try Again.
 - **Recordings first.** `WatchingController` pushes one recording-activity signal to the gate. When it turns on, a running helper gets SIGTERM and SIGKILL 3 s later if it is still there, and no helper starts until the signal turns off; the queue then generates the deferred protocols again by itself. A regeneration is not resumed.
 - **Fixed limits** (`LocalModelLimits`, not settings): a 32,768-token context, 16,000 output tokens, 20 minutes in total and 3 minutes without a progress line. A prompt that does not fit is refused before any weights load; a protocol stopped at the output limit is kept with a warning.
 - **Quit.** The app ends a running helper when it quits (SIGTERM, then SIGKILL after 1 s), and a run directory left by a crash is removed at the next launch.
@@ -881,7 +881,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 | **Audio** | Microphone · VAD | `settings` | `audioDevices` |
 | **Transcription** | Engine + per-engine options + vocabulary source + status | `settings`, three engines, `remoteVocabulary?` | — |
 | **Speakers** | Diarization · Speaker Identity · Known Voices · Recognition Stats · Experimental Diarization Tuning | `settings`, `recognitionStatsLog`, `enrollmentDiarizerFactory` | `knownVoicesSheet` |
-| **Output** | LLM Provider (with the local model's folder and Check Model) · Notes Language · Output Folder · Notion Export · Protocol Templates | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel` |
+| **Output** | LLM Provider (with the local model's folder and Check Model) · Notes Language · Output Folder · Notion Export · Meeting Notes Templates | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel` |
 | **Advanced** | Permissions · Diagnostics | — | `micPermission`, `screenRecordingOK`, `accessibilityOK` |
 | **About** | Build identity · Dependencies · Updates | `settings`, `updateChecker?` | — |
 
