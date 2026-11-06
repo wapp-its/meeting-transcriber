@@ -155,11 +155,10 @@ extension WatchLoop {
     ) async throws {
         if end.cutAt == nil { clearStoredCut(of: recorder) }
         let stoppedAt = nowProvider()
-        let recording: RecordingResult
-        if finishingForQuit {
-            recording = try await recorder.stopOffMain()
+        let recording: RecordingResult = if finishingForQuit {
+            try await recorder.stopOffMain()
         } else {
-            recording = try recorder.stop()
+            try recorder.stop()
         }
         var stopped = (recording: recording, pauses: takeRecordingPauses(endingAt: stoppedAt, capturedOffsets: recording.pauseOffsets))
         if let cutAt = end.cutAt {
