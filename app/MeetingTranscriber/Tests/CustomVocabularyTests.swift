@@ -78,6 +78,45 @@ final class CustomVocabularyTests: XCTestCase {
         XCTAssertTrue(AppSettings(defaults: defaults).customVocabularyEnabled)
     }
 
+    /// Parakeet applied a vocabulary from the URL source with no switch at all,
+    /// so the upgrade keeps it on although no file is configured.
+    func testUpgradeTurnsTheSwitchOnForParakeetWithAURLVocabulary() {
+        storeOldSettings(engine: "parakeet", address: "https://example.com/terms.txt")
+
+        XCTAssertTrue(AppSettings(defaults: defaults).customVocabularyEnabled)
+    }
+
+    /// The URL source chosen but no address entered: nothing was applied.
+    func testUpgradeLeavesTheSwitchOffForAURLSourceWithoutAnAddress() {
+        storeOldSettings(engine: "parakeet", address: "")
+
+        XCTAssertFalse(AppSettings(defaults: defaults).customVocabularyEnabled)
+    }
+
+    /// WhisperKit read any vocabulary only behind its own prompt flag, so a
+    /// URL source does not change what it gets.
+    func testUpgradeKeepsWhisperKitOnItsPromptFlagWithAURLVocabulary() {
+        for promptEnabled in [false, true] {
+            storeOldSettings(engine: "whisperKit", address: "https://example.com/terms.txt")
+            defaults.set(promptEnabled, forKey: "whisperKitVocabularyPromptEnabled")
+
+            XCTAssertEqual(
+                AppSettings(defaults: defaults).customVocabularyEnabled, promptEnabled,
+                "prompt flag \(promptEnabled)",
+            )
+        }
+    }
+
+    /// Settings as a build before the switch left them: no switch stored, the
+    /// URL source chosen with `address`, no vocabulary file.
+    private func storeOldSettings(engine: String, address: String) {
+        defaults.removeObject(forKey: "customVocabularyEnabled")
+        defaults.removeObject(forKey: "customVocabularyPath")
+        defaults.set(engine, forKey: "transcriptionEngine")
+        defaults.set(VocabularySource.url.rawValue, forKey: "vocabularySource")
+        defaults.set(address, forKey: "remoteVocabularyURL")
+    }
+
     // MARK: - Persistence
 
     func testCustomVocabularyPathPersists() {
