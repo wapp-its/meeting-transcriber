@@ -547,21 +547,24 @@ extension PipelineQueue {
         if suppressed > 0 {
             recordSuppressedSegments(jobID: ctx.jobID, suppressed)
         }
-        if !micEchoVerdicts.isEmpty {
-            // The whole distribution, not just the count that was acted on. The
-            // threshold between "copy" and "someone spoke" is the one number a
-            // field report will dispute ("it deleted my sentence"), and without
-            // seeing how the segments fell there is nothing to reason from.
-            // Numbers only: no audio, no transcript, nothing said.
-            let kept = micEchoVerdicts.count { $0 == .ownVoice }
-            let mixed = micEchoVerdicts.count { $0 == .mixed }
-            let unknown = micEchoVerdicts.count { $0 == .undecided }
-            logger
-                .info(
-                    "echo_dedup suppressed=\(suppressed, privacy: .public) mixed=\(mixed, privacy: .public) own=\(kept, privacy: .public) undecided=\(unknown, privacy: .public) of=\(micSegments.count, privacy: .public)",
-                )
-        }
+        logEchoDedup(micEchoVerdicts, suppressed: suppressed, of: micSegments.count)
         return segments
+    }
+
+    /// The whole distribution, not just the count that was acted on. The
+    /// threshold between "copy" and "someone spoke" is the one number a field
+    /// report will dispute ("it deleted my sentence"), and without seeing how the
+    /// segments fell there is nothing to reason from. Numbers only: no audio, no
+    /// transcript, nothing said. Silent when no segment was classified.
+    private func logEchoDedup(_ micEchoVerdicts: [EchoSegmentVerdict], suppressed: Int, of total: Int) {
+        guard !micEchoVerdicts.isEmpty else { return }
+        let kept = micEchoVerdicts.count { $0 == .ownVoice }
+        let mixed = micEchoVerdicts.count { $0 == .mixed }
+        let unknown = micEchoVerdicts.count { $0 == .undecided }
+        logger
+            .info(
+                "echo_dedup suppressed=\(suppressed, privacy: .public) mixed=\(mixed, privacy: .public) own=\(kept, privacy: .public) undecided=\(unknown, privacy: .public) of=\(total, privacy: .public)",
+            )
     }
 
     /// Stage 1 — resample source audio to 16 kHz and transcribe. Dual-source
