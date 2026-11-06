@@ -14,6 +14,7 @@
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
   "plan_reviewed_at": "2026-11-06T08:49:18.097908Z",
+  "ready": true,
   "review_attempts": [
     {
       "artifact_sha256": "7438c1243a7b9adbfe545563409df102d67bdd387fe0ce1964cae4670faa761c",
@@ -177,5 +178,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nProtocol templates and a default template exist since #2. A recording that starts without an options window gets the default, and the options windows open on the default. A meeting that recurs, such as a daily stand-up, needs the same non-default template every time, so today it has to be picked by hand at each start or the meeting gets the default format (owner request, paraphrased).\n\n## NOTES\n\n- Rules in Settings: a pattern on the meeting title (a regular expression, not case-sensitive) and the template it selects. The first matching rule wins. With no match, the default applies as today.\n- Applies to every new recording. Starts without a window get the matched template. The start dialog and the Record Meeting window open with it selected. A template picked by hand still wins.\n- A detected meeting has its real window title only with the Screen Recording permission. Without it, the title is \"<App> Call\".\n- Related: #6 (profiles; a rule may pick a profile later), #155 (shared code of the options windows), #69 (templates from a central URL).\n\n## TASKS\n\n- [ ] Draw the mockup (Settings rules, the two windows) and get it accepted\n- [ ] Build the spec",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/189"
   },
-  "updated_at": "2026-11-06T08:49:18.099360Z"
+  "updated_at": "2026-11-06T09:01:44.620189Z"
 }
