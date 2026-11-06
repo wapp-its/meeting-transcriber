@@ -312,6 +312,38 @@ final class PipelineQueueMeetingFilesLifecycleTests: XCTestCase {
         }
     }
 
+    /// The naming data of a parked job, and the name its files go by.
+    private func parkedNamingData(of job: PipelineJob, in queue: PipelineQueue) throws -> (
+        data: PipelineQueue.SpeakerNamingData, slug: String,
+    ) {
+        let slug = try XCTUnwrap(queue.job(withID: job.id)?.namingSlug)
+        return try (XCTUnwrap(SpeakerNamingStore(outputDir: outputDir).load(slug: slug)), slug)
+    }
+
+    /// A save that did not land says nothing about what sits at its path: here a
+    /// link to someone else's file, which the record must never take for the
+    /// meeting's own.
+    func testAFailedNamingSaveLeavesTheRecordAsItWas() async throws {
+        let queue = makeQueue(parksForNaming: true)
+        let job = try await parkForNaming(in: queue)
+        let before = try record(of: job).files
+        let (data, slug) = try parkedNamingData(of: job, in: queue)
+        let naming = try URL(fileURLWithPath: file(.naming, of: job).path)
+        let theirs = tmpDir.appendingPathComponent("theirs.txt")
+        try Data("theirs".utf8).write(to: theirs)
+        try FileManager.default.removeItem(at: naming)
+        try FileManager.default.createSymbolicLink(at: naming, withDestinationURL: theirs)
+        let folder = naming.deletingLastPathComponent().path
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder)
+        addTeardownBlock {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder)
+        }
+
+        XCTAssertFalse(queue.naming.saveNamingData(data, slug: slug, in: outputDir), "test premise")
+
+        XCTAssertEqual(try record(of: job).files, before)
+    }
+
     // MARK: - The raw transcript option
 
     func testWithTheRawTranscriptOptionOffItsFilesAreGoneAfterDone() async throws {

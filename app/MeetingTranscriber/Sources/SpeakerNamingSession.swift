@@ -341,15 +341,10 @@ final class SpeakerNamingSession {
     func saveNamingData(_ data: SpeakerNamingData, slug: String, in outputDir: URL) -> Bool {
         // Without a delegate nobody is left to say the job is gone.
         guard delegate?.isStillQueued(data.jobID) ?? true else { return false }
-        let store = SpeakerNamingStore(outputDir: outputDir)
-        // Also after a throw: a refused chmod comes after the write has replaced the file.
-        defer {
-            if let file = store.namingFile(slug: slug), FileManager.default.fileExists(atPath: file.path) {
+        do {
+            try SpeakerNamingStore(outputDir: outputDir).save(data, slug: slug) { file in
                 onFilesChanged?(data.jobID, .namingSaved(file))
             }
-        }
-        do {
-            try store.save(data, slug: slug)
             return true
         } catch {
             // Error left redacted: the write target is `<title-slug>_naming.json`,
