@@ -9,13 +9,13 @@ final class MenuBarMicrophoneTests: XCTestCase {
     private func makeView(
         microphoneMenu: MicrophoneMenuState,
         onSelectMicrophone: @escaping (String) -> Void = { _ in },
-    ) -> MenuBarView {
+    ) throws -> MenuBarView {
         var actions = MenuActions.noop
         actions.selectMicrophone = onSelectMicrophone
-        return MenuBarView(
+        return try MenuBarView(
             status: nil,
             isWatching: false,
-            pipelineQueue: PipelineQueue(),
+            pipelineQueue: makeIsolatedQueue(),
             updateChecker: nil,
             noMic: false,
             manualRecordingPendingOrActive: false,
@@ -36,7 +36,7 @@ final class MenuBarMicrophoneTests: XCTestCase {
 
     func testChoosingAMicrophoneHandsItsUIDToTheSelection() throws {
         var selected: [String] = []
-        let view = makeView(microphoneMenu: menuState(noMic: false)) { selected.append($0) }
+        let view = try makeView(microphoneMenu: menuState(noMic: false)) { selected.append($0) }
 
         let picker = try view.inspect()
             .find(viewWithAccessibilityIdentifier: A11yID.menuMicrophonePicker)

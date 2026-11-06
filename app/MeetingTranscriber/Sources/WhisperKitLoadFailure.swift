@@ -30,15 +30,10 @@ enum WhisperKitLoadFailure: LocalizedError, Equatable {
 
     /// The failure `error` stands for when a Hub request made with a token
     /// (`tokenSent`) or without one failed with it, nil when it is not a refusal.
+    /// The refusal is recognised by `WhisperKitModelSource.isRejectedToken`, the
+    /// one match on WhisperKit's internal Hub error.
     static func classify(_ error: any Error, tokenSent: Bool) -> Self? {
-        guard isRejectedToken(error) else { return nil }
+        guard WhisperKitModelSource.isRejectedToken(error) else { return nil }
         return tokenSent ? .tokenRejected : .tokenRequired
-    }
-
-    /// Whether `error` is the Hub refusing the request's credentials. WhisperKit
-    /// keeps its Hub error type internal, so it is matched by its fully qualified
-    /// name, which `WhisperKitLoadFailureTests` pins against the real type.
-    private static func isRejectedToken(_ error: any Error) -> Bool {
-        String(reflecting: error) == "ArgmaxCore.Hub.HubClientError.authorizationRequired"
     }
 }

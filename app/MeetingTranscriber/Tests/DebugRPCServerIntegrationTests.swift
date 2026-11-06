@@ -153,9 +153,9 @@
         func testStateExposesPostedNotifications() async throws {
             let manager = NotificationManager()
             let suite = "DebugRPCServerIntegrationTests-\(getpid())-\(UUID().uuidString)"
-            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            let defaults = try XCTUnwrap(DefaultsSuite.open(suite))
             defer { DefaultsSuite.remove(suite) }
-            let state = AppState(settings: AppSettings(defaults: defaults), notifier: manager)
+            let state = try AppState(pipelineEnvironment: makeIsolatedPipelineEnvironment(), settings: AppSettings(defaults: defaults), notifier: manager)
             defer { state.liveCaptions.clear() }
             manager.notify(title: "Meeting Detected", body: "Recording: Standup (Teams)")
             manager.notify(title: "Silent Recording", body: "Both channels silent")
@@ -188,7 +188,7 @@
         /// dev bundle's container-plist redirect).
         func testStateExposesEffectiveSettings() async throws {
             let suite = "DebugRPCServerIntegrationTests-\(getpid())-\(UUID().uuidString)"
-            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            let defaults = try XCTUnwrap(DefaultsSuite.open(suite))
             defer { DefaultsSuite.remove(suite) }
             let settings = AppSettings(defaults: defaults)
             settings.recordOnly = true
@@ -200,7 +200,7 @@
             // controller and kicks off actual CoreML/VAD model loads (network
             // download on a cold CI runner) in an unawaited background Task.
             settings.vadEnabled = true
-            let state = AppState(settings: settings)
+            let state = try AppState(pipelineEnvironment: makeIsolatedPipelineEnvironment(), settings: settings)
             defer { state.liveCaptions.clear() }
 
             let base = try await startServer(snapshot: state.rpcStateSnapshot())
@@ -1447,7 +1447,7 @@
         /// and leave every route test above green. With nothing recording the
         /// wired closure answers 200 (`unchanged`) where that default answers 503.
         func testV1RecordStopAnyIsWiredByAppState() async throws {
-            let state = makeRPCTestState()
+            let state = try makeRPCTestState()
             let base = try await listen(state.buildDebugRPCServer(port: 0, token: Self.testToken))
 
             let (data, response) = try await postRecord(base, #"{"action":"stop","scope":"any"}"#)

@@ -27,11 +27,11 @@ final class MenuBarViewConsentPromptTests: XCTestCase {
         body: "A meeting is active in Zoom. Everyone must agree to being recorded.",
     )
 
-    private func makeView(question: ConsentQuestion?, answers: Answers = Answers()) -> MenuBarView {
+    private func makeView(question: ConsentQuestion?, answers: Answers = Answers()) throws -> MenuBarView {
         var actions = MenuActions.noop
         actions.answerConsent = { question, granted in answers.calls.append((question, granted)) }
         actions.recordConsentWithOptions = { answers.optionsOpened.append($0) }
-        return MenuBarView(
+        return try MenuBarView(
             status: TranscriberStatus(
                 version: 1,
                 timestamp: "2024-01-01T00:00:00",
@@ -43,7 +43,7 @@ final class MenuBarViewConsentPromptTests: XCTestCase {
                 pid: nil,
             ),
             isWatching: true,
-            pipelineQueue: PipelineQueue(),
+            pipelineQueue: makeIsolatedQueue(),
             updateChecker: nil,
             noMic: false,
             manualRecordingPendingOrActive: false,
@@ -78,7 +78,7 @@ final class MenuBarViewConsentPromptTests: XCTestCase {
     }
 
     func testWithoutAQuestionTheMenuHasNoConsentSection() throws {
-        let sut = makeView(question: nil)
+        let sut = try makeView(question: nil)
 
         XCTAssertThrowsError(try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.consentPromptRecord))
         XCTAssertThrowsError(try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.consentPromptRecordWithOptions))
@@ -87,7 +87,7 @@ final class MenuBarViewConsentPromptTests: XCTestCase {
     }
 
     func testWithAQuestionTheMenuOpensWithItsTextThenItsAnswers() throws {
-        let sut = makeView(question: question)
+        let sut = try makeView(question: question)
 
         XCTAssertEqual(
             try Array(lines(of: sut).prefix(7)),
@@ -105,7 +105,7 @@ final class MenuBarViewConsentPromptTests: XCTestCase {
 
     func testRecordAnswersTheDisplayedQuestionWithYes() throws {
         let answers = Answers()
-        let sut = makeView(question: question, answers: answers)
+        let sut = try makeView(question: question, answers: answers)
 
         try tap(A11yID.consentPromptRecord, in: sut)
 
@@ -118,7 +118,7 @@ final class MenuBarViewConsentPromptTests: XCTestCase {
     /// the window's Record does.
     func testRecordWithOptionsHandsBackTheDisplayedQuestion() throws {
         let answers = Answers()
-        let sut = makeView(question: question, answers: answers)
+        let sut = try makeView(question: question, answers: answers)
 
         try tap(A11yID.consentPromptRecordWithOptions, in: sut)
 
@@ -128,7 +128,7 @@ final class MenuBarViewConsentPromptTests: XCTestCase {
 
     func testIgnoreAnswersTheDisplayedQuestionWithNo() throws {
         let answers = Answers()
-        let sut = makeView(question: question, answers: answers)
+        let sut = try makeView(question: question, answers: answers)
 
         try tap(A11yID.consentPromptIgnore, in: sut)
 

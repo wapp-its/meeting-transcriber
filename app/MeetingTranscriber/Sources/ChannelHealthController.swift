@@ -96,6 +96,17 @@ final class ChannelHealthController {
     @ObservationIgnored private(set) var micLevelDBFS: Double?
     @ObservationIgnored private(set) var appLevelDBFS: Double?
 
+    /// How often the microphone stalled in this recording, as of the last
+    /// tick; nil before the first. A stall is told again each time, so the
+    /// fault beside it cannot say whether a revival stalled once more.
+    /// `@ObservationIgnored` like the ages: only the RPC snapshot reads it.
+    @ObservationIgnored private(set) var micStallCount: Int?
+
+    /// The app tap's noise-floor verdict as of the last tick (issue #699).
+    /// Live and uncorroborated, unlike `appFault`. `@ObservationIgnored`
+    /// like the ages: written every tick, read only by the RPC snapshot.
+    @ObservationIgnored private(set) var appNoiseFloorOnly = false
+
     /// Per-channel "is this channel still delivering" decision, evaluated on
     /// every tick. Separate from `channelHealthMonitor`, which answers the
     /// louder-than-the-other question that drives the tint; see
@@ -283,6 +294,8 @@ final class ChannelHealthController {
         appAges = .unknown
         micLevelDBFS = nil
         appLevelDBFS = nil
+        micStallCount = nil
+        appNoiseFloorOnly = false
         firstTickAt = nil
         lastSpeechAt.removeAll()
         heldForPause = false
@@ -359,6 +372,10 @@ final class ChannelHealthController {
         }
         micLevelDBFS = mic
         appLevelDBFS = app
+        micStallCount = recorder.micCaptureStall.count
+        appNoiseFloorOnly = recorder.appCarriesOnlyNoiseFloor
+        // After the reported values above, so `/state` stays current while
+        // paused, and before every judgement below.
         if holdWhilePaused(recorder, now: now) { return nil }
         // The monitor's own threshold, not a copy of its default: the init
         // allows a different one, and a second constant could then disagree
@@ -439,6 +456,9 @@ final class ChannelHealthController {
         for channel in [AudioChannel.mic, .app] {
             guard channel == .mic ? channels.mic : channels.app else { continue }
             let ages = channel == .mic ? micAges : appAges
+            // A device change brought it back, so `/state` stops reporting a
+            // stall that is over. The monitor re-arms itself on the same edge.
+            if channel == .mic, !recorder.micCaptureStall.isActive, micFault == .stalled { micFault = nil }
             guard let fault = updateFaultMonitor(
                 for: channel, ages: ages, recorder: recorder, elapsedSinceStart: elapsed, now: now,
             ) else { continue }
@@ -451,6 +471,8 @@ final class ChannelHealthController {
             let alert = Self.captureAlert(
                 channel: channel, fault: fault,
                 everCarriedSignal: ages.secondsSinceLastEnergy != nil,
+                stall: recorder.micCaptureStall.details,
+                startTimedOut: channel == .mic && recorder.micCaptureStartTimedOut,
             )
             // Whether it was then posted is logged by the notifier, which decides that.
             log.notice(Self.faultLogLine(channel: channel, fault: fault, ages: ages, elapsed: elapsed, window: faultWindow))
@@ -481,11 +503,17 @@ final class ChannelHealthController {
         case .mic: micFaultMonitor.update(
                 ages: ages, gaveUp: gaveUp, elapsedSinceStart: elapsedSinceStart,
                 corroborated: corroborated, rebuildsExhausted: rebuildsExhausted,
+                // Only the microphone stalls: the app tap's watchdog rebuilds
+                // it but never releases it.
+                stall: recorder.micCaptureStall,
             )
 
         case .app: appFaultMonitor.update(
                 ages: ages, gaveUp: gaveUp, elapsedSinceStart: elapsedSinceStart,
                 corroborated: corroborated, rebuildsExhausted: rebuildsExhausted,
+                // Only the app tap has the noise-floor sensor (issue #699).
+                // Read once per tick, so `/state` and the fault agree.
+                noiseFloor: appNoiseFloorOnly,
             )
         }
     }

@@ -67,10 +67,35 @@ final class WhisperKitCustomModelSmokeTests: XCTestCase {
             throw XCTSkip("Set \(Self.environmentPrefix)REPO and \(Self.environmentPrefix)VARIANT to a Hugging Face model")
         }
         let origin = WhisperKitModelOrigin.hub(repoID: repoID)
+        // Whether the model is already in the cache, checked on the file system
+        // rather than through the locator: the offline assertion below is about the
+        // locator, so it must not be conditioned on the locator's own answer. With
+        // the folder there and the locator saying nothing, every load would go back
+        // to the Hub (issue #736), and that has to fail here rather than skip.
+        // The folder alone is no evidence: an interrupted download leaves it behind
+        // without its weights, and the locator rightly ignores such a copy. So the
+        // check asks for the files a finished copy of each CoreML bundle has, by
+        // name rather than through the production list it would otherwise share.
+        // A copy missing any of them is not treated as cached: the load below goes
+        // through the download, which completes it, and the assertion after the load
+        // then checks that the locator finds what the download produced.
+        let cachedFolder = WhisperKitLocalSnapshot.repoRoot(for: repoID).appendingPathComponent(variant, isDirectory: true)
+        let finishedDownloadFiles = ["AudioEncoder", "TextDecoder", "MelSpectrogram"].flatMap { bundle in
+            ["coremldata.bin", "model.mil", "weights/weight.bin"].map { "\(bundle).mlmodelc/\($0)" }
+        }
+        let missing = finishedDownloadFiles.filter { file in
+            !FileManager.default.fileExists(atPath: cachedFolder.appendingPathComponent(file).path)
+        }
+        let cached = missing.isEmpty
         // The production source, wrapped only to report whether the Hub was needed:
         // a second run against an already-fetched model must not download again.
         let production = WhisperKitModelSource.production(for: origin)
-        let foundLocally = production.locateLocal(variant) != nil
+        if cached {
+            XCTAssertNotNil(
+                production.locateLocal(variant),
+                "The fetched model is in the cache and the locator does not find it, so every load contacts the Hub",
+            )
+        }
         var downloaded = false
         let engine = WhisperKitEngine()
         engine.installModelSourceForTesting(WhisperKitModelSource(
@@ -85,9 +110,13 @@ final class WhisperKitCustomModelSmokeTests: XCTestCase {
 
         try await transcribe(with: engine, label: "repo=\(repoID) variant=\(variant)")
 
-        print("[CustomWhisperKitSmoke] foundLocallyBeforeLoad=\(foundLocally) downloaded=\(downloaded)")
-        if foundLocally {
+        print("[CustomWhisperKitSmoke] cachedBeforeLoad=\(cached) downloaded=\(downloaded)")
+        if cached {
             XCTAssertFalse(downloaded, "An already-fetched custom model must load without the Hub (issue #736)")
         }
+        XCTAssertNotNil(
+            production.locateLocal(variant),
+            "After a successful load the locator must find the model, or the next load goes back to the Hub (issue #736)",
+        )
     }
 }

@@ -2,9 +2,9 @@
     @testable import MeetingTranscriber
     import XCTest
 
-    /// What the Claude CLI provider gains from the shared process runner: a
-    /// timeout that also stops a CLI that prints nothing, and a run that
-    /// survives a CLI exiting without reading its input.
+    /// What a Claude CLI run must handle: a timeout that also stops a CLI
+    /// that prints nothing, a run that survives a CLI exiting without
+    /// reading its input, and a last output line without a newline.
     final class ClaudeCLIProtocolGeneratorRunnerTests: XCTestCase {
         /// A CLI that reads its prompt and then hangs without printing must be
         /// stopped at the timeout. The guard keeps a regression from hanging
@@ -86,28 +86,6 @@
             let result = try await generator.generate(transcript: "Speaker 1: hello", title: "Sync", diarized: false)
 
             XCTAssertEqual(result, "Protocol body")
-        }
-
-        /// Stdout beyond the runner's cap stops the CLI; the error names the
-        /// tool and nothing it printed.
-        func testGenerateFailsOnOutputOverTheCap() async throws {
-            let script = try Self.makeFakeClaudeScript(
-                body: "cat > /dev/null\nhead -c \(CLIProcessRunner.defaultMaxStdoutBytes + 1) /dev/zero",
-            )
-            defer { try? FileManager.default.removeItem(atPath: script) }
-
-            let generator = ClaudeCLIProtocolGenerator(claudeBin: script, language: "German")
-            do {
-                _ = try await generator.generate(transcript: "Speaker 1: hello", title: "Sync", diarized: false)
-                XCTFail("Expected generate() to throw .commandOutputTooLarge")
-            } catch let error as ProtocolError {
-                guard case let .commandOutputTooLarge(tool) = error else {
-                    XCTFail("Expected .commandOutputTooLarge, got \(error)")
-                    return
-                }
-                XCTAssertEqual(tool, "Claude CLI")
-                XCTAssertEqual(error.errorDescription, "Claude CLI wrote more output than the app accepts")
-            }
         }
 
         /// A fake `claude` that answers the `--help` probe at once (so the

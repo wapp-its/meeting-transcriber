@@ -11,19 +11,19 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "MicInpu
 ///
 /// Complements `PowerAssertionDetector` for call apps whose in-call power
 /// assertions are absent, unnamed, or undocumented (WeChat, Tencent Meeting,
-/// FaceTime, WhatsApp): a call ALWAYS captures the mic, so
+/// FaceTime, WhatsApp, Slack): a call ALWAYS captures the mic, so
 /// `kAudioProcessPropertyIsRunningInput` flipping true on a watched bundle ID
 /// is a reliable signal.
 ///
 /// Precision is deliberately traded for coverage, and the cost is real: any
 /// watched app holding the mic across `confirmationCount` polls counts as a
-/// call, so a WeChat or WhatsApp voice message longer than roughly
-/// `pollInterval * confirmationCount` (about 6 s at the defaults) looks like
-/// one. There is no minimum-duration filter downstream to catch that. What
-/// limits the blast radius: every one of these apps is off by default,
-/// detection needs N consecutive polls, a 5 s cooldown follows a reset, and a
-/// detected call asks before recording unless the user switched that app to
-/// record without asking.
+/// call, so a WeChat or WhatsApp voice message (or a Slack clip) longer than
+/// roughly `pollInterval * confirmationCount` (about 6 s at the defaults)
+/// looks like one. There is no minimum-duration filter downstream to catch
+/// that. What limits the blast radius: every one of these apps is off by
+/// default, detection needs N consecutive polls, a 5 s cooldown follows a
+/// reset, and a detected call asks before recording unless the user switched
+/// that app to record without asking.
 @Observable
 class MicInputDetector: MeetingDetecting {
     /// A call app watched by bundle ID.
@@ -49,6 +49,11 @@ class MicInputDetector: MeetingDetecting {
                 .filter { $0 == bundleID || (matchesHelpers && bundleID.hasPrefix($0 + ".")) }
                 .map(\.count)
                 .max()
+        }
+
+        /// Whether `bundleID` is this app's process or one of its helpers.
+        func matches(bundleID: String) -> Bool {
+            matchLength(bundleID: bundleID) != nil
         }
 
         /// An app added through "Add App…" always asks before recording: it
@@ -96,13 +101,26 @@ class MicInputDetector: MeetingDetecting {
         // belongs to the browser detection channel.
         MicPattern(appName: "FaceTime", bundleIDs: ["com.apple.FaceTime", "com.apple.avconferenced"]),
         MicPattern(appName: "WhatsApp", bundleIDs: ["net.whatsapp.WhatsApp"]),
+        // Slack Huddles. Not measured on a real huddle: Slack is Electron, so
+        // the mic is assumed to be held by a helper such as
+        // `com.tinyspeck.slackmacgap.helper`, hence `matchesHelpers`. Slack
+        // also holds the mic while recording a voice or video clip, so a long
+        // clip looks like a huddle and records, as a WhatsApp voice message does.
+        MicPattern(appName: "Slack", bundleIDs: ["com.tinyspeck.slackmacgap"], matchesHelpers: true),
     ]
 
     /// The `defaultPatterns` subset selected by the user's "Apps to Watch"
     /// toggles — same contract as `PowerAssertionDetector.patterns(watching:)`.
+    /// Custom bundle IDs a selected built-in already matches are dropped, so
+    /// one process is never watched under two patterns; with that built-in
+    /// deselected the custom entry applies again.
     static func patterns(watching watchedAppNames: [String], customBundleIDs: [String] = []) -> [MicPattern] {
         let watched = Set(watchedAppNames)
-        return defaultPatterns.filter { watched.contains($0.appName) } + customBundleIDs.map(customPattern(bundleID:))
+        let builtIns = defaultPatterns.filter { watched.contains($0.appName) }
+        let customs = customBundleIDs
+            .filter { id in !builtIns.contains { $0.matches(bundleID: id) } }
+            .map(customPattern(bundleID:))
+        return builtIns + customs
     }
 
     static func customPattern(bundleID: String) -> MicPattern {
@@ -170,8 +188,8 @@ class MicInputDetector: MeetingDetecting {
     }
 
     func checkOnce(excluding excludedApps: Set<String>) -> DetectedMeeting? {
-        // All four toggles default to off, so most installs run this detector
-        // with an empty pattern set. Skip the whole round then: no Core Audio
+        // Every one of these toggles defaults to off, so most installs run
+        // this detector with an empty pattern set. Skip the whole round then: no Core Audio
         // enumeration every poll, and no diagnostic naming every mic-using
         // bundle on machines that never opted into this channel.
         guard !patterns.isEmpty else { return nil }
@@ -400,6 +418,18 @@ final class CompositeMeetingDetector: MeetingDetecting {
 
     func isMeetingActive(_ meeting: DetectedMeeting) -> Bool {
         detectors.contains { $0.isMeetingActive(meeting) }
+    }
+
+    /// Union of the strategies that can identify calls.
+    func activeCalls(_ meeting: DetectedMeeting) -> ActiveCalls {
+        var union: Set<String> = []
+        var identified = false
+        for detector in detectors {
+            guard case let .ids(ids) = detector.activeCalls(meeting) else { continue }
+            identified = true
+            union.formUnion(ids)
+        }
+        return identified ? .ids(union) : .unidentified
     }
 
     func reset(appName: String?) {

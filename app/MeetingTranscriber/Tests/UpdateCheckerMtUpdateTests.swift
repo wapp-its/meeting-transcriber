@@ -342,9 +342,9 @@ final class UpdateCheckerMtUpdateTests: XCTestCase {
             logDir: directory,
         )
         return AppState(
+            pipelineEnvironment: IsolatedQueueEnvironment.make(logDir: directory, initialQueue: queue),
             settings: settings,
             updateChecker: checker,
-            pipelineEnvironment: IsolatedQueueEnvironment.make(logDir: directory, initialQueue: queue),
         )
     }
 }

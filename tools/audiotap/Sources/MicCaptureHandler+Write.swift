@@ -36,17 +36,24 @@ extension MicCaptureHandler {
             timelineAnchor.anchorIfUnset(hostSeconds: timeline.recordingSeconds(atHostSeconds: startSeconds))
             return
         }
+        // When the buffer arrived, on the same pause-free clock, for a
+        // revival's bridge (`TimelineAnchor.bridgeNextGap`).
+        let arrivedAt = timeline.recordingSeconds(atHostSeconds: machTicksToSeconds(mach_absolute_time()))
         for piece in pieces {
             guard let part = piece.isWhole(of: frameCount) ? buffer : Self.copy(piece, of: buffer) else { continue }
-            write(part, recordingSeconds: piece.recordingSeconds, converter: converter, resampleRatio: resampleRatio)
+            write(
+                part, recordingSeconds: piece.recordingSeconds, arrivedAt: arrivedAt,
+                converter: converter, resampleRatio: resampleRatio,
+            )
         }
     }
 
     /// Convert → gap fill → write → live sink for one run of unpaused frames.
     /// `recordingSeconds` is its first frame on the session's pause-free
-    /// recording clock.
+    /// recording clock, `arrivedAt` the buffer's arrival on that clock.
     private func write(
-        _ buffer: AVAudioPCMBuffer, recordingSeconds: Double, converter: AVAudioConverter?, resampleRatio: Double,
+        _ buffer: AVAudioPCMBuffer, recordingSeconds: Double, arrivedAt: Double,
+        converter: AVAudioConverter?, resampleRatio: Double,
     ) {
         do {
             if let converter {
@@ -65,12 +72,17 @@ extension MicCaptureHandler {
                 if let error {
                     logger.warning("Mic resample error: \(error.localizedDescription, privacy: .public)")
                 } else {
-                    fillTimelineGap(atRecordingSeconds: recordingSeconds, outputFrames: Int(outputBuffer.frameLength))
+                    fillTimelineGap(
+                        atRecordingSeconds: recordingSeconds, outputFrames: Int(outputBuffer.frameLength),
+                        arrivedAt: arrivedAt,
+                    )
                     try outputFile?.write(from: outputBuffer)
                     forwardToLiveSink(buffer: outputBuffer)
                 }
             } else {
-                fillTimelineGap(atRecordingSeconds: recordingSeconds, outputFrames: Int(buffer.frameLength))
+                fillTimelineGap(
+                    atRecordingSeconds: recordingSeconds, outputFrames: Int(buffer.frameLength), arrivedAt: arrivedAt,
+                )
                 try outputFile?.write(from: buffer)
                 forwardToLiveSink(buffer: buffer)
             }

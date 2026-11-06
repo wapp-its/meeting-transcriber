@@ -3,11 +3,11 @@
     import Foundation
     import UserNotifications
 
+    @MainActor
     extension RPCStateSnapshot.WindowInfo {
         /// Project an `NSWindow`'s pinning-relevant properties for the RPC
         /// snapshot. `id` is passed in (the caller already resolved it from the
         /// window identifier) so this stays a pure value mapping.
-        @MainActor
         init(window: NSWindow, id: String) {
             let behavior = window.collectionBehavior
             self.init(
@@ -28,6 +28,36 @@
             case .denied: "denied"
             case .broken: "broken"
             case .notDetermined: "notDetermined"
+            }
+        }
+    }
+
+    extension SpeakerActionOutcome {
+        init(_ result: SpeakerMatcher.RenameResult) {
+            self = switch result {
+            case .renamed: .ok
+            case .merged: .merged
+            case .noop: .noop
+            case .notFound: .notFound
+            case .notSaved: .notSaved
+            case .replacedCorruptDB: .dbReset
+            }
+        }
+
+        init(_ result: SpeakerMatcher.EditResult) {
+            self = switch result {
+            case .applied: .ok
+            case .notFound: .notFound
+            case .notSaved: .notSaved
+            case .replacedCorruptDB: .dbReset
+            }
+        }
+
+        /// Whether the action wrote a change, so cached speaker names are stale.
+        var changedDB: Bool {
+            switch self {
+            case .ok, .merged, .dbReset: true
+            case .noop, .notFound, .invalid, .notSaved: false
             }
         }
     }
@@ -57,7 +87,7 @@
         /// Build a snapshot of state for the debug RPC. Read-only.
         func rpcStateSnapshot() -> RPCStateSnapshot {
             let q = pipeline.queue
-            let stored = SpeakerMatcher().loadDB()
+            let stored = SpeakerMatcher(dbPath: pipeline.speakersDB).loadDB()
             let recentNames = SpeakerMatcher.rankByRecency(speakers: stored)
                 .prefix(10).map(\.name)
             let pendingJobs = q.pendingSpeakerNamingJobs.map { job in
@@ -289,6 +319,7 @@
                 micSilent: channelHealth.micSilentActive,
                 appSilent: channelHealth.appSilentActive,
                 recordingSilent: channelHealth.recordingSilentActive,
+                appNoiseFloorOnly: channelHealth.appNoiseFloorOnly,
                 micFault: channelHealth.micFault?.rawValue,
                 appFault: channelHealth.appFault?.rawValue,
                 micLevelDBFS: channelHealth.micLevelDBFS,
@@ -297,6 +328,7 @@
                 micSecondsSinceLastEnergy: channelHealth.micAges.secondsSinceLastEnergy,
                 appSecondsSinceLastBuffer: channelHealth.appAges.secondsSinceLastBuffer,
                 appSecondsSinceLastEnergy: channelHealth.appAges.secondsSinceLastEnergy,
+                micStallCount: channelHealth.micStallCount,
             )
         }
 
@@ -338,6 +370,7 @@
                 durationSec: Date().timeIntervalSince(job.enqueuedAt),
                 transcriptPath: job.transcriptPath?.path,
                 protocolPath: job.protocolPath?.path,
+                export: JobExportDTO(job: job),
                 error: job.error,
                 warnings: job.warnings,
                 participants: job.participants,
@@ -366,40 +399,34 @@
         /// the cached `knownSpeakerNames` only when the mutation actually changed
         /// state — `.notFound` paths skip the redundant disk read.
         ///
-        /// The `speakerMatcherFactory` parameter exists so tests can route
-        /// mutations to a temp-path `SpeakerMatcher` instead of the real
-        /// `~/Library/Application Support/.../speakers.json`. Production uses
-        /// the default and is unaffected.
+        /// Without a `speakerMatcherFactory` the actions work on the speaker
+        /// database the pipeline's environment names, the app's own
+        /// `speakers.json` in production. Tests pass a factory to route them
+        /// to a matcher of their own.
         func makeSpeakerDBActions(
-            speakerMatcherFactory: @escaping () -> SpeakerMatcher = { SpeakerMatcher() },
+            speakerMatcherFactory: (() -> SpeakerMatcher)? = nil,
         ) -> SpeakerDBActions {
-            SpeakerDBActions(
-                rename: { [weak self] from, to in
-                    let result = speakerMatcherFactory().renameSpeaker(from: from, to: to)
-                    let outcome: SpeakerActionOutcome = switch result {
-                    case .renamed: .ok
-                    case .merged: .merged
-                    case .noop: .noop
-                    case .notFound: .notFound
-                    }
-                    if outcome != .notFound { self?.pipeline.queue.refreshKnownSpeakerNames() }
-                    return outcome
+            let speakerMatcherFactory = speakerMatcherFactory
+                ?? SpeakerMatcher.factory(dbPath: pipeline.speakersDB, notifier: notifier)
+            let refreshingIfChanged: @MainActor (SpeakerActionOutcome) -> SpeakerActionOutcome = { [weak self] outcome in
+                if outcome.changedDB { self?.pipeline.queue.refreshKnownSpeakerNames() }
+                return outcome
+            }
+            return SpeakerDBActions(
+                rename: { from, to in
+                    refreshingIfChanged(.init(speakerMatcherFactory().renameSpeaker(from: from, to: to)))
                 },
-                delete: { [weak self] name in
-                    let removed = speakerMatcherFactory().deleteSpeaker(name: name)
-                    if removed { self?.pipeline.queue.refreshKnownSpeakerNames() }
-                    return removed ? .ok : .notFound
+                delete: { name in
+                    refreshingIfChanged(.init(speakerMatcherFactory().deleteSpeaker(name: name)))
                 },
-                merge: { [weak self] from, into in
-                    let merged = speakerMatcherFactory().mergeSpeakers(from: from, into: into)
-                    if merged { self?.pipeline.queue.refreshKnownSpeakerNames() }
-                    return merged ? .ok : .notFound
+                merge: { from, into in
+                    refreshingIfChanged(.init(speakerMatcherFactory().mergeSpeakers(from: from, into: into)))
                 },
                 seed: { [weak self] name in
                     let embedding = (0 ..< Self.seedEmbeddingDimension).map { _ in
                         Float.random(in: -1 ... 1)
                     }
-                    speakerMatcherFactory().mutateDB { stored in
+                    let mutation = speakerMatcherFactory().mutateDB { stored in
                         stored.append(StoredSpeaker(
                             name: name,
                             embeddings: [embedding],
@@ -413,6 +440,7 @@
                             isSynthetic: true,
                         ))
                     }
+                    guard mutation.saved else { return .notSaved }
                     self?.pipeline.queue.refreshKnownSpeakerNames()
                     return .ok
                 },

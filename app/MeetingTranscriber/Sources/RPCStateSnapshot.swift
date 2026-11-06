@@ -163,9 +163,16 @@
             /// without screenshot OCR.
             let recordingSilent: Bool
 
+            /// The app tap's noise-floor verdict (issue #699), live and
+            /// uncorroborated: `appFault` says "noiseFloor" only once the
+            /// microphone showed the call is live, and keeps saying it after
+            /// this clears.
+            let appNoiseFloorOnly: Bool
+
             /// The capture fault reported for each channel in this recording:
             /// "noBuffers", "digitalSilence", "gaveUp", "rebuildsExhausted"
-            /// (the app channel only), or absent when the channel is fine.
+            /// and "noiseFloor" (the app channel only), "stalled" (the
+            /// microphone only), or absent when the channel is fine.
             /// Distinct from `micSilent` / `appSilent`, which say only that
             /// one channel is quieter than the other and are true of a muted
             /// microphone, a quiet room and a dead tap alike.
@@ -185,10 +192,18 @@
             let appSecondsSinceLastBuffer: Double?
             let appSecondsSinceLastEnergy: Double?
 
+            /// How often the microphone was released for lack of audio in this
+            /// recording (issues #724, #706), every failed revival included.
+            /// `micFault` says "stalled" while it is released; this says how
+            /// often, since each stall is told anew. Absent before the first
+            /// tick of a recording.
+            let micStallCount: Int?
+
             static let inactive = Self(
                 micSilent: false,
                 appSilent: false,
                 recordingSilent: false,
+                appNoiseFloorOnly: false,
                 micFault: nil,
                 appFault: nil,
                 micLevelDBFS: nil,
@@ -197,6 +212,7 @@
                 micSecondsSinceLastEnergy: nil,
                 appSecondsSinceLastBuffer: nil,
                 appSecondsSinceLastEnergy: nil,
+                micStallCount: nil,
             )
         }
 
@@ -277,6 +293,7 @@
             let durationSec: Double
             let transcriptPath: String?
             let protocolPath: String?
+            let export: JobExportDTO?
             let error: String?
             let warnings: [String]
             let participants: [String]
@@ -367,11 +384,12 @@
                 /// Empty string = auto-detect (mirrors the UserDefaults sentinel).
                 let whisperLanguage: String
                 let parakeetLanguage: String
+                let customVocabularyEnabled: Bool
                 let customVocabularyPath: String
 
                 static let empty = Self(
                     engine: "", whisperKitModel: "", whisperLanguage: "",
-                    parakeetLanguage: "", customVocabularyPath: "",
+                    parakeetLanguage: "", customVocabularyEnabled: false, customVocabularyPath: "",
                 )
             }
 
@@ -404,13 +422,18 @@
                 let language: String
                 let openAIEndpoint: String
                 let openAIModel: String
+                /// Sampling overrides for the OpenAI-compatible provider. Nil
+                /// (omitted from the JSON) means the server default applies.
+                let openAITemperature: Double?
+                let openAITopP: Double?
                 /// Claude CLI binary name/path (non-secret). The App Store build
                 /// never compiles this file (`#if !APPSTORE`).
                 let claudeBin: String
 
                 static let empty = Self(
                     provider: "", language: "", openAIEndpoint: "",
-                    openAIModel: "", claudeBin: "",
+                    openAIModel: "", openAITemperature: nil, openAITopP: nil,
+                    claudeBin: "",
                 )
             }
 
@@ -430,10 +453,13 @@
                 let includeFullTranscriptInProtocol: Bool
                 /// Whether the completed job keeps a separate raw transcript file.
                 let saveRawTranscriptSeparately: Bool
+                /// Whether a job's files are named after the AI meeting title instead of the timestamped slug.
+                let useAITitleForFilenames: Bool
 
                 static let empty = Self(
                     directory: nil, hasCustomDirectory: false, hasCustomPrompt: false,
                     includeFullTranscriptInProtocol: false, saveRawTranscriptSeparately: false,
+                    useAITitleForFilenames: false,
                 )
             }
 

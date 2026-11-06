@@ -7,16 +7,16 @@ import XCTest
 @MainActor
 final class MenuBarJobMenuTests: XCTestCase {
     private func makeView(
-        pipelineQueue: PipelineQueue = PipelineQueue(),
+        pipelineQueue: PipelineQueue? = nil,
         history: [TerminalJobRecord] = [],
         onRemoveFailedJob: @escaping (UUID) -> Void = { _ in },
-    ) -> MenuBarView {
+    ) throws -> MenuBarView {
         var actions = MenuActions.noop
         actions.removeFailedJob = onRemoveFailedJob
-        return MenuBarView(
+        return try MenuBarView(
             status: nil,
             isWatching: false,
-            pipelineQueue: pipelineQueue,
+            pipelineQueue: pipelineQueue ?? makeIsolatedQueue(),
             updateChecker: nil,
             history: history,
             noMic: false,
@@ -41,7 +41,7 @@ final class MenuBarJobMenuTests: XCTestCase {
     /// Four failed jobs took four lines each, plus empty ones, when a job row
     /// was an `HStack`: the menu turns every part of a row into its own item.
     func testEachJobIsOneSubmenuWithoutRowLayoutParts() throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         for title in ["One", "Two", "Three", "Four"] {
             let job = makeJob(title)
             queue.enqueue(job)
@@ -58,7 +58,7 @@ final class MenuBarJobMenuTests: XCTestCase {
     /// A failed job is taken off the menu by Remove, which also takes it out
     /// of the history; Dismiss is left to a job waiting for speaker names.
     func testAJobsActionsAndFullErrorSitInItsSubmenu() throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         let job = makeJob("Broken")
         queue.enqueue(job)
         queue.updateJobState(id: job.id, to: .error, error: "Transcription failed")
@@ -74,7 +74,7 @@ final class MenuBarJobMenuTests: XCTestCase {
     /// user under "Needs you", and finished jobs are not in the menu at all.
     /// A header with no job under it is left out.
     func testJobsSitUnderInProgressAndNeedsYouAndFinishedOnesAreLeftOut() throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         queue.insertJobForTesting(makeJob("Running", state: .transcribing))
         queue.insertJobForTesting(makeJob("Queued"))
         queue.insertJobForTesting(makeJob("Unnamed", state: .speakerNamingPending))
@@ -96,7 +96,7 @@ final class MenuBarJobMenuTests: XCTestCase {
             XCTAssertThrowsError(try body.find(text: title), "\(title) finished, so it belongs to the window")
         }
 
-        let needsYouOnly = PipelineQueue()
+        let needsYouOnly = try makeIsolatedQueue()
         needsYouOnly.insertJobForTesting(makeJob("Broken", state: .error))
         let onlyFailed = try makeView(pipelineQueue: needsYouOnly).inspect()
         XCTAssertNoThrow(try onlyFailed.find(text: "Needs you"))

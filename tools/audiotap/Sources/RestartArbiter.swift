@@ -26,8 +26,12 @@ import Foundation
 /// engine, following `OutputDeviceChangeCoordinator` and `CaptureRestartRetryPolicy`.
 struct RestartArbiter: Equatable {
     /// How long a single restart attempt may take before it counts as wedged.
+    /// It bounds the microphone's first start too (issue #778), which also
+    /// shows its number to the user (`MicStartLimits`).
     ///
-    /// A healthy restart completes in roughly 300 ms (measured). The timeout only
+    /// A healthy restart completes in roughly 300 ms (measured). How long a
+    /// healthy first start takes is not measured; a Bluetooth profile switch
+    /// or a first permission prompt may make it slower. The timeout only
     /// has to separate "never returns" from "slow", so it sits far above the
     /// healthy case: the cost of firing too early is a sacrificed microphone
     /// track on a Bluetooth renegotiation that would have succeeded.
@@ -38,8 +42,8 @@ struct RestartArbiter: Equatable {
         case idle
         /// Capturing normally; no restart outstanding.
         case capturing
-        /// A restart attempt was launched and has not reported back. It may be
-        /// wedged, so nothing may touch the engine and no second attempt starts.
+        /// A restart attempt, or the first start, was launched and has not
+        /// reported back. It may be wedged, so nothing may touch the engine and no second attempt starts.
         case attemptInFlight(generation: Int)
         /// An attempt came back with an error and the next one is waiting out its
         /// backoff. A device change here is deliberately ignored: a flapping
@@ -54,6 +58,12 @@ struct RestartArbiter: Equatable {
         /// in the same process can wedge again because HAL client state is
         /// process-global.
         case gaveUp
+        /// The capture went without a buffer for the whole of
+        /// `MicCaptureProgressPolicy.maxSecondsWithoutAudio` and released its
+        /// engine. Unlike `gaveUp` nothing is wedged here, so a device change,
+        /// the user switching the input or reconnecting a headset, may start it
+        /// again. The output file stays open for that.
+        case stalled
         /// `stop()` was honoured. Terminal.
         case stopped
     }
@@ -79,8 +89,21 @@ struct RestartArbiter: Equatable {
         case retryBudgetExhausted
         /// The watchdog for `generation` fired.
         case attemptTimedOut(generation: Int)
+        /// The capture has not delivered within its current first-buffer
+        /// deadline (`MicCaptureProgressPolicy`). Rebuild it.
+        case progressDeadlineElapsed
+        /// The capture has gone without a buffer for the whole budget, across
+        /// however many restarts and rebuilds. Release it until a device
+        /// change.
+        case progressBudgetExhausted
         /// `stop()` was called.
         case stopRequested
+        /// `start()` is bringing up the capture's first engine (issue #778). It
+        /// runs as an attempt, because the call that wedges a restart is the
+        /// call that brings up the first engine too, and nothing else bounded
+        /// it: the first start ran on the main queue, so a wedge there froze
+        /// the whole app until it was quit.
+        case firstStartRequested
     }
 
     enum Action: Equatable {
@@ -100,22 +123,56 @@ struct RestartArbiter: Equatable {
         case giveUp
         /// The attempt returned an error. The existing backoff budget applies.
         case retry
+        /// The capture stalled: release its engine, keep its file, tell the
+        /// user. Recoverable, unlike `giveUp`.
+        case stall
         /// Normal `stop()`: touching the engine is safe.
         case teardown
+        /// `stop()` after a stall: the engine was released when it stalled, so
+        /// there is nothing to tear down and nothing wedged either.
+        case nothingToRelease
+        /// A restart the progress watchdog stands behind, a rebuild or a
+        /// revival, ran out of retries on attempts that all came back with
+        /// errors. Nothing is wedged and every engine is already released, so
+        /// the capture stalls, keeps its file and tells the user, and the next
+        /// device change may start it again, instead of ending for the
+        /// recording.
+        case returnToStall
         /// `stop()` while wedged or after giving up: seal the state and leave the
         /// engine alone, or the caller wedges too.
         case sealAndSkipEngine
+        /// The first start came back with an error. Not a retry: `start()` is
+        /// still waiting for this answer and throws it to its caller, which
+        /// owns what happens next. Nothing is outstanding afterwards.
+        case startFailed
     }
 
     private(set) var phase: Phase = .idle
     private var generation = 0
+    /// The attempt in flight or backing off was launched by the progress
+    /// watchdog, a rebuild or the revival of a stalled capture, rather than
+    /// by a device change. Decides where running out of retries leads:
+    /// `.stalled` for those, terminal `.gaveUp` for a device-change restart,
+    /// as before the watchdog existed.
+    private var recoverable = false
+    /// The attempt in flight is the capture's first start. Decides only what
+    /// a failure that came back leads to. Set by every launch, so a restart
+    /// failing later is retried as before.
+    private var firstStart = false
+
+    /// Whether the attempt out now, or backing off, is a rebuild or revival:
+    /// its failures are retried until the progress watchdog's budget is spent
+    /// rather than for the retry schedule's count.
+    var retriesUntilBudgetSpent: Bool {
+        recoverable
+    }
 
     /// False once the session is sealed. The restart path creates the output file
     /// whenever it finds none open, so a late-returning wedged attempt would
     /// otherwise overwrite a recording that was already finalized.
     var mayCreateOutputFile: Bool {
         switch phase {
-        case .idle, .capturing, .attemptInFlight, .backingOff, .committing: true
+        case .idle, .capturing, .attemptInFlight, .backingOff, .committing, .stalled: true
         case .gaveUp, .stopped: false
         }
     }
@@ -145,7 +202,7 @@ struct RestartArbiter: Equatable {
     /// from, so they cannot disagree.
     var seal: Seal? {
         switch phase {
-        case .idle, .capturing, .attemptInFlight, .backingOff, .committing: nil
+        case .idle, .capturing, .attemptInFlight, .backingOff, .committing, .stalled: nil
         case .gaveUp: .gaveUp
         case .stopped: .stopped
         }
@@ -157,16 +214,32 @@ struct RestartArbiter: Equatable {
             phase = .capturing
             return .ignore
 
-        case (.capturing, .deviceChanged), (.capturing, .retryDue), (.backingOff, .retryDue):
+        // The progress watchdog launches through here rather than around it,
+        // because the attempt it would race may be wedged inside AVFAudio and a
+        // second one would leak another thread into the same loop. A stalled
+        // capture has released its engine and nothing is in flight, so a device
+        // change may start it again. The first start launches here too: the
+        // call that wedges a restart is the one that brings up the first
+        // engine (issue #778).
+        case (.capturing, .deviceChanged), (.capturing, .retryDue), (.backingOff, .retryDue),
+             (.capturing, .progressDeadlineElapsed), (.stalled, .deviceChanged), (.idle, .firstStartRequested):
+            if phase == .stalled || event == .progressDeadlineElapsed { recoverable = true }
+            firstStart = event == .firstStartRequested
             generation += 1
             phase = .attemptInFlight(generation: generation)
             return .launchAttempt(generation: generation)
 
         case let (.attemptInFlight(current), .attemptReturned(reported, succeeded)) where reported == current:
-            phase = succeeded ? .committing(generation: current) : .backingOff
-            return succeeded ? .commit : .retry
+            if succeeded {
+                phase = .committing(generation: current)
+                return .commit
+            }
+            // A failed first start goes back to its caller, not into a backoff.
+            phase = firstStart ? .idle : .backingOff
+            return firstStart ? .startFailed : .retry
 
         case let (.committing(current), .commitReady(reported)) where reported == current:
+            recoverable = false
             phase = .capturing
             return .adopt
 
@@ -176,6 +249,22 @@ struct RestartArbiter: Equatable {
         case let (.attemptInFlight(current), .attemptTimedOut(reported)) where reported == current:
             phase = .gaveUp
             return .giveUp
+
+        case (.capturing, .progressBudgetExhausted):
+            phase = .stalled
+            return .stall
+
+        case (.stalled, .stopRequested):
+            phase = .stopped
+            return .nothingToRelease
+
+        // Only failures that came back: a rebuild or revival that wedges still
+        // times out into `.gaveUp` above, because its thread may hold the
+        // engine mutex.
+        case (.backingOff, .retryBudgetExhausted) where recoverable:
+            recoverable = false
+            phase = .stalled
+            return .returnToStall
 
         case (.backingOff, .retryBudgetExhausted):
             phase = .gaveUp
@@ -201,7 +290,8 @@ struct RestartArbiter: Equatable {
         // A watchdog whose attempt already reported back, or any control event in
         // a sealed session.
         case (_, .attemptTimedOut), (_, .deviceChanged), (_, .startSucceeded),
-             (_, .stopRequested), (_, .retryDue), (_, .retryBudgetExhausted):
+             (_, .stopRequested), (_, .retryDue), (_, .retryBudgetExhausted),
+             (_, .progressDeadlineElapsed), (_, .progressBudgetExhausted), (_, .firstStartRequested):
             return .ignore
         }
     }

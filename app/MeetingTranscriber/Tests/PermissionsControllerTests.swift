@@ -1,4 +1,5 @@
 @testable import MeetingTranscriber
+import os
 import XCTest
 
 /// Unit tests for `PermissionsController` — the first concern-specific
@@ -105,6 +106,53 @@ final class PermissionsControllerTests: XCTestCase {
         XCTAssertEqual(counter.count, 2, "A nil minimum interval must never debounce")
     }
 
+    // MARK: - check: one probe at a time (issue #778)
+
+    /// A probe that parks on `gate` and counts on exit, so a test can hold one
+    /// check open while a second one arrives.
+    private func gatedProbe(_ gate: MainActorGate, _ counter: ProbeCounter) -> PermissionsController.Probe {
+        { _ in await gate.wait(); return counter.probe() }
+    }
+
+    func testCheckDuringARunningCheckJoinsItInsteadOfProbingBesideIt() async {
+        // The debounce only knows about checks that have finished (`lastCheckAt`
+        // is written after the probe returns), so a check arriving while one is
+        // out used to open a second engine on the same microphone. It joins the
+        // running check instead, as the one follow-up that starts after it.
+        let gate = MainActorGate()
+        let counter = ProbeCounter()
+        let controller = PermissionsController(notifier: RecordingNotifier(), probe: gatedProbe(gate, counter))
+
+        async let first: Void = controller.check()
+        async let second: Void = controller.check(minimumInterval: 3)
+        await waitFor(gate.hasWaiter)
+        // Both callers are inside `check()` now; only one probe may be out.
+        try? await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(gate.waiterCount, 1, "the second check must join the running check, not probe beside it")
+
+        gate.open()
+        _ = await (first, second)
+        XCTAssertEqual(counter.count, 2, "the joined request runs as one follow-up after the first probe")
+        XCTAssertNotNil(controller.health, "the joined check reports a result")
+        XCTAssertNotNil(controller.lastCheckAt)
+    }
+
+    func testCheckAfterAJoinedCheckProbesAgain() async {
+        // Joining is per run, not forever: once the running check and its
+        // follow-up have answered, the next undebounced check runs its own.
+        let gate = MainActorGate()
+        let counter = ProbeCounter()
+        let controller = PermissionsController(notifier: RecordingNotifier(), probe: gatedProbe(gate, counter))
+        async let first: Void = controller.check()
+        async let second: Void = controller.check()
+        await waitFor(gate.hasWaiter)
+        gate.open()
+        _ = await (first, second)
+        XCTAssertEqual(counter.count, 2, "precondition: the first probe and its one follow-up")
+        await controller.check()
+        XCTAssertEqual(counter.count, 3)
+    }
+
     // MARK: - check: microphone probe retry
 
     /// The audio system can refuse the probe's engine start right after launch
@@ -112,7 +160,7 @@ final class PermissionsControllerTests: XCTestCase {
     /// retry, whichever way the first attempt failed, must post nothing.
     func testMicProbeRecoveringOnRetryIsHealthyAndPostsNothing() async {
         for failure in PermissionHealthCheck.MicProbeFailure.allCases {
-            let script = ScriptedMicProbe([.failed(failure), .delivered])
+            let script = ScriptedMicProbe([.failed(failure), .answered(bufferCount: 1)])
             let notifier = RecordingNotifier()
             let controller = makeMicrophoneController(script, notifier: notifier)
             await controller.check()
@@ -136,7 +184,7 @@ final class PermissionsControllerTests: XCTestCase {
     }
 
     func testMicProbeDeliveringFirstTimeIsNotRetried() async {
-        let script = ScriptedMicProbe([.delivered])
+        let script = ScriptedMicProbe([.answered(bufferCount: 1)])
         let controller = makeMicrophoneController(script, notifier: RecordingNotifier())
         await controller.check()
         XCTAssertEqual(controller.health?.microphone, .healthy)
@@ -151,7 +199,7 @@ final class PermissionsControllerTests: XCTestCase {
         for (index, first) in kinds.enumerated() {
             let second = kinds[(index + 1) % kinds.count]
 
-            let transient = ScriptedMicProbe([.failed(first), .delivered])
+            let transient = ScriptedMicProbe([.failed(first), .answered(bufferCount: 1)])
             await makeMicrophoneController(transient, notifier: RecordingNotifier()).check()
             XCTAssertEqual(transient.loggedFailures, [LoggedMicProbeFailure(attempt: 1, failure: first)])
 
@@ -201,13 +249,16 @@ final class PermissionsControllerTests: XCTestCase {
         _ script: ScriptedMicProbe,
         notifier: RecordingNotifier,
     ) -> PermissionsController {
-        PermissionsController(notifier: notifier) { mayRetry in
+        // Its own memory of the last verdict, so no other test's check leaks in.
+        let lastAnswered = OSAllocatedUnfairLock<PermissionStatus?>(initialState: nil)
+        return PermissionsController(notifier: notifier) { mayRetry in
             let microphone = await PermissionHealthCheck.checkMicrophoneLive(
                 authStatus: .authorized,
                 probe: { script.probe() },
                 sleep: { script.pause($0) },
                 logFailure: { script.log(attempt: $0, failure: $1) },
                 mayRetry: mayRetry,
+                lastAnswered: lastAnswered,
             )
             return microphone.map { HealthCheckResult(screenRecording: .healthy, microphone: $0, accessibility: .healthy) }
         }
@@ -224,12 +275,12 @@ private struct LoggedMicProbeFailure: Equatable {
 /// Lock-guarded because the live check calls it off the main actor.
 private final class ScriptedMicProbe: @unchecked Sendable {
     private let lock = NSLock()
-    private let outcomes: [PermissionHealthCheck.MicProbeOutcome]
+    private let outcomes: [MicProbeOutcome]
     private var probes = 0
     private var recordedPauses: [TimeInterval] = []
     private var recordedFailures: [LoggedMicProbeFailure] = []
 
-    init(_ outcomes: [PermissionHealthCheck.MicProbeOutcome]) {
+    init(_ outcomes: [MicProbeOutcome]) {
         self.outcomes = outcomes
     }
 
@@ -245,7 +296,7 @@ private final class ScriptedMicProbe: @unchecked Sendable {
         lock.withLock { recordedFailures }
     }
 
-    func probe() -> PermissionHealthCheck.MicProbeOutcome {
+    func probe() -> MicProbeOutcome {
         lock.withLock {
             defer { probes += 1 }
             return outcomes[min(probes, outcomes.count - 1)]

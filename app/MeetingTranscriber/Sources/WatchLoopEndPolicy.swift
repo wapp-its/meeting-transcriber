@@ -59,6 +59,9 @@ enum AutoStopReason: String {
     case appExited = "app_exited"
     /// "Stop now" to the long-silence question.
     case silenceStop = "silence_stop"
+    /// The app moved on to another call (issue #765): every call ID seen
+    /// during the recording is gone and only new ones are active.
+    case newCall = "new_call"
 
     /// The diagnostic line for an automatic stop. Carries no meeting title,
     /// participant or transcript, because the line is unconditional and lands
@@ -122,6 +125,11 @@ struct MeetingEndPoll: Equatable {
     /// The caller passes only answers to the question that is open now, so an
     /// answer to a withdrawn one never reaches the policy.
     var answer: ReceivedMeetingEndAnswer?
+    /// Every call ID observed during this recording before this poll.
+    var callIDsSeen: Set<String> = []
+    /// The calls observed right now; `.unidentified` leaves the end to the
+    /// grace period and the question alone.
+    var currentCalls: ActiveCalls = .unidentified
 }
 
 /// Static configuration for `WatchLoopEndPolicy.step`, re-used across every
@@ -155,16 +163,35 @@ enum WatchLoopEndPolicy {
         }
         switch phase {
         case let .listening(signalLostAt):
-            return listen(config: config, now: now, signalLostAt: signalLostAt, meetingActive: poll.meetingActive)
+            return listen(
+                config: config, now: now, signalLostAt: signalLostAt, meetingActive: poll.meetingActive,
+                callIDsSeen: poll.callIDsSeen, currentCalls: poll.currentCalls,
+            )
 
         case let .askingToEnd(pending):
             return ask(pending: pending, poll: poll)
 
         case .kept:
+            // A new call ends the kept recording uncut: the person chose to
+            // keep the audio after the loss, and the new call proves the
+            // recorded one over (issue #765).
+            if poll.meetingActive, isNewCall(callIDsSeen: poll.callIDsSeen, currentCalls: poll.currentCalls) {
+                return .stop(MeetingEndStop(reason: .newCall, cutAt: nil, signalAbsentFor: nil))
+            }
             // Back to listening once the signal returns, so the next loss is
             // asked about again; until then the person's answer stands.
             return .continuePolling(poll.meetingActive ? .listening(signalLostAt: nil) : phase)
         }
+    }
+
+    /// Whether the app moved on to another call: every call ID seen during
+    /// the recording is gone and only new ones are active. Deliberately no
+    /// requirement that a gap was observed first: the switch can fall between
+    /// two polls, and an all-new ID set already proves the recorded call's
+    /// assertions are gone.
+    static func isNewCall(callIDsSeen: Set<String>, currentCalls: ActiveCalls) -> Bool {
+        guard case let .ids(current) = currentCalls else { return false }
+        return !current.isEmpty && !callIDsSeen.isEmpty && current.isDisjoint(with: callIDsSeen)
     }
 
     /// Where the saved audio ends when watching stops during the wait, before
@@ -211,8 +238,13 @@ enum WatchLoopEndPolicy {
         now: Date,
         signalLostAt: Date?,
         meetingActive: Bool,
+        callIDsSeen: Set<String> = [],
+        currentCalls: ActiveCalls = .unidentified,
     ) -> WatchLoopEndDecision {
         if meetingActive {
+            if isNewCall(callIDsSeen: callIDsSeen, currentCalls: currentCalls) {
+                return .stop(MeetingEndStop(reason: .newCall, cutAt: nil, signalAbsentFor: nil))
+            }
             return .continuePolling(.listening(signalLostAt: nil))
         }
         guard let lost = signalLostAt else {
@@ -233,7 +265,16 @@ enum WatchLoopEndPolicy {
     /// recording ends, unless the person answered within them. A signal seen in
     /// time outranks "Stop now": the tap may have come while the call was
     /// coming back, and the cut would then discard the resumed meeting.
+    ///
+    /// A new call outranks everything here, the deadline and an answer
+    /// included: it proves the recorded call over, so the question is moot and
+    /// the recording ends at once, cut back like any end out of the question,
+    /// so the room between the calls is not kept (owner decision on back-to-back
+    /// calls).
     private static func ask(pending: PendingMeetingEnd, poll: MeetingEndPoll) -> WatchLoopEndDecision {
+        if poll.meetingActive, isNewCall(callIDsSeen: poll.callIDsSeen, currentCalls: poll.currentCalls) {
+            return .stop(MeetingEndStop(reason: .newCall, cutAt: pending.cutAt, signalAbsentFor: nil))
+        }
         let inTime = poll.now < pending.deadline
         if inTime, poll.meetingActive {
             return .withdrawQuestion(then: .listening(signalLostAt: nil))

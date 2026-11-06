@@ -29,8 +29,9 @@ public class AudioCaptureSession {
     private let config: AudioCaptureConfiguration
 
     /// The two handlers' hardware seams, nil in production. See the internal init.
-    private let appAttemptBody: (() throws -> AppTapSession?)?
-    private let micSessionFactory: (() -> any MicEngineSessionProviding)?
+    let appAttemptBody: (() throws -> AppTapSession?)?
+    let micSessionFactory: (() -> any MicEngineSessionProviding)?
+    let micHandlerFactory: ((URL) -> MicCaptureHandler)?
 
     private var appCapture: AppAudioCapture?
     private var micCapture: MicCaptureHandler?
@@ -47,12 +48,27 @@ public class AudioCaptureSession {
     /// restarts. Read from the polling path that already watches channel levels.
     public private(set) var appCaptureGaveUp = false
     public private(set) var micCaptureGaveUp = false
+    /// Set with `micCaptureGaveUp` when the microphone's first start did not
+    /// return within its deadline and the recording went on without it
+    /// (issue #778). Tells that give-up apart from a restart's: nothing was
+    /// restarted. Says the call missed its deadline, not that it is still
+    /// out: a later return does not clear it.
+    public private(set) var micCaptureStartTimedOut = false
 
     /// Set when the opt-in silent-track watchdog stopped rebuilding the app tap
     /// because its rebuilds did not restore signal (issue #672). Not terminal,
     /// unlike `appCaptureGaveUp`: the channel still captures, it captures
-    /// zeros. Read from the same polling path.
+    /// zeros. Read from the same polling path. Never cleared: whether it is
+    /// still news is decided by the fault monitor that reads it, not here.
     public private(set) var appSilentTrackWatchdogGaveUp = false
+
+    /// Whether the microphone is released for lack of audio, and how often it
+    /// was: it went without a buffer for the whole budget across restarts and
+    /// rebuilds (issues #724, #706). Not terminal like a give-up, so it clears
+    /// again once a device change brought the microphone back and it
+    /// delivered, not merely when its engine came up again, and it ends when
+    /// a revival gives up.
+    public private(set) var micCaptureStall = MicCaptureStall()
     private var appFileHandle: FileHandle?
 
     /// Whether the microphone's output path was free when this start reached it.
@@ -68,14 +84,22 @@ public class AudioCaptureSession {
     /// Test seam forwarding `AppAudioCapture.attemptBody` and
     /// `MicCaptureHandler.sessionFactory`; the reasoning is on each of those.
     /// Not `public` because neither of them is.
+    ///
+    /// `micHandlerFactory` replaces the whole microphone handler instead, for a
+    /// test that has to drive it: one on a manual clock, whose device change it
+    /// can post. What the session does with the handler's callbacks is only
+    /// observable that way, since a revival is started by a system input
+    /// change and a stall takes a minute of real time.
     init(
         _ configuration: AudioCaptureConfiguration,
         appAttemptBody: (() throws -> AppTapSession?)?,
         micSessionFactory: (() -> any MicEngineSessionProviding)?,
+        micHandlerFactory: ((URL) -> MicCaptureHandler)? = nil,
     ) {
         config = configuration
         self.appAttemptBody = appAttemptBody
         self.micSessionFactory = micSessionFactory
+        self.micHandlerFactory = micHandlerFactory
     }
 
     /// Start capturing app audio, mic audio, or both — whichever output URLs
@@ -130,14 +154,19 @@ public class AudioCaptureSession {
     /// from cached` is the only place it shows.
     ///
     /// Three costs, accepted rather than fixed here. A slow first microphone open
-    /// now delays app capture by that much, and since a *first* start is bounded
-    /// by no deadline (only restarts are, issue #588), a microphone open that
-    /// wedges now prevents app capture outright where it used to leave a running
-    /// tap behind it. A device change mid-recording restarts the two channels
+    /// now delays app capture by that much. A microphone open that wedges
+    /// delays it by `RestartArbiter.attemptTimeout`, the first start's deadline
+    /// (issue #778), and the recording then goes on without the microphone;
+    /// with the tap first it would have left a running tap behind it and lost
+    /// nothing of the app track. Before that deadline existed the same wedge
+    /// prevented app capture outright. A device change mid-recording restarts the two channels
     /// independently, so the same race stays reachable there. And an app-only
     /// recording opens no microphone at all, so the ordering buys it nothing:
     /// the meeting app opening its own input is the same trigger in the same
-    /// window, which only a delivery check after the fact would catch.
+    /// window, which only a delivery check after the fact can catch. That
+    /// check exists behind the opt-in silent-track watchdog: a no-first-buffer
+    /// probe that finds a tapped process rendering rebuilds the tap, see
+    /// `AppAudioCapture+SilentTrackWatchdog.swift`.
     public func start() throws {
         guard config.appOutputURL != nil || config.micOutputURL != nil else {
             throw AudioCaptureSessionError.noTracksRequested
@@ -203,21 +232,8 @@ public class AudioCaptureSession {
         guard let micURL = config.micOutputURL else { return }
 
         micFileWasAbsentBeforeStart = !FileManager.default.fileExists(atPath: micURL.path)
-        let mic = MicCaptureHandler(
-            outputURL: micURL,
-            debugLogging: config.debugLogging,
-            liveSink: config.micLiveSink,
-            debugFault: config.micDebugFault,
-            // `MicCaptureHandler`'s own convenience init builds the same
-            // session, and going through it would mean restating this call's
-            // four arguments in a second branch. The cost of not doing so: its
-            // default is no longer on any production path, so changing the
-            // session it builds would leave this line on the old one. It cannot
-            // be collapsed the other way either, since a public init may not
-            // name an internal protocol.
-            sessionFactory: micSessionFactory ?? { MicEngineSession() },
-            pauseGate: pauseGate,
-        )
+        let mic = micHandlerFactory?(micURL)
+            ?? Self.makeMicCapture(config, outputURL: micURL, sessionFactory: micSessionFactory, pauseGate: pauseGate)
         // Stored before the start rather than after it, so that both ways out of
         // here tear down through `discardMicCapture` instead of one of them
         // repeating what it does. The stop that follows on the failure path is
@@ -228,12 +244,25 @@ public class AudioCaptureSession {
         micCapture = mic
         do {
             try mic.start(deviceUID: config.micDeviceUID)
-            mic.onGiveUp = { [weak self] in self?.micCaptureGaveUp = true }
+            mic.onGiveUp = { [weak self] in
+                self?.micCaptureGaveUp = true
+                self?.micCaptureStall.noteGaveUp()
+            }
+            mic.onStall = { [weak self] details in self?.micCaptureStall.noteStalled(details) }
+            mic.onResume = { [weak self] in self?.micCaptureStall.noteResumed() }
         } catch {
             // `MicCaptureHandler` creates its WAV part-way through starting, so
             // a failure can leave one behind.
             discardMicCapture()
             guard config.appOutputURL != nil else { throw error }
+            // A start that did not return within its deadline is not a missing
+            // microphone, whose advice is to check the device, and the user
+            // needs to hear why the track is gone. Reported as a give-up too, so it is told at once and once, like the restart
+            // path's wedge, rather than as silence after a window.
+            if case MicCaptureError.firstStartTimedOut = error {
+                micCaptureStartTimedOut = true
+                micCaptureGaveUp = true
+            }
             // "Will continue", not "continuing": the tap has not been
             // attempted yet and can still fail after this line.
             logger.error("Failed to start mic capture: \(error.localizedDescription, privacy: .public). Will continue with app audio only.")
@@ -277,6 +306,37 @@ public class AudioCaptureSession {
             liveSink: config.appLiveSink,
             attemptBody: attemptBody,
             silentTrackWatchdog: config.silentTrackWatchdog,
+            pauseGate: pauseGate,
+        )
+    }
+
+    /// The microphone handler a configuration describes, with the real engine
+    /// session unless a test stands one in. Split out for the same reason as
+    /// `makeAppCapture`, and so that whether the handler hears the host's
+    /// device changes is assertable without opening an input.
+    ///
+    /// `pauseGate` is the session's one pause timeline, so the microphone cuts
+    /// the same span as the app track; a caller that does not pause can leave
+    /// it out.
+    static func makeMicCapture(
+        _ config: AudioCaptureConfiguration,
+        outputURL: URL,
+        sessionFactory: (() -> any MicEngineSessionProviding)?,
+        pauseGate: CapturePauseGate = CapturePauseGate(),
+    ) -> MicCaptureHandler {
+        MicCaptureHandler(
+            outputURL: outputURL,
+            debugLogging: config.debugLogging,
+            liveSink: config.micLiveSink,
+            debugFault: config.micDebugFault,
+            // `MicCaptureHandler`'s own convenience init builds the same
+            // session, and going through it would mean restating this call's
+            // four arguments in a second branch. The cost of not doing so: its
+            // default is no longer on any production path, so changing the
+            // session it builds would leave this line on the old one. It cannot
+            // be collapsed the other way either, since a public init may not
+            // name an internal protocol.
+            sessionFactory: sessionFactory ?? { MicEngineSession() },
             pauseGate: pauseGate,
         )
     }
@@ -341,6 +401,12 @@ public class AudioCaptureSession {
     /// muted device and for a dead tap alike).
     public var appSignalAges: ChannelSignalAges {
         appCapture?.currentSignalAges ?? .unknown
+    }
+
+    /// The app tap's noise-floor verdict (issue #699), false when the channel
+    /// was never opened. See `AppNoiseFloorSensor`.
+    public var appCarriesOnlyNoiseFloor: Bool {
+        appCapture?.carriesOnlyNoiseFloor ?? false
     }
 
     /// The microphone counterpart of `appSignalAges`.

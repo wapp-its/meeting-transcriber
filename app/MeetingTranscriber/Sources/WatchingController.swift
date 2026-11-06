@@ -42,6 +42,11 @@ final class WatchingController {
     /// See `defaultStartJoinTimeout`.
     private let startJoinTimeout: Duration
 
+    /// What `startJoinTimeout` is measured on. The continuous clock in
+    /// production; a test passes one it advances itself, so it can let the
+    /// bound pass at a point it chooses instead of timing a real wait.
+    private let joinClock: any Clock<Duration>
+
     /// Set while `startManualRecording` is in flight, i.e. from the call until
     /// `watchLoop` holds the manual loop. `startTask`'s counterpart for the
     /// manual path, so `isManualRecording` covers the window before the loop
@@ -61,6 +66,9 @@ final class WatchingController {
     /// The manual recording loop's clock, `WatchLoop`'s own default. Settable so
     /// a test can reach the four-hour limit without waiting it out.
     @ObservationIgnored var manualRecordingClock: () -> Date = Date.init
+
+    /// Set by `finishForQuit`: a start parked on a permission prompt gives up.
+    var isQuitting = false
 
     let settings: AppSettings
     let notifier: any AppNotifying
@@ -159,6 +167,7 @@ final class WatchingController {
             #endif
         },
         startJoinTimeout: Duration = WatchingController.defaultStartJoinTimeout,
+        joinClock: any Clock<Duration> = ContinuousClock(),
         makeDetector: (() -> any MeetingDetecting)? = nil,
         makeRecorder: @escaping @MainActor () -> any RecordingProvider = { DualSourceRecorder() },
     ) {
@@ -174,6 +183,7 @@ final class WatchingController {
         self.requestScreenRecording = requestScreenRecording
         self.requestAccessibility = requestAccessibility
         self.startJoinTimeout = startJoinTimeout
+        self.joinClock = joinClock
         self.makeRecorder = makeRecorder
         // Tests inject a deterministic detector; production defaults to one
         // filtered by the "Apps to Watch" toggles, re-read at each watch start.
@@ -273,8 +283,8 @@ final class WatchingController {
             // stop it. Bailing here rather than at the assignment also keeps
             // `pipeline.rebuild()` from replacing the queue the manual loop is
             // already wired to. Nothing leaks: `loop.start()` has not run, so
-            // there is no self-retaining watch task yet.
-            guard !isManualRecording else { return }
+            // there is no self-retaining watch task yet. Nor after a quit began.
+            guard !isManualRecording, !isQuitting else { return }
 
             syncEngines?()
             pipeline.rebuild()
@@ -310,17 +320,6 @@ final class WatchingController {
         }
     }
 
-    /// Whether a manual start may take over the loop it found, given what that
-    /// loop is doing. False while it is recording: taking it over stops it, and
-    /// a recording in progress is not something a later start may end.
-    ///
-    /// A pure function over the phase rather than an inline comparison, because
-    /// the guard it backs only fires in a race that no test can schedule
-    /// reliably — this is the layer that can be pinned.
-    static func mayTakeOverLoop(in state: WatchLoop.State) -> Bool {
-        state != .recording
-    }
-
     // MARK: - Settling in-flight starts (shared by both control surfaces)
 
     /// How long a control call waits for an in-flight start before giving up.
@@ -350,20 +349,6 @@ final class WatchingController {
         await join { self.startTask != nil }
     }
 
-    /// Bounded wait for the manual start alone, for a caller that just launched
-    /// one and has to answer for how it went.
-    ///
-    /// The task parks on the microphone TCC prompt, which on a menu-bar app can
-    /// sit unanswered behind other windows for as long as nobody looks. Awaiting
-    /// its value directly would hold an HTTP handler and its connection open for
-    /// exactly that long — the leak `joinStart` above exists to prevent. The task
-    /// clears `manualStartTask` in its own `defer`, so polling that is polling
-    /// its completion, and giving up here does not cancel a start the user may
-    /// still be about to answer.
-    func joinManualStart() async -> Bool {
-        await join { self.manualStartTask != nil }
-    }
-
     /// Settle *both* in-flight starts, auto and manual, under one deadline.
     ///
     /// `/v1/record` waits for a quiet moment before deciding what a request
@@ -386,14 +371,21 @@ final class WatchingController {
     /// cancellation. See `joinStart` for why the bound and the polling shape
     /// are what they are.
     func join(while inFlight: () -> Bool) async -> Bool {
-        let deadline = ContinuousClock.now + startJoinTimeout
-        while inFlight() {
-            if Task.isCancelled { return false }
-            if ContinuousClock.now >= deadline { return false }
-            try? await Task.sleep(for: .milliseconds(50))
+        // Opens the existential so the deadline is an instant of that clock.
+        func wait(on clock: some Clock<Duration>) async -> Bool {
+            let deadline = clock.now.advanced(by: startJoinTimeout)
+            while inFlight() {
+                if Task.isCancelled { return false }
+                if clock.now >= deadline { return false }
+                try? await clock.sleep(for: Self.joinPollInterval)
+            }
+            return true
         }
-        return true
+        return await wait(on: joinClock)
     }
+
+    /// How often a join rechecks whether the start it waits for has settled.
+    static let joinPollInterval: Duration = .milliseconds(50)
 
     // MARK: - Manual recording
 
@@ -488,6 +480,7 @@ final class WatchingController {
         }
 
         _ = await ensureMicAccess()
+        guard !isQuitting else { return .failed }
 
         pipeline.ensureQueue()
 
@@ -523,6 +516,9 @@ final class WatchingController {
                 body: "Recording: \(loop.manualRecordingInfo?.title ?? "")",
             )
             return .started
+        } catch is CancellationError {
+            watchLoop = nil // a quit began while the recorder was built: not an error
+            return .failed
         } catch {
             notifier.notify(title: "Error", body: error.localizedDescription)
             watchLoop = nil

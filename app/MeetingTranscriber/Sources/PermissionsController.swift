@@ -17,7 +17,11 @@ import UserNotifications
 /// churning the microphone, which the probe opens for half a second:
 /// - **One check at a time.** A request while a check runs is folded into one
 ///   follow-up that starts after it, so no two probes run side by side and no
-///   older result can land after a newer one.
+///   older result can land after a newer one. The debounce cannot do that: it
+///   only knows about checks that have finished. It mattered most while the
+///   probe had no deadline (issue #778): a wedged probe never finished, so every
+///   activation started another one that wedged the same way. The probe is
+///   bounded now, so joining a running check no longer waits for good.
 /// - **Never while a recording captures** (`setRecordingActive`). A request then
 ///   waits for the capture to end, and a check already running gives way before
 ///   its retry; one check runs once the capture has ended.

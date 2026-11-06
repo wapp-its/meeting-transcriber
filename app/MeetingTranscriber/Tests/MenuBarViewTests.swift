@@ -45,26 +45,30 @@ final class MenuBarViewTests: XCTestCase {
         history: [TerminalJobRecord] = [],
         isRecordingPaused: Bool = false,
         onTogglePause: (() -> Void)? = nil,
-    ) -> MenuBarView {
+        onQuit: @escaping () -> Void = {},
+        notionExportEnabled: Bool = false,
+    ) throws -> MenuBarView {
         var actions = MenuActions.noop
         actions.installUpdate = onInstallUpdate
         actions.recordMicrophone = onRecordMicrophone
         actions.stopManualRecording = onStopManualRecording
         actions.togglePause = onTogglePause
         actions.openProtocol = onOpenProtocol
-        actions.openLastProtocol = onOpenLastProtocol
+        actions.openLastProtocol = { onOpenLastProtocol($0.url) }
+        actions.quit = onQuit
         actions.nameSpeakers = onNameSpeakers
         actions.showAllTranscriptions = onShowAllTranscriptions
-        return MenuBarView(
+        return try MenuBarView(
             status: status,
             isWatching: isWatching,
-            pipelineQueue: pipelineQueue ?? PipelineQueue(),
+            pipelineQueue: pipelineQueue ?? makeIsolatedQueue(),
             updateChecker: updateChecker,
             updateInstallBlockedReason: updateInstallBlockedReason,
             history: history,
             noMic: noMic,
             manualRecordingPendingOrActive: manualRecordingPendingOrActive,
             isRecordingPaused: isRecordingPaused,
+            notionExportEnabled: notionExportEnabled,
             actions: actions,
         )
     }
@@ -72,13 +76,13 @@ final class MenuBarViewTests: XCTestCase {
     // MARK: - Start/Stop button
 
     func testIdleShowsStartWatching() throws {
-        let sut = makeView(status: makeStatus(state: .idle), isWatching: false)
+        let sut = try makeView(status: makeStatus(state: .idle), isWatching: false)
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Start Watching for Meetings"))
     }
 
     func testWatchingShowsStopWatching() throws {
-        let sut = makeView(status: makeStatus(state: .watching), isWatching: true)
+        let sut = try makeView(status: makeStatus(state: .watching), isWatching: true)
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Stop Watching for Meetings"))
     }
@@ -87,13 +91,13 @@ final class MenuBarViewTests: XCTestCase {
 
     func testMeetingInfoShownWhenRecording() throws {
         let meeting = MeetingInfo(app: "Teams", title: "Standup", pid: 123)
-        let sut = makeView(status: makeStatus(state: .recording, meeting: meeting))
+        let sut = try makeView(status: makeStatus(state: .recording, meeting: meeting))
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Standup"))
     }
 
     func testMeetingInfoHiddenWhenIdle() throws {
-        let sut = makeView(status: makeStatus(state: .idle))
+        let sut = try makeView(status: makeStatus(state: .idle))
         let body = try sut.inspect()
         XCTAssertThrowsError(try body.find(text: "Standup"))
     }
@@ -101,13 +105,13 @@ final class MenuBarViewTests: XCTestCase {
     // MARK: - Error display
 
     func testErrorShownWhenErrorState() throws {
-        let sut = makeView(status: makeStatus(state: .error, error: "Python crashed"))
+        let sut = try makeView(status: makeStatus(state: .error, error: "Python crashed"))
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Python crashed"))
     }
 
     func testErrorHiddenWhenNotErrorState() throws {
-        let sut = makeView(status: makeStatus(state: .recording, error: "stale error"))
+        let sut = try makeView(status: makeStatus(state: .recording, error: "stale error"))
         let body = try sut.inspect()
         XCTAssertThrowsError(try body.find(text: "stale error"))
     }
@@ -116,13 +120,13 @@ final class MenuBarViewTests: XCTestCase {
 
     func testNameSpeakersButtonShownWhenWaiting() throws {
         // swiftlint:disable:next trailing_closure
-        let sut = makeView(status: makeStatus(state: .waitingForSpeakerNames), onNameSpeakers: {})
+        let sut = try makeView(status: makeStatus(state: .waitingForSpeakerNames), onNameSpeakers: {})
         let item = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.nameSpeakersMenuItem)
         XCTAssertNoThrow(try item.find(text: "Name Speakers…"))
     }
 
     func testNameSpeakersButtonHiddenWhenIdle() throws {
-        let sut = makeView(status: makeStatus(state: .idle))
+        let sut = try makeView(status: makeStatus(state: .idle))
         let body = try sut.inspect()
         XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.nameSpeakersMenuItem))
     }
@@ -130,13 +134,13 @@ final class MenuBarViewTests: XCTestCase {
     // MARK: - Detail text
 
     func testDetailShownWhenNonEmpty() throws {
-        let sut = makeView(status: makeStatus(state: .watching, detail: "Checking Teams..."))
+        let sut = try makeView(status: makeStatus(state: .watching, detail: "Checking Teams..."))
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Checking Teams..."))
     }
 
     func testDetailHiddenWhenEmpty() throws {
-        let sut = makeView(status: makeStatus(state: .watching, detail: ""))
+        let sut = try makeView(status: makeStatus(state: .watching, detail: ""))
         let body = try sut.inspect()
         XCTAssertThrowsError(try body.find(text: "Checking Teams..."))
     }
@@ -154,7 +158,7 @@ final class MenuBarViewTests: XCTestCase {
         return job
     }
 
-    /// "Open Last Protocol" follows the finished-job history rather than the
+    /// "Open Last Notes" follows the finished-job history rather than the
     /// status file, so it is there for a job that has left the queue or
     /// finished before a restart, and it opens that job's protocol.
     func testOpenLastProtocolOpensTheLastFinishedJobsProtocol() throws {
@@ -181,16 +185,96 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.openLastProtocolMenuItem))
     }
 
+    func testOpenLastProtocolIsOfferedForACompletedJobWithoutNotion() throws {
+        let dir = try makeTempDirectory(prefix: "menu_open_last_test")
+        let markdown = dir.appendingPathComponent("protocol.md")
+        try "# Protocol".write(to: markdown, atomically: true, encoding: .utf8)
+        let queue = try makeIsolatedQueue()
+        var job = PipelineJob(
+            meetingTitle: "Sprint", appName: "Zoom", mixPath: URL(fileURLWithPath: "/tmp/mix.wav"),
+            appPath: nil, micPath: nil, micDelay: 0,
+        )
+        job.protocolPath = markdown
+        queue.enqueue(job)
+        queue.updateJobState(id: job.id, to: .done)
+
+        let sut = try makeView(status: makeStatus(), pipelineQueue: queue)
+        XCTAssertNoThrow(try sut.inspect().find(button: "Open Last Notes"))
+    }
+
+    private func notionExportedJob(title: String, mix: String, pageID: String, completed: Bool) -> PipelineJob {
+        var job = PipelineJob(
+            meetingTitle: title,
+            appName: "Zoom",
+            mixPath: URL(fileURLWithPath: mix),
+            appPath: nil, micPath: nil, micDelay: 0,
+        )
+        job.recordNotionPage(
+            NotionPageResult(pageID: pageID, url: "https://www.notion.so/\(pageID)"),
+            databaseID: "database-1",
+        )
+        if completed { job.finishNotionExport(succeeded: true) }
+        return job
+    }
+
+    func testOpenLastProtocolInNotionCallsOpenCallbackWithoutQuitting() throws {
+        let queue = try makeIsolatedQueue()
+        let job = notionExportedJob(title: "Sprint", mix: "/tmp/mix.wav", pageID: "page-1", completed: true)
+        queue.enqueue(job)
+        queue.updateJobState(id: job.id, to: .done)
+
+        var openedURL: URL?
+        var quitCalled = false
+        let sut = try makeView(
+            status: makeStatus(),
+            pipelineQueue: queue,
+            onOpenLastProtocol: { openedURL = $0 },
+            onQuit: { quitCalled = true },
+            notionExportEnabled: true,
+        )
+        try sut.inspect().find(button: "Open Last Notes in Notion").tap()
+
+        XCTAssertEqual(openedURL, URL(string: "https://www.notion.so/page-1"))
+        XCTAssertFalse(quitCalled)
+    }
+
+    func testOpenLastProtocolInNotionUsesTheDisplayedTargetAfterQueueChanges() throws {
+        let queue = try makeIsolatedQueue()
+        let displayedJob = notionExportedJob(title: "First", mix: "/tmp/first.wav", pageID: "page-1", completed: true)
+        queue.enqueue(displayedJob)
+        queue.updateJobState(id: displayedJob.id, to: .done)
+
+        var openedURL: URL?
+        var quitCalled = false
+        let sut = try makeView(
+            status: makeStatus(),
+            pipelineQueue: queue,
+            onOpenLastProtocol: { openedURL = $0 },
+            onQuit: { quitCalled = true },
+            notionExportEnabled: true,
+        )
+        let displayedButton = try sut.inspect().find(button: "Open Last Notes in Notion")
+
+        queue.removeJob(id: displayedJob.id)
+        let newerJob = notionExportedJob(title: "Second", mix: "/tmp/second.wav", pageID: "page-2", completed: false)
+        queue.enqueue(newerJob)
+        queue.updateJobState(id: newerJob.id, to: .done)
+
+        try displayedButton.tap()
+        XCTAssertEqual(openedURL, URL(string: "https://www.notion.so/page-1"))
+        XCTAssertFalse(quitCalled)
+    }
+
     // MARK: - Static buttons always present
 
     func testSettingsButtonExists() throws {
-        let sut = makeView(status: makeStatus())
+        let sut = try makeView(status: makeStatus())
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Settings..."))
     }
 
     func testQuitButtonExists() throws {
-        let sut = makeView(status: makeStatus())
+        let sut = try makeView(status: makeStatus())
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Quit"))
     }
@@ -198,7 +282,7 @@ final class MenuBarViewTests: XCTestCase {
     // MARK: - Record Microphone (issue #633)
 
     func testRecordMicrophoneButtonShownWhenIdle() throws {
-        let sut = makeView(status: makeStatus(state: .idle))
+        let sut = try makeView(status: makeStatus(state: .idle))
         let item = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.recordMicrophoneMenuItem)
         XCTAssertNoThrow(try item.find(text: "Record Microphone Only"))
     }
@@ -206,7 +290,7 @@ final class MenuBarViewTests: XCTestCase {
     func testRecordMicrophoneButtonCallsCallback() throws {
         var called = false
         // swiftlint:disable:next trailing_closure
-        let sut = makeView(status: makeStatus(state: .idle), onRecordMicrophone: { called = true })
+        let sut = try makeView(status: makeStatus(state: .idle), onRecordMicrophone: { called = true })
 
         try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.recordMicrophoneMenuItem).button().tap()
 
@@ -215,7 +299,7 @@ final class MenuBarViewTests: XCTestCase {
 
     func testRecordMicrophoneButtonHiddenWhileRecording() throws {
         // Same rule as Record with Options…: the menu offers Stop Recording instead.
-        let sut = makeView(status: makeStatus(state: .recording))
+        let sut = try makeView(status: makeStatus(state: .recording))
         let body = try sut.inspect()
         XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.recordMicrophoneMenuItem))
     }
@@ -224,7 +308,7 @@ final class MenuBarViewTests: XCTestCase {
         // Visible but dead, on purpose: someone who set "No Microphone" months
         // ago needs to see the entry to learn why it cannot run, and starting
         // anyway would record nothing.
-        let sut = makeView(status: makeStatus(state: .idle), noMic: true)
+        let sut = try makeView(status: makeStatus(state: .idle), noMic: true)
 
         let button = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.recordMicrophoneMenuItem)
         XCTAssertTrue(button.isDisabled())
@@ -235,7 +319,7 @@ final class MenuBarViewTests: XCTestCase {
         // The window between registering a start and the loop existing. The
         // narrow `state == .recording` predicate misses it, leaving the item
         // enabled and the click silently dropped by the ownership guard.
-        let sut = makeView(status: makeStatus(state: .idle), manualRecordingPendingOrActive: true)
+        let sut = try makeView(status: makeStatus(state: .idle), manualRecordingPendingOrActive: true)
 
         let button = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.recordMicrophoneMenuItem)
         XCTAssertTrue(button.isDisabled())
@@ -245,7 +329,7 @@ final class MenuBarViewTests: XCTestCase {
     func testRecordMicrophoneButtonEnabledWhenTheMicrophoneIsAllowed() throws {
         // Control for the assertion above: without it a button that was always
         // disabled would pass just as well.
-        let sut = makeView(status: makeStatus(state: .idle), noMic: false)
+        let sut = try makeView(status: makeStatus(state: .idle), noMic: false)
 
         let button = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.recordMicrophoneMenuItem)
         XCTAssertFalse(button.isDisabled())
@@ -258,10 +342,10 @@ final class MenuBarViewTests: XCTestCase {
         var called = false
         var actions = MenuActions.noop
         actions.startStop = { called = true }
-        let sut = MenuBarView(
+        let sut = try MenuBarView(
             status: makeStatus(state: .idle),
             isWatching: false,
-            pipelineQueue: PipelineQueue(),
+            pipelineQueue: makeIsolatedQueue(),
             updateChecker: nil,
             noMic: false,
             manualRecordingPendingOrActive: false,
@@ -276,10 +360,10 @@ final class MenuBarViewTests: XCTestCase {
         var called = false
         var actions = MenuActions.noop
         actions.quit = { called = true }
-        let sut = MenuBarView(
+        let sut = try MenuBarView(
             status: makeStatus(state: .idle),
             isWatching: false,
-            pipelineQueue: PipelineQueue(),
+            pipelineQueue: makeIsolatedQueue(),
             updateChecker: nil,
             noMic: false,
             manualRecordingPendingOrActive: false,
@@ -294,10 +378,10 @@ final class MenuBarViewTests: XCTestCase {
         var called = false
         var actions = MenuActions.noop
         actions.openSettings = { called = true }
-        let sut = MenuBarView(
+        let sut = try MenuBarView(
             status: makeStatus(state: .idle),
             isWatching: false,
-            pipelineQueue: PipelineQueue(),
+            pipelineQueue: makeIsolatedQueue(),
             updateChecker: nil,
             noMic: false,
             manualRecordingPendingOrActive: false,
@@ -312,10 +396,10 @@ final class MenuBarViewTests: XCTestCase {
         var called = false
         var actions = MenuActions.noop
         actions.nameSpeakers = { called = true }
-        let sut = MenuBarView(
+        let sut = try MenuBarView(
             status: makeStatus(state: .waitingForSpeakerNames),
             isWatching: false,
-            pipelineQueue: PipelineQueue(),
+            pipelineQueue: makeIsolatedQueue(),
             updateChecker: nil,
             noMic: false,
             manualRecordingPendingOrActive: false,
@@ -329,7 +413,7 @@ final class MenuBarViewTests: XCTestCase {
     /// The way into the All Recordings window is there whatever else the menu
     /// shows: while recording with a job line above it, and idle with none.
     func testAllRecordingsItemIsAlwaysShownAndCallsItsCallback() throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         var job = PipelineJob(
             meetingTitle: "Standup", appName: "Teams",
             mixPath: URL(fileURLWithPath: "/tmp/mix.wav"), appPath: nil, micPath: nil, micDelay: 0,
@@ -359,8 +443,8 @@ final class MenuBarViewTests: XCTestCase {
         finished.state = .done
         finished.protocolPath = URL(fileURLWithPath: "/tmp/standup.md")
         let views = [
-            makeView(status: makeStatus(state: .idle)),
-            makeView(status: makeStatus(state: .idle), history: [TerminalJobRecord(job: finished)]),
+            try makeView(status: makeStatus(state: .idle)),
+            try makeView(status: makeStatus(state: .idle), history: [TerminalJobRecord(job: finished)]),
         ]
 
         for view in views {
@@ -373,14 +457,14 @@ final class MenuBarViewTests: XCTestCase {
     // MARK: - State label
 
     func testNilStatusShowsIdleLabel() throws {
-        let sut = makeView(status: nil)
+        let sut = try makeView(status: nil)
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Idle"))
     }
 
     func testMeetingAppAndPidShown() throws {
         let meeting = MeetingInfo(app: "Zoom", title: "Retro", pid: 456)
-        let sut = makeView(status: makeStatus(state: .recording, meeting: meeting))
+        let sut = try makeView(status: makeStatus(state: .recording, meeting: meeting))
         let body = try sut.inspect()
         let texts = body.findAll(ViewType.Text.self)
         let found = texts.contains { (try? $0.string())?.contains("Zoom") == true }
@@ -398,7 +482,7 @@ final class MenuBarViewTests: XCTestCase {
     /// A running job sits under "In progress" with its stage and when that
     /// stage started, not a counting elapsed time.
     func testRunningJobIsShownInProgressWithItsStage() throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         let job = PipelineJob(
             meetingTitle: "Standup",
             appName: "Teams",
@@ -420,7 +504,7 @@ final class MenuBarViewTests: XCTestCase {
     /// A failed line opens what the job left and has no Dismiss: Remove takes
     /// it off for good.
     func testFailedJobOffersOpenAndNoDismiss() throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         var job = PipelineJob(
             meetingTitle: "Retro",
             appName: "Zoom",
@@ -448,10 +532,10 @@ final class MenuBarViewTests: XCTestCase {
         var called = false
         var actions = MenuActions.noop
         actions.processFiles = { called = true }
-        let sut = MenuBarView(
+        let sut = try MenuBarView(
             status: makeStatus(),
             isWatching: false,
-            pipelineQueue: PipelineQueue(),
+            pipelineQueue: makeIsolatedQueue(),
             updateChecker: nil,
             noMic: false,
             manualRecordingPendingOrActive: false,
@@ -466,7 +550,7 @@ final class MenuBarViewTests: XCTestCase {
     /// Dismiss stays on a job waiting for speaker names, the one line it is
     /// left on, next to Name Speakers.
     func testDismissButtonCallsCallbackWithJobID() throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         var job = PipelineJob(
             meetingTitle: "Standup",
             appName: "Teams",
@@ -498,7 +582,7 @@ final class MenuBarViewTests: XCTestCase {
 
     /// A failed line offers Remove instead of Dismiss.
     func testRemoveButtonShownForErrorJob() throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         let job = PipelineJob(
             meetingTitle: "Sprint",
             appName: "Webex",
@@ -537,7 +621,7 @@ final class MenuBarViewTests: XCTestCase {
         let first = try queue.insertJobForTesting(mixPath: emptyFile("first_mix.wav", in: dir), state: .error, error: "Failed")
         let second = try queue.insertJobForTesting(mixPath: emptyFile("second_mix.wav", in: dir), state: .error, error: "Failed")
 
-        let sut = makeView(status: makeStatus(), pipelineQueue: queue)
+        let sut = try makeView(status: makeStatus(), pipelineQueue: queue)
         try sut.inspect()
             .find(viewWithAccessibilityIdentifier: A11yID.jobRetryButton(1))
             .button()
@@ -566,6 +650,26 @@ final class MenuBarViewTests: XCTestCase {
         )
     }
 
+    /// The Retry row is shown from the job's recorded state and the queue's
+    /// bookkeeping alone. The audio path here does not exist, so a view that
+    /// asked the file system would hide the row, and a view body must not do
+    /// that: the recording can sit on a network volume. The retry re-checks
+    /// the file itself when it runs.
+    func testFailedJobRetryRowIsOfferedWithoutAskingTheFileSystem() throws {
+        let queue = try makeIsolatedQueue()
+        queue.insertJobForTesting(
+            mixPath: URL(fileURLWithPath: "/nonexistent-volume/recordings/gone_mix.wav"),
+            state: .error, error: "Failed",
+        )
+
+        let body = try makeView(status: makeStatus(), pipelineQueue: queue).inspect()
+
+        XCTAssertNoThrow(
+            try body.find(viewWithAccessibilityIdentifier: A11yID.jobRetryButton(0)),
+            "the Retry row was decided by a file system check in the view body",
+        )
+    }
+
     private func emptyFile(_ name: String, in dir: URL) throws -> URL {
         let url = dir.appendingPathComponent(name)
         try Data().write(to: url)
@@ -575,13 +679,13 @@ final class MenuBarViewTests: XCTestCase {
     // MARK: - Record with Options button
 
     func testRecordAppButtonExistsWhenIdle() throws {
-        let sut = makeView(status: makeStatus(state: .idle))
+        let sut = try makeView(status: makeStatus(state: .idle))
         let item = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.recordWithOptionsMenuItem)
         XCTAssertNoThrow(try item.find(text: "Record with Options…"))
     }
 
     func testRecordAppButtonHiddenDuringRecording() throws {
-        let sut = makeView(status: makeStatus(state: .recording))
+        let sut = try makeView(status: makeStatus(state: .recording))
         let body = try sut.inspect()
         XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.recordWithOptionsMenuItem))
     }
@@ -590,10 +694,10 @@ final class MenuBarViewTests: XCTestCase {
         var called = false
         var actions = MenuActions.noop
         actions.recordApp = { called = true }
-        let sut = MenuBarView(
+        let sut = try MenuBarView(
             status: makeStatus(state: .idle),
             isWatching: false,
-            pipelineQueue: PipelineQueue(),
+            pipelineQueue: makeIsolatedQueue(),
             updateChecker: nil,
             noMic: false,
             manualRecordingPendingOrActive: false,
@@ -608,13 +712,13 @@ final class MenuBarViewTests: XCTestCase {
 
     func testStopRecordingButtonVisibleDuringManualRecording() throws {
         // swiftlint:disable:next trailing_closure
-        let sut = makeView(status: makeStatus(state: .recording), onStopManualRecording: {})
+        let sut = try makeView(status: makeStatus(state: .recording), onStopManualRecording: {})
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Stop Recording"))
     }
 
     func testStopRecordingButtonHiddenWhenNoManualRecording() throws {
-        let sut = makeView(status: makeStatus(state: .recording))
+        let sut = try makeView(status: makeStatus(state: .recording))
         let body = try sut.inspect()
         XCTAssertThrowsError(try body.find(text: "Stop Recording"))
     }
@@ -623,10 +727,10 @@ final class MenuBarViewTests: XCTestCase {
         var called = false
         var actions = MenuActions.noop
         actions.stopManualRecording = { called = true }
-        let sut = MenuBarView(
+        let sut = try MenuBarView(
             status: makeStatus(state: .recording),
             isWatching: false,
-            pipelineQueue: PipelineQueue(),
+            pipelineQueue: makeIsolatedQueue(),
             updateChecker: nil,
             noMic: false,
             manualRecordingPendingOrActive: false,
@@ -644,7 +748,7 @@ final class MenuBarViewTests: XCTestCase {
     func testThePauseItemSitsUnderStopRecordingAndCallsItsCallback() throws {
         for (paused, label, other) in [(false, "Pause Recording", "Resume Recording"), (true, "Resume Recording", "Pause Recording")] {
             var toggles = 0
-            let sut = makeView(
+            let sut = try makeView(
                 status: makeStatus(state: .recording),
                 onStopManualRecording: {},
                 isRecordingPaused: paused,
@@ -674,8 +778,8 @@ final class MenuBarViewTests: XCTestCase {
 
     // MARK: - Update indicator
 
-    func testUpdateIndicatorShownWhenUpdateAvailable() throws {
-        let checker = UpdateChecker(provider: MockUpdateProvider())
+    private func checkerWithUpdate(installedCask: String? = nil) throws -> UpdateChecker {
+        let checker = UpdateChecker(provider: MockUpdateProvider(), installedCask: installedCask)
         checker.availableUpdate = try ReleaseInfo(
             tagName: "v1.0.0",
             name: "Release v1.0.0",
@@ -683,22 +787,34 @@ final class MenuBarViewTests: XCTestCase {
             htmlURL: XCTUnwrap(URL(string: "https://github.com/pasrom/meeting-transcriber/releases/tag/v1.0.0")),
             dmgURL: URL(string: "https://example.com/app.dmg"),
         )
+        return checker
+    }
 
-        let sut = makeView(status: makeStatus(), updateChecker: checker)
+    func testUpdateIndicatorShownWhenUpdateAvailable() throws {
+        let sut = try makeView(status: makeStatus(), updateChecker: checkerWithUpdate())
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Update Available: v1.0.0"))
+    }
+
+    func testUpdateIndicatorSaysItCopiesBrewCommandForHomebrewInstall() throws {
+        let sut = try makeView(
+            status: makeStatus(),
+            updateChecker: checkerWithUpdate(installedCask: "meeting-transcriber"),
+        )
+        let body = try sut.inspect()
+        XCTAssertNoThrow(try body.find(text: "Update Available: v1.0.0 (Copy brew Command)"))
     }
 
     func testUpdateIndicatorHiddenWhenNoUpdate() throws {
         let checker = UpdateChecker(provider: MockUpdateProvider())
 
-        let sut = makeView(status: makeStatus(), updateChecker: checker)
+        let sut = try makeView(status: makeStatus(), updateChecker: checker)
         let body = try sut.inspect()
         XCTAssertThrowsError(try body.find(text: "Update Available:"))
     }
 
     func testUpdateIndicatorHiddenWhenNoChecker() throws {
-        let sut = makeView(status: makeStatus())
+        let sut = try makeView(status: makeStatus())
         let body = try sut.inspect()
         XCTAssertThrowsError(try body.find(text: "Update Available:"))
     }
@@ -753,7 +869,7 @@ final class MenuBarViewTests: XCTestCase {
         for row in rows {
             let checker = try makeMtUpdateChecker()
             checker.isChecking = row.checking
-            let sut = makeView(
+            let sut = try makeView(
                 status: makeStatus(), updateChecker: checker,
                 updateInstallBlockedReason: row.reason, onInstallUpdate: row.callback,
             )
@@ -792,7 +908,7 @@ final class MenuBarViewTests: XCTestCase {
     // MARK: - Error job display
 
     func testErrorJobShowsErrorMessage() throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         let job = PipelineJob(
             meetingTitle: "Broken",
             appName: "Teams",
@@ -818,7 +934,7 @@ final class MenuBarViewTests: XCTestCase {
     // MARK: - Record/Stop button mutual exclusion
 
     func testRecordAppAndStopBothHiddenDuringAutoRecording() throws {
-        let sut = makeView(status: makeStatus(state: .recording), onStopManualRecording: nil)
+        let sut = try makeView(status: makeStatus(state: .recording), onStopManualRecording: nil)
         let body = try sut.inspect()
         XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.recordWithOptionsMenuItem))
         XCTAssertThrowsError(try body.find(text: "Stop Recording"))
@@ -826,7 +942,7 @@ final class MenuBarViewTests: XCTestCase {
 
     func testStopRecordingReplacesRecordAppButton() throws {
         // swiftlint:disable:next trailing_closure
-        let sut = makeView(status: makeStatus(state: .idle), onStopManualRecording: {})
+        let sut = try makeView(status: makeStatus(state: .idle), onStopManualRecording: {})
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Stop Recording"))
         XCTAssertThrowsError(try body.find(viewWithAccessibilityIdentifier: A11yID.recordWithOptionsMenuItem))
@@ -835,7 +951,7 @@ final class MenuBarViewTests: XCTestCase {
     // MARK: - Job state labels
 
     func testWaitingJobShowsWaitingLabel() throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         let job = PipelineJob(
             meetingTitle: "Standup",
             appName: "Teams",
@@ -844,13 +960,13 @@ final class MenuBarViewTests: XCTestCase {
         )
         queue.enqueue(job)
 
-        let sut = makeView(status: makeStatus(), pipelineQueue: queue)
+        let sut = try makeView(status: makeStatus(), pipelineQueue: queue)
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(text: "Waiting..."))
     }
 
     func testCancelButtonShownForWaitingJob() throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         let job = PipelineJob(
             meetingTitle: "Sprint",
             appName: "Zoom",
@@ -859,13 +975,13 @@ final class MenuBarViewTests: XCTestCase {
         )
         queue.enqueue(job)
 
-        let sut = makeView(status: makeStatus(), pipelineQueue: queue)
+        let sut = try makeView(status: makeStatus(), pipelineQueue: queue)
         let body = try sut.inspect()
         XCTAssertNoThrow(try body.find(button: "Cancel"))
     }
 
     func testCancelButtonHiddenForDoneJob() throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         let job = PipelineJob(
             meetingTitle: "Sprint",
             appName: "Zoom",
@@ -875,13 +991,13 @@ final class MenuBarViewTests: XCTestCase {
         queue.enqueue(job)
         queue.updateJobState(id: job.id, to: .done)
 
-        let sut = makeView(status: makeStatus(), pipelineQueue: queue)
+        let sut = try makeView(status: makeStatus(), pipelineQueue: queue)
         let body = try sut.inspect()
         XCTAssertThrowsError(try body.find(button: "Cancel"))
     }
 
     func testDoneJobWithoutPathsHidesOpenButton() throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         let job = PipelineJob(
             meetingTitle: "Sprint",
             appName: "Zoom",
@@ -891,7 +1007,7 @@ final class MenuBarViewTests: XCTestCase {
         queue.enqueue(job)
         queue.updateJobState(id: job.id, to: .done)
 
-        let sut = makeView(status: makeStatus(), pipelineQueue: queue)
+        let sut = try makeView(status: makeStatus(), pipelineQueue: queue)
         let body = try sut.inspect()
         XCTAssertThrowsError(try body.find(button: "Open"))
     }
@@ -904,7 +1020,7 @@ final class MenuBarViewTests: XCTestCase {
             .generatingProtocol, .protocolReady, .error,
         ]
         for state in states {
-            let sut = makeView(status: makeStatus(state: state))
+            let sut = try makeView(status: makeStatus(state: state))
             let body = try sut.inspect()
             XCTAssertNoThrow(
                 try body.find(text: state.label),
@@ -913,10 +1029,71 @@ final class MenuBarViewTests: XCTestCase {
         }
     }
 
+    func testJobRowDoesNotContainSpacerOrHStack() throws {
+        // This checks the SwiftUI structure; ViewInspector cannot verify native
+        // NSMenu hit-testing or which row macOS highlights on hover.
+        let queue = try makeIsolatedQueue()
+        let job = PipelineJob(
+            meetingTitle: "Sprint",
+            appName: "Zoom",
+            mixPath: URL(fileURLWithPath: "/tmp/mix.wav"),
+            appPath: nil, micPath: nil, micDelay: 0,
+        )
+        queue.enqueue(job)
+
+        let sut = try makeView(status: makeStatus(), pipelineQueue: queue)
+        let body = try sut.inspect()
+        XCTAssertThrowsError(try body.find(ViewType.Spacer.self))
+        XCTAssertThrowsError(try body.find(ViewType.HStack.self))
+    }
+
+    func testJobLabelsAndCancelArePresent() throws {
+        let queue = try makeIsolatedQueue()
+        let job = PipelineJob(
+            meetingTitle: "Sprint",
+            appName: "Zoom",
+            mixPath: URL(fileURLWithPath: "/tmp/mix.wav"),
+            appPath: nil, micPath: nil, micDelay: 0,
+        )
+        queue.enqueue(job)
+
+        let body = try makeView(status: makeStatus(), pipelineQueue: queue).inspect()
+        XCTAssertNoThrow(try body.find(text: "Sprint"))
+        XCTAssertNoThrow(try body.find(text: "Waiting..."))
+        XCTAssertFalse(try body.find(button: "Cancel").isDisabled())
+    }
+
+    func testCancelButtonCancelsOnlyItsOwnJob() throws {
+        let dir = try makeTempDirectory(prefix: "menubar_cancel_test")
+        let queue = PipelineQueue(logDir: dir)
+        let first = try PipelineJob(
+            meetingTitle: "First", appName: "Teams",
+            mixPath: emptyFile("first_mix.wav", in: dir),
+            appPath: nil, micPath: nil, micDelay: 0,
+        )
+        let second = try PipelineJob(
+            meetingTitle: "Second", appName: "Zoom",
+            mixPath: emptyFile("second_mix.wav", in: dir),
+            appPath: nil, micPath: nil, micDelay: 0,
+        )
+        queue.enqueue(first)
+        queue.enqueue(second)
+
+        let body = try makeView(status: makeStatus(), pipelineQueue: queue).inspect()
+        let cancelButtons = body.findAll(ViewType.Button.self).filter { button in
+            (try? button.labelView().text().string()) == "Cancel"
+        }
+        XCTAssertEqual(cancelButtons.count, 2)
+        try cancelButtons[1].tap()
+
+        XCTAssertTrue(queue.jobs.contains { $0.id == first.id })
+        XCTAssertFalse(queue.jobs.contains { $0.id == second.id })
+    }
+
     // MARK: - Multiple jobs
 
     func testMultipleJobsRendered() throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         let job1 = PipelineJob(
             meetingTitle: "Meeting 1",
             appName: "Teams",

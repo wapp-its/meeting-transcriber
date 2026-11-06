@@ -1,13 +1,39 @@
 import AppKit
 @preconcurrency import AVFoundation
+import enum FluidAudio.ASRError
 import Foundation
 @testable import MeetingTranscriber
 import UserNotifications
 import XCTest
 
+// MARK: - App Source Text
+
+/// The text of an app source file under `Sources/`, for the few properties
+/// only the source can show without touching the user's files: a default
+/// argument that names one of the app's own folders, or a call in an
+/// initialiser no test can build.
+func appSourceText(_ name: String, file: StaticString = #filePath) throws -> String {
+    let url = URL(fileURLWithPath: "\(file)")
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Sources/\(name)")
+    return try String(contentsOf: url, encoding: .utf8)
+}
+
 // MARK: - Temp-Directory / Temp-File Helpers
 
 extension XCTestCase {
+    /// Make an existing file unreadable (mode 000), restoring it on teardown
+    /// so the temp directory can be removed even when an assertion throws.
+    /// Skips as root, which reads a mode-000 file regardless.
+    func makeUnreadable(_ url: URL) throws {
+        try XCTSkipIf(geteuid() == 0, "root reads a mode-000 file, so it is not unreadable")
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: url.path)
+        let path = url.path
+        addTeardownBlock {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path)
+        }
+    }
+
     /// Create a unique temp directory under `FileManager.default.temporaryDirectory`
     /// and register an automatic cleanup with `addTeardownBlock`. The dir is
     /// removed regardless of whether tearDown is async, sync, or absent.
@@ -37,13 +63,13 @@ extension XCTestCase {
 
 // MARK: - Async Polling Helper
 
+@MainActor
 extension XCTestCase {
     /// Yields repeatedly until `condition()` is true or `timeout` elapses.
     /// Needed for tests that await operations spawning a `Task { @MainActor in … }`
     /// (e.g. AppState's `withObservationTracking` re-arm, AVCaptureDevice
     /// permission prompts) — a single `Task.yield()` isn't always enough to
     /// drain the runloop before the assertion fires.
-    @MainActor
     func waitFor(
         _ condition: @autoclosure () -> Bool,
         timeout: Duration = .milliseconds(500),
@@ -57,7 +83,6 @@ extension XCTestCase {
     /// Async-condition overload for conditions that must `await` (e.g. reading
     /// actor-isolated test-double state). Polls with a short sleep instead of
     /// a bare yield so the awaited actor gets real scheduling windows.
-    @MainActor
     func waitFor(
         _ condition: () async -> Bool,
         timeout: Duration = .seconds(5),
@@ -114,7 +139,7 @@ extension XCTestCase {
     func requireLocalVQEModel() throws -> String {
         switch LocalVQEModel.resolve() {
         case let .found(path):
-            return path
+            path
 
         case let .overrideMissing(path):
             // The resolver knows the difference between unset and dangling, so
@@ -242,7 +267,7 @@ func makeTestWatchLoop(
         pipelineQueue: pipelineQueue,
         pollInterval: 0.05,
         endGracePeriod: 0.1,
-        noMic: noMic,
+        noMic: { noMic },
         micDeviceUID: { micDeviceUID },
         recordOnly: recordOnly,
         recordOnlyDestination: { .unscoped(recordOnlyOutputDir()) },
@@ -336,12 +361,19 @@ final class MockDiarization: DiarizationProvider, @unchecked Sendable {
     /// The `numSpeakers` value passed to each `run` call, in order — lets tests
     /// assert how the speaker count is threaded (e.g. a naming-dialog re-run).
     var receivedNumSpeakers: [Int?] = []
+    /// The audio each `run` call was handed, in order — lets a test say which
+    /// folder a re-run read from.
+    var receivedAudioPaths: [URL] = []
     var throwOnPathSuffix: String?
     var resultToReturn: DiarizationResult?
+    /// Runs inside each call with that call's 1-based number.
+    var onRun: ((Int) -> Void)?
 
     func run(audioPath: URL, numSpeakers: Int?, meetingTitle _: String) throws -> DiarizationResult {
         runCount += 1
+        onRun?(runCount)
         receivedNumSpeakers.append(numSpeakers)
+        receivedAudioPaths.append(audioPath)
         if let suffix = throwOnPathSuffix, audioPath.lastPathComponent.hasSuffix(suffix) {
             throw NSError(
                 domain: "MockDiarization", code: 1,
@@ -363,40 +395,15 @@ final class MockDiarization: DiarizationProvider, @unchecked Sendable {
     }
 }
 
-/// Mock protocol generator that captures the transcript instead of calling Claude CLI.
-class MockProtocolGen: ProtocolGenerating {
-    var generateCalled = false
-    var capturedTranscript: String?
-    var capturedTitle: String?
-    // swiftlint:disable:next discouraged_optional_boolean
-    var capturedDiarized: Bool?
-    var capturedMeetingStartTime: Date?
-    var capturedInstructions: ProtocolInstructions?
-    var shouldThrow = false
-
-    func generate(transcript: String, title: String, diarized: Bool, meetingStartTime: Date?, instructions: ProtocolInstructions) throws -> String {
-        generateCalled = true
-        capturedTranscript = transcript
-        capturedTitle = title
-        capturedDiarized = diarized
-        capturedMeetingStartTime = meetingStartTime
-        capturedInstructions = instructions
-        if shouldThrow {
-            throw NSError(
-                domain: "MockProtocolGen",
-                code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Mock protocol error"],
-            )
-        }
-        return """
-        # Meeting Protocol - \(title)
-        **Date:** 2026-03-06
-
-        ---
-
-        ## Summary
-        Test protocol generated by mock.
-        """
+/// The call shape from before protocol templates, for tests that are not about
+/// the prompt or the meeting time: the built-in template and no background.
+/// `MockProtocolGen` lives in its own file.
+extension ProtocolGenerating {
+    func generate(transcript: String, title: String, diarized: Bool, meetingStartTime: Date? = nil) async throws -> String {
+        try await generate(
+            transcript: transcript, title: title, diarized: diarized, meetingStartTime: meetingStartTime,
+            instructions: ProtocolInstructions(template: ProtocolGenerator.protocolPrompt, background: nil),
+        )
     }
 }
 
@@ -413,14 +420,14 @@ class MockEngine: TranscribingEngine {
     /// the far end falls silent, which one shared list cannot express.
     var segmentsByPathSuffix: [String: [TimestampedSegment]] = [:]
     var transcribeCallCount = 0
-    /// Refuses every path. `throwingPathSuffixes` below is checked first, so a
-    /// test setting both gets that one's message.
+    /// Refuses every path with an unclassified, so engine-wide, error.
+    /// `throwingPathSuffixes` is checked first.
     var shouldThrow = false
-    /// Path suffixes this engine refuses, standing in for the real engine's
-    /// `Invalid audio data provided...`. An empty-track test needs the refusal
-    /// to come from the empty track, or it asserts on the mock rather than on
-    /// the pipeline's decision not to ask it.
+    /// Paths refused with Parakeet's per-file `ASRError.invalidAudioData`, so
+    /// an empty-track test can tell the refusal came from the empty track.
     var throwingPathSuffixes: Set<String> = []
+    /// Paths on which a model fails to load (engine-wide); others transcribe.
+    var modelFailurePathSuffixes: Set<String> = []
 
     func loadModel() {
         modelState = .loaded
@@ -429,8 +436,10 @@ class MockEngine: TranscribingEngine {
     func transcribeSegments(audioPath: URL) throws -> [TimestampedSegment] {
         transcribeCallCount += 1
         if throwingPathSuffixes.contains(where: { audioPath.path.hasSuffix($0) }) {
-            let refusal = "Invalid audio data provided. Must be at least 300ms of 16kHz audio"
-            throw NSError(domain: "MockEngine", code: 2, userInfo: [NSLocalizedDescriptionKey: refusal])
+            throw ASRError.invalidAudioData
+        }
+        if modelFailurePathSuffixes.contains(where: { audioPath.path.hasSuffix($0) }) {
+            throw ASRError.modelLoadFailed
         }
         if shouldThrow {
             throw NSError(domain: "MockEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Mock transcription error"])
@@ -549,6 +558,7 @@ actor MockEouManager: EouStreamingAsrManaging {
     }
 }
 
+@MainActor
 extension XCTestCase {
     /// Build an `AppState` over a per-call unique, volatile `UserDefaults` suite
     /// that is torn down after the test. Shared by the RPC-snapshot test classes
@@ -556,14 +566,13 @@ extension XCTestCase {
     /// …) to exercise `rpcStateSnapshot()` without touching the real defaults
     /// domain or leaking a preference domain across runs. Captures only the
     /// Sendable suite name in the teardown block.
-    @MainActor
-    func makeRPCTestState() -> AppState {
+    func makeRPCTestState() throws -> AppState {
         let suite = "RPCTestState-\(getpid())-\(UUID().uuidString)"
-        guard let defaults = UserDefaults(suiteName: suite) else {
+        guard let defaults = DefaultsSuite.open(suite) else {
             fatalError("Could not create test UserDefaults suite")
         }
         addTeardownBlock { DefaultsSuite.remove(suite) }
-        return AppState(settings: AppSettings(defaults: defaults))
+        return try AppState(pipelineEnvironment: makeIsolatedPipelineEnvironment(), settings: AppSettings(defaults: defaults))
     }
 }
 

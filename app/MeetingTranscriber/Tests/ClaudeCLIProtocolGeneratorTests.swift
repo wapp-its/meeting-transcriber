@@ -499,9 +499,9 @@
             XCTAssertEqual(reply.count, 2, "unexpected fake CLI reply: \(result)")
             let directory = reply.first ?? ""
             XCTAssertNotEqual(directory, "/")
-            XCTAssertNotEqual(directory, Self.physicalPath(NSHomeDirectory()))
+            XCTAssertNotEqual(directory, physicalPath(NSHomeDirectory()))
             XCTAssertNotEqual(
-                directory, Self.physicalPath(FileManager.default.currentDirectoryPath),
+                directory, physicalPath(FileManager.default.currentDirectoryPath),
                 "the CLI inherited the working directory of the process that launched it",
             )
             XCTAssertEqual(reply.last, "0", "the CLI's working directory \(directory) is not empty")
@@ -586,15 +586,6 @@
             let missingParent = FileManager.default.temporaryDirectory
                 .appendingPathComponent("claude-cli-missing-\(UUID().uuidString)", isDirectory: true)
             XCTAssertThrowsError(try ClaudeCLIProtocolGenerator.makeWorkingDirectory(in: missingParent))
-        }
-
-        /// `path` with every symlink resolved, as `pwd -P` reports it
-        /// (`/var` → `/private/var`). Foundation's `resolvingSymlinksInPath`
-        /// strips `/private` instead, so it cannot be compared with the shell.
-        private static func physicalPath(_ path: String) -> String? {
-            guard let resolved = realpath(path, nil) else { return nil }
-            defer { free(resolved) }
-            return String(cString: resolved)
         }
     }
 #endif

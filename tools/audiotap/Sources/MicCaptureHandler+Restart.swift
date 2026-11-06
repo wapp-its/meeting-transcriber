@@ -18,65 +18,61 @@ extension MicCaptureHandler {
     /// is what enforces that: an attempt already in flight may be wedged, and
     /// starting a second one would leak another thread into the same loop.
     ///
-    /// `trigger` only names the cause for the log; both device triggers launch
-    /// exactly the same attempt. What differs is how often they may ask: a
-    /// configuration change comes here only through `MicConfigChangePolicy`
-    /// (see `+ConfigChange`), which paces and caps those restarts, because a
-    /// pinned headset posted one after every engine start and restarting on
-    /// each never let a buffer arrive. A default-input change comes straight
-    /// here, as it always has. The stall watchdog does not come through here,
-    /// because it has to count its launch and log its line between the
-    /// arbiter's grant and the launch (see `+StallWatchdog`), but it takes the
-    /// same `claimRestartAttempt` and the same `launchRestartAttempt`.
+    /// `fromConfigurationChange` says the engine raised it rather than the
+    /// system input changing. Only that ends a storm (below): a switch of the
+    /// input is the user acting, often on a notification, and always gets its
+    /// restart. A microphone selection during the recording comes here too
+    /// (`+DeviceSelection`), so it revives a stalled capture exactly as a
+    /// change of the input does; `announce` runs once the arbiter granted the
+    /// attempt and before it is launched, so the caller's line comes first.
     ///
-    /// Returns whether the arbiter granted an attempt, so the caller can
-    /// charge only a restart that was actually launched.
+    /// Returns whether an attempt was launched.
     @discardableResult
-    func handleDeviceChange(_ trigger: MicRestartTrigger = .defaultInputChanged) -> Bool {
-        guard let claim = claimRestartAttempt() else { return false }
-        // Not the watchdog's budget, but it ends the wait for a stall
-        // restart's first buffer: what arrives next is this restart's.
-        stallWatchdog.withLock { _ = $0.restartLaunched(byStall: false) }
-        launchRestartAttempt(deviceUID: claim.deviceUID, generation: claim.generation, trigger: trigger)
-        return true
-    }
-
-    /// Choose the device a restart aims at and ask the arbiter for an attempt.
-    /// Nil when there is nothing to restart or an attempt is already
-    /// outstanding.
-    ///
-    /// The target is the pinned device whenever it is still present, the
-    /// system default otherwise, whatever triggered the restart and however
-    /// many restarts failed before. Falling back while the pinned device is
-    /// there would bypass a headset's hardware mute.
-    func claimRestartAttempt() -> (deviceUID: String?, generation: Int)? {
+    func handleDeviceChange(fromConfigurationChange: Bool = false, announce: () -> Void = {}) -> Bool {
         let isDeviceAvailable = selectedDeviceUID.map(isDevicePresent) ?? false
+        // A capture that stalled for lack of audio released its engine and is
+        // waiting for exactly this: a new device is the one thing that may
+        // bring it back (see `+Progress`).
+        let stalled = arbiter.withLock { $0.phase == .stalled }
+        // Only a change of the input revives. A configuration change cannot
+        // reach a stalled capture through its observer, which the stall
+        // removed, and if one ever did it would be the storm it stalled for.
+        if stalled, fromConfigurationChange { return false }
+        guard !stalled || mayRevive else { return false }
+        // A storm is ended here, at its next restart, once it has gone the
+        // whole budget without audio, rather than at the adoption before:
+        // that engine gets its first deadline, and a storm that settles just
+        // past the budget keeps the engine it settled on.
+        if fromConfigurationChange, !stalled, isRecording, isSilentPastBudget {
+            stallSilentCapture()
+            return false
+        }
         let action = MicRestartPolicy.decideRestart(
-            isRecording: isRecording,
+            isRecording: isRecording || stalled,
             // The arbiter owns "an attempt is outstanding" now, including the
             // backoff window, so this only asks the policy about the device.
             isRestarting: false,
             selectedDeviceUID: selectedDeviceUID,
             isSelectedDeviceAvailable: isDeviceAvailable,
         )
-        guard case let .restart(deviceUID) = action else { return nil }
+        guard case let .restart(deviceUID) = action else { return false }
         guard case let .launchAttempt(generation) = arbiter.withLock({ $0.handle(.deviceChanged) })
-        else { return nil }
-        return (deviceUID, generation)
+        else { return false }
+        announce()
+        if stalled { noteRevival() }
+        // A stalled capture's engine was released when it stalled.
+        launchRestartAttempt(deviceUID: deviceUID, generation: generation, outgoingReleased: stalled)
+        return true
     }
 
-    /// Runs one restart attempt off the main queue and arms a deadline for it.
+    /// Runs one restart attempt off the main queue, which arms a deadline for
+    /// itself once any bridge of the timeline is written.
     ///
     /// The deadline is the whole point: the call that brings an engine up can
     /// loop forever inside AVFAudio and cannot be cancelled, so the only way to
     /// find out is to stop waiting. `CaptureRestartRetryPolicy` still governs
     /// attempts that come back with an error; it never sees one that hangs.
-    ///
-    /// Known exposure, accepted for now: the OUTGOING session's teardown below
-    /// runs synchronously on the main queue before the deadline is armed. If it
-    /// blocked, the main thread would block with it and no deadline would
-    /// notice. `MicCaptureHandlerStallWatchdogTests` pins where that happens.
-    func launchRestartAttempt(deviceUID: String?, generation: Int, trigger: MicRestartTrigger) {
+    func launchRestartAttempt(deviceUID: String?, generation: Int, outgoingReleased: Bool = false) {
         if deviceUID == nil, let uid = selectedDeviceUID {
             logger.warning("Mic: selected device '\(uid)' no longer available, falling back to system default")
         }
@@ -93,40 +89,54 @@ extension MicCaptureHandler {
         // It never reads `session`, so a stop running later on this same queue
         // cannot interleave with an adoption.
         removeConfigChangeObserver()
-        session.teardown()
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + RestartArbiter.attemptTimeout) { [weak self] in
-            self?.handleAttemptTimeout(generation: generation)
-        }
+        if !outgoingReleased { session.teardown() }
+        anchorTimelineIfNothingDelivered()
 
         restartQueue.async { [weak self] in
-            self?.runRestartAttempt(deviceUID: deviceUID, generation: generation, trigger: trigger)
+            self?.runRestartAttempt(deviceUID: deviceUID, generation: generation)
         }
     }
 
     /// Builds a fresh session and brings it up. Everything it produces stays
     /// local until the arbiter agrees this attempt is still the current one, so
     /// an attempt that returns after its deadline cannot adopt anything.
-    private func runRestartAttempt(deviceUID: String?, generation: Int, trigger: MicRestartTrigger) {
+    private func runRestartAttempt(deviceUID: String?, generation: Int) {
+        writePendingTimelineBridge(generation: generation)
+        // A stop while the bridge was written ended it at the next chunk, and
+        // nothing after it may open a microphone the recording no longer
+        // wants: started anyway, the engine opened the input after the
+        // recording ended, and a wedge there left this thread stuck in it.
+        // From here on a stop is the in-flight case the arbiter already
+        // handles, and a retry goes through the arbiter too.
+        //
         // AVAudioEngine can be in a bad state after a config change, so an
         // attempt always builds a new session rather than reusing the engine.
         // Checked and built under the lock stop()'s seal takes: either this
         // builds first and stop() finds an attempt in flight, or the seal comes
-        // first and nothing is built.
+        // first and nothing is built, not even a session nothing would adopt.
         let (built, sealAtBuild) = attemptBuildLock.withLock { () -> ((any MicEngineSessionProviding)?, RestartArbiter.Seal?) in
             let state = arbiter.withLock { $0 }
             return state.mayBuildAttempt(generation: generation) ? (sessionFactory(), nil) : (nil, state.seal)
         }
         guard let candidate = built else {
             logger.notice(
-                "Mic: not building restart attempt \(generation, privacy: .public) after \(trigger.logDescription, privacy: .public): \(Self.sealReason(sealAtBuild), privacy: .public) first",
+                "Mic: not building restart attempt \(generation, privacy: .public): \(Self.sealReason(sealAtBuild), privacy: .public) first",
             )
             return
+        }
+        // The deadline is for the engine, so it starts once the bridge is
+        // written: after a long stall that write takes real time, and counted
+        // against the deadline it would give a healthy revival up for good.
+        // Armed on the main queue, where every timer of this path lives.
+        DispatchQueue.main.async { [weak self] in
+            self?.scheduleOnMain(RestartArbiter.attemptTimeout) { [weak self] in
+                self?.handleAttemptTimeout(generation: generation)
+            }
         }
         var started: (rate: Double, device: MicInputDevice?)?
         var thrown: (any Error)?
         do {
-            started = try startEngine(deviceUID: deviceUID, on: candidate)
+            started = try startEngine(deviceUID: deviceUID, on: candidate, generation: generation)
         } catch {
             thrown = error
         }
@@ -143,7 +153,7 @@ extension MicCaptureHandler {
             // Publication happens on the main queue, where stop() also runs, so
             // the two are totally ordered instead of racing on `session`.
             DispatchQueue.main.async { [weak self] in
-                self?.adopt(candidate, deviceUID: deviceUID, generation: generation, started: result, trigger: trigger)
+                self?.adopt(candidate, deviceUID: deviceUID, generation: generation, started: result)
             }
 
         case .retry:
@@ -151,18 +161,18 @@ extension MicCaptureHandler {
             // recoverable: the device usually settles within a few hundred ms.
             let reason = failure?.localizedDescription ?? "unknown error"
             logger.error(
-                "Failed to restart mic after \(trigger.logDescription, privacy: .public): \(reason, privacy: .public) — scheduling retry",
+                "Failed to restart mic after device change: \(reason, privacy: .public) — scheduling retry",
             )
             candidate.teardown()
             DispatchQueue.main.async { [weak self] in
-                self?.scheduleRestartRetry(deviceUID: deviceUID, trigger: trigger)
+                self?.scheduleRestartRetry(deviceUID: deviceUID)
             }
 
         default:
-            // The session was sealed while this attempt was outstanding. It owns
-            // nothing shared, so it tears its own work down.
+            // The session was sealed, or the attempt superseded, while it was
+            // outstanding. It owns nothing shared, so it tears its own work down.
             logger.notice(
-                "Mic: restart attempt \(generation, privacy: .public) after \(trigger.logDescription, privacy: .public) returned after \(Self.sealReason(sealAtReturn), privacy: .public); tearing its session down",
+                "Mic: restart attempt \(generation, privacy: .public) returned after \(Self.sealReason(sealAtReturn), privacy: .public); tearing its session down",
             )
             candidate.teardown()
         }
@@ -185,12 +195,10 @@ extension MicCaptureHandler {
         deviceUID: String?,
         generation: Int,
         started: (rate: Double, device: MicInputDevice?)?,
-        trigger: MicRestartTrigger,
     ) {
         let rate = started?.rate
-        // Read before the arbiter resumes capturing, so a buffer the render
-        // thread delivers in between is still credited to this adoption.
-        let adoptedAt = stallClock()
+        // Before the phase flips back to capturing; see `MicEpochHandover`.
+        let handover = endEpoch()
         guard case .adopt = arbiter.withLock({ $0.handle(.commitReady(generation: generation)) }) else {
             logger.notice("Mic: discarding a restart that succeeded after the session was sealed")
             candidate.teardown()
@@ -199,17 +207,13 @@ extension MicCaptureHandler {
         session = candidate
         activeInputDevice = started?.device
         restartRetryCount = 0
-        configChangePolicy.engineStarted(at: adoptedAt)
-        cancelPendingConfigChangeRestart()
         installConfigChangeObserver()
-        noteAdoptionForStallWatchdog(at: adoptedAt, trigger: trigger, onSelectedDevice: deviceUID != nil, rate: rate)
-        // A stall restart's adoption is logged by the watchdog and a
-        // selection's here, both at a retained level; a device change keeps
-        // its line as it was.
-        if trigger == .deviceSelected {
-            let line = MicSelectionLogLine.adopted(rate: rate)
-            logger.log(level: line.level, "\(line.text, privacy: .public)")
-        } else if trigger.stallRestart == nil {
+        // A selection's adoption is logged at a retained level (see
+        // `MicSelectionLogLine`); a device change keeps its line as it was.
+        if selectionRestartOutstanding {
+            selectionRestartOutstanding = false
+            logSelection(.adopted(rate: rate))
+        } else {
             logger.info(
                 "Mic: engine restarted on \(deviceUID != nil ? "selected" : "default") device (\(Int(rate ?? 0)) Hz)",
             )
@@ -217,6 +221,9 @@ extension MicCaptureHandler {
         if let rate, rate <= 0 {
             logger.warning("Mic: hardware format rate is \(rate) after restart — may produce incorrect audio")
         }
+        // Last but one, so a stall it decides on is logged after the adoption
+        // it judges.
+        noteRestartAdopted(handover)
         applyPendingSelection(adoptedDeviceUID: deviceUID)
     }
 
@@ -233,56 +240,102 @@ extension MicCaptureHandler {
         // may be inside a call that holds the engine's mutex, so any engine
         // teardown would block this thread behind it.
         outputFile = nil
-        stopStallWatchdog()
-        cancelPendingConfigChangeRestart()
         endDeviceSelection()
         onGiveUp?()
     }
 
-    private func removeConfigChangeObserver() {
+    /// Throws `MicAttemptSuperseded` once the attempt for `generation` is no
+    /// longer the one in flight: it was given up at its deadline, with or
+    /// without a stop, or the capture was stopped. Called before the first
+    /// engine call, before `installTap`, which only attaches a tap to a node
+    /// and is checked as an early exit, and before `start`, the one step that
+    /// opens the input; the file and the converter between them are not
+    /// checked.
+    ///
+    /// What it cannot prevent: a step that passed this check and then takes
+    /// longer than the deadline itself, a slow Bluetooth profile switch say,
+    /// still opens the input after the deadline, under whatever records then,
+    /// until the stale attempt is torn down when the step returns. Closing
+    /// that would mean holding the arbiter's lock across a call that may never
+    /// return.
+    func ensureAttemptIsCurrent(_ generation: Int) throws {
+        guard arbiter.withLock({ $0.phase == .attemptInFlight(generation: generation) }) else {
+            logger.info("Mic: attempt \(generation) is no longer current, not going on with its engine")
+            throw MicAttemptSuperseded()
+        }
+    }
+
+    /// An engine configuration change restarts the engine unless it left a
+    /// pinned engine as it started; see `MicConfigurationChangePolicy` for
+    /// why that case exists. Main queue.
+    func handleEngineConfigChange() {
+        if MicConfigurationChangePolicy.decide(session.configurationChangeReading()) == .ignore {
+            logger.info("Mic: engine configuration change left the pinned engine unchanged; keeping it")
+            return
+        }
+        logger.info("Mic: engine configuration changed (format/route change)")
+        handleDeviceChange(fromConfigurationChange: true)
+    }
+
+    func removeConfigChangeObserver() {
         guard let observer = configChangeObserver else { return }
         NotificationCenter.default.removeObserver(observer)
         configChangeObserver = nil
     }
 
-    /// Re-attempt a restart that came back with an error, bounded by
-    /// `maxRestartRetries`. An attempt that never came back does not reach here:
+    /// Re-attempt a restart that came back with an error, bounded by the retry
+    /// schedule's count, or for a rebuild or revival by the watchdog's budget
+    /// (`restartRetryAction`). An attempt that never came back does not reach here:
     /// the deadline gives up instead, because each wedged attempt costs a thread
     /// and a good fraction of a core for the rest of the process's life.
     /// No `isRecording` guard anywhere in here: during the backoff the phase is
     /// `.backingOff`, so capture is deliberately not "running". The arbiter is the
     /// guard, and it answers `.ignore` for both events once the session is sealed.
-    ///
-    /// The retries belong to the restart that failed, so they carry its
-    /// trigger: a stall restart's retries are not new stall restarts and are
-    /// not charged to the watchdog's budget.
-    private func scheduleRestartRetry(deviceUID: String?, trigger: MicRestartTrigger) {
-        switch decideRetry(restartRetryCount) {
+    private func scheduleRestartRetry(deviceUID: String?) {
+        switch restartRetryAction() {
         case .giveUp:
-            guard case .giveUp = arbiter.withLock({ $0.handle(.retryBudgetExhausted) }) else { return }
-            logger.error("Mic: giving up restart after \(self.restartRetryCount) failed attempts")
-            outputFile = nil
-            stopStallWatchdog()
-            cancelPendingConfigChangeRestart()
-            endDeviceSelection()
-            onGiveUp?()
+            let outcome = arbiter.withLock { $0.handle(.retryBudgetExhausted) }
+            switch outcome {
+            case .giveUp:
+                logger.error("Mic: giving up restart after \(self.restartRetryCount) failed attempts")
+                outputFile = nil
+                endDeviceSelection()
+                onGiveUp?()
+
+            case .returnToStall:
+                // A rebuild or revival whose attempts kept failing until the
+                // budget ran out: nothing is wedged and the engines are
+                // released, so it stalls and waits for the next device change
+                // with a fresh budget.
+                logger.error(
+                    "Mic: restarting the microphone failed \(self.restartRetryCount) times without audio for the whole budget, releasing it until the input device changes",
+                )
+                restartRetryCount = 0
+                selectionRestartOutstanding = false
+                onStall?(stallDetails)
+
+            default:
+                break
+            }
 
         case let .retry(delay):
             restartRetryCount += 1
             let attempt = restartRetryCount
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            scheduleOnMain(delay) { [weak self] in
                 guard let self else { return }
                 guard case let .launchAttempt(generation) = self.arbiter.withLock({ $0.handle(.retryDue) })
                 else { return }
-                logger.info("Mic: restart retry \(attempt)/\(CaptureRestartRetryPolicy.maxAttempts)")
+                logger.info("Mic: restart retry \(attempt)")
                 // Re-resolve the target now rather than reusing the one captured
                 // when the backoff started: a device change during the backoff is
                 // ignored by design, so this is where a newer reality is picked up.
-                // A selection made since then is taken exactly as it resolves,
-                // the default included: the captured target is the previous
-                // device, which is the one failing.
-                let target = self.selectionPending ? self.currentRestartTarget() : self.currentRestartTarget() ?? deviceUID
-                self.launchRestartAttempt(deviceUID: target, generation: generation, trigger: trigger)
+                // The attempt that failed already released the session, or the
+                // stall did before a revival. A selection made since then is
+                // taken exactly as it resolves, the default included: the
+                // captured target is the previous device, which is the one failing.
+                let target = self.selectionPending
+                    ? self.currentRestartTarget() : self.currentRestartTarget() ?? deviceUID
+                self.launchRestartAttempt(deviceUID: target, generation: generation, outgoingReleased: true)
             }
         }
     }
@@ -293,3 +346,8 @@ extension MicCaptureHandler {
         return isDevicePresent(uid) ? uid : nil
     }
 }
+
+/// An attempt found it was no longer the current one part-way through
+/// bringing its engine up. Internal: it only ever reaches the arbiter, which
+/// rejects the attempt as stale.
+struct MicAttemptSuperseded: Error {}

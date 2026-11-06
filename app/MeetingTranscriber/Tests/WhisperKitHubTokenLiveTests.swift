@@ -7,7 +7,7 @@ import XCTest
 /// path makes carries the app's token and never the one the machine holds. Skipped
 /// unless `MEETINGTRANSCRIBER_HF_LIVE=1`. Downloads `openai_whisper-tiny` (about
 /// 70 MB) into WhisperKit's cache on first use; run it under a scratch
-/// `CFFIXED_USER_HOME` with an empty Documents folder, so the tokenizer is not cached
+/// `CFFIXED_USER_HOME` with an empty download base, so the tokenizer is not cached
 /// yet and has to be fetched.
 @MainActor
 final class WhisperKitHubTokenLiveTests: XCTestCase {
@@ -27,10 +27,14 @@ final class WhisperKitHubTokenLiveTests: XCTestCase {
         )
     }
 
-    /// Where WhisperKit caches the tiny model's tokenizer when no tokenizer folder is
-    /// configured, which is how the app builds its pipes.
+    /// Where WhisperKit caches the tiny model's tokenizer for the app's pipes: under
+    /// the download base, which every pipe is built with (`WhisperKitModelSource.pipeConfig`).
     private var tokenizerFile: URL {
-        WhisperTokenizerCache.searchPaths(repository: "openai/whisper-tiny", modelFolder: nil, tokenizerFolder: nil)[0]
+        WhisperTokenizerCache.searchPaths(
+            repository: "openai/whisper-tiny",
+            modelFolder: nil,
+            tokenizerFolder: WhisperKitLocalSnapshot.downloadBase,
+        )[0]
             .appendingPathComponent("tokenizer.json")
     }
 

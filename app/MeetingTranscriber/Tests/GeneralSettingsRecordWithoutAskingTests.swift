@@ -32,7 +32,7 @@ final class GeneralSettingsRecordWithoutAskingTests: XCTestCase {
         let apps = AppMeetingPattern.recordWithoutAskingCandidates.map(\.appName)
         XCTAssertEqual(
             apps,
-            ["Microsoft Teams", "Zoom", "Webex", "WeChat", "Tencent Meeting", "FaceTime", "WhatsApp"],
+            ["Microsoft Teams", "Zoom", "Webex", "WeChat", "Tencent Meeting", "FaceTime", "WhatsApp", "Slack"],
         )
 
         for app in apps {

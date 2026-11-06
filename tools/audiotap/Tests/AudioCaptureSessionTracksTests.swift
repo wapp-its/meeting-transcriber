@@ -11,6 +11,7 @@ final class AudioCaptureSessionTracksTests: XCTestCase {
     /// microphone seam. It reports, as the device it is bound to, the one it
     /// was asked for (`Default` when asked for none), and can fail its bring-up.
     private final class FakeMicSession: MicEngineSessionProviding, @unchecked Sendable {
+        let followsSystemDefaultInput = false
         private let lock = NSLock()
         private var reported = "Default"
         private let shouldFail: Bool

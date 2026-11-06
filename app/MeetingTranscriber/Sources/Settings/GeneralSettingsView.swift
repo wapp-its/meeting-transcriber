@@ -50,6 +50,8 @@ struct GeneralSettingsView: View {
                 Toggle("Tencent Meeting", isOn: $settings.watchTencentMeeting)
                 Toggle("FaceTime", isOn: $settings.watchFaceTime)
                 Toggle("WhatsApp", isOn: $settings.watchWhatsApp)
+                Toggle("Slack", isOn: $settings.watchSlack)
+                    .accessibilityIdentifier(A11yID.watchSlackToggle)
                 customApps
                 Toggle("Browser Web Meetings", isOn: $settings.watchBrowserMeetings)
                     .accessibilityIdentifier(A11yID.watchBrowserToggle)
@@ -190,7 +192,7 @@ struct GeneralSettingsView: View {
             return "\(name) can't watch itself."
         }
         let executable = info["CFBundleExecutable"] as? String
-        let builtInName = MicInputDetector.defaultPatterns.first { $0.bundleIDs.contains(bundleID) }?.appName
+        let builtInName = MicInputDetector.defaultPatterns.first { $0.matches(bundleID: bundleID) }?.appName
             ?? PowerAssertionDetector.defaultPatterns.first { executable.map($0.processNames.contains) ?? false }?.appName
         if let builtInName {
             return "\(builtInName) has its own toggle above."
@@ -312,7 +314,7 @@ struct GeneralSettingsView: View {
                     .font(.callout.weight(.semibold))
                 Text(
                     "Files land in `\(display)`. Each recording gets a `<timestamp>_meta.json` " +
-                        "sidecar next to its WAVs. No transcription, diarization, or protocol " +
+                        "sidecar next to its WAVs. No transcription, diarization, or meeting notes " +
                         "generation runs on this device.",
                 )
                 .font(.caption)

@@ -149,11 +149,10 @@
 
         /// Generate a 32-byte hex token, persist atomically with mode 0600, return it.
         /// Reuses an existing non-empty file so `mt-cli` survives across launches.
-        nonisolated static func loadOrCreateToken() -> String {
-            let url = tokenFileURL
+        nonisolated static func loadOrCreateToken(at url: URL = tokenFileURL) -> String {
             if let data = try? Data(contentsOf: url),
                let existing = String(data: data, encoding: .utf8)?
-               .trimmingCharacters(in: .whitespacesAndNewlines),
+                   .trimmingCharacters(in: .whitespacesAndNewlines),
                !existing.isEmpty {
                 return existing
             }
@@ -515,7 +514,8 @@
         }
 
         /// Map the action outcome to an HTTP response. `notFound` → 404,
-        /// `invalid` → 400, everything else → 200 with the outcome string in the body.
+        /// `invalid` → 400, `notSaved` → 503, `dbReset` → 409, everything else → 200 with the
+        /// outcome string in the body.
         private static func respond(to outcome: SpeakerActionOutcome) -> HTTPResponse {
             switch outcome {
             case .notFound:
@@ -523,6 +523,21 @@
 
             case .invalid:
                 return HTTPResponse.badRequest()
+
+            case .notSaved:
+                return HTTPResponse.serviceUnavailable(
+                    "speaker database could not be read or written; nothing was changed\n",
+                )
+
+            case .dbReset:
+                return HTTPResponse(
+                    status: 409, reason: "Conflict",
+                    body: Data(
+                        ("speaker database was damaged and set aside; only the profiles that could "
+                            + "still be read were kept, and the action found nothing to act on among them\n").utf8,
+                    ),
+                    contentType: "text/plain",
+                )
 
             case .ok, .noop, .merged:
                 let body = Data(#"{"outcome":"\#(outcome.rawValue)"}"#.utf8)
@@ -555,6 +570,15 @@
         case merged
         case notFound
         case invalid
+        /// The speaker DB could not be read or written, so nothing changed.
+        /// Not `notFound`: a DB that was never read says nothing about whether
+        /// the speaker is in it.
+        case notSaved
+        /// The speaker DB was damaged, set aside and replaced by the profiles
+        /// that could still be read (none, if it did not decode at all), and
+        /// the action found nothing to act on among them. Not `notFound`
+        /// either: the name may well be in the set-aside copy.
+        case dbReset
     }
 
     /// Default `.noop` rejects every request so tests and dry-launches can't

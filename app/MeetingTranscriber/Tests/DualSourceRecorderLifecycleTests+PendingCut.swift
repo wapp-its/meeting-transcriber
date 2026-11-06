@@ -126,6 +126,30 @@ extension DualSourceRecorderLifecycleTests {
         XCTAssertEqual(try storedCutFiles(dir), [stem + RecordingFileSuffix.pendingCut])
     }
 
+    /// The same through the quit's stop, whose mix fails off the main actor,
+    /// after the capture half has already returned.
+    func testAStopOffMainThatThrowsAfterAStoreHandsTheStoredCutToRecovery() async throws {
+        let dir = try makeTempDirectory(prefix: "lifecycle_cut_stop_off_main_failed")
+        let (recorder, session) = makeRecorder(dir: dir)
+        let (mic, stem) = try startHoldingRecording(recorder, session, in: dir)
+        let now = Date()
+        try recorder.storePendingCut(cutAt: now - 60, deadline: now + 60, startedAt: now - 600)
+        try Data(repeating: 0xFF, count: 128).write(to: mic)
+        session.micTrack = mic
+
+        var threw = false
+        do {
+            _ = try await recorder.stopOffMain()
+        } catch {
+            threw = true
+        }
+        XCTAssertTrue(threw, "a stop whose mix fails must throw")
+
+        XCTAssertEqual(try markerStems(in: dir), [stem])
+        XCTAssertEqual(try storedCutFiles(dir), [stem + RecordingFileSuffix.pendingCut])
+        XCTAssertFalse(PendingRecordingCut.isHeld(stem), "recovery passes over a held stored cut")
+    }
+
     func testAStoreWhileNotRecordingThrowsAndWritesNothing() throws {
         let dir = try makeTempDirectory(prefix: "lifecycle_cut_not_recording")
         let (recorder, session) = makeRecorder(dir: dir)

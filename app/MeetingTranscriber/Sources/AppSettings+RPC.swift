@@ -60,6 +60,7 @@
                 whisperKitModel: whisperKitModel,
                 whisperLanguage: whisperLanguage,
                 parakeetLanguage: parakeetLanguage,
+                customVocabularyEnabled: customVocabularyEnabled,
                 customVocabularyPath: customVocabularyPath,
             )
         }
@@ -85,6 +86,8 @@
                 language: protocolLanguage,
                 openAIEndpoint: openAIEndpoint,
                 openAIModel: openAIModel,
+                openAITemperature: openAITemperature,
+                openAITopP: openAITopP,
                 claudeBin: claudeBin,
             )
         }
@@ -96,6 +99,7 @@
                 hasCustomPrompt: defaultProtocolTemplate != .builtIn,
                 includeFullTranscriptInProtocol: includeFullTranscriptInProtocol,
                 saveRawTranscriptSeparately: saveRawTranscriptSeparately,
+                useAITitleForFilenames: useAITitleForFilenames,
             )
         }
 

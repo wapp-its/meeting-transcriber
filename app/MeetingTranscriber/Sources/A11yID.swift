@@ -23,6 +23,7 @@ enum A11yID {
     static let watchAtLaunchToggle = "watchAtLaunchToggle"
     static let silencePromptToggle = "silencePromptToggle"
     static let silencePromptMinutesStepper = "silencePromptMinutesStepper"
+    static let watchSlackToggle = "watchSlackToggle"
     static let browserConsentWarning = "browserConsentWarning"
     static let consentDenyListSection = "consentDenyListSection"
     /// Per-row Remove button in the never-record list, addressed by ROW INDEX,
@@ -82,7 +83,7 @@ enum A11yID {
     /// "Name Speakers..." too.
     static let nameSpeakersMenuItem = "nameSpeakersMenuItem"
 
-    /// The menu's items under "Record & Import" and "Open Last Protocol".
+    /// The menu's items under "Record & Import" and "Open Last Notes".
     /// Tests find them by these values: the open recording prompt has a
     /// "Record with Options…" button of its own.
     static let recordMicrophoneMenuItem = "recordMicrophoneMenuItem"
@@ -160,6 +161,16 @@ enum A11yID {
 
     static let recordOnlyBanner = "recordOnlyBanner"
     static let transcriptionSection = "transcriptionSection"
+    static let vocabularySection = "vocabularySection"
+    /// Opens a confirmation dialog, so it stays off the `/ui/press` allowlist.
+    static let legacyWhisperModelsTrashButton = "legacyWhisperModelsTrashButton"
+
+    /// Per-variant checkbox in the old-models row, addressed by ROW INDEX like
+    /// `consentDeniedAppRemove`.
+    static func legacyWhisperModelToggle(_ index: Int) -> String {
+        "legacyWhisperModelToggle.\(index)"
+    }
+
     static let protocolSection = "protocolSection"
     static let protocolProviderPicker = "protocolProviderPicker"
     static let codexProviderNote = "codexProviderNote"
@@ -201,6 +212,29 @@ enum A11yID {
 
     static let includeFullTranscriptToggle = "includeFullTranscriptToggle"
     static let saveRawTranscriptToggle = "saveRawTranscriptToggle"
+    static let useAITitleForFilenamesToggle = "useAITitleForFilenamesToggle"
+    static let openAIAPIKeyPlacementPicker = "openAIAPIKeyPlacementPicker"
+    static let openAIAPIKeyHeaderNameField = "openAIAPIKeyHeaderNameField"
+    static let openAIAPIKeyHeaderNameWarning = "openAIAPIKeyHeaderNameWarning"
+    static let openAITemperatureToggle = "openAITemperatureToggle"
+    static let openAITemperatureValue = "openAITemperatureValue"
+    static let openAITopPToggle = "openAITopPToggle"
+    static let openAITopPValue = "openAITopPValue"
+    static let notionSection = "notionSection"
+    static let notionExportToggle = "notionExportToggle"
+    static let notionConfigurationNotice = "notionConfigurationNotice"
+    static let notionSkipLocalMarkdownToggle = "notionSkipLocalMarkdownToggle"
+    static let notionSpeakerTagsToggle = "notionSpeakerTagsToggle"
+    static let notionConfirmDatabaseButton = "notionConfirmDatabaseButton"
+    static let notionAPIKeyField = "notionAPIKeyField"
+    static let notionDatabasePicker = "notionDatabasePicker"
+    static let notionDatabaseIDField = "notionDatabaseIDField"
+    static let notionTestConnectionButton = "notionTestConnectionButton"
+    static let notionParentPagePicker = "notionParentPagePicker"
+    static let notionParentPageField = "notionParentPageField"
+    static let notionInitDatabaseButton = "notionInitDatabaseButton"
+    static let notionUpgradeSchemaButton = "notionUpgradeSchemaButton"
+    static let notionRefreshButton = "notionRefreshButton"
     static let outputFolderSection = "outputFolderSection"
     static let vadSection = "vadSection"
     static let echoCancellationToggle = "echoCancellationToggle"
@@ -236,7 +270,7 @@ enum A11yID {
     static let remoteVocabularyTokenField = "remoteVocabularyTokenField"
     static let remoteVocabularyUpdateButton = "remoteVocabularyUpdateButton"
     static let remoteVocabularyStatus = "remoteVocabularyStatus"
-    static let whisperKitVocabularyPromptToggle = "whisperKitVocabularyPromptToggle"
+    static let customVocabularyToggle = "customVocabularyToggle"
     static let whisperKitModelPicker = "whisperKitModelPicker"
     static let whisperKitCustomRepoField = "whisperKitCustomRepoField"
     static let whisperKitCustomVariantField = "whisperKitCustomVariantField"
@@ -287,6 +321,10 @@ enum A11yID {
     /// `/ui/press` allowlist (`AboutSettingsViewTests`).
     static let updateInstallButton = "updateInstallButton"
 
+    // About tab, update actions: one per install route.
+    static let updateDownload = "update-download"
+    static let updateCopyBrewCommand = "update-copy-brew-command"
+
     // Speaker-naming dialog.
     static let confirmButton = "confirm-button"
     static let skipButton = "skip-button"
@@ -299,6 +337,8 @@ enum A11yID {
     /// The line under the Standard count of a two-track job saying the
     /// microphone side is counted automatically; absent for a single file.
     static let rerunMicSideNote = "rerun-mic-side-note"
+    /// Why the session did not take the last answer (`SpeakerNamingRefusal`).
+    static let namingRefusalMessage = "naming-refusal-message"
 
     /// Per-speaker play button (`play-<label>`); the label varies at runtime.
     static func play(_ speakerLabel: String) -> String {

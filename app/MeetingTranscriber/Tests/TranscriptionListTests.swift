@@ -201,7 +201,7 @@ final class TranscriptionListTests: XCTestCase {
         XCTAssertEqual(titles(sections.needsYou), ["First unrecorded", "Second unrecorded", "Recorded"])
     }
 
-    /// "Open Last Protocol" takes the job that finished last with a file, by
+    /// "Open Last Notes" takes the job that finished last with a file, by
     /// finish order: a retried job added first and finished last is it. A
     /// later finish without a file and a later failure are passed over, and a
     /// job with only a transcript opens that.
@@ -222,6 +222,41 @@ final class TranscriptionListTests: XCTestCase {
         XCTAssertNil(TranscriptionList.lastFinished(TranscriptionList.entries(liveJobs: [], records: [
             TerminalJobRecord(job: failed),
         ])))
+    }
+
+    /// A finished job whose notes went to Notion and left no local file is
+    /// still the last finished one, from the queue and from the history, and
+    /// "Open Last Notes" opens its page. With a file, the page wins only while
+    /// Notion export is on. A page whose export has not completed counts for
+    /// nothing, so a partial page is never opened.
+    func testTheLastFinishedJobCarriesItsCompletedNotionPage() throws {
+        let page = try XCTUnwrap(URL(string: "https://www.notion.so/page-1"))
+        var notionOnly = try job("Notion only", addedAt: 0, state: .done)
+        notionOnly.recordNotionPage(NotionPageResult(pageID: "page-1", url: page.absoluteString), databaseID: "db")
+        notionOnly.finishNotionExport(succeeded: true)
+
+        let views: [(String, [PipelineJob], [TerminalJobRecord])] = [
+            ("in the queue", [notionOnly], []),
+            ("from the history", [], [TerminalJobRecord(job: notionOnly)]),
+        ]
+        for (moment, live, records) in views {
+            let last = TranscriptionList.lastFinished(TranscriptionList.entries(liveJobs: live, records: records))
+            XCTAssertEqual(last?.notionPageURL, page, moment)
+            XCTAssertEqual(JobOpenTarget.resolve(forEntry: last, preferNotion: false), .notion(page), moment)
+        }
+
+        var withFile = notionOnly
+        withFile.protocolPath = URL(fileURLWithPath: "/out/notes.md")
+        let entry = TranscriptionList.lastFinished(TranscriptionList.entries(liveJobs: [withFile], records: []))
+        XCTAssertEqual(JobOpenTarget.resolve(forEntry: entry, preferNotion: true), .notion(page))
+        XCTAssertEqual(
+            JobOpenTarget.resolve(forEntry: entry, preferNotion: false), .file(URL(fileURLWithPath: "/out/notes.md")),
+        )
+
+        var partial = try job("Partial", addedAt: 1, state: .done)
+        partial.recordNotionPage(NotionPageResult(pageID: "page-2", url: "https://www.notion.so/page-2"), databaseID: "db")
+        XCTAssertNil(TranscriptionList.lastFinished(TranscriptionList.entries(liveJobs: [partial], records: [])))
+        XCTAssertNil(JobOpenTarget.resolve(forEntry: nil, preferNotion: true))
     }
 
     /// A finished job the history does not hold ranks below every recorded
@@ -254,7 +289,7 @@ final class TranscriptionListTests: XCTestCase {
 
     /// Right after it finished, after the queue dropped it a minute later, and
     /// after a restart that reads the history from disk, the finished job is
-    /// the one "Open Last Protocol" opens.
+    /// the one "Open Last Notes" opens.
     @MainActor
     func testTheLastFinishedJobOutlivesTheQueueAndARestart() throws {
         let path = try makeTempDirectory(prefix: "last_finished").appendingPathComponent("terminal_jobs.json")

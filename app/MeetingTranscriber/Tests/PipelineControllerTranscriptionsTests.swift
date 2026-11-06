@@ -35,8 +35,8 @@ final class PipelineControllerTranscriptionsTests: XCTestCase {
         PipelineController(
             settings: settings,
             notifier: RecordingNotifier(),
-            terminalJobStore: terminalJobStore,
             queueEnvironment: IsolatedQueueEnvironment.make(logDir: tmpDir, initialQueue: queue),
+            terminalJobStore: terminalJobStore,
         )
     }
 

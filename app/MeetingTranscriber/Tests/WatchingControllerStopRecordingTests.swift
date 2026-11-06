@@ -89,7 +89,7 @@ final class WatchingControllerStopRecordingTests: XCTestCase {
     // MARK: - AppState.canStopRecording
 
     func testTheMenuOffersAStopForEveryRecordingAndNotWhileOnlyWatching() async throws {
-        let state = makeRPCTestState()
+        let state = try makeRPCTestState()
 
         let (watchingLoop, _) = makeTestWatchLoop()
         state.watching.watchLoop = watchingLoop

@@ -9,7 +9,7 @@ struct MenuBarView: View {
     /// set, it disables the menu's install item.
     var updateInstallBlockedReason: String?
     /// The finished-job history, read with the queue's jobs so a failed line
-    /// and "Open Last Protocol" outlive the queue's one-minute reap and a
+    /// and "Open Last Notes" outlive the queue's one-minute reap and a
     /// restart.
     var history: [TerminalJobRecord] = []
     /// Whether the user set "No Microphone (app audio only)". Only reaches the
@@ -30,6 +30,11 @@ struct MenuBarView: View {
     var microphoneMenu: MicrophoneMenuState?
     /// The Output entry; nil leaves it out.
     var outputMenu: OutputMenuState?
+    /// Whether Notion export is on, which makes "Open Last Notes" prefer the
+    /// job's Notion page. A page exported before the setting was turned off
+    /// is still the fallback when no local file exists; `JobOpenTarget` owns
+    /// that rule.
+    var notionExportEnabled = false
     /// What the menu's items do; a nil optional action hides or disables its
     /// item (see `MenuActions`).
     let actions: MenuActions
@@ -297,17 +302,18 @@ struct MenuBarView: View {
     }
 
     /// The way to the results: the newest one and every job. "Open Last
-    /// Protocol" is the menu's one click to the newest result now that
-    /// finished jobs are not listed, shown while the history holds a finished
-    /// job with a file. "All Recordings…" is shown at all times: finished jobs
-    /// are listed in the window, not in the menu.
+    /// Notes" is the menu's one click to the newest result now that finished
+    /// jobs are not listed, shown while the history holds a finished job with
+    /// a file or a Notion page, and named after where it goes. "All
+    /// Recordings…" is shown at all times: finished jobs are listed in the
+    /// window, not in the menu.
     private var recordingsSection: some View {
         Section("Recordings") {
-            if let url = TranscriptionList.lastFinished(transcriptionEntries)?.fileToOpen {
+            if let target = lastNotesTarget {
                 Button {
-                    actions.openLastProtocol(url)
+                    actions.openLastProtocol(target)
                 } label: {
-                    Label("Open Last Protocol", systemImage: "doc.text")
+                    Label(target.lastProtocolLabel, systemImage: target.systemImage)
                 }
                 .keyboardShortcut("o")
                 .accessibilityIdentifier(A11yID.openLastProtocolMenuItem)
@@ -323,19 +329,38 @@ struct MenuBarView: View {
         }
     }
 
+    /// Hoisted out of the `ViewBuilder` for the type-check budget (see the
+    /// note on `body`).
+    private var lastNotesTarget: JobOpenTarget? {
+        JobOpenTarget.resolve(
+            forEntry: TranscriptionList.lastFinished(transcriptionEntries),
+            preferNotion: notionExportEnabled,
+        )
+    }
+
+    /// mt-update mode first; otherwise a GitHub release, installed the way
+    /// this copy was: a Homebrew install copies its `brew upgrade` command,
+    /// anything else opens the download.
     @ViewBuilder private var updateSection: some View {
         if let updateChecker, updateChecker.isMtUpdateMode {
             mtUpdateItem(updateChecker)
-        } else if let update = updateChecker?.availableUpdate {
+        } else if let updateChecker, let update = updateChecker.availableUpdate {
+            let route = updateChecker.installRoute(for: update)
             Divider()
             Button {
-                NSWorkspace.shared.open(update.dmgURL ?? update.htmlURL)
+                route.perform()
             } label: {
-                Label(
-                    "Update Available: \(update.tagName)",
-                    systemImage: "arrow.down.circle.fill",
-                )
+                Label(updateTitle(update, route: route), systemImage: "arrow.down.circle.fill")
             }
+        }
+    }
+
+    /// The menu closes on click, so the title has to say up front that the
+    /// item copies a command rather than opening a download.
+    private func updateTitle(_ update: ReleaseInfo, route: UpdateInstallRoute) -> String {
+        switch route {
+        case .homebrew: "Update Available: \(update.tagName) (Copy brew Command)"
+        case .download: "Update Available: \(update.tagName)"
         }
     }
 

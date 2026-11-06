@@ -11,6 +11,9 @@ struct JobStatusDTO: Codable, Equatable {
     let meetingTitle: String
     let transcriptPath: String?
     let protocolPath: String?
+    /// Absent when no export was attempted, including export switched on but
+    /// not configured, which the job's warnings explain.
+    let export: JobExportDTO?
     let error: String?
     let warnings: [String]
     /// Absent when the job was not dual-source, or when no honest verdict was
@@ -22,10 +25,10 @@ struct JobStatusDTO: Codable, Equatable {
     /// the same moment for the history; both come from the job's start.
     let meetingStartedAt: String?
 
-    /// Spelled out rather than left to the memberwise init so `echo` and
-    /// `meetingStartedAt` can default to nil: each is an addition to an
-    /// existing wire shape, and every caller that predates it means exactly
-    /// "no verdict" / "no recording start".
+    /// Spelled out rather than left to the memberwise init so `echo`,
+    /// `meetingStartedAt` and `export` can default to nil: each is an addition
+    /// to an existing wire shape, and every caller that predates it means
+    /// exactly "no verdict" / "no recording start" / "no export".
     init(
         jobID: String,
         state: JobState,
@@ -36,6 +39,7 @@ struct JobStatusDTO: Codable, Equatable {
         warnings: [String],
         echo: EchoDetectionDTO? = nil,
         meetingStartedAt: String? = nil,
+        export: JobExportDTO? = nil,
     ) {
         self.jobID = jobID
         self.state = state
@@ -46,6 +50,38 @@ struct JobStatusDTO: Codable, Equatable {
         self.warnings = warnings
         self.echo = echo
         self.meetingStartedAt = meetingStartedAt
+        self.export = export
+    }
+}
+
+/// Where a job's protocol was exported. Destination-neutral on the wire so a
+/// second destination is not a breaking change to `/v1`.
+struct JobExportDTO: Codable, Equatable {
+    let destination: String
+    let status: String
+    /// Present as soon as the page exists, so a partial export can be retried.
+    let id: String?
+    /// Present only once the export completed, so nobody opens a partial page.
+    let url: String?
+
+    init(status: String, id: String?, url: String?, destination: String = "notion") {
+        self.destination = destination
+        self.status = status
+        self.id = id
+        self.url = url
+    }
+
+    init?(job: PipelineJob) {
+        guard let status = job.notionExportStatus else { return nil }
+        self.init(
+            status: status.rawValue,
+            id: job.notionPageID,
+            url: job.hasCompletedNotionExport ? job.notionPageURL?.absoluteString : nil,
+        )
+    }
+
+    var isInProgress: Bool {
+        status == NotionExportStatus.inProgress.rawValue
     }
 }
 
@@ -105,6 +141,27 @@ struct EchoDetectionDTO: Codable, Equatable {
     /// way instead of introducing a second idiom for the same idea.
     var removed: Bool? // swiftlint:disable:this discouraged_optional_boolean
 
+    /// Wall-clock seconds the canceller spent on the microphone track, or nil
+    /// when it never processed it.
+    ///
+    /// Recorded because `removed` answers only half of the question that
+    /// decides whether this feature can default to on. The other half is what
+    /// a run costs against the length of a real meeting, and this is where a
+    /// driver tallying `removed` per job finds it: the stage timing log keeps
+    /// the same number as an `echoCancelling` event, but that log is a local
+    /// file behind the Settings averages, not part of the job a caller reads
+    /// over the API or out of the finished-job store. The two are one clock
+    /// reading (`PipelineQueue.recordEchoCancellationTiming`), never two.
+    ///
+    /// Present for a confirmed run and for a declined one alike, since a
+    /// decline is the run that cost minutes for nothing. Absent on a narrower
+    /// population than `removed` is: a missing model and a run that threw
+    /// write `removed: false` and leave this nil, because nothing was
+    /// processed and a near-zero here would read as a run that cost nothing.
+    /// So `removed: false` with this absent is a run that never got going, and
+    /// with it present a run the self-check or the file swap turned down.
+    var cancellationSeconds: Double?
+
     /// The detector's own result, narrowed to what belongs on a wire and in a
     /// persisted job. The per-window series stays behind: it grows with the
     /// recording, and a caller polling a job does not want it.
@@ -127,6 +184,7 @@ struct EchoDetectionDTO: Codable, Equatable {
         windowsAffected = try container.decode(Int.self, forKey: .windowsAffected)
         suppressedSegments = try container.decodeIfPresent(Int.self, forKey: .suppressedSegments) ?? 0
         removed = try container.decodeIfPresent(Bool.self, forKey: .removed)
+        cancellationSeconds = try container.decodeIfPresent(Double.self, forKey: .cancellationSeconds)
     }
 }
 
@@ -145,6 +203,7 @@ extension JobStatusDTO {
             warnings: job.warnings,
             echo: job.echo,
             meetingStartedAt: job.meetingStartTime.map { ISO8601DateFormatter().string(from: $0) },
+            export: JobExportDTO(job: job),
         )
     }
 }

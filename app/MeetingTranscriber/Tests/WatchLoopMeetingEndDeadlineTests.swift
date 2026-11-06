@@ -204,7 +204,7 @@ final class WatchLoopMeetingEndDeadlineTests: XCTestCase {
             defaultOutputDir: dir.appendingPathComponent("output", isDirectory: true),
         )
         let state = AppState(
-            settings: settings, notifier: SilentNotifier(), pipelineEnvironment: IsolatedQueueEnvironment.make(logDir: dir),
+            pipelineEnvironment: IsolatedQueueEnvironment.make(logDir: dir), settings: settings, notifier: SilentNotifier(),
         )
         XCTAssertFalse(state.meetingEndCountdownOverlay, "no loop")
         let harness = Harness()

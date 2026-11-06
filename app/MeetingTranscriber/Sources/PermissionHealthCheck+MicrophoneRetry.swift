@@ -1,5 +1,5 @@
 import AVFoundation
-import os.log
+import os
 
 private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "PermissionHealthCheck")
 
@@ -12,8 +12,9 @@ extension PermissionHealthCheck {
     static let micProbeRetryPause: TimeInterval = 2.0
 
     /// Why one microphone probe attempt failed: one case per way `probeMicrophone`
-    /// gives up.
-    enum MicProbeFailure: CaseIterable {
+    /// gives up. All but `.noBufferBeforeTimeout` arrive as `MicProbeOutcome.failed`;
+    /// that one is an `.answered` probe that counted no buffer.
+    enum MicProbeFailure: CaseIterable, Sendable {
         case noInputDevice
         case invalidFormat
         case tapInstallFailed
@@ -35,36 +36,15 @@ extension PermissionHealthCheck {
         /// the one there is not ready yet (a format of 0 Hz or 0 channels, which an
         /// input device reported for minutes after a wake from sleep while the
         /// grant was fine). Neither says anything about the grant, so a probe that
-        /// ends on one is inconclusive and reports healthy, the way an inconclusive
-        /// Accessibility probe does. A probe that opened the device and got no
-        /// buffer stays the signature of a broken grant.
+        /// ends on one is inconclusive and never reports broken on its own: the
+        /// verdict stays the last one a probe had evidence for, healthy when there
+        /// is none, the way an inconclusive Accessibility probe reports healthy. A
+        /// probe that opened the device and got no buffer stays the signature of a
+        /// broken grant.
         var isInconclusive: Bool {
             switch self {
             case .noInputDevice, .invalidFormat: true
             case .tapInstallFailed, .engineStartFailed, .noBufferBeforeTimeout: false
-            }
-        }
-    }
-
-    /// What one microphone probe attempt observed.
-    enum MicProbeOutcome {
-        case delivered
-        case failed(MicProbeFailure)
-
-        /// Whether an allowed grant still stands after this outcome: the probe
-        /// delivered, or it failed only in a way that says nothing about the grant.
-        var leavesGrantStanding: Bool {
-            switch self {
-            case .delivered: true
-            case let .failed(failure): failure.isInconclusive
-            }
-        }
-
-        /// Compact, PII-free token for the debug log.
-        var logToken: String {
-            switch self {
-            case .delivered: "delivered"
-            case let .failed(failure): "\(failure.isInconclusive ? "inconclusive" : "failed")(\(failure.logToken))"
             }
         }
     }
@@ -74,16 +54,24 @@ extension PermissionHealthCheck {
     /// probe's engine start with "try again" (error 35) while the microphone works,
     /// and the notification's dedup does not survive a restart, so without the retry
     /// every launch could tell the user to toggle a grant that is fine. A probe that
-    /// delivers on its first attempt is not retried. When both attempts fail, the
-    /// retry's failure decides: it is the later look at the device.
+    /// delivers on its first attempt is not retried, and neither is one that did not
+    /// answer: its bring-up still holds the probe lane, which refuses the retry at
+    /// once. When both attempts fail, the retry's failure decides: it is the later
+    /// look at the device. A retry that did not answer learned nothing, so the first
+    /// attempt's failure stands.
+    ///
+    /// The verdict is `microphoneVerdict(afterAuthorizedProbe:lastAnswered:)`: an
+    /// outcome that says nothing about the grant keeps the verdict of the last one
+    /// that did, which `lastAnswered` holds. TCC saying anything but yes clears it.
     ///
     /// `mayRetry` is asked after the pause, right before the retry would open the
     /// microphone a second time. When it says no (a recording started meanwhile,
     /// and opening an input can switch a Bluetooth headset out of its music profile
     /// underneath that recording), the check ends without a verdict and returns nil.
     ///
-    /// `authStatus`, `probe`, `sleep` and `logFailure` are injected so tests can drive
-    /// the probe outcomes on a virtual clock, without a microphone.
+    /// `authStatus`, `probe`, `sleep`, `logFailure` and `lastAnswered` are injected
+    /// so tests can drive the probe outcomes on a virtual clock, without a
+    /// microphone and without sharing the process-wide memory.
     static func checkMicrophoneLive(
         authStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .audio),
         probe: @Sendable () async -> MicProbeOutcome = { await probeMicrophone() },
@@ -94,8 +82,10 @@ extension PermissionHealthCheck {
             logMicProbeFailure(attempt: attempt, failure: failure)
         },
         mayRetry: @Sendable () async -> Bool = { true },
+        lastAnswered: OSAllocatedUnfairLock<PermissionStatus?> = lastAnsweredMicrophoneVerdict,
     ) async -> PermissionStatus? {
         if authStatus != .authorized {
+            lastAnswered.withLock { $0 = nil }
             let r = checkMicrophone(authStatus: authStatus, probeSucceeds: false)
             debugLog("checkMicrophoneLive: authStatus=\(authStatus.rawValue) probe=skipped → \(r)")
             return r
@@ -104,7 +94,8 @@ extension PermissionHealthCheck {
             debugLog("checkMicrophoneLive: authStatus=authorized probe=yielded (a recording started before the retry) → no verdict")
             return nil
         }
-        let r = checkMicrophone(authStatus: authStatus, probeSucceeds: outcome.leavesGrantStanding)
+        let r = microphoneVerdict(afterAuthorizedProbe: outcome, lastAnswered: lastAnswered.withLock { $0 })
+        if outcome.isEvidence { lastAnswered.withLock { $0 = r } }
         debugLog("checkMicrophoneLive: authStatus=authorized probe=\(outcome.logToken) → \(r)")
         return r
     }
@@ -116,13 +107,14 @@ extension PermissionHealthCheck {
         logFailure: @Sendable (_ attempt: Int, _ failure: MicProbeFailure) -> Void,
         mayRetry: @Sendable () async -> Bool,
     ) async -> MicProbeOutcome? {
-        guard case let .failed(first) = await probe() else { return .delivered }
-        logFailure(1, first)
+        let first = await probe()
+        guard let firstFailure = first.failure else { return first }
+        logFailure(1, firstFailure)
         await sleep(micProbeRetryPause)
         guard await mayRetry() else { return nil }
         let second = await probe()
-        if case let .failed(failure) = second { logFailure(2, failure) }
-        return second
+        if let failure = second.failure { logFailure(2, failure) }
+        return second == .didNotAnswer ? first : second
     }
 
     /// Writes one failed probe attempt to the unified log. The per-process debug file

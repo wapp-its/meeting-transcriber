@@ -9,13 +9,13 @@ final class MenuBarOutputTests: XCTestCase {
     private func makeView(
         outputMenu: OutputMenuState,
         onSelectOutput: @escaping (String) -> Void = { _ in },
-    ) -> MenuBarView {
+    ) throws -> MenuBarView {
         var actions = MenuActions.noop
         actions.selectOutput = onSelectOutput
-        return MenuBarView(
+        return try MenuBarView(
             status: nil,
             isWatching: false,
-            pipelineQueue: PipelineQueue(),
+            pipelineQueue: makeIsolatedQueue(),
             updateChecker: nil,
             noMic: false,
             manualRecordingPendingOrActive: false,
@@ -33,7 +33,7 @@ final class MenuBarOutputTests: XCTestCase {
             ],
             current: OutputDevice(uid: OutputRoutingWarning.teamsLoopbackUID, name: "Microsoft Teams Audio"),
         )
-        let view = makeView(outputMenu: menu) { selected.append($0) }
+        let view = try makeView(outputMenu: menu) { selected.append($0) }
 
         let picker = try view.inspect()
             .find(viewWithAccessibilityIdentifier: A11yID.menuOutputPicker)

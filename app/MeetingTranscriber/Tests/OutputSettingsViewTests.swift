@@ -85,6 +85,14 @@ final class OutputSettingsViewTests: XCTestCase {
         XCTAssertTrue(result.isEmpty)
     }
 
+    // MARK: - Protocol language list
+
+    func testProtocolLanguagesContainNoDuplicates() {
+        // The picker uses the names as ForEach ids, so a repeat would collide.
+        let languages = AppSettings.protocolLanguages
+        XCTAssertEqual(languages.count, Set(languages).count)
+    }
+
     // MARK: - Render
 
     func testViewRendersWithDefaultSettings() throws {
@@ -98,7 +106,7 @@ final class OutputSettingsViewTests: XCTestCase {
     private func makeIsolatedDefaults() -> UserDefaults {
         let suite = "OutputSettingsViewTests-\(getpid())-\(UUID().uuidString)"
         addTeardownBlock { DefaultsSuite.remove(suite) }
-        guard let defaults = UserDefaults(suiteName: suite) else {
+        guard let defaults = DefaultsSuite.open(suite) else {
             fatalError("Could not create test UserDefaults suite")
         }
         return defaults

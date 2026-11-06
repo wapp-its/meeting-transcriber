@@ -1,3 +1,4 @@
+import CoreML
 import FluidAudio
 import Foundation
 import os.log
@@ -42,22 +43,36 @@ struct OfflineDiarizerTuning: Equatable {
 }
 
 /// CoreML-based speaker diarization using FluidAudio (on-device, no HuggingFace token needed).
-/// `@unchecked Sendable` because `PipelineQueue` shares one instance across
-/// two `async let` diarisation runs. The mutable `offlineProcessor` /
-/// `sortformerDiarizer` / `nemotronDiarizer` are init-once-then-read; the
-/// underlying FluidAudio CoreML inference is documented thread-safe.
+/// `@unchecked Sendable` because `DiarizationProvider` is `Sendable`: one
+/// instance diarizes both tracks of a dual-source job, which
+/// `PipelineQueue.runDualTrackDiarization` runs one after the other, not in
+/// parallel. The lazily set `offlineProcessor` / `sortformerDiarizer` state is
+/// not synchronised and relies on that order. Nemotron 3 mode does not: its
+/// stream state is not thread-safe, so its runs go through `nemotronRunGate`.
 final class FluidDiarizer: DiarizationProvider, @unchecked Sendable {
     let mode: DiarizerMode
     private var offlineProcessor: any OfflineDiarizationProcessing
 
     private var sortformerDiarizer: SortformerDiarizer?
+    /// Builds a ready Sortformer diarizer for the requested compute units and
+    /// reports the units its loaded model carries. Everything that needs the
+    /// real model sits behind this one seam, so a test can supply a stub.
+    private let makeSortformerDiarizer: (MLComputeUnits) async throws -> (SortformerDiarizer, MLComputeUnits)
     /// Lazily-loaded Nemotron 3 diarizer, used only by
     /// `FluidDiarizer+Nemotron.runNemotron`. Not `private` because that
-    /// extension lives in a separate file (codecov-ignored, it needs the
-    /// ~200 MB model). Unlike the CoreML inference it carries streaming state
-    /// and is not thread-safe; `runNemotron` resets it at the start of a run,
-    /// and the pipeline's two tracks run one after the other.
-    var nemotronDiarizer: Nemotron3Diarizer?
+    /// extension lives in a separate file. Unlike the CoreML inference it
+    /// carries streaming state and is not thread-safe, so it is only touched
+    /// inside `nemotronRunGate`; `runNemotron` resets it at the start of a run.
+    var nemotronDiarizer: (any NemotronStreamingDiarizing)?
+    /// Serialises Nemotron 3 runs on this instance, so in this mode, unlike
+    /// Offline and Sortformer, `run` is safe to call concurrently.
+    let nemotronRunGate = AsyncSerialGate()
+    /// Loads the Nemotron 3 model for the requested compute units and returns
+    /// a ready streaming diarizer plus the units its loaded model carries.
+    /// Everything that needs the real model sits behind this one seam, so a
+    /// test can supply a stub. Not `private` for the same reason as
+    /// `nemotronDiarizer`.
+    let makeNemotronDiarizer: (MLComputeUnits) async throws -> (any NemotronStreamingDiarizing, MLComputeUnits)
     /// Lazily-loaded WeSpeaker (pyannote `wespeaker_v2`) models, used only by
     /// `FluidDiarizer+SortformerEmbeddings.extractSortformerEmbeddings`. Not
     /// `private` because the extension lives in a separate file (codecov-
@@ -72,9 +87,20 @@ final class FluidDiarizer: DiarizationProvider, @unchecked Sendable {
         mode: DiarizerMode = .offline,
         tuning: OfflineDiarizerTuning = .defaults,
         offlineProcessor: (any OfflineDiarizationProcessing)? = nil,
+        makeSortformerDiarizer: @escaping (MLComputeUnits) async throws -> (SortformerDiarizer, MLComputeUnits) = { computeUnits in
+            let diarizer = SortformerDiarizer()
+            let models = try await SortformerModels.loadFromHuggingFace(config: .default, computeUnits: computeUnits)
+            diarizer.initialize(models: models)
+            return (diarizer, models.mainModel.configuration.computeUnits)
+        },
+        makeNemotronDiarizer: @escaping (MLComputeUnits) async throws -> (any NemotronStreamingDiarizing, MLComputeUnits) = { computeUnits in
+            try await FluidDiarizer.loadNemotronDiarizer(computeUnits: computeUnits)
+        },
     ) {
         self.mode = mode
         self.offlineProcessor = offlineProcessor ?? FluidOfflineProcessor(tuning: tuning)
+        self.makeSortformerDiarizer = makeSortformerDiarizer
+        self.makeNemotronDiarizer = makeNemotronDiarizer
     }
 
     /// Normalize FluidAudio's "Speaker 0" format to "SPEAKER_0".
@@ -128,13 +154,31 @@ final class FluidDiarizer: DiarizationProvider, @unchecked Sendable {
 
     // MARK: - Sortformer Mode (SortformerDiarizer)
 
+    /// Compute units for the Sortformer model. Left to FluidAudio (nil), the
+    /// default config resolves to `.all`, and Core ML's plan then puts more
+    /// than a third of the graph's operations on the GPU. With CPU + Neural
+    /// Engine those move to the Neural Engine. Measured on an M3 Max with the
+    /// three quality fixtures: the Sortformer pass ran 21 to 24 % faster, DER
+    /// was identical on two fixtures and 0.0009 higher on the third. The first
+    /// run after a model or OS update pays a one-time compile for the new
+    /// routing. FluidAudio forwards an explicit value to Core ML unchanged;
+    /// only `nil` goes through its own `recommendedComputeUnits` choice.
+    /// This is a speed choice, not a crash fix: the WeSpeaker embeddings that
+    /// follow in Sortformer mode keep FluidAudio's default routing.
+    static let sortformerComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
+
+    /// Log label for compute units read back from a loaded model.
+    static func computeUnitsLabel(_ units: MLComputeUnits) -> String {
+        units == .cpuAndNeuralEngine ? "cpuAndNeuralEngine" : "rawValue \(units.rawValue)"
+    }
+
     private func runSortformer(audioPath: URL) async throws -> MeetingTranscriber.DiarizationResult {
         if sortformerDiarizer == nil {
-            let diarizer = SortformerDiarizer()
-            let models = try await SortformerModels.loadFromHuggingFace(config: .default)
-            diarizer.initialize(models: models)
+            let (diarizer, routed) = try await makeSortformerDiarizer(Self.sortformerComputeUnits)
             sortformerDiarizer = diarizer
-            logger.info("FluidAudio Sortformer models ready")
+            // `routed` is read back from the loaded model, so the log shows the
+            // routing Core ML was given rather than the value this file asked for.
+            logger.info("FluidAudio Sortformer models ready (computeUnits: \(Self.computeUnitsLabel(routed), privacy: .public))")
         }
 
         logger.info("Starting Sortformer diarization: \(audioPath.lastPathComponent)")
@@ -180,6 +224,15 @@ final class FluidDiarizer: DiarizationProvider, @unchecked Sendable {
     /// the count wrong in two meetings; the 95 MB `c128-split-w8a8` build
     /// would halve the download for a slightly higher error.
     static let nemotronConfig = Nemotron3Config.fast128
+
+    /// Compute units for the Nemotron 3 model. `Nemotron3Models.loadFromHuggingFace`
+    /// defaults to `.all`, which lets Core ML put parts of the graph on the
+    /// GPU; this keeps it off that path like the other two modes (see
+    /// `FluidOfflineProcessor.makeModelConfiguration` and
+    /// `sortformerComputeUnits`). The `fast128` preset compiles for the
+    /// Neural Engine. Unlike Sortformer's, this choice has not been
+    /// benchmarked against `.all`.
+    static let nemotronComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
 
     /// Turns Nemotron 3's frame probabilities into segments: its 10 ms frames,
     /// the 0.5 activity threshold Sortformer mode uses, and speech shorter
@@ -305,9 +358,16 @@ struct FluidOfflineProcessor: OfflineDiarizationProcessing {
     private var manager: OfflineDiarizerManager?
     private var currentNumSpeakers: Int?
     private let tuning: OfflineDiarizerTuning
+    private let prepareModels: (OfflineDiarizerManager, MLModelConfiguration) async throws -> Void
 
-    init(tuning: OfflineDiarizerTuning = .defaults) {
+    init(
+        tuning: OfflineDiarizerTuning = .defaults,
+        prepareModels: @escaping (OfflineDiarizerManager, MLModelConfiguration) async throws -> Void = { manager, configuration in
+            try await manager.prepareModels(configuration: configuration)
+        },
+    ) {
         self.tuning = tuning
+        self.prepareModels = prepareModels
     }
 
     /// Build the `OfflineDiarizerConfig` from a tuning struct + optional speaker count.
@@ -326,6 +386,18 @@ struct FluidOfflineProcessor: OfflineDiarizationProcessing {
         return config
     }
 
+    /// Keep FluidAudio's offline inference off Metal. Core ML's `.all`
+    /// routing can send the WeSpeaker embedding model through MPSGraph, whose
+    /// in-process abort cannot be caught or retried by the pipeline. The CPU +
+    /// Neural Engine route retains hardware acceleration without invoking the
+    /// crash-prone GPU path. FluidAudio 0.15.5+ reads only `computeUnits` from
+    /// this configuration; older releases silently use `.all` instead.
+    static func makeModelConfiguration() -> MLModelConfiguration {
+        let configuration = MLModelConfiguration()
+        configuration.computeUnits = .cpuAndNeuralEngine
+        return configuration
+    }
+
     mutating func prepare(numSpeakers: Int?) async throws {
         guard manager == nil || numSpeakers != currentNumSpeakers else { return }
 
@@ -339,7 +411,7 @@ struct FluidOfflineProcessor: OfflineDiarizationProcessing {
                 "FluidAudio offline tuning (\(flag)): clusterThreshold=\(t.clusterThreshold) warmStartFa=\(t.warmStartFa) warmStartFb=\(t.warmStartFb) minSegmentDurationSeconds=\(t.minSegmentDurationSeconds) excludeOverlap=\(t.excludeOverlap)",
             )
         let newManager = OfflineDiarizerManager(config: config)
-        try await newManager.prepareModels()
+        try await prepareModels(newManager, Self.makeModelConfiguration())
         manager = newManager
         currentNumSpeakers = numSpeakers
         logger.info("FluidAudio offline models ready")

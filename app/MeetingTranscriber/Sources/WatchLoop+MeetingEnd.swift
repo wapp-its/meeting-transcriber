@@ -6,6 +6,25 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "WatchLo
 /// A stopped recording and its pauses, which a cut changes together.
 typealias StoppedRecording = (recording: RecordingResult, pauses: [RecordingPause])
 
+/// Why `WatchLoop.waitForMeetingEnd` finished.
+enum MeetingEndReason: Equatable {
+    /// The meeting ended, hit the max duration, or watching was stopped.
+    case ended
+    /// The app moved on to a different call, which is already live.
+    case replacedByNewCall
+}
+
+/// How `WatchLoop.waitForMeetingEnd` finished: where the saved audio has to
+/// end, nil to keep everything recorded, and why.
+struct MeetingEndOutcome: Equatable {
+    let cutAt: Date?
+    let reason: MeetingEndReason
+
+    static func ended(cutAt: Date?) -> Self {
+        Self(cutAt: cutAt, reason: .ended)
+    }
+}
+
 /// How a detected meeting's recording ends, split out of `WatchLoop.swift` to
 /// keep that file under the line cap.
 ///
@@ -26,7 +45,10 @@ extension WatchLoop {
     static let meetingEndQuestionCountdown: TimeInterval = 120
 
     /// Poll until the meeting ends, and return where its saved audio has to
-    /// end, nil to keep everything recorded.
+    /// end, nil to keep everything recorded, and whether the app moved on to
+    /// a new call. A new call outranks the open question and the countdown:
+    /// the recording ends at once, the question is taken back, and the caller
+    /// starts the new call's recording right away.
     ///
     /// Cancellation (Stop Watching) is an end like any other rather than an
     /// error, so the caller finalizes the recording instead of losing it; an
@@ -46,7 +68,7 @@ extension WatchLoop {
     func waitForMeetingEnd(
         _ meeting: DetectedMeeting,
         storingCutsIn recording: (recorder: any RecordingProvider, startedAt: Date)? = nil,
-    ) async throws -> Date? {
+    ) async throws -> MeetingEndOutcome {
         let startTime = nowProvider()
         let config = WatchLoopEndConfig(
             maxDuration: maxDuration,
@@ -54,6 +76,7 @@ extension WatchLoop {
             countdown: meetingEndCountdown,
         )
         var phase = MeetingEndPhase.listening(signalLostAt: nil)
+        var callIDsSeen: Set<String> = []
         var capWarned = false
         let title = Self.cleanTitle(meeting.windowTitle)
         defer {
@@ -72,21 +95,18 @@ extension WatchLoop {
                     // before the stop may settle the question: a Keep
                     // recording tapped after it must not keep the countdown.
                     let answer = takeMeetingEndAnswer().flatMap { $0.receivedAt < requestedAt ? $0 : nil }
-                    return WatchLoopEndPolicy.cutWhenWatchingStops(phase: phase, answer: answer)
+                    return .ended(cutAt: WatchLoopEndPolicy.cutWhenWatchingStops(phase: phase, answer: answer))
                 }
-                let poll = MeetingEndPoll(
-                    now: nowProvider(),
-                    meetingActive: detector.isMeetingActive(meeting),
-                    answer: takeMeetingEndAnswer(),
-                )
+                let poll = pollMeeting(meeting, callIDsSeen: callIDsSeen)
                 let decision = WatchLoopEndPolicy.step(config: config, startTime: startTime, phase: phase, poll: poll)
                 if let stop = stepSilencePrompt(beside: decision, from: phase) {
                     diagnostics.notice(AutoStopReason.silenceStop.logLine(trigger: .auto, silentFor: stop.silentFor))
                     holdRedetection(of: meeting)
-                    return stop.cutAt
+                    return .ended(cutAt: stop.cutAt)
                 }
                 switch decision {
                 case let .continuePolling(next):
+                    logGraceChange(from: phase, to: next)
                     phase = next
 
                 case let .askToEnd(pending):
@@ -100,12 +120,9 @@ extension WatchLoop {
                     phase = next
 
                 case let .stop(stop):
-                    diagnostics.notice(stop.reason.logLine(trigger: .auto, signalAbsentFor: stop.signalAbsentFor))
-                    if stop.reason == .maxDuration {
-                        postStopNotice(RecordingStopNotices.capReached(recordingTitle: title, maxDuration: maxDuration))
-                    }
-                    return stop.cutAt
+                    return outcome(of: stop, meeting: meeting, title: title)
                 }
+                if case let .ids(ids) = poll.currentCalls { callIDsSeen.formUnion(ids) }
                 warnBeforeMaximumIfDue(
                     elapsed: poll.now.timeIntervalSince(startTime), recordingTitle: title, trigger: .auto, warned: &capWarned,
                 )
@@ -113,7 +130,98 @@ extension WatchLoop {
             }
         } catch is CancellationError {}
         logger.info("Watch cancelled mid-recording — finalizing in-flight recording")
-        return WatchLoopEndPolicy.cutWhenWatchingStops(phase: phase, answer: takeMeetingEndAnswer())
+        return .ended(cutAt: WatchLoopEndPolicy.cutWhenWatchingStops(phase: phase, answer: takeMeetingEndAnswer()))
+    }
+
+    /// Stop a detected meeting's recorder, cut it back where its end says,
+    /// and hand it on. Outside a quit, the stop, the cut and the hand-off are
+    /// synchronous, so they run to completion on a cancelled watch task and
+    /// nothing else can start a recording while they do. During a quit the
+    /// mix and a record-only write run off the main actor, so the quit's
+    /// budget (a main-actor timer) can fire meanwhile; the cut stays on it,
+    /// since room audio after a meeting must not be kept.
+    ///
+    /// `startedAt` is when the loop saw the capture running, where the cut is
+    /// measured from. A stored cut is removed before the stop when the end
+    /// carries none, so a stop that throws cannot hand a settled question's
+    /// cut to recovery, and after the cut when it does.
+    func finishMeetingRecording(
+        _ meeting: DetectedMeeting,
+        recorder: any RecordingProvider,
+        startedAt: Date,
+        end: MeetingEndOutcome,
+        participants: [String] = [],
+        protocolOptions: MeetingProtocolOptions? = nil,
+    ) async throws {
+        if end.cutAt == nil { clearStoredCut(of: recorder) }
+        let stoppedAt = nowProvider()
+        let recording: RecordingResult
+        if finishingForQuit {
+            recording = try await recorder.stopOffMain()
+        } else {
+            recording = try recorder.stop()
+        }
+        var stopped = (recording: recording, pauses: takeRecordingPauses(endingAt: stoppedAt, capturedOffsets: recording.pauseOffsets))
+        if let cutAt = end.cutAt {
+            stopped = cutBack(stopped, to: cutAt, startedAt: startedAt, stoppedAt: stoppedAt, recorder: recorder)
+            clearStoredCut(of: recorder)
+        }
+        let title = Self.cleanTitle(meeting.windowTitle)
+        if finishingForQuit, recordOnly() {
+            await writeRecordOnlyOffMain(
+                title: title, appName: meeting.pattern.appName, recording: stopped.recording, trigger: .auto,
+                pauses: stopped.pauses, participants: participants,
+            )
+        } else {
+            enqueueRecording(
+                title: title, appName: meeting.pattern.appName, recording: stopped.recording, trigger: .auto,
+                pauses: stopped.pauses, participants: participants, protocolOptions: protocolOptions,
+            )
+        }
+    }
+
+    /// Report an automatic stop and say how the wait ended: the diagnostic
+    /// line, the cap's notice, and for a new call the reason the caller starts
+    /// the next recording at once on.
+    private func outcome(of stop: MeetingEndStop, meeting: DetectedMeeting, title: String) -> MeetingEndOutcome {
+        diagnostics.notice(stop.reason.logLine(trigger: .auto, signalAbsentFor: stop.signalAbsentFor))
+        if stop.reason == .maxDuration {
+            postStopNotice(RecordingStopNotices.capReached(recordingTitle: title, maxDuration: maxDuration))
+        }
+        guard stop.reason == .newCall else { return .ended(cutAt: stop.cutAt) }
+        logger.info("\(meeting.pattern.appName, privacy: .public) moved on to a new call — ending this recording")
+        return MeetingEndOutcome(cutAt: stop.cutAt, reason: .replacedByNewCall)
+    }
+
+    /// What this poll sees. A live call already proves the meeting active,
+    /// which spares a second assertion snapshot that could disagree with the
+    /// first; a detector that cannot tell calls apart answers from its own
+    /// signal as before.
+    private func pollMeeting(_ meeting: DetectedMeeting, callIDsSeen: Set<String>) -> MeetingEndPoll {
+        let now = nowProvider()
+        let currentCalls = detector.activeCalls(meeting)
+        let meetingActive = if case let .ids(ids) = currentCalls, !ids.isEmpty {
+            true
+        } else {
+            detector.isMeetingActive(meeting)
+        }
+        return MeetingEndPoll(
+            now: now,
+            meetingActive: meetingActive,
+            answer: takeMeetingEndAnswer(),
+            callIDsSeen: callIDsSeen,
+            currentCalls: currentCalls,
+        )
+    }
+
+    /// Log when the grace period starts and when the signal clears it.
+    private func logGraceChange(from old: MeetingEndPhase, to new: MeetingEndPhase) {
+        guard case let .listening(oldLost) = old, case let .listening(newLost) = new else { return }
+        if oldLost == nil, newLost != nil {
+            logger.info("Meeting inactive — grace period started")
+        } else if oldLost != nil, newLost == nil {
+            logger.info("Meeting active again — grace period cleared")
+        }
     }
 
     /// The long-silence question's step in a poll of the wait, run after the

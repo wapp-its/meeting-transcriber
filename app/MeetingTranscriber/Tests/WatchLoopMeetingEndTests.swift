@@ -267,7 +267,7 @@ final class WatchLoopMeetingEndTests: XCTestCase { // swiftlint:disable:this bal
             if t == 15 { h.answerFirstQuestion(.stopNow) }
         }
 
-        let cutAt = try await loop.waitForMeetingEnd(meeting)
+        let cutAt = try await loop.waitForMeetingEnd(meeting).cutAt
 
         XCTAssertEqual(seconds(cutAt), 10)
         XCTAssertEqual(harness.elapsed, 15, "ends at the poll after the answer")
@@ -289,7 +289,7 @@ final class WatchLoopMeetingEndTests: XCTestCase { // swiftlint:disable:this bal
             if t == 45 { h.answerFirstQuestion(.stopNow) }
         }
 
-        let cutAt = try await loop.waitForMeetingEnd(meeting)
+        let cutAt = try await loop.waitForMeetingEnd(meeting).cutAt
 
         let ids = harness.askedIDs
         XCTAssertEqual(ids.count, 2, "a fresh question after the second loss")
@@ -311,7 +311,7 @@ final class WatchLoopMeetingEndTests: XCTestCase { // swiftlint:disable:this bal
             if t == 15 { h.answerFirstQuestion(.keepRecording) }
         }
 
-        let cutAt = try await loop.waitForMeetingEnd(meeting)
+        let cutAt = try await loop.waitForMeetingEnd(meeting).cutAt
 
         XCTAssertNil(cutAt, "a kept recording is not cut")
         XCTAssertEqual(harness.askedIDs.count, 1, "no second question while the signal stays away")
@@ -329,7 +329,7 @@ final class WatchLoopMeetingEndTests: XCTestCase { // swiftlint:disable:this bal
             if t == 60 { h.signal.active = false }
         }
 
-        let cutAt = try await loop.waitForMeetingEnd(meeting)
+        let cutAt = try await loop.waitForMeetingEnd(meeting).cutAt
 
         XCTAssertEqual(harness.askedIDs.count, 2)
         XCTAssertEqual(harness.elapsed, 190, "asked again at 70 s, ended unanswered at 190 s")
@@ -422,7 +422,7 @@ final class WatchLoopMeetingEndTests: XCTestCase { // swiftlint:disable:this bal
         let harness = Harness()
         let loop = harness.makeLoop(maxDuration: 50)
 
-        let cutAt = try await loop.waitForMeetingEnd(meeting)
+        let cutAt = try await loop.waitForMeetingEnd(meeting).cutAt
 
         XCTAssertEqual(seconds(cutAt), 10)
         XCTAssertEqual(harness.elapsed, 51)

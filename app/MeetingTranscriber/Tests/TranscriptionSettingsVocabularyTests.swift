@@ -12,7 +12,7 @@ final class TranscriptionSettingsVocabularyTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         suiteName = "TranscriptionSettingsVocabularyTests-\(UUID().uuidString)"
-        defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults = try XCTUnwrap(DefaultsSuite.open(suiteName))
     }
 
     override func tearDown() async throws {
@@ -24,6 +24,7 @@ final class TranscriptionSettingsVocabularyTests: XCTestCase {
 
     func testVocabularyPathFieldWritesBackThroughTheBookmarkSafeSetter() throws {
         let settings = AppSettings(defaults: defaults)
+        settings.customVocabularyEnabled = true
         let field = try makeView(settings: settings).inspect().find(ViewType.TextField.self) { field in
             try field.accessibilityIdentifier() == A11yID.customVocabularyPathField
         }
@@ -46,6 +47,7 @@ final class TranscriptionSettingsVocabularyTests: XCTestCase {
         for engine in [TranscriptionEngineSetting.parakeet, .whisperKit] {
             let settings = AppSettings(defaults: defaults)
             settings.transcriptionEngine = engine
+            settings.customVocabularyEnabled = true
             XCTAssertNoThrow(
                 try makeView(settings: settings)
                     .inspect()
@@ -55,29 +57,21 @@ final class TranscriptionSettingsVocabularyTests: XCTestCase {
         }
     }
 
-    func testWhisperKitVocabularyControlAttachesTheBoundedPriorityHelp() throws {
+    func testWhisperKitVocabularyFileRowAttachesThePriorityHelp() throws {
         let settings = AppSettings(defaults: defaults)
         settings.transcriptionEngine = .whisperKit
+        settings.customVocabularyEnabled = true
 
         let vocabularyControl = try makeView(settings: settings)
             .inspect()
-            .find(viewWithAccessibilityIdentifier: A11yID.customVocabularyFileRow)
+            .find(viewWithAccessibilityIdentifier: A11yID.vocabularySection)
+            .find(ViewType.HStack.self) { (try? $0.find(viewWithAccessibilityIdentifier: A11yID.customVocabularyPathField)) != nil }
 
         XCTAssertEqual(
             try vocabularyControl.help().string(),
             TranscriptionSettingsView.vocabularyHelpText(for: .whisperKit),
         )
-    }
-
-    func testWhisperKitShowsItsVocabularyHintCapacity() throws {
-        let settings = AppSettings(defaults: defaults)
-        settings.transcriptionEngine = .whisperKit
-
-        XCTAssertNoThrow(
-            try makeView(settings: settings)
-                .inspect()
-                .find(text: "When enabled, WhisperKit uses a 32-token hint; earlier terms have priority."),
-        )
+        XCTAssertTrue(TranscriptionSettingsView.vocabularyHelpText(for: .whisperKit).contains("Earlier terms have priority"))
     }
 
     func testWhisperKitExperimentalVocabularyPromptWritesBackToSettings() throws {
@@ -85,51 +79,83 @@ final class TranscriptionSettingsVocabularyTests: XCTestCase {
         settings.transcriptionEngine = .whisperKit
         let toggle = try makeView(settings: settings)
             .inspect()
-            .find(viewWithAccessibilityIdentifier: A11yID.whisperKitVocabularyPromptToggle)
+            .find(viewWithAccessibilityIdentifier: A11yID.customVocabularyToggle)
             .find(ViewType.Toggle.self)
 
         try toggle.tap()
 
-        XCTAssertTrue(settings.whisperKitVocabularyPromptEnabled)
+        XCTAssertTrue(settings.customVocabularyEnabled)
     }
 
-    func testWhisperKitExperimentalVocabularyPromptExplainsTheQualityTradeoff() throws {
+    func testWhisperKitPutsTheExperimentalWarningInTheHelpBadgeInsteadOfCaptions() throws {
         let settings = AppSettings(defaults: defaults)
         settings.transcriptionEngine = .whisperKit
-
-        XCTAssertNoThrow(
-            try makeView(settings: settings)
-                .inspect()
-                .find(text: "Experimental: dense audio can omit whole sentences. See help for measured results; prefer Parakeet for vocabulary boosting."),
-        )
-    }
-
-    func testWhisperKitExperimentalVocabularyPromptAttachesTheQualityTooltip() throws {
-        let settings = AppSettings(defaults: defaults)
-        settings.transcriptionEngine = .whisperKit
-        let toggle = try makeView(settings: settings)
-            .inspect()
-            .find(viewWithAccessibilityIdentifier: A11yID.whisperKitVocabularyPromptToggle)
-            .find(ViewType.Toggle.self)
+        let body = try makeView(settings: settings).inspect()
 
         XCTAssertEqual(
-            try toggle.help().string(),
-            "Experimental. WhisperKit treats the vocabulary as a decoder hint, "
-                + "not a correction. In a dense four-speaker English evaluation, a 25-content-token prompt "
-                + "from this 32-token budget raised word error rate from 29% to 77% and deletions from 73 to 241. "
-                + "It can omit whole sentences. Results vary by audio; prefer Parakeet for vocabulary boosting.",
+            try body.find(viewWithAccessibilityIdentifier: A11yID.customVocabularyToggle)
+                .find(HelpBadge.self).actualView().text,
+            SettingsHelp.customVocabularyWhisperKit,
+        )
+        XCTAssertThrowsError(try body.find(text: "When enabled, WhisperKit uses a 32-token hint; earlier terms have priority."))
+    }
+
+    func testWhisperKitVocabularyPromptSitsInTheVocabularySectionAndGatesTheFileRow() throws {
+        let settings = AppSettings(defaults: defaults)
+        settings.transcriptionEngine = .whisperKit
+        let section = try makeView(settings: settings).inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.vocabularySection)
+        XCTAssertNoThrow(try section.find(viewWithAccessibilityIdentifier: A11yID.customVocabularyToggle))
+        XCTAssertThrowsError(try section.find(viewWithAccessibilityIdentifier: A11yID.customVocabularyPathField))
+        XCTAssertNoThrow(try section.find(viewWithAccessibilityIdentifier: A11yID.terminologyRulesEditor))
+
+        settings.customVocabularyEnabled = true
+        XCTAssertNoThrow(
+            try makeView(settings: settings).inspect()
+                .find(viewWithAccessibilityIdentifier: A11yID.vocabularySection)
+                .find(viewWithAccessibilityIdentifier: A11yID.customVocabularyPathField),
         )
     }
 
-    func testParakeetHidesWhisperKitExperimentalVocabularyPrompt() throws {
+    func testParakeetShowsTheSwitchAndHidesTheFileRowWhileOff() throws {
+        let settings = AppSettings(defaults: defaults)
+        settings.transcriptionEngine = .parakeet
+        settings.customVocabularyEnabled = false
+        let section = try makeView(settings: settings).inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.vocabularySection)
+
+        XCTAssertNoThrow(try section.find(viewWithAccessibilityIdentifier: A11yID.customVocabularyToggle))
+        XCTAssertThrowsError(try section.find(viewWithAccessibilityIdentifier: A11yID.customVocabularyPathField))
+    }
+
+    func testParakeetHelpBadgeIsGeneralWithoutTheWhisperKitWarning() throws {
         let settings = AppSettings(defaults: defaults)
         settings.transcriptionEngine = .parakeet
 
-        XCTAssertThrowsError(
-            try makeView(settings: settings)
-                .inspect()
-                .find(viewWithAccessibilityIdentifier: A11yID.whisperKitVocabularyPromptToggle),
+        XCTAssertEqual(
+            try makeView(settings: settings).inspect()
+                .find(viewWithAccessibilityIdentifier: A11yID.customVocabularyToggle)
+                .find(HelpBadge.self).actualView().text,
+            SettingsHelp.customVocabulary,
         )
+    }
+
+    /// The switch covers both sources, so the source picker sits under it and the
+    /// file row shows only for the local-file source.
+    func testTheSourcePickerShowsOnlyWhileTheSwitchIsOn() throws {
+        let settings = AppSettings(defaults: defaults)
+        settings.customVocabularyEnabled = false
+        XCTAssertThrowsError(
+            try makeView(settings: settings).inspect()
+                .find(viewWithAccessibilityIdentifier: A11yID.vocabularySection)
+                .find(viewWithAccessibilityIdentifier: A11yID.vocabularySourcePicker),
+        )
+
+        settings.customVocabularyEnabled = true
+        let section = try makeView(settings: settings).inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.vocabularySection)
+        XCTAssertNoThrow(try section.find(viewWithAccessibilityIdentifier: A11yID.vocabularySourcePicker))
+        XCTAssertNoThrow(try section.find(viewWithAccessibilityIdentifier: A11yID.customVocabularyFileRow))
     }
 
     private func makeView(settings: AppSettings) -> TranscriptionSettingsView {

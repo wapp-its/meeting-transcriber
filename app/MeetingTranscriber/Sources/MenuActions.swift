@@ -22,10 +22,11 @@ struct MenuActions {
     var togglePause: (() -> Void)?
     /// A job line's Open: the job's protocol, else its transcript.
     var openProtocol: (URL) -> Void
-    /// "Open Last Protocol": the newest finished job's protocol, else its
-    /// transcript. Separate from a job line's Open because a file that is
-    /// gone is reported here, as the All Recordings window reports it.
-    var openLastProtocol: (URL) -> Void
+    /// "Open Last Notes": the newest finished job's protocol, else its
+    /// transcript, or its Notion page as `JobOpenTarget` decides. Separate
+    /// from a job line's Open because a file that is gone is reported here,
+    /// as the All Recordings window reports it.
+    var openLastProtocol: (JobOpenTarget) -> Void
     var openSettings: () -> Void
     /// Opens the naming window; set only while a job waits for speaker names.
     var nameSpeakers: (() -> Void)?

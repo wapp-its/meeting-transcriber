@@ -39,18 +39,56 @@ enum WhisperKitLocalSnapshot {
     /// present directory proves nothing while a file at its final path is whole.
     static let requiredFiles = ["coremldata.bin", "model.mil", "weights/weight.bin"]
 
-    /// What the tokenizer load reads from a model folder before it turns to the Hub
-    /// (`HubTokenScopedWhisperKit`). Only a picked folder has to carry them: it is
-    /// never downloaded and its pipe never fetches a tokenizer, so without them the
-    /// load fails. A Hub variant is not checked for them, because the stock ones do
-    /// not ship them and get the tokenizer through the download cache instead.
+    /// The tokenizer files the pipe can read from a model folder. Its search order
+    /// is the shared cache (`models/openai/whisper-<detected size>`) first, the model
+    /// folder second (`WhisperTokenizerCache.searchPaths`). A Hub variant falls back
+    /// to fetching the tokenizer with the app's token (`HubTokenScopedWhisperKit`);
+    /// a picked folder never fetches one, so without these files and without that
+    /// cache its load fails. A Hub variant is not checked for them, because the
+    /// stock ones do not ship them and get the tokenizer through the download cache
+    /// instead.
     static let requiredTokenizerFiles = ["tokenizer.json", "tokenizer_config.json"]
+
+    /// Where WhisperKit keeps models and tokenizers in this app: the one source of
+    /// truth for the download, the pipe's tokenizer lookup and the locator below,
+    /// so they cannot point at different places.
+    ///
+    /// Not the library default `Documents/huggingface`, which iCloud "Desktop &
+    /// Documents" uploads, about 1 GB per variant (issue #640). Not `Caches`
+    /// either: a purge there means a silent gigabyte download, or a failed load
+    /// offline. In the sandboxed build it resolves inside the container.
+    ///
+    /// The bare path, for lookups that must not touch the disk. Anything that
+    /// writes there goes through `downloadBase`.
+    static let downloadBaseLocation = AppPaths.dataDir.appendingPathComponent("huggingface", isDirectory: true)
+
+    /// `downloadBaseLocation`, created and excluded from backup on first access,
+    /// once per process. What WhisperKit is handed as `downloadBase`, so no
+    /// download can reach the folder before it is prepared.
+    static let downloadBase: URL = {
+        prepareDownloadBase(downloadBaseLocation)
+        return downloadBaseLocation
+    }()
+
+    /// Create `base` and exclude it from Time Machine, the one advantage `Caches`
+    /// would have had for re-downloadable weights. Best effort: a folder that
+    /// cannot be marked is still a working download base.
+    static func prepareDownloadBase(_ base: URL, fileManager: FileManager = .default) {
+        var base = base
+        do {
+            try fileManager.createDirectory(at: base, withIntermediateDirectories: true)
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            try base.setResourceValues(values)
+        } catch {
+            logger.warning("Could not prepare the WhisperKit download folder: \(String(describing: type(of: error)), privacy: .public)")
+        }
+    }
 
     /// The root WhisperKit's own downloader writes into. Taken from
     /// `HubApiWrapper`, the API published for exactly this ("callers outside
     /// ArgmaxCore have no dependency on the internal Hub types"), instead of
-    /// rebuilding `Documents/huggingface` by hand, so the two cannot drift and the
-    /// sandboxed build resolves it inside its container automatically.
+    /// rebuilding the `models/<repo>` layout by hand, so the two cannot drift.
     static var defaultRepoRoot: URL {
         repoRoot(for: repoID)
     }
@@ -58,8 +96,13 @@ enum WhisperKitLocalSnapshot {
     /// The root the downloader writes `repoID`'s variants into, so a custom
     /// repository is looked up where its own download put it.
     static func repoRoot(for repoID: String) -> URL {
-        HubApiWrapper.shared.localRepoLocation(HubApiWrapper.Repo(id: repoID, type: .models))
+        hub.localRepoLocation(HubApiWrapper.Repo(id: repoID, type: .models))
     }
+
+    /// Kept rather than built per call: every `HubApiWrapper` starts its own
+    /// network path monitor. Built on the bare location, because a lookup has no
+    /// reason to create the folder.
+    private static let hub = HubApiWrapper(downloadBase: downloadBaseLocation)
 
     /// The folder holding a complete copy of `variant`, or nil when anything
     /// required is missing. Pure path and existence checks, never the network.
@@ -108,12 +151,15 @@ enum WhisperKitLocalSnapshot {
     /// `requiredFiles`), plus the tokenizer when `includingTokenizer` is set, which
     /// only a folder that is never downloaded needs (see `requiredTokenizerFiles`).
     static func firstMissingFile(in folder: URL, includingTokenizer: Bool = false) -> String? {
-        var required = requiredBundles.flatMap { bundle in
+        requiredPaths(includingTokenizer: includingTokenizer)
+            .first { !FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path) }
+    }
+
+    /// Every file `firstMissingFile` checks, relative to the model folder.
+    static func requiredPaths(includingTokenizer: Bool = false) -> [String] {
+        let bundles = requiredBundles.flatMap { bundle in
             requiredFiles.map { "\(bundle).mlmodelc/\($0)" }
         }
-        if includingTokenizer {
-            required += requiredTokenizerFiles
-        }
-        return required.first { !FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path) }
+        return includingTokenizer ? bundles + requiredTokenizerFiles : bundles
     }
 }

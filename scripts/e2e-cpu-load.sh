@@ -75,8 +75,10 @@ DEV_BUNDLE_DEPLOY="$HOME/Applications/MeetingTranscriber-Dev.app"
 SIMULATOR_PKG="$ROOT/tools/meeting-simulator"
 SIMULATOR_BIN="$SIMULATOR_PKG/.build/release/meeting-simulator"
 DEFAULT_FIXTURE="$ROOT/app/MeetingTranscriber/Tests/Fixtures/two_speakers_de.wav"
+# shellcheck disable=SC2034 # read by the RPC helpers in lib/e2e-helpers.sh
 RPC_TOKEN_FILE="$HOME/Library/Application Support/MeetingTranscriber/.rpc-token"
 REC_DIR="$HOME/Library/Application Support/MeetingTranscriber/recordings"
+# shellcheck disable=SC2034 # read by the RPC helpers in lib/e2e-helpers.sh
 RPC_BASE="http://127.0.0.1:9876"
 # shellcheck source=lib/bundle-ids.sh
 source "$ROOT/scripts/lib/bundle-ids.sh"
@@ -105,30 +107,16 @@ fail() { printf '[e2e-cpu-load] FAIL: %s\n' "$*" >&2; exit 1; }
 
 # shellcheck source=scripts/lib/e2e-helpers.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/e2e-helpers.sh"
+# Ends what a timed-out earlier step left running, then records this
+# driver for the next (see e2e_register_driver).
+e2e_register_driver
 
 require_command() {
     command -v "$1" >/dev/null || fail "missing command: $1"
 }
 
+# shellcheck disable=SC2034 # read by the RPC helpers in lib/e2e-helpers.sh
 RPC_TOKEN=""
-rpc() {
-    local path="$1"
-    curl --silent --show-error --max-time 10 \
-        --header "Authorization: Bearer $RPC_TOKEN" \
-        "$RPC_BASE$path" 2>/dev/null || true
-}
-
-# Fetch /metrics and verify it looks like a metrics snapshot. The explicit
-# non-empty guard matters: jq 1.6 exits 0 on EMPTY input even with -e
-# (fixed in 1.7 to exit 4) — without it a timed-out curl would masquerade
-# as a valid snapshot.
-metrics_snapshot() {
-    local m
-    m="$(rpc /metrics)"
-    { [ -n "$m" ] && jq -e '.monotonicTimeSeconds > 0' <<<"$m" >/dev/null 2>&1; } \
-        || fail "/metrics returned no usable snapshot: $m"
-    printf '%s' "$m"
-}
 
 # Compute window averages from two cumulative snapshots.
 # $1 = start JSON, $2 = end JSON; prints a one-object JSON summary.
@@ -235,23 +223,11 @@ if [ "$fg_user" != "$my_user" ]; then
     fail "Aqua foreground user is '$fg_user', not '$my_user' — Fast User Switching is active."
 fi
 
-# See the shared note in e2e-app.sh: `rpc` ends in `|| true`, so probing
-# through it reports success for a refused connection and leaves the token
-# file, which outlives every run on the host, as the only real condition.
-# Ask curl directly and let its exit status decide.
-_rpc_ready() {
-    [ -f "$RPC_TOKEN_FILE" ] || return 1
-    RPC_TOKEN="$(cat "$RPC_TOKEN_FILE")"
-    curl --silent --fail --max-time 5 \
-        --header "Authorization: Bearer $RPC_TOKEN" \
-        "$RPC_BASE/healthz" >/dev/null 2>&1
-}
-
 launch_app_and_wait() {
     log "Launching $DEV_BUNDLE_DEPLOY"
     open "$DEV_BUNDLE_DEPLOY"
     log "Waiting up to ${RPC_READY_TIMEOUT_S}s for RPC /healthz"
-    poll_until "$RPC_READY_TIMEOUT_S" 1 _rpc_ready \
+    poll_until "$RPC_READY_TIMEOUT_S" 1 rpc_ready \
         || fail "RPC /healthz did not respond within ${RPC_READY_TIMEOUT_S}s"
     log "RPC up"
 }
@@ -284,47 +260,27 @@ on_exit() {
     fi
     rm -f "${RUN_START_MARKER:-}" 2>/dev/null || true
 }
-trap on_exit EXIT INT TERM
+# INT/TERM exit (and so run on_exit once, from EXIT): a trap that only ran
+# on_exit would return into the interrupted command and let the lane carry on
+# after its cleanup, which a reaper SIGTERM relies on not happening.
+trap on_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
-# All RPC predicates carry the non-empty guard: jq 1.6 exits 0 on EMPTY
-# input even with -e, so a timed-out `rpc /state` would otherwise count
-# as a satisfied predicate.
-
-_pipeline_drained() {
-    local state
-    state="$(rpc /state)"
-    [ -n "$state" ] && jq -e \
-        '.pipeline.isProcessing == false and .pipeline.activeJobCount == 0' \
-        <<<"$state" >/dev/null 2>&1
-}
-
-# Pipeline state tracks JOBS, not model loads — the Parakeet preload that
-# liveTranscriptionEnabled triggers at launch is only visible here.
-_model_loaded() {
-    local state
-    state="$(rpc /state)"
-    [ -n "$state" ] && jq -e '.engines.parakeet.modelState == "loaded"' \
-        <<<"$state" >/dev/null 2>&1
-}
-
-_recording_active() {
-    local state
-    state="$(rpc /state)"
-    [ -n "$state" ] && jq -e '.watchState == "recording"' <<<"$state" >/dev/null 2>&1
-}
-
-_live_path_hot() {
-    [ "$(rpc /state | jq -r '.liveCaptions.recentFinals | length' 2>/dev/null)" -gt 0 ] 2>/dev/null
-}
+# The /state waits go through poll_state (scripts/lib/e2e-helpers.sh), so an
+# app that stops answering fails as such instead of as "never happened".
+_PIPELINE_DRAINED='.pipeline.isProcessing == false and .pipeline.activeJobCount == 0'
 
 # Snapshot → sleep → snapshot → print the window summary JSON.
 measure_window() {
     local secs="$1" start end
     assert_app_alive
-    start="$(metrics_snapshot)"
+    metrics_snapshot || fail "$(rpc_why $? /metrics "the CPU/RAM snapshot was not taken")"
+    start="$RPC_BODY"
     sleep "$secs"
     assert_app_alive
-    end="$(metrics_snapshot)"
+    metrics_snapshot || fail "$(rpc_why $? /metrics "the CPU/RAM snapshot was not taken")"
+    end="$RPC_BODY"
     window_delta "$start" "$end"
 }
 
@@ -332,12 +288,13 @@ measure_window() {
 # stopped (meeting ended early) or post-processing started. Either mixes
 # non-steady-state load into the numbers — flagged, not failed, per the
 # log-first policy.
+# An app that does not answer flags the window too: nothing then says the state
+# held, and an unanswered read used to come out as "clean".
 contamination_flag() {
     local flag
-    flag="$(rpc /state | jq -r \
-        '(.watchState != "recording") or .pipeline.isProcessing or (.pipeline.activeJobCount > 0)' \
-        2>/dev/null)"
-    if [ "$flag" = "true" ]; then printf 'true'; else printf 'false'; fi
+    flag="$(state_query '(.watchState != "recording") or .pipeline.isProcessing or (.pipeline.activeJobCount > 0)')" \
+        || flag=true
+    if [ "$flag" = "false" ]; then printf 'false'; else printf 'true'; fi
 }
 
 # === session A: default profile (live captions OFF, record-only) ============
@@ -355,8 +312,8 @@ write_dev_default "$BUNDLE_ID" autoWatch true bool
 launch_app_and_wait
 
 log "Session A settle: waiting up to ${SETTLE_TIMEOUT_S}s for pipeline to drain"
-poll_until "$SETTLE_TIMEOUT_S" 5 _pipeline_drained \
-    || fail "pipeline still busy after ${SETTLE_TIMEOUT_S}s — stale recovered jobs?"
+poll_state "$SETTLE_TIMEOUT_S" 5 state_is "$_PIPELINE_DRAINED" \
+    || fail "$(state_why $? "pipeline still busy after ${SETTLE_TIMEOUT_S}s — stale recovered jobs?")"
 # Extra settle for what no RPC field can see: page-ins, launch tails.
 sleep 10
 
@@ -370,8 +327,8 @@ log "Starting meeting-simulator → $SIMULATOR_FIXTURE"
 SIM_PID=$!
 
 log "Waiting for recording to start (watchState == recording, timeout ${RECORDING_DEADLINE_S}s)"
-poll_until "$RECORDING_DEADLINE_S" 2 _recording_active \
-    || fail "recording never started within ${RECORDING_DEADLINE_S}s — detector or TCC problem?"
+poll_state "$RECORDING_DEADLINE_S" 2 state_is '.watchState == "recording"' \
+    || fail "$(state_why $? "recording never started within ${RECORDING_DEADLINE_S}s — detector or TCC problem?")"
 
 log "Window 2/3 — recording WITHOUT live captions: ${ACTIVE_WINDOW_S}s"
 REC_SUMMARY="$(measure_window "$ACTIVE_WINDOW_S")"
@@ -396,10 +353,12 @@ write_dev_default "$BUNDLE_ID" recordOnly false bool
 launch_app_and_wait
 
 log "Session B settle: waiting up to ${SETTLE_TIMEOUT_S}s for pipeline drain + Parakeet preload"
-poll_until "$SETTLE_TIMEOUT_S" 5 _pipeline_drained \
-    || fail "pipeline still busy after ${SETTLE_TIMEOUT_S}s"
-poll_until "$SETTLE_TIMEOUT_S" 5 _model_loaded \
-    || fail "Parakeet preload didn't finish within ${SETTLE_TIMEOUT_S}s"
+poll_state "$SETTLE_TIMEOUT_S" 5 state_is "$_PIPELINE_DRAINED" \
+    || fail "$(state_why $? "pipeline still busy after ${SETTLE_TIMEOUT_S}s")"
+# Pipeline state tracks JOBS, not model loads — the Parakeet preload that
+# liveTranscriptionEnabled triggers at launch is only visible here.
+poll_state "$SETTLE_TIMEOUT_S" 5 state_is '.engines.parakeet.modelState == "loaded"' \
+    || fail "$(state_why $? "Parakeet preload didn't finish within ${SETTLE_TIMEOUT_S}s")"
 # Extra settle for what no RPC field can see: CoreML compile tail, page-ins.
 sleep 10
 
@@ -409,8 +368,8 @@ log "Starting meeting-simulator → $SIMULATOR_FIXTURE (session B)"
 SIM_PID=$!
 
 log "Waiting for first finalised caption (proves live path is hot, timeout ${CAPTION_DEADLINE_S}s)"
-poll_until "$CAPTION_DEADLINE_S" 3 _live_path_hot \
-    || fail "no finalised caption within ${CAPTION_DEADLINE_S}s — live path never became active"
+poll_state "$CAPTION_DEADLINE_S" 3 state_is '(.liveCaptions.recentFinals | length) > 0' \
+    || fail "$(state_why $? "no finalised caption within ${CAPTION_DEADLINE_S}s — live path never became active")"
 
 log "Window 3/3 — recording WITH live captions: ${ACTIVE_WINDOW_S}s"
 LIVE_SUMMARY="$(measure_window "$ACTIVE_WINDOW_S")"

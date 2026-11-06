@@ -34,6 +34,8 @@ final class VocabularySourceSettingsTests: XCTestCase {
             remoteVocabularyTokenAccount: tokenAccount,
             remoteVocabularyCacheDirectory: cacheDirectory,
         )
+        // The source controls sit under the vocabulary switch.
+        settings.customVocabularyEnabled = true
         fetcher = RemoteVocabularyFetcherFake()
     }
 

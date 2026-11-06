@@ -35,6 +35,20 @@ enum ChannelFault: String, Equatable {
     /// been tried. The channel is still capturing, which is what keeps this
     /// apart from `gaveUp`.
     case rebuildsExhausted
+
+    /// The microphone went without a buffer for the capture layer's whole
+    /// budget, across restarts and rebuilds of its engine, and was released
+    /// (issues #724, #706). Unlike `gaveUp` nothing is stuck: a device change
+    /// brings it back, which is what the message has to say.
+    case stalled
+
+    /// Buffers keep arriving and carry energy, but for the sensor's whole
+    /// window nearly all of it sat below one 16-bit step, a floor rather than
+    /// the call (issue #699). App channel only, from `AppNoiseFloorSensor`. Reported like
+    /// `digitalSilence` and in its place: a tap of a silent meeting app
+    /// delivers exact zeros, which are that report's, so a floor that never
+    /// rises says the tap is not reading the meeting app at all.
+    case noiseFloor
 }
 
 /// Decides whether one capture channel has failed, from what the capture layer
@@ -82,12 +96,47 @@ struct ChannelFaultMonitor {
     /// the channel twice or the state showed no fault at all.
     private var reportedGiveUp = false
 
-    /// Its own latch for the same reason the give-up has one: it says
-    /// something the silence report cannot, that rebuilding was tried and
-    /// failed, so it is still worth reporting after one. It ends digital-
-    /// silence reporting for the channel; buffers stopping later and a later
-    /// give-up are still news.
-    private var reportedRebuildsExhausted = false
+    /// Where the watchdog give-up's report stands. Its own state for the same
+    /// reason the give-up has a latch: it says something the silence report
+    /// cannot, that rebuilding was tried and failed, so it is still worth
+    /// reporting after one. Once reported it ends digital-silence reporting
+    /// for the channel; buffers stopping later and a later capture give-up
+    /// (`gaveUp`) are still news. The watchdog itself never gives up twice in
+    /// a recording, so there is no second report to arm for.
+    private enum WatchdogReport: Equatable {
+        case unseen
+        /// Seen but held back for corroboration, since this time into the
+        /// recording. The capture layer's flag never clears, so without the
+        /// time the report would still fall due after the far end started
+        /// talking again. Trails the give-up itself by a queue hop and a
+        /// poll, which `update` allows for.
+        case pending(since: TimeInterval)
+        /// Overtaken by signal before it could be reported. Kept apart from
+        /// `reported` because nothing was said: a later run of zeros is still
+        /// the plain silence report's.
+        case retired
+        case reported
+    }
+
+    private var watchdogReport = WatchdogReport.unseen
+
+    /// The stall count last reported, rather than a latch like the others:
+    /// a stall says something the silence message cannot (restarting did not
+    /// help, and what will), and a give-up after a revived capture wedges says
+    /// something the stall could not (it is not coming back). Every further
+    /// stall is news too, whether the revived microphone delivered in between
+    /// or never did: either way the remedy did not hold.
+    private var reportedStalls = 0
+
+    /// Whether the last update saw the channel stalled, to find the revival.
+    private var wasStalled = false
+
+    /// When the current observation window began: the start of the recording,
+    /// or the revival of a stalled channel. The ages the capture layer
+    /// reports still span the stall when the flag clears, so a revived
+    /// channel is judged only on what it did since, over a full window of its
+    /// own, as a fresh recording would be.
+    private var windowStart: TimeInterval = 0
 
     init(window: TimeInterval) {
         self.window = window
@@ -101,7 +150,8 @@ struct ChannelFaultMonitor {
     ///     a chance to pass.
     ///   - corroborated: whether the recording is known to be capturing
     ///     anything at all right now, i.e. whether the *other* channel carried
-    ///     speech inside the window. Gates `digitalSilence` only: zeroes are
+    ///     speech inside the window. Gates `digitalSilence` and `noiseFloor`
+    ///     only: zeroes are
     ///     also what a healthy channel carries when its source is silent, and
     ///     a recording where nothing at all is happening belongs to
     ///     `SilentRecordingMonitor`.
@@ -110,14 +160,24 @@ struct ChannelFaultMonitor {
     ///     buffer a moment ago, and no age can say it will never deliver
     ///     another.
     ///   - rebuildsExhausted: whether the silent-track watchdog stopped
-    ///     rebuilding this channel's capture. Defaulted because only the app
-    ///     channel has a watchdog, so false is the true answer everywhere else.
+    ///     rebuilding this channel's capture. Reported once, corroborated, and
+    ///     not at all if the channel carried signal since the give-up.
+    ///     Defaulted because only the app channel has a watchdog, so false is
+    ///     the true answer everywhere else.
+    ///   - stall: whether this channel's capture is released for lack of
+    ///     audio, and how often it was. Defaulted because only the microphone
+    ///     stalls.
+    ///   - noiseFloor: whether the capture layer's noise-floor sensor holds
+    ///     that this channel carries only a level below one 16-bit step.
+    ///     Defaulted because only the app channel has that sensor.
     mutating func update(
         ages: ChannelSignalAges,
         gaveUp: Bool,
         elapsedSinceStart: TimeInterval,
         corroborated: Bool,
         rebuildsExhausted: Bool = false,
+        stall: MicCaptureStall = MicCaptureStall(),
+        noiseFloor: Bool = false,
     ) -> ChannelFault? {
         // First, and without waiting for the window: this is already terminal
         // when the flag flips, and the window exists to rule out states that
@@ -131,14 +191,55 @@ struct ChannelFaultMonitor {
         // `digitalSilence` needs (issue #614): the watchdog cannot tell a dead
         // tap from a far end that is silent, a muted call or a lobby, and this
         // pierces Focus, so it waits for the other channel to show the call is
-        // live. The flag stays set, so a later corroborated tick reports it.
-        if rebuildsExhausted, corroborated, !reportedRebuildsExhausted, !reportedGiveUp {
-            reportedRebuildsExhausted = true
-            return .rebuildsExhausted
+        // live. The flag stays set, so a later corroborated tick reports it,
+        // unless the channel carried signal since the give-up: then "rebuilding
+        // did not bring audio back" is no longer true, and the report retires.
+        if rebuildsExhausted, !reportedGiveUp {
+            let seenAt: TimeInterval? = switch watchdogReport {
+            case .unseen: elapsedSinceStart
+            case let .pending(since): since
+            case .retired, .reported: nil
+            }
+            if let seenAt {
+                // The flag is first seen a queue hop and a poll after the
+                // watchdog decided, and the watchdog decides only on a run
+                // of zeros at least its trigger length long. So signal
+                // younger than the trigger when the flag was first seen, or
+                // any signal after that margin, came after the give-up. A
+                // channel that never carried signal keeps its give-up.
+                if let energyAge = ages.secondsSinceLastEnergy,
+                   energyAge < elapsedSinceStart - seenAt + SilentTrackWatchdogLimits.secondsOfZerosBeforeRebuild {
+                    watchdogReport = .retired
+                } else if corroborated {
+                    watchdogReport = .reported
+                    return .rebuildsExhausted
+                } else {
+                    watchdogReport = .pending(since: seenAt)
+                }
+            }
         }
-        guard !reportedSilence, !reportedGiveUp, elapsedSinceStart >= window else { return nil }
+        // Also without a window: the capture layer already waited out its own
+        // budget before it stalled.
+        if stall.isActive {
+            wasStalled = true
+            if stall.count > reportedStalls {
+                reportedStalls = stall.count
+                if !reportedGiveUp { return .stalled }
+            }
+        } else if wasStalled {
+            // Revived. Everything reported about the dead channel is re-armed,
+            // silence included, so a revived microphone that is dead or
+            // delivers only zeroes is reported like any other, once it has
+            // had its window.
+            wasStalled = false
+            reportedSilence = false
+            windowStart = elapsedSinceStart
+        }
+        // While stalled the stall message covers the silence.
+        let observed = elapsedSinceStart - windowStart
+        guard !reportedSilence, !reportedGiveUp, !stall.isActive, observed >= window else { return nil }
 
-        let bufferAge = ages.secondsSinceLastBuffer ?? elapsedSinceStart
+        let bufferAge = min(ages.secondsSinceLastBuffer ?? elapsedSinceStart, observed)
         if bufferAge >= window {
             reportedSilence = true
             return .noBuffers
@@ -147,16 +248,29 @@ struct ChannelFaultMonitor {
         // The watchdog report already said this channel is silent, with more
         // in it; a plain silence report after it would say less. A channel
         // that then stops delivering altogether is a different failure, which
-        // is why only this arm is suppressed.
-        let energyAge = ages.secondsSinceLastEnergy ?? elapsedSinceStart
-        guard energyAge >= window, corroborated, !reportedRebuildsExhausted else { return nil }
+        // is why only this arm is suppressed. The noise floor is a silence
+        // report too, under the same corroboration and the same latch; exact
+        // silence keeps its own, more specific message when both hold.
+        let energyAge = min(ages.secondsSinceLastEnergy ?? elapsedSinceStart, observed)
+        let digitallySilent = energyAge >= window
+        // The sensor counts exact zeros too. A channel with no non-zero
+        // sample across the sensor's window is exact silence, which waits for
+        // its own window even when the sensor tripped first (a Warn-after
+        // above that window).
+        let floorOnly = noiseFloor
+            && (ages.secondsSinceLastEnergy.map { $0 < AppNoiseFloorLimits.windowSeconds } ?? false)
+        let fault: ChannelFault? = digitallySilent ? .digitalSilence : (floorOnly ? .noiseFloor : nil)
+        guard let fault, corroborated, watchdogReport != .reported else { return nil }
         reportedSilence = true
-        return .digitalSilence
+        return fault
     }
 
     mutating func reset() {
         reportedSilence = false
         reportedGiveUp = false
-        reportedRebuildsExhausted = false
+        watchdogReport = .unseen
+        reportedStalls = 0
+        wasStalled = false
+        windowStart = 0
     }
 }

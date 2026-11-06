@@ -272,4 +272,112 @@ final class WatchLoopEndPolicyTests: XCTestCase {
             "recording_auto_stop trigger=manual reason=max_duration",
         )
     }
+
+    // MARK: - New call (issue #765, owner decision on back-to-back calls)
+
+    private func callStep(
+        seen: Set<String>,
+        current: ActiveCalls,
+        in phase: MeetingEndPhase = .listening(signalLostAt: nil),
+        active: Bool = true,
+        at seconds: TimeInterval = 5,
+        answer: MeetingEndAnswer? = nil,
+    ) -> WatchLoopEndDecision {
+        WatchLoopEndPolicy.step(
+            config: Self.defaultConfig,
+            startTime: t0,
+            phase: phase,
+            poll: MeetingEndPoll(
+                now: at(seconds),
+                meetingActive: active,
+                answer: answer.map { ReceivedMeetingEndAnswer(answer: $0, receivedAt: at(seconds)) },
+                callIDsSeen: seen,
+                currentCalls: current,
+            ),
+        )
+    }
+
+    private static let newCallStop = WatchLoopEndDecision.stop(MeetingEndStop(reason: .newCall, cutAt: nil, signalAbsentFor: nil))
+
+    func testStopsWhenOnlyUnseenCallIDsAreActive() {
+        XCTAssertEqual(callStep(seen: ["1", "2"], current: .ids(["3", "4"])), Self.newCallStop)
+    }
+
+    /// Within the grace period the old call's audio is still the meeting's,
+    /// so the stop keeps all of it.
+    func testANewCallWithinTheGracePeriodStopsUncut() {
+        XCTAssertEqual(
+            callStep(seen: ["1"], current: .ids(["3"]), in: .listening(signalLostAt: at(2))),
+            Self.newCallStop,
+        )
+    }
+
+    func testContinuesWhileARecordedCallIDIsStillActive() {
+        // An extra assertion next to the recorded call's is not a new call.
+        XCTAssertEqual(
+            callStep(seen: ["1", "2"], current: .ids(["2", "3"])),
+            .continuePolling(.listening(signalLostAt: nil)),
+        )
+    }
+
+    func testContinuesOnTheFirstObservation() {
+        XCTAssertEqual(callStep(seen: [], current: .ids(["1"])), .continuePolling(.listening(signalLostAt: nil)))
+    }
+
+    func testContinuesWhenTheDetectorCannotIdentifyCalls() {
+        XCTAssertEqual(callStep(seen: ["1"], current: .unidentified), .continuePolling(.listening(signalLostAt: nil)))
+    }
+
+    func testInactiveMeetingStartsGraceRatherThanSplitting() {
+        XCTAssertEqual(
+            callStep(seen: ["1"], current: .ids([]), active: false),
+            .continuePolling(.listening(signalLostAt: at(5))),
+        )
+    }
+
+    /// Owner decision: a new call while "the meeting seems to have ended" is
+    /// open ends the old recording at once, before the countdown, cut back
+    /// like any end out of the question; the caller takes the question back
+    /// and starts the new call's recording.
+    func testANewCallWhileAskingStopsAtOnceCutBack() {
+        XCTAssertEqual(
+            callStep(seen: ["1", "2"], current: .ids(["3"]), in: .askingToEnd(pending), at: 40),
+            .stop(MeetingEndStop(reason: .newCall, cutAt: at(15), signalAbsentFor: nil)),
+        )
+    }
+
+    /// The new call outranks an answer that arrives in the same poll: a Keep
+    /// recording was about the old call, which is over.
+    func testANewCallWhileAskingOutranksKeepRecording() {
+        XCTAssertEqual(
+            callStep(seen: ["1"], current: .ids(["3"]), in: .askingToEnd(pending), at: 40, answer: .keepRecording),
+            .stop(MeetingEndStop(reason: .newCall, cutAt: at(15), signalAbsentFor: nil)),
+        )
+    }
+
+    /// The same call coming back while asking still only takes the question back.
+    func testTheSameCallComingBackWhileAskingWithdrawsTheQuestion() {
+        XCTAssertEqual(
+            callStep(seen: ["1", "2"], current: .ids(["2"]), in: .askingToEnd(pending), at: 40),
+            .withdrawQuestion(then: .listening(signalLostAt: nil)),
+        )
+    }
+
+    /// After "Keep recording" the person chose the audio after the loss, so a
+    /// new call ends the recording without a cut.
+    func testANewCallAfterKeepRecordingStopsUncut() {
+        XCTAssertEqual(
+            callStep(seen: ["1"], current: .ids(["3"]), in: .kept(signalLostAt: at(5)), at: 200),
+            Self.newCallStop,
+        )
+    }
+
+    /// The cap landing on the same poll as a new call keeps the new call's
+    /// reason, so the caller still starts the new recording at once.
+    func testANewCallOnTheCapPollWhileAskingKeepsItsReason() {
+        XCTAssertEqual(
+            callStep(seen: ["1"], current: .ids(["3"]), in: .askingToEnd(pending), at: 1001),
+            .stop(MeetingEndStop(reason: .newCall, cutAt: at(15), signalAbsentFor: nil)),
+        )
+    }
 }

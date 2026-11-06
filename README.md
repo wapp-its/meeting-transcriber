@@ -1,9 +1,9 @@
 # Meeting Transcriber
 
-> **The local-first meeting transcriber for macOS.** Records Teams, Zoom, and Webex calls, transcribes them on-device with Whisper / Parakeet, separates speakers, and turns the result into a Markdown protocol using your own Claude CLI or any local LLM. **No cloud. No subscription. No audio ever leaves your Mac.**
+> **The local-first meeting transcriber for macOS.** Records Teams, Zoom, and Webex calls, transcribes them on-device with Whisper / Parakeet, separates speakers, and turns the result into Markdown meeting notes using your own Claude CLI or any local LLM. **No cloud. No subscription. No audio ever leaves your Mac.**
 
 <p align="center">
-  <img src="docs/hero.gif" alt="Meeting Transcriber turning a Teams call into a Markdown protocol on-device" width="860">
+  <img src="docs/hero.gif" alt="Meeting Transcriber turning a Teams call into Markdown meeting notes on-device" width="860">
 </p>
 
 <p align="center">
@@ -39,7 +39,7 @@ brew install --cask meeting-transcriber
 
 > Homebrew 6.0+ may flag the third-party tap as untrusted. If so, run `brew trust --tap pasrom/meeting-transcriber` before installing.
 
-The app lives in your menu bar — open it, grant microphone + screen-recording permission, and the first detected Teams/Zoom/Webex call records automatically.
+The app lives in your menu bar — open it, grant microphone + screen-recording permission, and the first detected Teams/Zoom/Webex call brings up a "Record <App> meeting?" question, as a notification and at the top of the menu.
 
 ---
 
@@ -55,8 +55,8 @@ flowchart TD
     D1["WhisperKit<br/>99 languages"]
     D2["Parakeet TDT v3<br/>25 EU languages"]
     E["Speaker Diarization<br/>FluidAudio · dual-track + recognition"]
-    F["Protocol Generation<br/>Claude CLI · Codex CLI · custom command<br/>OpenAI-compatible · local MLX model · none"]
-    G["Markdown Protocol<br/>Summary · Decisions · Tasks · Transcript"]
+    F["Meeting Notes Generation<br/>Claude CLI · Codex CLI · custom command<br/>OpenAI-compatible · local MLX model · none"]
+    G["Markdown Meeting Notes<br/>Summary · Decisions · Tasks · Transcript"]
 
     A --> B
     A2 --> C
@@ -81,7 +81,7 @@ flowchart TD
 
 ## Features
 
-- **Automatic meeting detection** — Recognizes Teams, Zoom, and Webex meetings via window title polling, opt-in browser meeting detection (Google Meet, Whereby, web Zoom/Teams in any Chromium browser) gated behind a recording-consent prompt, and opt-in mic-input detection for call apps without a reliable meeting signal (WeChat, Tencent Meeting, FaceTime, WhatsApp) — per app, off by default, and unlike the browser path it starts recording without a prompt
+- **Automatic meeting detection** — Recognizes Teams, Zoom, and Webex meetings via window title polling, opt-in browser meeting detection (Google Meet, Whereby, web Zoom/Teams in any Chromium browser) gated behind a recording-consent prompt, and opt-in mic-input detection for call apps without a reliable meeting signal (WeChat, Tencent Meeting, FaceTime, WhatsApp, Slack Huddles) — per app, off by default. Every detected meeting asks before it records unless its app is set to record without asking in Settings → General; browser meetings always ask
 - **Dual audio recording** — App audio ([CATapDescription](https://developer.apple.com/documentation/coreaudio/catap)) + microphone simultaneously
 - **On-device transcription** — Two engines, selectable in Settings:
   - [WhisperKit](https://github.com/argmaxinc/WhisperKit) — 99+ languages, ~1 GB model; besides the stock models, a custom WhisperKit model can be loaded from another Hugging Face repository or a local folder (see [Custom WhisperKit models](#custom-whisperkit-models))
@@ -92,12 +92,12 @@ flowchart TD
 - **Echo bleed handling** — On loudspeaker recordings, remote voices picked up by the microphone are detected automatically and reported. Two optional remedies, both off by default: acoustic echo cancellation removes the bleed from the microphone audio itself, and a transcript dedup leaves the duplicated lines out. The dedup is off because it can mistake a quiet remark made over the far end for echo and drop it
 - **Speaker recognition** — Voice embeddings stored across meetings, matched via cosine similarity
 - **VAD preprocessing** — Optional silence trimming via FluidAudio Silero v6 before transcription, with automatic timestamp remapping
-- **AI protocol generation** — Structured Markdown via [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), a custom command (any command-line model tool, e.g. `ollama run` or `mlx_lm.generate`, with `{model}`, `{prompt_file}`, `{transcript_file}` and `{output_file}` placeholders, run without a shell), OpenAI-compatible APIs (Ollama, LM Studio, etc.), a local MLX model the app runs itself without a server (Homebrew build, see [Using the local model](#using-the-local-model)), or disabled (save transcript only)
+- **AI meeting notes generation** — Structured Markdown via [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), a custom command (any command-line model tool, e.g. `ollama run` or `mlx_lm.generate`, with `{model}`, `{prompt_file}`, `{transcript_file}` and `{output_file}` placeholders, run without a shell), OpenAI-compatible APIs (Ollama, LM Studio, etc.), a local MLX model the app runs itself without a server (Homebrew build, see [Using the local model](#using-the-local-model)), or disabled (save transcript only)
 - **Protocol templates** — Several named prompts as Markdown files in `~/Library/Application Support/MeetingTranscriber/Protocol Templates/`, created, edited, deleted and picked as the default in Settings → Output, next to the read-only built-in "Standard (built-in)"; a custom prompt from an earlier version becomes the template "Custom Prompt" and the default. Every template can use `{LANGUAGE}`, `{MEETING_DATE}` (`YYYY-MM-DD`), and `{MEETING_TIME}` (`HH:mm`); recordings include authoritative metadata, while imports and recovery jobs resolve time placeholders to `Unknown`. Background info entered for a meeting is added to the prompt
 - **Manual recording** — Record any app via app picker, not just detected meetings
 - **Multi-format input** — Supports WAV, MP3, M4A, MP4, FLAC, plus the phone and messenger voice formats AMR, 3GP/3G2 and OPUS/OGG; MKV and WebM additionally need ffmpeg
 - **Update checker** — Notifies when a new version is available
-- **Background processing** — PipelineQueue runs transcription and protocol generation independently from recording
+- **Background processing** — PipelineQueue runs transcription and meeting notes generation independently from recording
 - **Record-only mode** — Skip the entire post-recording pipeline and drop dual-source recordings + a metadata sidecar into the output folder, for external/fleet processing (e.g. a separate GPU host)
 - **Local automation API** (Homebrew build): drive the pipeline headlessly over localhost HTTP. POST an audio file, get a diarized transcript back. See [`docs/automation-api.md`](docs/automation-api.md)
 - **Stream Deck and hotkey control** (Homebrew build): start/stop watching from a Stream Deck key, Shortcut, Raycast or any launcher. See [`docs/stream-deck.md`](docs/stream-deck.md)
@@ -211,10 +211,10 @@ The app uses an animated waveform icon in the menu bar that reflects the current
 <img src="docs/menu-bar-recording.gif" width="80" alt="Recording">&nbsp;&nbsp;
 <img src="docs/menu-bar-transcribing.gif" width="80" alt="Transcribing">&nbsp;&nbsp;
 <img src="docs/menu-bar-diarizing.gif" width="80" alt="Diarizing">&nbsp;&nbsp;
-<img src="docs/menu-bar-protocol.gif" width="80" alt="Protocol">
+<img src="docs/menu-bar-protocol.gif" width="80" alt="Meeting Notes">
 </p>
 
-**Idle** → **Recording** (bars bounce) → **Transcribing** (bars morph to text) → **Diarizing** (bars split into groups) → **Protocol** (lines appear sequentially)
+**Idle** → **Recording** (bars bounce) → **Transcribing** (bars morph to text) → **Diarizing** (bars split into groups) → **Meeting Notes** (lines appear sequentially)
 
 ### Permission problem badge
 
@@ -236,7 +236,7 @@ The health check distinguishes *denied* from *broken*. "Broken" usually means th
 <img src="docs/menu-bar-record-only.gif" width="80" alt="Record-only mode">
 </p>
 
-A small red dot in the bottom-right corner is overlaid on top of the current icon (idle, recording, transcribing, …) whenever **Record-only mode** is enabled (Settings → General → "Record-only mode"). In this mode the app keeps detecting meetings and producing dual-source recordings, but skips the entire post-recording pipeline (VAD, transcription, diarization, protocol generation). Recordings + a per-meeting `<timestamp>_meta.json` sidecar are dropped into your configured Output Folder for an external pipeline (e.g. a Linux GPU host via Syncthing) to pick up. The dot stays visible across all states so the mode is always clearly indicated; if a permission problem coexists, the red exclamation badge takes precedence.
+A small red dot in the bottom-right corner is overlaid on top of the current icon (idle, recording, transcribing, …) whenever **Record-only mode** is enabled (Settings → General → "Record-only mode"). In this mode the app keeps detecting meetings and producing dual-source recordings, but skips the entire post-recording pipeline (VAD, transcription, diarization, meeting notes generation). Recordings + a per-meeting `<timestamp>_meta.json` sidecar are dropped into your configured Output Folder for an external pipeline (e.g. a Linux GPU host via Syncthing) to pick up. The dot stays visible across all states so the mode is always clearly indicated; if a permission problem coexists, the red exclamation badge takes precedence.
 
 ### Per-channel asymmetric-silence indicator
 
@@ -261,7 +261,7 @@ If a permission problem coexists, the red exclamation badge takes precedence ove
 
 ## Usage
 
-Launch the app — it sits in your menu bar. When a supported meeting is detected, recording starts automatically. When the meeting ends, the pipeline runs in the background: transcription → diarization → protocol generation.
+Launch the app — it sits in your menu bar. When a supported meeting is detected, the app asks whether to record it, or starts at once for an app set to record without asking. When the meeting ends, the pipeline runs in the background: transcription → diarization → meeting notes generation.
 
 You can also batch-process existing audio and video files via the menu (⌘P) — supported formats: WAV, MP3, M4A, MP4, FLAC, AMR, 3GP/3G2 and OPUS/OGG (and MKV, WebM when ffmpeg is installed). Smartphone call recordings (AMR, 3GP) and voice messages (OPUS) need no extra tools.
 
@@ -275,16 +275,16 @@ Open Settings via the menu bar item or ⌘,.
 
 | Tab | What's in it |
 |---|---|
-| **General** | Record-only mode, apps to watch (Teams/Zoom/Webex/Browser/WeChat/Tencent Meeting/FaceTime/WhatsApp), detection timing, update checks |
+| **General** | Record-only mode, apps to watch (Teams/Zoom/Webex/Browser/WeChat/Tencent Meeting/FaceTime/WhatsApp/Slack), detection timing, update checks |
 | **Audio** | Microphone device, voice activity detection (VAD), per-channel silence indicator, echo cancellation (off by default) |
 | **Transcribe** | ASR engine (WhisperKit / Parakeet) and per-engine options (model incl. a custom WhisperKit model, language, custom vocabulary from a file or a URL), terminology normalization rules, live caption overlay (PoC) |
 | **Speakers** | Diarization, mic speaker name, known voices, recognition stats |
-| **Output** | LLM provider (Claude CLI / Codex CLI / custom command / OpenAI-compatible / local model / none), the local model's folder, transcript-retention options, protocol language, output folder, protocol templates (default, create, edit, delete, open folder) |
+| **Output** | LLM provider (Claude CLI / Codex CLI / custom command / OpenAI-compatible / local model / none), the local model's folder, transcript-retention options, notes language, output folder, protocol templates (default, create, edit, delete, open folder) |
 | **Advanced** | Permissions status, diagnostics, version info |
 
 ### Custom WhisperKit models
 
-Settings → Transcribe → Model → **Custom model…** loads a fine-tuned WhisperKit model instead of a stock one, for example a Swiss German fine-tune. Enter a Hugging Face repository laid out like [`argmaxinc/whisperkit-coreml`](https://huggingface.co/argmaxinc/whisperkit-coreml) (one folder per variant) plus the variant folder name, e.g. `spert/flix-swissgerman-whisperkit` and `flix-swissgerman-large-v3_8bit`; it downloads on first use and loads offline afterwards. Alternatively choose a model folder on disk: it must contain `AudioEncoder.mlmodelc`, `TextDecoder.mlmodelc`, `MelSpectrogram.mlmodelc`, `tokenizer.json` and `tokenizer_config.json`, and is never downloaded. Until a custom model is filled in, the previously selected stock model is used.
+Settings → Transcribe → Model → **Custom model…** loads a fine-tuned WhisperKit model instead of a stock one, for example a Swiss German fine-tune. Enter a Hugging Face repository laid out like [`argmaxinc/whisperkit-coreml`](https://huggingface.co/argmaxinc/whisperkit-coreml) (one folder per variant) plus the exact variant folder name, e.g. `spert/flix-swissgerman-whisperkit` and `flix-swissgerman-large-v3_8bit`; it downloads on first use and loads offline afterwards. A variant that is only the tail of the real folder name is refused with the real name, because it would load once and then never offline. Alternatively choose a model folder on disk with **Choose…** (in the App Store build only a chosen folder is accessible; a typed path works outside the sandbox). It must contain `AudioEncoder.mlmodelc`, `TextDecoder.mlmodelc`, `MelSpectrogram.mlmodelc`, `tokenizer.json` and `tokenizer_config.json`. The folder itself is never downloaded; for the tokenizer, WhisperKit prefers a stock tokenizer it has already cached and reads the folder's own tokenizer otherwise, so a folder that carries one loads without a network. Each field takes effect on Return, when you leave it or when you close the Settings window, so while you change the repository and then the variant, the new repository is briefly paired with the old variant; until a custom model is filled in, the previously selected stock model is used, and a load that fails says why under the model status.
 
 To find a model without typing its name, choose **From Hugging Face…** in the same picker. It searches Hugging Face for repositories tagged `whisperkit` and lists each variant this app can load, with its download size, the license (a non-commercial license is marked) and a notice when the repository is gated. A gated repository needs accepted terms on huggingface.co and the token below. **Use** fills in the repository and variant; a stock variant of `argmaxinc/whisperkit-coreml` selects its stock entry instead. After you pick a new model there or in the picker, the app asks whether to load it now; with **Later** it downloads on the first transcription.
 
@@ -299,16 +299,16 @@ Files are saved to `~/Library/Application Support/MeetingTranscriber/protocols/`
 | File | Content |
 |------|---------|
 | `20260225_1400_meeting.txt` | Raw transcript (when enabled) |
-| `20260225_1400_meeting.md` | Structured protocol (when an LLM provider is configured) |
+| `20260225_1400_meeting.md` | Structured meeting notes (when an LLM provider is configured) |
 
 In **Settings → Output**, both transcript options default to enabled for backward compatibility:
 
-- **Include full transcript in protocol** appends the verbatim transcript to generated Markdown.
+- **Include full transcript in meeting notes** appends the verbatim transcript to generated Markdown.
 - **Save raw transcript separately** retains the standalone `.txt` file.
 
-Disable both to retain only the generated meeting minutes. The recording follows its own retention policy and is not deleted by either setting. To avoid data loss, a raw transcript is retained if protocol generation is disabled, fails, or the job ends with an error.
+Disable both to retain only the generated meeting notes. The recording follows its own retention policy and is not deleted by either setting. To avoid data loss, a raw transcript is retained if meeting notes generation is disabled, fails, or the job ends with an error.
 
-**Protocol structure:** Summary, Participants, Topics Discussed, Decisions, Tasks (with responsible person, deadline, priority), Open Questions, and optionally the Full Transcript.
+**Meeting notes structure:** Summary, Participants, Topics Discussed, Decisions, Tasks (with responsible person, deadline, priority), Open Questions, and optionally the Full Transcript.
 
 ---
 

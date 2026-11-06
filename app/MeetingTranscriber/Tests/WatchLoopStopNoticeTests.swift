@@ -252,7 +252,7 @@ final class WatchLoopStopNoticeTests: XCTestCase {
         let harness = Harness()
         let loop = harness.makeLoop()
 
-        let cutAt = try await loop.waitForMeetingEnd(meeting)
+        let cutAt = try await loop.waitForMeetingEnd(meeting).cutAt
 
         XCTAssertNil(cutAt)
         XCTAssertEqual(harness.elapsed, 130)

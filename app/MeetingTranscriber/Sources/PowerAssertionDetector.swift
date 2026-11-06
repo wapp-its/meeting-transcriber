@@ -1,5 +1,4 @@
 import AppKit
-import IOKit.pwr_mgt
 import os.log
 
 private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "PowerAssertionDetector")
@@ -28,6 +27,11 @@ class PowerAssertionDetector: MeetingDetecting {
         /// `processNames`: a pattern can accept a fixed list of processes and
         /// still identify each of them separately.
         let identity: Identity
+        /// Whether each call gets assertions with fresh IDs, so an unseen ID
+        /// means a new call (issue #765). On only where measured (Teams):
+        /// Zoom also matches by type, and an unrelated assertion recreated
+        /// mid-call would split one call in two.
+        let assertionIdentifiesCall: Bool
 
         /// `.shared`: every process in `processNames` is the same app, so the
         /// pattern's own `appName` is the identity (Teams is one app whether it
@@ -52,6 +56,7 @@ class PowerAssertionDetector: MeetingDetecting {
             keywords: [String],
             assertionTypes: [String] = [],
             identity: Identity = .shared,
+            assertionIdentifiesCall: Bool = false,
         ) {
             // A process-open pattern MUST identify per process. Shared identity
             // would file every unclaimed process on the machine into one
@@ -70,6 +75,7 @@ class PowerAssertionDetector: MeetingDetecting {
             self.keywords = keywords
             self.assertionTypes = assertionTypes
             self.identity = processNames.isEmpty ? .perProcess : identity
+            self.assertionIdentifiesCall = assertionIdentifiesCall
             loweredKeywords = keywords.map { $0.lowercased() }
         }
 
@@ -121,6 +127,7 @@ class PowerAssertionDetector: MeetingDetecting {
             appName: "Microsoft Teams",
             processNames: ["MSTeams", "Microsoft Teams", "Microsoft Teams WebView", "Microsoft Teams (work or school)"],
             keywords: ["call in progress"],
+            assertionIdentifiesCall: true,
         ),
         AssertionPattern(
             appName: "Zoom",
@@ -188,6 +195,9 @@ class PowerAssertionDetector: MeetingDetecting {
     /// Diagnostic dedup: (process|name|type) keys already logged as unmatched,
     /// so a persistently-running unmatched meeting app logs once per session.
     private var loggedMissKeys: Set<String> = []
+    /// The keys the last poll reported as "did not match". Read by tests; the
+    /// log line is emitted from the same list.
+    private(set) var lastUnmatchedKeys: [String] = []
 
     /// Closure that provides assertion data. Defaults to IOPMCopyAssertionsByProcess.
     /// Override in tests to inject mock data.
@@ -265,32 +275,51 @@ class PowerAssertionDetector: MeetingDetecting {
 
     func checkOnce(excluding excludedApps: Set<String>) -> DetectedMeeting? {
         let assertions = assertionProvider()
+        // Every identity whose assertion matched, including the ones set aside
+        // on purpose (denied, cooling down after a reset, or an added app's
+        // own process). Those are not misses, and the diagnostic must not call
+        // them "did not match" (issue #814); it reads this set, not the hits.
+        var matchedThisRound: Set<String> = []
         // Apps in cooldown are skipped; every other identity counts once per poll.
-        let firstMatch = signallingHits(in: assertions) { key in
-            if let until = cooldownUntil[key], Date() < until { return true }
-            return false
-        }
+        let firstMatch = signallingHits(
+            in: assertions,
+            skipping: { key in
+                if let until = cooldownUntil[key], Date() < until { return true }
+                return false
+            },
+            matched: { key in
+                matchedThisRound.insert(key)
+                if isIdentityDenied(key) { logDeniedOnce(key) }
+            },
+        )
         let hitsThisRound = Set(firstMatch.keys)
         for key in hitsThisRound {
             consecutiveHits[key, default: 0] += 1
         }
 
-        logUnmatchedWatchedAssertions(assertions, hits: hitsThisRound)
+        logUnmatchedWatchedAssertions(assertions, matched: matchedThisRound)
 
-        // Check confirmation threshold. An excluded identity keeps counting
-        // above but is passed over here (see `MeetingDetecting`).
-        for (key, hits) in consecutiveHits where !excludedApps.contains(key) {
-            if hits >= confirmationCount, let match = firstMatch[key] {
-                return detectedMeeting(for: match)
-            }
-        }
-
-        // Reset counters for identities with no hit this round
+        // Reset counters for identities with no hit this round. Before the
+        // pick, not after: returning a meeting used to skip this, so a stale
+        // single hit survived while another meeting was returned on every poll,
+        // and the next hit confirmed in one poll instead of `confirmationCount`
+        // consecutive ones.
         for key in consecutiveHits.keys where !hitsThisRound.contains(key) {
             consecutiveHits[key] = 0
         }
 
-        return nil
+        // Check confirmation threshold. An excluded identity keeps counting
+        // above but is passed over here (see `MeetingDetecting`). Among the
+        // rest, not dictionary order: a meeting that records without asking
+        // first, then by identity key, so the pick is the same from one poll
+        // to the next and the consent gate never alternates between two.
+        let confirmed = firstMatch.compactMap { key, match -> Candidate? in
+            guard !excludedApps.contains(key), consecutiveHits[key, default: 0] >= confirmationCount else { return nil }
+            let identity = Self.meetingIdentity(pattern: match.pattern, processName: match.processName)
+            return Candidate(key: key, match: match, identity: identity)
+        }
+        guard let pick = confirmed.min(by: { Self.startRank($0) < Self.startRank($1) }) else { return nil }
+        return detectedMeeting(for: pick.match)
     }
 
     /// See `MeetingDetecting`. Nothing here writes detector state, so taking
@@ -307,11 +336,15 @@ class PowerAssertionDetector: MeetingDetecting {
     /// browsers sharing the browser pattern never share a slot. A denied
     /// identity is never a hit, so it cannot shadow another meeting or force a
     /// counter-wiping reset; `skip` passes over further identities (cooldowns).
+    /// Matching runs first, so `matched` hears every identity that matched,
+    /// the ones set aside afterwards included.
     private func signallingHits(
         in assertions: [Int32: [[String: Any]]],
         skipping skip: (String) -> Bool = { _ in false },
+        matched: (String) -> Void = { _ in },
     ) -> [String: Hit] {
         var hits: [String: Hit] = [:]
+        var seen: Set<String> = []
         for (pid, pidAssertions) in assertions {
             for assertion in pidAssertions {
                 guard let processName = assertion["Process Name"] as? String,
@@ -322,11 +355,16 @@ class PowerAssertionDetector: MeetingDetecting {
 
                 for pattern in patterns {
                     let key = pattern.identityKey(processName: processName)
-                    if isIdentityDenied(key) || skip(key) || hits[key] != nil { continue }
-                    if matchAssertion(processName: processName, assertName: assertName, assertType: assertType, pattern: pattern),
-                       !isAddedAppHit(pid: pid, pattern: pattern) {
-                        hits[key] = (pid, processName, pattern)
-                    }
+                    // Only count each identity once per poll.
+                    guard !seen.contains(key),
+                          matchAssertion(processName: processName, assertName: assertName, assertType: assertType, pattern: pattern)
+                    else { continue }
+                    matched(key)
+                    // An added app's own process is left to the microphone path.
+                    if isAddedAppHit(pid: pid, pattern: pattern) { continue }
+                    seen.insert(key)
+                    if isIdentityDenied(key) || skip(key) { continue }
+                    hits[key] = (pid, processName, pattern)
                 }
             }
         }
@@ -382,32 +420,67 @@ class PowerAssertionDetector: MeetingDetecting {
         }
     }
 
+    /// An identity over the confirmation threshold in one poll.
+    private struct Candidate {
+        let key: String
+        let match: Hit
+        let identity: AppMeetingPattern
+    }
+
+    /// Order among the candidates of one poll: a meeting that records without
+    /// asking before one that waits for consent, then by identity key, so the
+    /// pick is the same from one poll to the next.
+    private static func startRank(_ candidate: Candidate) -> (Int, String) {
+        (candidate.identity.requiresRecordingConsent ? 1 : 0, candidate.key)
+    }
+
     func isMeetingActive(_ meeting: DetectedMeeting) -> Bool {
-        let assertions = assertionProvider()
-        for (pid, pidAssertions) in assertions {
+        assertionProvider().contains { pid, pidAssertions in
+            pidAssertions.contains { matchingPattern(of: $0, pid: pid, for: meeting) != nil }
+        }
+    }
+
+    func activeCalls(_ meeting: DetectedMeeting) -> ActiveCalls {
+        let identifiesCall = patterns.contains { pattern in
+            pattern.assertionIdentifiesCall
+                && pattern.identifies(meetingAppName: meeting.pattern.identityKey, processName: meeting.ownerName)
+        }
+        guard identifiesCall else { return .unidentified }
+        var ids: Set<String> = []
+        for (pid, pidAssertions) in assertionProvider() {
             for assertion in pidAssertions {
-                guard let processName = assertion["Process Name"] as? String,
-                      let assertName = assertion["AssertName"] as? String else {
-                    continue
+                guard let pattern = matchingPattern(of: assertion, pid: pid, for: meeting) else { continue }
+                // An assertion without an ID, or from a pattern whose IDs do not
+                // track calls, cannot be told apart from the next call's.
+                guard pattern.assertionIdentifiesCall, let id = assertion["AssertionId"] as? Int else {
+                    return .unidentified
                 }
-                let assertType = assertion["AssertType"] as? String ?? ""
-                // Same rule as `checkOnce`: an assertion keeps this meeting
-                // alive only when it resolves to the SAME identity. Comparing
-                // `pattern.appName` would compare a category token against a
-                // process name for `.perProcess` patterns, so nothing would ever
-                // match and every browser recording would stop at the end grace.
-                // The meeting's identity key equals its name for every meeting
-                // this detector reports; an added app's key matches no pattern.
-                for pattern in patterns
-                    where pattern.identifies(meetingAppName: meeting.pattern.identityKey, processName: processName) {
-                    if matchAssertion(processName: processName, assertName: assertName, assertType: assertType, pattern: pattern),
-                       !isAddedAppHit(pid: pid, pattern: pattern) {
-                        return true
-                    }
-                }
+                ids.insert(String(id))
             }
         }
-        return false
+        return .ids(ids)
+    }
+
+    /// The pattern through which `assertion`, held by `pid`, keeps `meeting`
+    /// alive, if any.
+    private func matchingPattern(of assertion: [String: Any], pid: pid_t, for meeting: DetectedMeeting) -> AssertionPattern? {
+        guard let processName = assertion["Process Name"] as? String,
+              let assertName = assertion["AssertName"] as? String else {
+            return nil
+        }
+        let assertType = assertion["AssertType"] as? String ?? ""
+        // Same rule as `checkOnce`: an assertion keeps this meeting
+        // alive only when it resolves to the SAME identity. Comparing
+        // `pattern.appName` would compare a category token against a
+        // process name for `.perProcess` patterns, so nothing would ever
+        // match and every browser recording would stop at the end grace.
+        // The meeting's identity key equals its name for every meeting
+        // this detector reports; an added app's key matches no pattern.
+        return patterns.first { pattern in
+            pattern.identifies(meetingAppName: meeting.pattern.identityKey, processName: processName)
+                && matchAssertion(processName: processName, assertName: assertName, assertType: assertType, pattern: pattern)
+                && !isAddedAppHit(pid: pid, pattern: pattern)
+        }
     }
 
     func reset(appName: String? = nil) {
@@ -452,59 +525,6 @@ class PowerAssertionDetector: MeetingDetecting {
 
     // MARK: - Private
 
-    /// Processes that belong to an app the user can watch in its own right. A
-    /// process-open pattern can never take one of these, so a native client is
-    /// never also seen as a browser meeting.
-    ///
-    /// Two sources, because an app can be known to this detector, to
-    /// `MicInputDetector`, or to both: the bound assertion patterns here, plus
-    /// every `AppMeetingPattern.ownerNames`, which is where the mic-detected
-    /// call apps (WeChat, WhatsApp, FaceTime, Tencent Meeting) are declared.
-    /// WhatsApp in particular is Electron and so a plausible holder of the very
-    /// assertion the open pattern keys on.
-    ///
-    /// Always from ALL known apps, never from the watched subset. Otherwise
-    /// switching an app's toggle off would hand it to the browser path and
-    /// record it anyway, against the user's explicit opt-out, which is the one
-    /// thing this exclusion exists to prevent.
-    static let claimedProcesses: Set<String> = Set(
-        defaultPatterns.flatMap(\.processNames) + AppMeetingPattern.all.flatMap(\.ownerNames),
-    )
-
-    /// Whether one assertion matches one pattern.
-    ///
-    /// Bound patterns check the process first, as before. Process-open patterns
-    /// accept any process except one claimed by a bound pattern: Teams is
-    /// Electron and plausibly holds the identical WebRTC assertion during a
-    /// call, so without the exclusion a native Teams call would fire twice, once
-    /// auto-starting under its own pattern and once prompting as a browser
-    /// meeting.
-    ///
-    /// The exclusion is keyed on the process, not the service, which is what
-    /// keeps web meetings working: Zoom, Teams or Webex taken in a browser hold
-    /// the assertion under the browser, and no native pattern claims a browser.
-    static func matches(
-        pattern: AssertionPattern,
-        processName: String,
-        assertName: String,
-        assertType: String,
-    ) -> Bool {
-        if pattern.processNames.isEmpty {
-            // The name becomes the identity, the prompt body and the deny-list
-            // key, so a blank one would ask "A meeting is active in ." and store
-            // an unremovable blank row. The allowlist used to make this
-            // unreachable.
-            guard !processName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                return false
-            }
-            guard !claimedProcesses.contains(processName) else { return false }
-        } else {
-            guard pattern.processNames.contains(processName) else { return false }
-        }
-        if pattern.matchesKeyword(in: assertName) { return true }
-        return pattern.assertionTypes.contains(assertType)
-    }
-
     private func matchAssertion(processName: String, assertName: String, assertType: String, pattern: AssertionPattern) -> Bool {
         Self.matches(pattern: pattern, processName: processName, assertName: assertName, assertType: assertType)
     }
@@ -522,10 +542,21 @@ class PowerAssertionDetector: MeetingDetecting {
         return addedApps.matchLength(bundleID: bundleID) != nil
     }
 
-    private func logUnmatchedWatchedAssertions(_ assertions: [Int32: [[String: Any]]], hits: Set<String>) {
-        for key in Self.unmatchedWatchedAssertionKeys(
-            assertions: assertions, patterns: patterns, hits: hits,
-        ) {
+    /// One line per denied identity per session, naming the list that holds
+    /// it, so a refused app is not mistaken for one the detector cannot see.
+    private func logDeniedOnce(_ identity: String) {
+        guard loggedMissKeys.insert("denied|\(identity)").inserted else { return }
+        logger.info("""
+        Meeting assertion from \(identity, privacy: .public) matched but is ignored: \
+        the app is on the "Never for this app" list (Settings → General).
+        """)
+    }
+
+    private func logUnmatchedWatchedAssertions(_ assertions: [Int32: [[String: Any]]], matched: Set<String>) {
+        lastUnmatchedKeys = Self.unmatchedWatchedAssertionKeys(
+            assertions: assertions, patterns: patterns, hits: matched,
+        )
+        for key in lastUnmatchedKeys {
             guard loggedMissKeys.insert(key).inserted else { continue }
             logger.info("""
             Watched meeting app is running but its power assertion did not match \
@@ -533,42 +564,5 @@ class PowerAssertionDetector: MeetingDetecting {
             if a meeting is active, detection is not firing.
             """)
         }
-    }
-
-    /// Default assertion provider using IOPMCopyAssertionsByProcess.
-    ///
-    /// The API returns a CFDictionary keyed by PID (CFNumber), not String.
-    /// We extract keys/values manually via CFDictionaryGetKeysAndValues.
-    static func systemAssertions() -> [Int32: [[String: Any]]] {
-        var assertionsByProcess: Unmanaged<CFDictionary>?
-        let status = IOPMCopyAssertionsByProcess(&assertionsByProcess)
-        guard status == kIOReturnSuccess, let raw = assertionsByProcess else {
-            return [:]
-        }
-
-        let cfDict = raw.takeRetainedValue()
-        let count = CFDictionaryGetCount(cfDict)
-        guard count > 0 else { return [:] }
-
-        let keys = UnsafeMutablePointer<UnsafeRawPointer?>.allocate(capacity: count)
-        let values = UnsafeMutablePointer<UnsafeRawPointer?>.allocate(capacity: count)
-        defer {
-            keys.deallocate()
-            values.deallocate()
-        }
-        CFDictionaryGetKeysAndValues(cfDict, keys, values)
-
-        var result: [Int32: [[String: Any]]] = [:]
-        for i in 0 ..< count {
-            guard let valPtr = values[i] else { continue }
-            guard let keyPtr = keys[i] else { continue }
-            let keyObj = Unmanaged<AnyObject>.fromOpaque(keyPtr).takeUnretainedValue()
-            let pid = keyObj as? Int32 ?? 0
-            let valObj = Unmanaged<AnyObject>.fromOpaque(valPtr).takeUnretainedValue()
-            if let assertions = valObj as? [[String: Any]] {
-                result[pid] = assertions
-            }
-        }
-        return result
     }
 }

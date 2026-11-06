@@ -73,6 +73,7 @@ extension WatchLoop {
             identityKey: key,
         )
         pendingConsentQuestion = question
+        logger.info("Meeting in \(app, privacy: .public) detected, asking for consent")
         consentTask = Task { [weak self] in
             guard let self else { return }
             let answer = await notifier.askToRecord(question)
@@ -182,9 +183,21 @@ extension WatchLoop {
             default:
                 consentPolicy.recordDecline(app: key, now: nowProvider())
             }
+            // One line covers the whole quiet spell that follows: the gate
+            // skips the call silently until the suppression ends, so this is
+            // where "why is it not asking" gets answered (issue #814).
+            let now = nowProvider()
+            let quiet = Self.quietPeriod(
+                consentPolicy.decision(app: key, now: now, isDenied: denyListStore.isDenied(key)), now: now,
+            )
+            logger.info("""
+            Consent for \(question.app, privacy: .public) resolved: \(String(describing: answer), privacy: .public); \
+            not asking again \(quiet, privacy: .public)
+            """)
             detector.reset(appName: key)
             return
         }
+        logger.info("Consent for \(question.app, privacy: .public) resolved: granted")
         // Minutes can pass between prompt and click, and watching may have been
         // switched off in between — recording then would be recording without
         // having been asked to watch at all.
@@ -210,5 +223,27 @@ extension WatchLoop {
         }
         approvedConsentMeeting = meeting
         approvedConsentProtocolOptions = protocolOptions
+    }
+
+    /// Forget the open question. Not a decline: this extension decides what
+    /// an answer (or the lack of one) means.
+    func clearConsentState() {
+        pendingConsentQuestion = nil
+        appsWaitingForPrompt = []
+        approvedConsentMeeting = nil
+        pendingConsentProtocolOptions = nil
+        approvedConsentProtocolOptions = nil
+        consentTask = nil
+    }
+
+    /// How long the gate stays quiet after a non-granted answer, for the log.
+    /// A duration, not a `Date`: its description is UTC, which next to local
+    /// log timestamps reads as already over.
+    private static func quietPeriod(_ decision: BrowserConsentPolicy.Decision, now: Date) -> String {
+        switch decision {
+        case let .suppressed(until): "for \(Int(until.timeIntervalSince(now).rounded())) s"
+        case .denied: "for this app (Never for this app)"
+        case .ask: "before the next detection"
+        }
     }
 }

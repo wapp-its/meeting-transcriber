@@ -14,7 +14,8 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "RemoteV
 ///   calls `start()`.
 /// - **When it checks:** at `start()`, `debounce` after the source, address or
 ///   token last changed, on `refreshNow()`, and every `interval`, only while
-///   the source is `.url` and the address valid, and never two at once.
+///   the source is `.url`, the vocabulary is switched on
+///   (`customVocabularyEnabled`) and the address valid, and never two at once.
 /// - **Generations.** Every change of source, address or token starts a new
 ///   generation and cancels the check in flight. A result that still arrives
 ///   for an older generation is dropped, so a copy fetched for one address
@@ -128,11 +129,17 @@ final class RemoteVocabularyController {
         RemoteVocabulary.normalizedAddress(settings.remoteVocabularyURL)
     }
 
+    /// The URL source is in use: chosen, and the vocabulary switched on. With the
+    /// switch off no engine reads any vocabulary, so nothing is fetched either.
+    private var urlSourceActive: Bool {
+        settings.customVocabularyEnabled && settings.vocabularySource == .url
+    }
+
     /// The status while no check runs. A copy whose sidecar was not trusted
     /// has no check time, so it shows as being checked: whenever this is
     /// computed with the URL source and a valid address, a check is due.
     private func idleStatus() -> RemoteVocabularyStatus {
-        guard settings.vocabularySource == .url else { return .inactive }
+        guard urlSourceActive else { return .inactive }
         if case let .failure(problem) = RemoteVocabulary.validateAddress(settings.remoteVocabularyURL) {
             return .addressProblem(problem)
         }
@@ -146,6 +153,7 @@ final class RemoteVocabularyController {
     private func observeSettings() {
         withObservationTracking {
             _ = settings.vocabularySource
+            _ = settings.customVocabularyEnabled
             _ = settings.remoteVocabularyURL
             _ = settings.remoteVocabularyTokenRevision
         } onChange: { [weak self] in
@@ -174,7 +182,7 @@ final class RemoteVocabularyController {
             cache.discardAll(except: address)
         }
         status = idleStatus()
-        guard settings.vocabularySource == .url,
+        guard urlSourceActive,
               case .success = RemoteVocabulary.validateAddress(settings.remoteVocabularyURL)
         else { return }
         debounceTask = Task { [weak self, debounce] in
@@ -185,7 +193,7 @@ final class RemoteVocabularyController {
     }
 
     private func beginCheck() {
-        guard !isChecking, settings.vocabularySource == .url,
+        guard !isChecking, urlSourceActive,
               case let .success(url) = RemoteVocabulary.validateAddress(settings.remoteVocabularyURL)
         else { return }
         debounceTask?.cancel()
@@ -213,7 +221,7 @@ final class RemoteVocabularyController {
     /// an answer can be queued on the main actor ahead of that.
     private func describesSettings(_ checkGeneration: Int, address: String, tokenRevision: Int) -> Bool {
         generation == checkGeneration
-            && settings.vocabularySource == .url
+            && urlSourceActive
             && currentAddress == address
             && settings.remoteVocabularyTokenRevision == tokenRevision
     }

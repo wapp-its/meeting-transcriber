@@ -175,4 +175,29 @@ extension WatchingController {
         }
         return .changed
     }
+
+    /// Bounded wait for the manual start alone, for a caller that just launched
+    /// one and has to answer for how it went.
+    ///
+    /// The task parks on the microphone TCC prompt, which on a menu-bar app can
+    /// sit unanswered behind other windows for as long as nobody looks. Awaiting
+    /// its value directly would hold an HTTP handler and its connection open for
+    /// exactly that long — the leak `joinStart` exists to prevent. The task
+    /// clears `manualStartTask` in its own `defer`, so polling that is polling
+    /// its completion, and giving up here does not cancel a start the user may
+    /// still be about to answer.
+    func joinManualStart() async -> Bool {
+        await join { self.manualStartTask != nil }
+    }
+
+    /// Whether a manual start may take over the loop it found, given what that
+    /// loop is doing. False while it is recording: taking it over stops it, and
+    /// a recording in progress is not something a later start may end.
+    ///
+    /// A pure function over the phase rather than an inline comparison, because
+    /// the guard it backs only fires in a race that no test can schedule
+    /// reliably — this is the layer that can be pinned.
+    static func mayTakeOverLoop(in state: WatchLoop.State) -> Bool {
+        state != .recording
+    }
 }

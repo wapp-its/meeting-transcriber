@@ -1,7 +1,7 @@
 import Foundation
 import os.log
 
-private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "PipelineController")
+private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "StagingRecovery")
 
 /// How `QueueEnvironment` is wired in production, with the staging-folder
 /// recovery it hands each new queue. Split out of `PipelineController.swift` to
@@ -11,8 +11,11 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Pipelin
 extension PipelineController.QueueEnvironment {
     static var production: Self {
         Self(
-            logDir: nil,
+            logDir: AppPaths.ipcDir,
             stagingDir: AppPaths.recordingsDir,
+            speakersDB: AppPaths.speakersDB,
+            recognitionStatsLog: RecognitionStatsLog.defaultPath,
+            stageTimingLog: StageTimingLog.defaultPath,
             recoverStagedRecordings: PipelineController.recoverStagedRecordings(into:levelBalance:),
         )
     }
@@ -25,6 +28,9 @@ extension PipelineController {
     /// re-mixing or cutting (watching stopped and started again) would
     /// otherwise cut, restore or queue the same recording twice at once, and
     /// two cuts would share the cut's fixed working-file names.
+    /// `StagingRecoveryGate` alone covers only the file work of a pass, not
+    /// the orphan scan that must pass over the recordings a cut left
+    /// unsettled, which is why the pass is chained here as well.
     @MainActor private(set) static var stagedRecoveryPass: Task<Void, Never>?
 
     private static func recoverStagedRecordings(into q: PipelineQueue, levelBalance: Bool) {
@@ -41,6 +47,11 @@ extension PipelineController {
         levelBalance: Bool,
         diagnostics: any DiagnosticsLogging,
     ) -> Task<Void, Never> {
+        // Taken here, before any wait for an earlier pass: the age guards that
+        // tell a crashed recording from a live one are measured from it, so a
+        // recording that began while this pass waited is not mistaken for a
+        // crashed one merely because the wait was long.
+        let requestedAt = Date()
         let previous = stagedRecoveryPass
         let pass = Task {
             await previous?.value
@@ -48,13 +59,16 @@ extension PipelineController {
             // the steps below repair, re-mix, cut and delete files, so a
             // controller built against another staging folder would otherwise
             // reach into the real one, which is exactly what injecting the
-            // folder was meant to prevent. Detached so the dir scans and
-            // per-file rewrites run off-main and don't block startup (same
-            // reason the orphan scan offloads its own filesystem work).
+            // folder was meant to prevent. The file work runs on the
+            // `StagingRecoveryGate` queue, so a re-mix that takes minutes
+            // neither blocks startup nor parks a thread of the cooperative
+            // pool.
             let staging = q.stagingDir
-            let unsettled = await Task.detached(priority: .utility) {
-                recoverStagingFolder(staging, levelBalance: levelBalance, diagnostics: diagnostics)
-            }.value
+            let unsettled = await StagingRecoveryGate.run {
+                recoverStagingFolder(
+                    staging, levelBalance: levelBalance, diagnostics: diagnostics, requestedAt: requestedAt,
+                )
+            }
             await recoverOrphans(
                 into: q, holdingBack: unsettled.map { staging.appendingPathComponent($0 + RecordingFileSuffix.mix) },
             )
@@ -75,18 +89,26 @@ extension PipelineController {
     ///   5. apply the collected cuts to the recordings that now have a mix.
     /// Returns the stems step 5 left unsettled, which the orphan scan must
     /// pass over (`RecoveredCut.apply`).
+    ///
+    /// Not safe to run twice at once on one folder; production runs it
+    /// through `StagingRecoveryGate`. `minAge` is the age guard of steps 2
+    /// to 4, measured back from `requestedAt`.
     @discardableResult
     nonisolated static func recoverStagingFolder(
         _ staging: URL,
         levelBalance: Bool,
         diagnostics: any DiagnosticsLogging,
+        requestedAt: Date = Date(),
+        minAge: TimeInterval = 30,
     ) -> Set<String> {
         let pendingCuts = RecoveredCut.collect(in: staging, diagnostics: diagnostics)
-        let repaired = WavHeaderRepair.repairUnfinalized(in: staging)
+        let repaired = WavHeaderRepair.repairUnfinalized(in: staging, minAge: minAge, now: requestedAt)
         if repaired > 0 { logger.info("Repaired \(repaired) unfinalized recording(s) on launch") }
-        let recovered = DualSourceRecorder.recoverCrashedRecordings(in: staging, levelBalance: levelBalance)
+        let recovered = DualSourceRecorder.recoverCrashedRecordings(
+            in: staging, minAge: minAge, levelBalance: levelBalance, now: requestedAt,
+        )
         if recovered > 0 { logger.info("Recovered \(recovered) crashed recording(s) on launch") }
-        DualSourceRecorder.cleanupTempFiles(recordingsDir: staging)
+        DualSourceRecorder.cleanupTempFiles(recordingsDir: staging, minAge: minAge, now: requestedAt)
         return RecoveredCut.apply(pendingCuts, in: staging, diagnostics: diagnostics)
     }
 

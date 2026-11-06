@@ -18,14 +18,21 @@ enum OutputSettingsLogic {
         return "~/" + path.dropFirst(prefixed.count)
     }
 
-    /// Merge the currently-selected model into a fetched picker list so the
-    /// user's choice survives even when `/models` doesn't echo it back
-    /// (custom Ollama tags, in-flight rename, offline cache). Returns
-    /// `available` unchanged when `selected` is empty or already present.
+    /// Merge the currently-selected value into a picker list so the user's
+    /// choice survives even when the list doesn't contain it: a model that
+    /// `/models` doesn't echo back (custom Ollama tags, in-flight rename,
+    /// offline cache), or a protocol language stored by an older build or set
+    /// outside the app. Returns `available` unchanged when `selected` is empty
+    /// or already present.
     static func mergePickerOptions(available: [String], selected: String) -> [String] {
         guard !selected.isEmpty, !available.contains(selected) else { return available }
         return [selected] + available
     }
+}
+
+enum ConnectionTestResult {
+    case success(String)
+    case failure(String)
 }
 
 struct OutputSettingsView: View {
@@ -39,11 +46,6 @@ struct OutputSettingsView: View {
     @State private var connectionTestResult: ConnectionTestResult?
     @State private var availableModels: [String] = []
     @State private var didAttemptConnectionTest = false
-
-    enum ConnectionTestResult {
-        case success(String)
-        case failure(String)
-    }
 
     var body: some View {
         // swiftlint:disable:next closure_body_length
@@ -75,11 +77,15 @@ struct OutputSettingsView: View {
             }
             .accessibilityIdentifier(A11yID.outputFolderSection)
 
-            Section("Protocol Generation") {
-                Toggle("Include full transcript in protocol", isOn: $settings.includeFullTranscriptInProtocol)
+            NotionExportSettingsView(settings: settings)
+
+            Section("Meeting Notes") {
+                Toggle("Include full transcript in meeting notes", isOn: $settings.includeFullTranscriptInProtocol)
                     .accessibilityIdentifier(A11yID.includeFullTranscriptToggle)
                 Toggle("Save raw transcript separately", isOn: $settings.saveRawTranscriptSeparately)
                     .accessibilityIdentifier(A11yID.saveRawTranscriptToggle)
+                Toggle("Use AI meeting title for filenames", isOn: $settings.useAITitleForFilenames)
+                    .accessibilityIdentifier(A11yID.useAITitleForFilenamesToggle)
 
                 Picker("LLM Provider", selection: $settings.protocolProvider) {
                     ForEach(ProtocolProvider.allCases, id: \.self) { provider in
@@ -90,8 +96,8 @@ struct OutputSettingsView: View {
 
                 providerConfigView
 
-                Picker("Protocol Language", selection: $settings.protocolLanguage) {
-                    ForEach(AppSettings.protocolLanguages, id: \.self) { lang in
+                Picker("Notes Language", selection: $settings.protocolLanguage) {
+                    ForEach(languagePickerOptions, id: \.self) { lang in
                         Text(lang).tag(lang)
                     }
                 }
@@ -120,7 +126,7 @@ struct OutputSettingsView: View {
                         Text(bin).tag(bin)
                     }
                 }
-                Text("Binary used for protocol generation")
+                Text("Binary used to generate meeting notes")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -151,7 +157,7 @@ struct OutputSettingsView: View {
             openAIConfigView
 
         case .none:
-            Text("No LLM summarization will be generated. Raw transcripts are retained if no protocol is saved.")
+            Text("No LLM summarization will be generated. Raw transcripts are retained if no meeting notes are saved.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -184,6 +190,25 @@ struct OutputSettingsView: View {
             }
         }
 
+        SamplingOverrideRow(
+            parameter: .temperature,
+            value: $settings.openAITemperature,
+            toggleID: A11yID.openAITemperatureToggle,
+            valueID: A11yID.openAITemperatureValue,
+        )
+        SamplingOverrideRow(
+            parameter: .topP,
+            value: $settings.openAITopP,
+            toggleID: A11yID.openAITopPToggle,
+            valueID: A11yID.openAITopPValue,
+        )
+        Text("Passed to the server only when switched on. Off leaves the server's own default in place.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        Text("Some servers reject both together, and reasoning models often reject any value.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
         HStack {
             Text("API Key")
             Spacer()
@@ -193,6 +218,35 @@ struct OutputSettingsView: View {
         Text("Leave empty if your local server doesn't require authentication")
             .font(.caption)
             .foregroundStyle(.secondary)
+
+        Picker("API Key Authentication", selection: $settings.openAIAPIKeyPlacement) {
+            ForEach(OpenAIAPIKeyPlacement.allCases, id: \.self) { placement in
+                Text(placement.label).tag(placement)
+            }
+        }
+        .accessibilityIdentifier(A11yID.openAIAPIKeyPlacementPicker)
+
+        if settings.openAIAPIKeyPlacement == .customHeader {
+            HStack {
+                Text("Header Name")
+                Spacer()
+                TextField("", text: $settings.openAIAPIKeyHeaderName)
+                    .frame(width: 200)
+                    .multilineTextAlignment(.trailing)
+                    .accessibilityIdentifier(A11yID.openAIAPIKeyHeaderNameField)
+            }
+            Text("Sends the API key unchanged in this HTTP header, e.g. api-key.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if !OpenAIProtocolGenerator.isValidAPIKeyHeaderName(
+                settings.openAIAPIKeyHeaderName.trimmingCharacters(in: .whitespacesAndNewlines),
+            ) {
+                Text("Enter a valid HTTP header name. Content-Type, Content-Length, Host and other connection-level headers are reserved.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier(A11yID.openAIAPIKeyHeaderNameWarning)
+            }
+        }
 
         HStack {
             Button {
@@ -241,6 +295,8 @@ struct OutputSettingsView: View {
                 endpoint: settings.openAIEndpoint,
                 model: settings.openAIModel,
                 apiKey: apiKey,
+                apiKeyPlacement: settings.openAIAPIKeyPlacement,
+                apiKeyHeaderName: settings.openAIAPIKeyHeaderName,
             )
             testingConnection = false
             switch result {
@@ -262,6 +318,10 @@ struct OutputSettingsView: View {
         }
     }
 
+    private var languagePickerOptions: [String] {
+        OutputSettingsLogic.mergePickerOptions(available: AppSettings.protocolLanguages, selected: settings.protocolLanguage)
+    }
+
     private var modelPickerOptions: [String] {
         OutputSettingsLogic.mergePickerOptions(available: availableModels, selected: settings.openAIModel)
     }
@@ -279,8 +339,55 @@ struct OutputSettingsView: View {
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
-        panel.message = "Choose a folder for protocol output"
+        panel.message = "Choose a folder for recordings, transcripts and meeting notes"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         settings.setCustomOutputDir(url)
+    }
+}
+
+/// One optional sampling override: a toggle that switches it on and, while it
+/// is on, a field and stepper for the value. Switching it off clears the value,
+/// so the parameter is left out of the request and the server default applies.
+private struct SamplingOverrideRow: View {
+    let parameter: OpenAISamplingParameter
+    @Binding var value: Double?
+    let toggleID: String
+    let valueID: String
+
+    var body: some View {
+        Toggle("Override \(parameter.label)", isOn: isOverridden)
+            .accessibilityIdentifier(toggleID)
+
+        if value != nil {
+            HStack {
+                Text(parameter.label)
+                Spacer()
+                TextField(parameter.label, value: currentValue, format: .number)
+                    .labelsHidden()
+                    .frame(width: 60)
+                    .multilineTextAlignment(.trailing)
+                Stepper(parameter.label, value: currentValue, in: parameter.range, step: 0.05)
+                    .labelsHidden()
+            }
+            // A container element, so the identifier names the row instead
+            // of being copied onto the label, field and stepper inside it.
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(valueID)
+        }
+    }
+
+    private var isOverridden: Binding<Bool> {
+        Binding(
+            get: { value != nil },
+            set: { value = $0 ? OpenAISamplingParameter.initialOverride : nil },
+        )
+    }
+
+    private var currentValue: Binding<Double> {
+        Binding(
+            // The row only renders while overridden; the fallback just makes it total.
+            get: { value ?? OpenAISamplingParameter.initialOverride },
+            set: { value = $0 },
+        )
     }
 }

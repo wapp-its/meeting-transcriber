@@ -47,9 +47,15 @@ extension AppSettings {
     ///
     /// A folder wins over a repository, since picking one is the more deliberate
     /// act. A custom model that is not filled in yet resolves to the stock variant
-    /// in `whisperKitModel`, so a half-typed repository never costs a recording; one
-    /// that is filled in is used even when the folder turns out to be incomplete, so
-    /// the load fails with the reason instead of quietly running another model.
+    /// in `whisperKitModel`, so an empty or malformed entry loads nothing new; one
+    /// that is filled in is used as entered, even when the folder turns out to be
+    /// incomplete, so the load fails with the reason instead of quietly running
+    /// another model. What counts as "entered" is decided in Settings: each field
+    /// hands its value over on Return or when it is left (`DraftTextField`), no
+    /// longer on every keystroke, because the engine observer acts on every write
+    /// here. Each field commits on its own, so changing the repository and then the
+    /// variant is two commits, and in between the new repository is paired with
+    /// the old variant.
     var whisperKitModelSelection: WhisperKitModelSelection {
         let stock = WhisperKitModelSelection(variant: whisperKitModel, origin: .stock)
         guard whisperKitCustomModelEnabled else { return stock }
@@ -71,7 +77,7 @@ extension AppSettings {
     /// custom model folder either way, since a folder wins over the repository and
     /// would otherwise keep loading, or come back when "Custom model…" is picked again.
     func useHubModel(repoID: String, variant: String) {
-        updateWhisperKitCustomModelFolder(path: "", bookmark: nil)
+        clearWhisperKitCustomModelFolder()
         if repoID == WhisperKitLocalSnapshot.repoID, WhisperKitStockModel.model(for: variant) != nil {
             whisperKitCustomModelEnabled = false
             whisperKitModel = variant
@@ -83,14 +89,21 @@ extension AppSettings {
     }
 
     func setWhisperKitCustomModelFolder(_ url: URL) {
-        let bookmark = VocabularyFileAccess.withAccess(to: url) { scopedURL in
-            try? scopedURL.bookmarkData(
-                options: .withSecurityScope,
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil,
-            )
-        }
+        let bookmark = VocabularyFileAccess.withAccess(to: url, VocabularyFileAccess.makeBookmark)
         updateWhisperKitCustomModelFolder(path: url.path, bookmark: bookmark)
+    }
+
+    /// Re-create the bookmark when macOS reports it stale (the folder moved or was
+    /// renamed), and show the folder's current path. Called once at launch next to
+    /// the vocabulary and output-folder repairs, off the view-update path. A stale
+    /// bookmark still resolves, so this is about the shown path and the stored
+    /// data staying current, not about the next load. No-op without a bookmark or
+    /// while it is current.
+    func repairStaleWhisperKitCustomModelFolderBookmark() {
+        guard let bookmark = whisperKitCustomModelFolderBookmark,
+              let repaired = VocabularyFileAccess.refreshedStaleBookmark(bookmark)
+        else { return }
+        updateWhisperKitCustomModelFolder(path: repaired.url.path, bookmark: repaired.bookmark)
     }
 
     /// Handles manual path edits. A bookmark is tied to its original URL, so keeping
@@ -100,15 +113,35 @@ extension AppSettings {
         updateWhisperKitCustomModelFolder(path: path, bookmark: nil)
     }
 
+    /// Back to the repository fields. The one way to leave a picked folder that
+    /// needs no typing, which matters in the sandboxed build where a typed path
+    /// carries no grant anyway.
+    func clearWhisperKitCustomModelFolder() {
+        updateWhisperKitCustomModelFolder(path: "", bookmark: nil)
+    }
+
     func refreshWhisperKitCustomModelValidation() {
         whisperKitCustomModelValidation = currentWhisperKitCustomModelValidation()
     }
 
+    /// For an edit to the repository or variant. While a folder is set it wins and
+    /// the validation line describes the folder, so there is nothing to recompute,
+    /// and recomputing would resolve the folder's bookmark and walk its files on
+    /// the main actor for a field that does not even apply.
+    func refreshWhisperKitRepositoryValidation() {
+        guard whisperKitCustomModelFolderPath.isEmpty else { return }
+        refreshWhisperKitCustomModelValidation()
+    }
+
     private func currentWhisperKitCustomModelValidation() -> WhisperKitCustomModelValidation {
         if !whisperKitCustomModelFolderPath.isEmpty {
+            // Fail-fast resolution: this runs in `init` and on the view path, where
+            // a bookmark on a detached volume must not block the main actor. The
+            // load resolves with the full options (`WhisperKitModelSource`).
             guard let folder = VocabularyFileAccess.resolve(
                 path: whisperKitCustomModelFolderPath,
                 bookmark: whisperKitCustomModelFolderBookmark,
+                options: VocabularyFileAccess.failFastScopedResolution,
             ) else { return .folder(.folderUnavailable) }
             let problem = VocabularyFileAccess.withAccess(to: folder, WhisperKitLocalSnapshot.checkModelFolder)
             return problem.map(WhisperKitCustomModelValidation.folder) ?? .folderReady

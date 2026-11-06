@@ -5,7 +5,7 @@ name: E2E (Browser Meeting)
 # answers the consent prompt over RPC, and asserts the record-only _app.wav is
 # non-silent. Chrome is the primary (builds + runs on every event); Brave, Edge
 # and Chromium run nightly/dispatch as best-effort forks reusing that bundle.
-# Background: CLAUDE.md > E2E Architecture. Driver: scripts/e2e-browser.sh.
+# Background: e2e-architecture skill. Driver: scripts/e2e-browser.sh.
 #
 # NON-GATING CANARY: not referenced by any required check and not listed in
 # .github/tag-ruleset.json. Red is reported (no continue-on-error) but never
@@ -63,6 +63,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+
+      # See the same step in e2e-app.yml: the driver reads ~/Downloads.
+      - name: Preflight TCC grants
+        timeout-minutes: 2
+        run: bash scripts/ci/tcc-preflight.sh --downloads
 
       - uses: ./.github/actions/verify-xcode
 
@@ -174,6 +179,12 @@ jobs:
             /tmp/e2e-browser-assertions.txt
             /tmp/e2e-browser-audiotap.log
           if-no-files-found: ignore
+
+      # See the same step in e2e-app.yml.
+      - name: End e2e drivers a step timeout left behind
+        if: always()
+        timeout-minutes: 3
+        run: source scripts/lib/e2e-helpers.sh && e2e_reap_registered_drivers
 
       - name: Cleanup signing keychain
         if: always() && env.E2E_SIGNING_KEYCHAIN != ''

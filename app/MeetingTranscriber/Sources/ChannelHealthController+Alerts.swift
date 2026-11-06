@@ -13,8 +13,9 @@ extension ChannelHealthController {
     /// benign reading to weigh against interrupting a meeting.
     nonisolated static func gaveUpAlert(
         channel: AudioChannel,
+        startTimedOut: Bool = false,
     ) -> (title: String, body: String, urgency: NotificationUrgency) {
-        ("Capture Channel Lost", captureGaveUpMessage(for: channel), .timeSensitive)
+        ("Capture Channel Lost", captureGaveUpMessage(for: channel, startTimedOut: startTimedOut), .timeSensitive)
     }
 
     /// Title, body and Focus behaviour for a channel that stopped delivering.
@@ -31,9 +32,16 @@ extension ChannelHealthController {
         channel: AudioChannel,
         fault: ChannelFault,
         everCarriedSignal: Bool,
+        stall: MicStallDetails = MicStallDetails(),
+        startTimedOut: Bool = false,
     ) -> (title: String, body: String, urgency: NotificationUrgency) {
         if fault == .gaveUp {
-            return gaveUpAlert(channel: channel)
+            return gaveUpAlert(channel: channel, startTimedOut: startTimedOut)
+        }
+        // Same title and urgency as a give-up: the track is gone for now and
+        // nothing brings it back on its own. Only the remedy differs.
+        if fault == .stalled {
+            return ("Capture Channel Lost", captureStalledMessage(for: stall), .timeSensitive)
         }
         let suppressible = fault == .digitalSilence && channel == .mic
         return (
@@ -121,6 +129,14 @@ extension ChannelHealthController {
         case (_, .gaveUp, _):
             captureGaveUpMessage(for: channel)
 
+        // Not reached from a notification: `captureAlert` answers a stall
+        // before it gets here, with the stall's own details. Kept so the
+        // switch stays exhaustive; a caller that wants a stall's text calls
+        // `captureStalledMessage(for:)`, since these default details may not
+        // describe the stall at hand.
+        case (_, .stalled, _):
+            captureStalledMessage(for: MicStallDetails())
+
         case (.app, .noBuffers, _):
             "The app-audio channel is delivering no audio to this recording. Switch the system "
                 + "output device to another one, in Control Center or in "
@@ -149,6 +165,22 @@ extension ChannelHealthController {
                 + "\(SystemSettingsPaths.soundOutput). Changing the output inside the meeting app "
                 + "does not help. The recording continues."
 
+        // Neither digital-silence arm fits: buffers carry energy, so
+        // `everCarriedSignal` is true without the call ever having been in
+        // them, and it is not a permission problem, since a tap that may not
+        // hear the app delivers exact zeros. What fixed it in issue #699 was
+        // making the device the meeting app plays through the system output,
+        // which also rebuilds the tap. "Usually", because one field case is
+        // all the evidence there is for the cause.
+        case (.app, .noiseFloor, _):
+            "The app-audio channel has carried almost nothing for "
+                + "\(Int(AppNoiseFloorLimits.windowSeconds)) seconds, at most a faint noise floor, "
+                + "while the microphone carries audio. Set the system output, in Control Center "
+                + "or in \(SystemSettingsPaths.soundOutput), to the device the meeting app plays "
+                + "through. Changing the output inside the meeting app does not "
+                + "help. A silent meeting app records as exact silence, so a floor like this "
+                + "usually means the tap is not hearing the meeting app's output device."
+
         case (.app, .digitalSilence, false):
             "The app-audio channel has delivered only silence since this recording started, "
                 + "while the microphone carries audio. Check that Meeting Transcriber is enabled "
@@ -161,18 +193,74 @@ extension ChannelHealthController {
                 + "Check that the input device is still connected, and that Meeting Transcriber "
                 + "still has permission to use the microphone."
 
-        // The microphone has no watchdog; if it ever reports this, it is
-        // still a microphone delivering zeros.
-        case (.mic, .digitalSilence, _), (.mic, .rebuildsExhausted, _):
+        // The microphone's watchdog stalls rather than reporting this; if it
+        // ever does, it is still a microphone delivering zeros. It has no
+        // noise-floor sensor either; the arm only keeps the switch exhaustive.
+        case (.mic, .digitalSilence, _), (.mic, .rebuildsExhausted, _), (.mic, .noiseFloor, _):
             "The microphone is delivering silence, not quiet audio. "
                 + "Check the mute switch on your headset or input device, and the input mute "
                 + "in macOS. A meeting app's own mute button does not cause this."
         }
     }
 
-    nonisolated static func captureGaveUpMessage(for channel: AudioChannel) -> String {
-        let track = channel == .mic ? "Microphone" : "App-audio"
-        return "\(track) capture could not recover after an audio device change and has stopped "
+    /// Message for a microphone that went without audio for the capture
+    /// layer's whole budget and was released (issues #724, #706), worded from
+    /// what the stall says about itself.
+    ///
+    /// Not the give-up copy: nothing is stuck and nothing holds a core, and an
+    /// app restart is not the remedy. What makes it try again is a change of
+    /// the system input device, the one change the capture listens for. With
+    /// a microphone chosen in the app's settings it tries that microphone
+    /// again rather than the new system input, so the copy says so instead of
+    /// promising the new device, and it does not promise that reconnecting a
+    /// headset helps, since that changes the system input only when the
+    /// headset becomes the default. It names the limit on those tries, so a
+    /// switch past it is not a promise broken in silence.
+    ///
+    /// Two facts change the wording. A microphone that never delivered did
+    /// not "stop", which is what an engine that comes up silent from its
+    /// first second looks like. And once the revivals without audio have run
+    /// out, a change of input is ignored, so that stall must not offer one.
+    nonisolated static func captureStalledMessage(for details: MicStallDetails) -> String {
+        let limit = MicCaptureProgressPolicy.maxRevivalsWithoutAudio
+        let what = details.everDelivered
+            ? "The microphone stopped delivering audio and restarting it did not help, so it has been released."
+            : "The microphone has not delivered any audio in this recording and restarting it did not help, "
+            + "so it has been released."
+        let remedy = details.mayRevive
+            ? "Switching the system input device, in Control Center or in System Settings → Sound → Input, "
+            + "makes it try again (with the microphone chosen in Meeting Transcriber's settings, if one is "
+            + "chosen there). After \(limit) tries that bring no audio, it stays released until the recording ends."
+            : "Switching the input device has now brought no audio \(limit) times, so it stays released until "
+            + "the recording ends."
+        return "\(what) The rest of the recording continues without it. \(remedy)"
+    }
+
+    /// The microphone's restarts are not all device changes any more: the
+    /// progress watchdog rebuilds an engine that never delivers, and a rebuild
+    /// can wedge or fail like any restart. So its copy names what failed, a
+    /// restart, rather than a device change that may never have happened. The
+    /// app-audio channel is restarted only by a change of output device.
+    ///
+    /// A first start that timed out (issue #778, `startTimedOut`) gets its own
+    /// copy, because nothing was restarted. What is recorded is only that the
+    /// call did not return within the deadline, not that it is still out: a
+    /// later return does not update the flag. So the copy says what was
+    /// observed: no answer within the deadline, the recording going on
+    /// without the microphone, and the app not responding for as long as it
+    /// waited. No remedy: that restarting the app clears the call is not
+    /// measured, and the next recording may simply work. No claim about CPU or
+    /// later recordings either.
+    nonisolated static func captureGaveUpMessage(for channel: AudioChannel, startTimedOut: Bool = false) -> String {
+        if startTimedOut {
+            let seconds = MicStartLimits.firstStartDeadlineSeconds
+            return "The microphone did not respond within \(seconds) seconds of being opened, so this recording "
+                + "continues without it. Meeting Transcriber did not respond while it waited."
+        }
+        let what = channel == .mic
+            ? "Microphone capture could not be restarted"
+            : "App-audio capture could not recover after an audio device change"
+        return "\(what) and has stopped "
             + "for this recording. The rest of the recording continues. "
             + "Restart Meeting Transcriber to bring the channel back, and to release the extra CPU "
             + "a stuck restart attempt may still be holding."

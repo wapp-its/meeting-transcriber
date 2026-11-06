@@ -10,6 +10,12 @@ extension AppSettings {
         whisperLanguage.isEmpty ? nil : whisperLanguage
     }
 
+    /// Pinned microphone as an optional value. Empty string means the system
+    /// default input device.
+    var micDeviceUIDOrNil: String? {
+        micDeviceUID.isEmpty ? nil : micDeviceUID
+    }
+
     /// Parakeet language hint as an optional value. Empty string means the
     /// engine should auto-detect the language.
     var parakeetLanguageOrNil: String? {
@@ -48,6 +54,7 @@ extension AppSettings {
         if watchTencentMeeting { apps.append(AppMeetingPattern.tencentMeeting.appName) }
         if watchFaceTime { apps.append(AppMeetingPattern.faceTime.appName) }
         if watchWhatsApp { apps.append(AppMeetingPattern.whatsApp.appName) }
+        if watchSlack { apps.append(AppMeetingPattern.slack.appName) }
         return apps
     }
 

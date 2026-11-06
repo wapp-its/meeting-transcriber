@@ -9,9 +9,14 @@ final class WhisperKitLoadFailureTests: XCTestCase {
     /// Stand-in for any failure that has nothing to do with the Hub.
     private struct Unrelated: Error {}
 
+    /// WhisperKit 1.1.1 carries the status code of the refusal, nil when it had no
+    /// token to send; each is the same refusal here.
     func testARefusedRequestIsNamedByWhetherATokenWasSent() {
-        XCTAssertEqual(WhisperKitLoadFailure.classify(Hub.HubClientError.authorizationRequired, tokenSent: true), .tokenRejected)
-        XCTAssertEqual(WhisperKitLoadFailure.classify(Hub.HubClientError.authorizationRequired, tokenSent: false), .tokenRequired)
+        for statusCode in [401, 403, nil] as [Int?] {
+            let refusal = Hub.HubClientError.authorizationRequired(statusCode: statusCode)
+            XCTAssertEqual(WhisperKitLoadFailure.classify(refusal, tokenSent: true), .tokenRejected)
+            XCTAssertEqual(WhisperKitLoadFailure.classify(refusal, tokenSent: false), .tokenRequired)
+        }
     }
 
     /// `httpStatusCode(401)` included: the Hub client turns a 401 or 403 into

@@ -38,9 +38,9 @@ final class AppStateConsentPromptTests: XCTestCase {
 
     private func makeState() -> AppState {
         AppState(
+            pipelineEnvironment: IsolatedQueueEnvironment.make(logDir: testLogDir),
             settings: settings,
             notifier: SilentNotifier(),
-            pipelineEnvironment: IsolatedQueueEnvironment.make(logDir: testLogDir),
         )
     }
 

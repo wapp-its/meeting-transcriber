@@ -30,16 +30,16 @@ final class MenuBarMenuOrderTests: XCTestCase {
     }
 
     private func makeView(
-        pipelineQueue: PipelineQueue = PipelineQueue(),
+        pipelineQueue: PipelineQueue? = nil,
         history: [TerminalJobRecord] = [],
         microphoneMenu: MicrophoneMenuState? = nil,
         outputMenu: OutputMenuState? = nil,
         actions: MenuActions = .noop,
-    ) -> MenuBarView {
-        MenuBarView(
+    ) throws -> MenuBarView {
+        try MenuBarView(
             status: nil,
             isWatching: false,
-            pipelineQueue: pipelineQueue,
+            pipelineQueue: pipelineQueue ?? makeIsolatedQueue(),
             updateChecker: nil,
             history: history,
             noMic: false,
@@ -97,11 +97,11 @@ final class MenuBarMenuOrderTests: XCTestCase {
     func testTheMenuReadsInTheMockupsOrderWithItsShortcuts() throws {
         var finished = makeJob("Retro", state: .done)
         finished.protocolPath = URL(fileURLWithPath: "/tmp/Retro.md")
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         queue.insertJobForTesting(makeJob("Unnamed", state: .speakerNamingPending))
         var actions = MenuActions.noop
         actions.nameSpeakers = {}
-        let sut = makeView(
+        let sut = try makeView(
             pipelineQueue: queue, history: [TerminalJobRecord(job: finished)],
             microphoneMenu: Self.microphone, outputMenu: Self.output, actions: actions,
         )
@@ -122,7 +122,7 @@ final class MenuBarMenuOrderTests: XCTestCase {
             .item("Name Speakers…"),
             .item("Unnamed — Speaker names needed"),
             .heading("Recordings"),
-            .item("Open Last Protocol"),
+            .item("Open Last Notes"),
             .item("All Recordings…"),
             .divider,
             .item("Settings..."),
@@ -135,7 +135,7 @@ final class MenuBarMenuOrderTests: XCTestCase {
             "Record with Options…": ["r"],
             "Import Audio/Video Files…": ["p"],
             "Name Speakers…": ["n"],
-            "Open Last Protocol": ["o"],
+            "Open Last Notes": ["o"],
             "All Recordings…": ["t"],
             "Settings...": [","],
             "Quit": ["q"],
@@ -164,7 +164,7 @@ final class MenuBarMenuOrderTests: XCTestCase {
     /// that job's own line, and counts as no row: the failed job after it keeps
     /// the index it has without the line, so its Remove still reaches it.
     func testNameSpeakersIsTheFirstLineOfNeedsYouAndShiftsNoRowIndex() throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         queue.insertJobForTesting(makeJob("Running", state: .waiting))
         queue.insertJobForTesting(makeJob("Unnamed", state: .speakerNamingPending))
         let broken = makeJob("Broken", state: .error)
@@ -173,7 +173,7 @@ final class MenuBarMenuOrderTests: XCTestCase {
         var actions = MenuActions.noop
         actions.nameSpeakers = {}
         actions.removeFailedJob = { removed.append($0) }
-        let sut = makeView(pipelineQueue: queue, actions: actions)
+        let sut = try makeView(pipelineQueue: queue, actions: actions)
 
         XCTAssertEqual(
             try needsYouLines(of: sut),
@@ -185,7 +185,7 @@ final class MenuBarMenuOrderTests: XCTestCase {
 
     /// Nothing waiting for names, no line: the group opens with its first job.
     func testWithoutAJobWaitingForNamesNeedsYouOpensWithItsFirstJob() throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         queue.insertJobForTesting(makeJob("Broken", state: .error))
 
         XCTAssertEqual(try needsYouLines(of: makeView(pipelineQueue: queue)), [.item("Broken — Failed")])
