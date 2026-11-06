@@ -34,8 +34,11 @@ final class MicWatchdogHarness {
         if let url { try? FileManager.default.removeItem(at: url) }
     }
 
+    /// `pauseGate` is the recording's pause timeline, for a suite that pauses
+    /// the capture.
     func makeHandler(
         debugFault: DebugTapFault? = nil,
+        pauseGate: CapturePauseGate = CapturePauseGate(),
         beforeBridgeChunk: @escaping @Sendable () -> Void = {},
     ) throws -> MicCaptureHandler {
         let url = FileManager.default.temporaryDirectory
@@ -47,7 +50,7 @@ final class MicWatchdogHarness {
         let makeSession: () -> any MicEngineSessionProviding = { factory.make() }
         let handler = MicCaptureHandler(
             outputURL: url, debugFault: debugFault, sessionFactory: makeSession,
-            scheduleOnMain: clock.scheduler, clock: clock.reading,
+            scheduleOnMain: clock.scheduler, clock: clock.reading, pauseGate: pauseGate,
         )
         handler.bridgeGate.beforeChunk = beforeBridgeChunk
         handler.onStall = { [weak self] details in
