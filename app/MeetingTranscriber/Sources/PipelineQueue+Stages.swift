@@ -1161,6 +1161,7 @@ extension PipelineQueue {
                     speakerNames: speakerNames,
                     configuration: configuration,
                     savedLocally: savedLocally,
+                    template: usedTemplate,
                 ),
                 jobID: jobID,
             )

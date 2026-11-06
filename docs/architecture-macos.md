@@ -689,7 +689,7 @@ The title comes from the first top-level `# ` heading in what the model
 wrote, and only for a job that ran the built-in template (after a fallback
 too): a custom template's first heading is whatever it writes, a section such
 as "Action items" as often as a title, so its files keep the timestamped
-names (`ProtocolGenerator.fileTitleSlug`).
+names (`ProtocolGenerator.fileTitleSlug`, over `ProtocolGenerator.aiTitle`).
 
 `AppSettings.protocolLanguage` (default `"German"`) is substituted into the prompt as `{LANGUAGE}`. Every template can also use `{MEETING_DATE}` (`YYYY-MM-DD`) and `{MEETING_TIME}` (`HH:mm`), derived from the captured recording start time. Imports and recovery jobs resolve those time placeholders to `Unknown` rather than their enqueue or processing time. Only recordings with a captured start receive the authoritative meeting-metadata block, so templates receive reliable temporal context without needing to add the placeholders.
 
@@ -724,7 +724,10 @@ job and a quit costs no second LLM call. The local copy is kept by default;
 retry. Export failures add a job warning with a short cause and keep the local copy.
 `notionSpeakerTagsEnabled` separately opts in to sending confirmed speaker names as
 tags and defaults off. Date and Tags are written only when the selected database
-has recognized columns.
+has recognized columns. The page title follows the file-name rule
+(`ProtocolGenerator.aiTitle`): the title the model wrote for notes from the
+built-in template, otherwise the job's title. A retry reads the notes from the
+backup and decides by the template the job asked for.
 
 The job records its Notion page and database IDs as soon as the page is created,
 so retries and protocol re-exports can use the same destination. Re-export after
