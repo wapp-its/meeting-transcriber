@@ -1,0 +1,18 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-21T15:15:00.715122Z",
+  "depends_on": [
+    "gh-97-delete-recordings-by-hand-and-after-a.5",
+    "gh-97-delete-recordings-by-hand-and-after-a.7"
+  ],
+  "id": "gh-97-delete-recordings-by-hand-and-after-a.8",
+  "priority": null,
+  "review": "codex:gpt-6-astra:xhigh",
+  "spec": "gh-97-delete-recordings-by-hand-and-after-a",
+  "spec_path": ".flow/tasks/gh-97-delete-recordings-by-hand-and-after-a.8.md",
+  "status": "todo",
+  "title": "Multi-select, footer and docs",
+  "updated_at": "2026-10-21T15:15:00.715122Z"
+}

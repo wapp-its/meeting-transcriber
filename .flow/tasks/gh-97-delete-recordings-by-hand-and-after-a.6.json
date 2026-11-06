@@ -1,0 +1,20 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-21T15:15:00.715079Z",
+  "depends_on": [
+    "gh-97-delete-recordings-by-hand-and-after-a.2",
+    "gh-97-delete-recordings-by-hand-and-after-a.3",
+    "gh-97-delete-recordings-by-hand-and-after-a.4",
+    "gh-97-delete-recordings-by-hand-and-after-a.5"
+  ],
+  "id": "gh-97-delete-recordings-by-hand-and-after-a.6",
+  "priority": null,
+  "review": "codex:gpt-6-astra:xhigh",
+  "spec": "gh-97-delete-recordings-by-hand-and-after-a",
+  "spec_path": ".flow/tasks/gh-97-delete-recordings-by-hand-and-after-a.6.md",
+  "status": "todo",
+  "title": "Automatic deletion: the check and when it runs",
+  "updated_at": "2026-10-21T15:27:49.917772Z"
+}
