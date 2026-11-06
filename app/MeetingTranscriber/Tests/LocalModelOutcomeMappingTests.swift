@@ -23,7 +23,7 @@
         func testEachLocalOutcomeEndsTheJobAsR11Says() async throws {
             let (incomplete, short) = (LocalModelNotice.incompleteWarning, LocalModelNotice.Shortfall.self)
             let expectations = [
-                Expectation(outcome: .incomplete(text: "Partial minutes"), warning: incomplete, doneTitle: "Protocol Ready", shortfall: nil),
+                Expectation(outcome: .incomplete(text: "Partial minutes"), warning: incomplete, doneTitle: "Meeting Notes Ready", shortfall: nil),
                 Expectation(outcome: .lowMemory(lowMemory), warning: short.lowMemory.warning, doneTitle: nil, shortfall: .lowMemory),
                 Expectation(outcome: .noModel, warning: short.noModel.warning, doneTitle: nil, shortfall: .noModel),
                 Expectation(outcome: .promptTooLong, warning: failureWarning, doneTitle: "Transcript Saved", shortfall: nil),
@@ -133,7 +133,7 @@
             try await pipeline.waitUntilDone([id])
 
             XCTAssertEqual(notifier.notices, [.paused(jobID: id, title: "Standup")])
-            XCTAssertEqual(notifier.notifications.map(\.title), ["Protocol Ready"])
+            XCTAssertEqual(notifier.notifications.map(\.title), ["Meeting Notes Ready"])
             XCTAssertEqual(notifier.episodeEnds, 1)
         }
 

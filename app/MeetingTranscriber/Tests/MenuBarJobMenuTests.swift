@@ -215,7 +215,7 @@ final class MenuBarJobMenuTests: XCTestCase {
             (
                 .generatingProtocol,
                 clock(.generatingProtocol, from: at(14, 23, 58), to: at(15, 0, 3)),
-                "Generating Protocol · since 23:58 · ready about 00:03",
+                "Generating Meeting Notes · since 23:58 · ready about 00:03",
             ),
             (.transcribing, nil, "Transcribing"),
         ]
