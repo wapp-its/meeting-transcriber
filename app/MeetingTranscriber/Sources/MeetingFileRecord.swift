@@ -120,10 +120,15 @@ extension MeetingFileRecord {
         )
     }
 
-    /// List `file` under its role, in place of whatever that role listed: a role
-    /// has one file at a time, and the newest write of it is the one on disk.
-    mutating func list(_ file: MeetingFile) {
-        if let index = files.firstIndex(where: { $0.role == file.role }) {
+    /// List `file` under its role. A write to a listed path replaces that entry,
+    /// and any other file of the role leaves the record unless `keeping` names it.
+    /// A role usually has one file; it has more when a run wrote to another output
+    /// folder and the first still holds its file, which a deletion has to find.
+    /// Whether that file is still there is for the caller to ask the disk
+    /// (`MeetingFileStore.list`), as this runs under the store's lock.
+    mutating func list(_ file: MeetingFile, keeping: Set<String> = []) {
+        files.removeAll { $0.role == file.role && $0.path != file.path && !keeping.contains($0.path) }
+        if let index = files.firstIndex(where: { $0.role == file.role && $0.path == file.path }) {
             files[index] = file
         } else {
             files.append(file)

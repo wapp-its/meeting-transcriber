@@ -344,6 +344,24 @@ final class PipelineQueueMeetingFilesLifecycleTests: XCTestCase {
         XCTAssertEqual(try record(of: job).files, before)
     }
 
+    /// A save into another folder while the first cannot be reached: the first
+    /// file still exists, so a later deletion has to find both.
+    func testANamingFileInAFolderThatIsNotThereStaysListedBesideANewOne() async throws {
+        let queue = makeQueue(parksForNaming: true)
+        let job = try await parkForNaming(in: queue)
+        let first = try file(.naming, of: job).path
+        let (data, slug) = try parkedNamingData(of: job, in: queue)
+        try FileManager.default.moveItem(at: outputDir, to: tmpDir.appendingPathComponent("unplugged"))
+        let other = tmpDir.appendingPathComponent("other")
+
+        XCTAssertTrue(queue.naming.saveNamingData(data, slug: slug, in: other), "test premise")
+
+        let second = other.appendingPathComponent("recordings/\(slug)_naming.json")
+        let listed = try record(of: job).files.filter { $0.role == .naming }
+        XCTAssertEqual(listed.map(\.path), [first, MeetingFile.resolvedPath(second)])
+        XCTAssertEqual(listed.map(\.state), [.present, .present])
+    }
+
     // MARK: - The raw transcript option
 
     func testWithTheRawTranscriptOptionOffItsFilesAreGoneAfterDone() async throws {

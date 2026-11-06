@@ -106,6 +106,30 @@ final class MeetingFileStore {
         }
     }
 
+    /// List files the pipeline has just written. An earlier file of the same role
+    /// at another path goes only when the disk answers that it is gone: one in a
+    /// folder that cannot be reached, or still there beside the new one, is a file
+    /// of this meeting all the same.
+    func list(_ files: [MeetingFile], jobID: UUID) {
+        let kept = earlierFilesStillOnDisk(beside: files, jobID: jobID)
+        update(jobID: jobID) { record in
+            for file in files {
+                record.list(file, keeping: kept)
+            }
+        }
+    }
+
+    /// The paths `list` keeps. Outside `update`, as the lock is never held while
+    /// the disk is asked.
+    private func earlierFilesStillOnDisk(beside files: [MeetingFile], jobID: UUID) -> Set<String> {
+        guard let record = record(for: jobID) else { return [] }
+        return Set(record.files.filter { earlier in
+            earlier.state != .gone
+                && files.contains { $0.role == earlier.role && $0.path != earlier.path }
+                && MeetingFilePresence.of(earlier.path) != .gone
+        }.map(\.path))
+    }
+
     /// What a regeneration left of a meeting's protocol. `current` is nil when the
     /// new one did not go in place and the old one did not go back; `keptPrevious`
     /// is a previous protocol still on disk under a name of its own.
@@ -114,8 +138,9 @@ final class MeetingFileStore {
         guard let origin = record(for: jobID)?.origin else { return }
         let currentFile = current.map { MeetingFile(role: .protocol, url: $0, owned: origin.owns(.protocol)) }
         let keptFile = keptPrevious.map { MeetingFile(role: .previousProtocol, url: $0, owned: origin.owns(.previousProtocol)) }
+        let kept = currentFile.map { earlierFilesStillOnDisk(beside: [$0], jobID: jobID) } ?? []
         update(jobID: jobID) { record in
-            if let currentFile { record.list(currentFile) }
+            if let currentFile { record.list(currentFile, keeping: kept) }
             // Never `list`: each run the Trash refuses leaves one more copy, and
             // deleting the meeting has to find them all.
             if let keptFile {

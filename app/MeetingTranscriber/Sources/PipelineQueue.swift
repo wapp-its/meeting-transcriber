@@ -1319,11 +1319,7 @@ extension PipelineQueue {
         let files = written.compactMap { role, path in
             path.map { MeetingFile(role: role, url: $0, owned: origin.owns(role)) }
         }
-        meetingFileStore.update(jobID: jobID) { record in
-            for file in files {
-                record.list(file)
-            }
-        }
+        meetingFileStore.list(files, jobID: jobID)
     }
 
     /// Files moved on disk by the title rename. Each `source` was resolved before

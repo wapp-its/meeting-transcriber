@@ -315,6 +315,86 @@ final class MeetingFileStoreTests: XCTestCase {
         XCTAssertNil(store.record(for: record.jobID), "memory follows the file, and the file has nothing")
     }
 
+    // MARK: - Listing a written file
+
+    /// A file written just now, in `folder` under `dir`, with the folder made.
+    private func writeFile(_ name: String, folder: String, in dir: URL) throws -> URL {
+        let parent = dir.appendingPathComponent(folder)
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        let file = parent.appendingPathComponent(name)
+        try Data("written".utf8).write(to: file, options: .atomic)
+        return file
+    }
+
+    /// A store with one record, listing `files`.
+    private func makeStore(in dir: URL, id: UUID, listing files: [MeetingFile]) -> MeetingFileStore {
+        let store = MeetingFileStore(path: dir.appendingPathComponent("meeting_files.json"))
+        store.create(MeetingFileRecord(jobID: id, origin: .recorded, recordingDate: nil, files: files))
+        return store
+    }
+
+    /// An earlier file of a role leaves the record only when the disk answers
+    /// that it is gone: anything else is a file a later deletion has to find.
+    func testAnEarlierFileOfTheRoleStaysListedUnlessItIsGone() throws {
+        let unplug: @Sendable (URL) throws -> Void = { file in
+            let folder = file.deletingLastPathComponent()
+            try FileManager.default.moveItem(at: folder, to: folder.appendingPathExtension("unplugged"))
+        }
+        let cases: [(name: String, change: (URL) throws -> Void, markedGone: Bool, stays: Bool)] = [
+            ("still there", { _ in }, false, true),
+            ("folder not reachable", unplug, false, true),
+            ("removed", { try FileManager.default.removeItem(at: $0) }, false, false),
+            ("marked gone, folder not reachable", unplug, true, false),
+        ]
+        for (name, change, markedGone, stays) in cases {
+            let dir = try makeTempDirectory(prefix: "meeting-file-store")
+            let earlier = try writeFile("meeting.txt", folder: "a", in: dir)
+            let newer = try writeFile("meeting.txt", folder: "b", in: dir)
+            let earlierFile = MeetingFile(role: .transcript, url: earlier, owned: true)
+            let newerFile = MeetingFile(role: .transcript, url: newer, owned: true)
+            let id = UUID()
+            let store = makeStore(in: dir, id: id, listing: [earlierFile])
+            if markedGone {
+                store.update(jobID: id) { $0.files[0].state = .gone }
+            }
+            try change(earlier)
+
+            store.list([newerFile], jobID: id)
+
+            let paths = store.record(for: id)?.files.map(\.path)
+            XCTAssertEqual(paths, stays ? [earlierFile.path, newerFile.path] : [newerFile.path], name)
+        }
+    }
+
+    /// A rewrite replaces the file its path names, so its entry takes the new
+    /// identity, and the other file of the role is not touched.
+    func testARewriteUpdatesOnlyTheEntryOfItsOwnPath() throws {
+        let dir = try makeTempDirectory(prefix: "meeting-file-store")
+        let first = try MeetingFile(role: .naming, url: writeFile("m.json", folder: "a", in: dir), owned: true)
+        let second = try MeetingFile(role: .naming, url: writeFile("m.json", folder: "b", in: dir), owned: true)
+        let id = UUID()
+        let store = makeStore(in: dir, id: id, listing: [first, second])
+
+        let rewritten = try MeetingFile(role: .naming, url: writeFile("m.json", folder: "b", in: dir), owned: true)
+        XCTAssertNotEqual(rewritten.identity, second.identity, "test premise")
+        store.list([rewritten], jobID: id)
+
+        XCTAssertEqual(store.record(for: id)?.files, [first, rewritten])
+    }
+
+    /// Regenerate Notes writes through the same rule as the pipeline.
+    func testARegeneratedProtocolElsewhereKeepsAnEarlierOneThatIsStillThere() throws {
+        let dir = try makeTempDirectory(prefix: "meeting-file-store")
+        let earlier = try MeetingFile(role: .protocol, url: writeFile("m.md", folder: "a", in: dir), owned: true)
+        let newer = try writeFile("m.md", folder: "b", in: dir)
+        let id = UUID()
+        let store = makeStore(in: dir, id: id, listing: [earlier])
+
+        store.noteProtocolReplaced(jobID: id, current: newer, keptPrevious: nil)
+
+        XCTAssertEqual(store.record(for: id)?.files.map(\.path), [earlier.path, MeetingFile.resolvedPath(newer)])
+    }
+
     private func corruptPath(of path: URL) -> URL {
         path.deletingLastPathComponent().appendingPathComponent("meeting_files.json.corrupt")
     }
