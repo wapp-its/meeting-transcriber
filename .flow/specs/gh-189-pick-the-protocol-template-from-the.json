@@ -11,9 +11,86 @@
   "impl_review_rounds": {},
   "next_task": 1,
   "no_plan": true,
-  "plan_review_rounds": 0,
-  "plan_review_status": "unknown",
-  "plan_reviewed_at": null,
+  "plan_review_rounds": 1,
+  "plan_review_status": "needs_work",
+  "plan_reviewed_at": "2026-11-06T08:45:22.030366Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "7438c1243a7b9adbfe545563409df102d67bdd387fe0ce1964cae4670faa761c",
+      "backend": "codex",
+      "base_sha": "a882b7438618fcb941164467dd31cd1bef7b646a",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-7e830d78e03447d47d3f64b45079ba3a",
+            "classification": "introduced",
+            "findingId": "finding-7e830d78e03447d47d3f64b45079ba3a",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-70c558f08ae2ce5d778f6fd4fbe2ae8c",
+            "classification": "introduced",
+            "findingId": "finding-70c558f08ae2ce5d778f6fd4fbe2ae8c",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-8af1412614d4c7493df7d39473c447f5",
+            "classification": "introduced",
+            "findingId": "finding-8af1412614d4c7493df7d39473c447f5",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-8da15c9c192a7d54c4f2076c7af6fb94",
+            "classification": "introduced",
+            "findingId": "finding-8da15c9c192a7d54c4f2076c7af6fb94",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "782615f0a9a8222db666f2d2fe8362481584fbdc",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 352154,
+      "output_sha256": "546c1a9f64bc373a2fa1c935f14b7541d10282e80e729b4ceb74b4fb44e1144e",
+      "reservation_id": "6dd4c49ab4b245bea1a3a525171f8944",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-06T08:45:21.999238Z",
+      "tool_calls": 43,
+      "verdict": "NEEDS_WORK"
+    }
+  ],
+  "review_hash_epoch": {},
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
   "spec_path": ".flow/specs/gh-189-pick-the-protocol-template-from-the.md",
   "status": "open",
   "title": "Pick the protocol template from the meeting title",
@@ -29,5 +106,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nProtocol templates and a default template exist since #2. A recording that starts without an options window gets the default, and the options windows open on the default. A meeting that recurs, such as a daily stand-up, needs the same non-default template every time, so today it has to be picked by hand at each start or the meeting gets the default format (owner request, paraphrased).\n\n## NOTES\n\n- Rules in Settings: a pattern on the meeting title (a regular expression, not case-sensitive) and the template it selects. The first matching rule wins. With no match, the default applies as today.\n- Applies to every new recording. Starts without a window get the matched template. The start dialog and the Record Meeting window open with it selected. A template picked by hand still wins.\n- A detected meeting has its real window title only with the Screen Recording permission. Without it, the title is \"<App> Call\".\n- Related: #6 (profiles; a rule may pick a profile later), #155 (shared code of the options windows), #69 (templates from a central URL).\n\n## TASKS\n\n- [ ] Draw the mockup (Settings rules, the two windows) and get it accepted\n- [ ] Build the spec",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/189"
   },
-  "updated_at": "2026-10-21T08:28:06.125011Z"
+  "updated_at": "2026-11-06T08:48:22.425699Z"
 }
