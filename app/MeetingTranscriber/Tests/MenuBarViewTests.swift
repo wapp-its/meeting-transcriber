@@ -442,9 +442,9 @@ final class MenuBarViewTests: XCTestCase {
         )
         finished.state = .done
         finished.protocolPath = URL(fileURLWithPath: "/tmp/standup.md")
-        let views = [
-            try makeView(status: makeStatus(state: .idle)),
-            try makeView(status: makeStatus(state: .idle), history: [TerminalJobRecord(job: finished)]),
+        let views = try [
+            makeView(status: makeStatus(state: .idle)),
+            makeView(status: makeStatus(state: .idle), history: [TerminalJobRecord(job: finished)]),
         ]
 
         for view in views {
