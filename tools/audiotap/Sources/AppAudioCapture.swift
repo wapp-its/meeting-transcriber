@@ -588,16 +588,7 @@ public class AppAudioCapture: @unchecked Sendable {
         default:
             break
         }
-        if outputListenerInstalled, let listener = outputDeviceChangeListener {
-            AudioObjectRemovePropertyListenerBlock(
-                AudioObjectID(kAudioObjectSystemObject),
-                &defaultOutputAddress,
-                DispatchQueue.main,
-                listener,
-            )
-            outputDeviceChangeListener = nil
-            outputListenerInstalled = false
-        }
+        removeOutputDeviceChangeListener()
         logger.info("Audio capture stopped")
     }
 }

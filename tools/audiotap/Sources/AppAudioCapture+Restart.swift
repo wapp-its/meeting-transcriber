@@ -186,4 +186,17 @@ extension AppAudioCapture {
             logger.info("App audio: listening for default output device changes")
         }
     }
+
+    /// The counterpart of `installOutputDeviceChangeListener()`, called by `stop()`.
+    func removeOutputDeviceChangeListener() {
+        guard outputListenerInstalled, let listener = outputDeviceChangeListener else { return }
+        AudioObjectRemovePropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &defaultOutputAddress,
+            DispatchQueue.main,
+            listener,
+        )
+        outputDeviceChangeListener = nil
+        outputListenerInstalled = false
+    }
 }
