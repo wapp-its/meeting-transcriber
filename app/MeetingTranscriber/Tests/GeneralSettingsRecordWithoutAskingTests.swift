@@ -17,6 +17,7 @@ final class GeneralSettingsRecordWithoutAskingTests: XCTestCase {
         settings.watchTencentMeeting = true
         settings.watchFaceTime = true
         settings.watchWhatsApp = true
+        settings.watchSlack = true
         return settings
     }
 
