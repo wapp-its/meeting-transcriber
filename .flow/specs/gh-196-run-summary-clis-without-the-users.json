@@ -11,9 +11,10 @@
   "impl_review_rounds": {},
   "next_task": 1,
   "no_plan": true,
-  "plan_review_rounds": 2,
-  "plan_review_status": "needs_work",
-  "plan_reviewed_at": "2026-11-06T15:51:15.378587Z",
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-11-06T15:52:57.187666Z",
+  "ready": true,
   "review_attempts": [
     {
       "artifact_sha256": "472bbbe5f5f311bccd785a47cd9e63b6db2903e696900ebbf83acceaa11dcb6e",
@@ -111,9 +112,64 @@
       "task": null,
       "timestamp": "2026-11-06T15:51:15.360834Z",
       "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "718d29422fde90f1fb7e1e476218c8f7c50c7312e21d08d79d89aa8fc7908d87",
+      "backend": "codex",
+      "base_sha": "c9951a5251e1f90877fca8866a49eb3b52650694",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-d73f2bb6289be12137eb784c68efb0f5",
+            "classification": "introduced",
+            "findingId": "finding-d73f2bb6289be12137eb784c68efb0f5",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-78808cb034de5c2ed025d4089de124c5",
+            "classification": "introduced",
+            "findingId": "finding-78808cb034de5c2ed025d4089de124c5",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "7f5dc932ee2781cba52df20229531fbba04851ff",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 666,
+      "output_sha256": "54b80015ed4ec53d6c48bc46f3e5d36056e00816689e2417c5ffaf6bb44b41fd",
+      "reservation_id": "b849b99c45624f278659f2fafac7f14b",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-06T15:52:57.155566Z",
+      "verdict": "SHIP"
     }
   ],
-  "review_hash_epoch": {},
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
@@ -134,5 +190,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nThe app can write a protocol with the Claude CLI or the Codex CLI preset. That CLI then starts with the user's own setup for the tool. This includes their MCP servers and connectors, tools (also shell commands), hooks, plugins, global instructions and telemetry. The transcript is untrusted input, so these tools should not be in reach. The extra setup also costs input tokens on every summary.\n\n## TASKS\n\n- [ ] Start both CLIs without the user's setup, with the same login and model\n- [ ] Keep the custom command provider as it is",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/196"
   },
-  "updated_at": "2026-11-06T15:51:41.915600Z"
+  "updated_at": "2026-11-06T15:53:38.725507Z"
 }
