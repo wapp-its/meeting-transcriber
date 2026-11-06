@@ -5,12 +5,15 @@ private let webRTC = PowerAssertionFixture.webRTC
 
 /// PID 7 is the added app, PID 9 its helper, PID 11 an app whose bundle ID
 /// only shares the added one's text without being its helper, PID 8 a
-/// browser; anything else does not resolve.
+/// browser; anything else does not resolve. The added app is made up on
+/// purpose: a process a known app claims (Slack is one) never reaches the
+/// added-app check, because `claimedProcesses` keeps it off the browser path
+/// first.
 private let bundleIDs: [pid_t: String] = [
-    7: "com.example.slack",
+    7: "com.example.chat",
     8: "com.brave.Browser",
-    9: "com.example.slack.helper",
-    11: "com.example.slacker",
+    9: "com.example.chat.helper",
+    11: "com.example.chatter",
 ]
 
 /// An app added through "Add App…" is watched through the microphone and keyed
@@ -18,9 +21,9 @@ private let bundleIDs: [pid_t: String] = [
 /// alone: otherwise one call in an added Electron app would be detected twice,
 /// under two identities, and answering one prompt would leave the other.
 final class PowerAssertionDetectorAddedAppTests: XCTestCase {
-    private func addedSlackDetector() -> PowerAssertionDetector {
+    private func addedChatboxDetector() -> PowerAssertionDetector {
         let detector = PowerAssertionFixture.browserDetector()
-        detector.addedAppBundleIDs = ["com.example.slack"]
+        detector.addedAppBundleIDs = ["com.example.chat"]
         detector.bundleIDForPID = { bundleIDs[$0] }
         return detector
     }
@@ -36,20 +39,20 @@ final class PowerAssertionDetectorAddedAppTests: XCTestCase {
     }
 
     func testAnAddedAppAndItsHelperAreNeverBrowserMeetings() {
-        let detector = addedSlackDetector()
+        let detector = addedChatboxDetector()
         detector.assertionProvider = {
             PowerAssertionFixture.assertions(
-                (7, "Slack", webRTC),
+                (7, "Chatbox", webRTC),
                 (8, "Brave Browser", webRTC),
-                (9, "Slack Helper", webRTC),
+                (9, "Chatbox Helper", webRTC),
                 (10, PowerAssertionFixture.unknownBrowser, webRTC),
-                (11, "Slacker", webRTC),
+                (11, "Chatterbox", webRTC),
             )
         }
 
         XCTAssertEqual(
             detectedIdentities(detector),
-            ["Brave Browser", PowerAssertionFixture.unknownBrowser, "Slacker"],
+            ["Brave Browser", PowerAssertionFixture.unknownBrowser, "Chatterbox"],
             "the added app and its helper are left to the microphone path; a browser, an unresolvable process and a bundle ID that is not a helper are not",
         )
     }
@@ -61,23 +64,23 @@ final class PowerAssertionDetectorAddedAppTests: XCTestCase {
             lookups += 1
             return bundleIDs[pid]
         }
-        detector.assertionProvider = { PowerAssertionFixture.assertions((7, "Slack", webRTC)) }
+        detector.assertionProvider = { PowerAssertionFixture.assertions((7, "Chatbox", webRTC)) }
 
         let meeting = try XCTUnwrap(detector.checkOnce())
-        XCTAssertEqual(meeting.pattern.appName, "Slack")
+        XCTAssertEqual(meeting.pattern.appName, "Chatbox")
         XCTAssertTrue(detector.isMeetingActive(meeting))
         XCTAssertEqual(lookups, 0, "a default install must pay nothing for the exclusion")
     }
 
     func testAnAddedAppDoesNotKeepABrowserMeetingOfItsNameActive() throws {
-        let detector = addedSlackDetector()
-        detector.assertionProvider = { PowerAssertionFixture.assertions((7, "Slack", webRTC)) }
+        let detector = addedChatboxDetector()
+        detector.assertionProvider = { PowerAssertionFixture.assertions((7, "Chatbox", webRTC)) }
         let meeting = try DetectedMeeting(
             pattern: PowerAssertionDetector.meetingIdentity(
-                pattern: PowerAssertionFixture.browserPattern(), processName: "Slack",
+                pattern: PowerAssertionFixture.browserPattern(), processName: "Chatbox",
             ),
-            windowTitle: "Slack Call",
-            ownerName: "Slack",
+            windowTitle: "Chatbox Call",
+            ownerName: "Chatbox",
             windowPID: 7,
         )
 
@@ -116,17 +119,17 @@ final class PowerAssertionDetectorAddedAppTests: XCTestCase {
             )
             assertions.windowListProvider = { [] }
             assertions.bundleIDForPID = { bundleIDs[$0] }
-            assertions.assertionProvider = { PowerAssertionFixture.assertions((7, "Slack", webRTC)) }
+            assertions.assertionProvider = { PowerAssertionFixture.assertions((7, "Chatbox", webRTC)) }
             return assertions
         }
 
         // The default confirmation count is 2, so each detector polls twice.
-        let added = try detector(customApps: ["com.example.slack"])
+        let added = try detector(customApps: ["com.example.chat"])
         _ = added.checkOnce()
         XCTAssertNil(added.checkOnce(), "an added app's process is not a browser meeting")
 
         let notAdded = try detector(customApps: [])
         _ = notAdded.checkOnce()
-        XCTAssertEqual(notAdded.checkOnce()?.pattern.appName, "Slack", "without the entry it is one, as today")
+        XCTAssertEqual(notAdded.checkOnce()?.pattern.appName, "Chatbox", "without the entry it is one, as today")
     }
 }
