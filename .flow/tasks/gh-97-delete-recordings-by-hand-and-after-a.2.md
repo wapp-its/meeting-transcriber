@@ -50,9 +50,54 @@ Completes the record of task .1 for every other way a meeting enters, leaves or 
 - [ ] A completed Notion export sets the record's saved-to-Notion mark, and removing the local file afterwards marks the protocol gone without losing that mark; an export that created its page and then failed does not set it, and a later export that fails takes it back; a cancelled recording's record lists its relocated paths (R1, A8).
 - [ ] The new tests were written before the implementation and pass; the spec's quick command stays green.
 ## Done summary
-TBD
+A meeting's file record now follows it through imports, orphan recovery, Retry, cancel, dismiss and remove, speaker naming, raw transcript removal, Notion exports, a cancelled recording's move and Regenerate Notes, so a later deletion finds every file and never refuses the app's own file as replaced. New segments files are written with permissions 0600 and older ones keep theirs.
 
+Tier: implementer - opus (explicit invocation) at xhigh effort (requested) (model: claude-opus-5-5)
+
+baseline: green via handoff (green (verified at 6358433e by the conductor; only .flow/ paths moved since))
+gate classify: FULL (code changed), so the focused Quick commands ran: 49 tests in the new and the existing meeting file classes on the committed tree, 791 neighbouring pipeline, naming, regeneration, Notion, controller and workflow tests, the spec's quick command (101 tests), all exit 0; lint 0 violations.
+
+Not run here: the App Store variant build, CI's `swiftlint analyze`, the full suite and the sanitizers. The new code has no `#if` and uses nothing the App Store variant lacks, but no build has checked that.
+
+Tests written first: 22 of the 32 new tests ran red against compile-only stubs, each because the record did not change yet. The other 10 passed from the start, because they pin what must stay as it is: the three import tests (task .1's `enqueue` default already records them, so this task adds no import code), removing a failed job, a folder that is not there, a transcript kept after a failed protocol, an older segments file, a page created before a failed export, a hand-picked file, a job without a record. Of those 10 only the missing-folder test was checked by hand: with the probe swapped for `fileExists` it went red.
+
+### Deviations from the task text
+
+DECIDED: `PipelineQueueMeetingFilesTests.swift` stays unchanged and the new queue tests sit in `PipelineQueueMeetingFilesLifecycleTests.swift` and `PipelineQueueMeetingFilesEntryTests.swift`, because adding them there broke `type_body_length` at 452 lines (rule 1: the brief's split rule, these two files count as inside Touches).
+DECIDED: Retry returns "in progress" from `noteOutcome` in `PipelineQueue.swift`, because `retryJob` moved to `PipelineQueue+Retry.swift`, outside Touches. Only a Retry enters `.waiting` as a state change, so the case needs no check of the old state (rule 6). The task's other line references were stale as well and were resolved by name.
+DECIDED: `SpeakerNamingStore.save` keeps its signature and a new `namingFile(slug:)` names the path, instead of `save` returning it. `saveNamingData` reports from a `defer`, because a refused chmod throws after the write has already replaced the file (rule 6).
+
+### Other choices
+
+DECIDED: a job the restore discards for its missing audio also gets "left unfinished", or it would read as in progress for good. The in-flight drop right below it does not, because another queue still runs that job (rule 6).
+DECIDED: an orphan whose mix has no readable creation date counts as older than the store and is excluded from automatic deletion (rule 1: spec D9, the safe side).
+DECIDED: when neither the new protocol nor the old one could go in place, the record lists the kept copy and marks the protocol gone (rule 6).
+DECIDED: a queued Notion re-export turns the mark off at once, because a quit before it runs ends it failed without passing `exportToNotion` (rule 1: spec "the meeting's latest Notion export completed").
+DECIDED: `ProtocolRegenerator.environment` loses `private`, so one test can tell a wired `protocolReplaced` from its do-nothing default (rule 6).
+DECIDED: the new `protocolReplaced` closure follows `regenerated` and `AppState` passes the store's method. `regenerated` is then no longer the last argument, so its `trailing_closure` disable comment is gone (rule 6).
+
+### Known limits
+
+A refused chmod on the segments file leaves it with default permissions and no warning (`try?`), the same silence a failed write of this optional file already has. Volumes that refuse chmod can do this.
+
+### For later tasks
+
+`previousProtocol` is the one role that can list several files, added by `MeetingFileStore.noteProtocolReplaced`. The doc comment on `MeetingFileRecord.list` still says a role has one file, which holds for every caller of `list`; that file is outside this task's Touches. Code that reads files by role has to expect several here.
+
+This task sets `excludedFromAutomaticDeletion` and `savedToNotion`, which the deletion decision reads later. Both are declared by task .1 and no production code reads them yet. The Notion mark ignores a retired queue, like the terminal job store next to it.
+
+No route a user takes to a mapped feature changed.
+
+stage: impl-review - ran (model: gpt-6-astra xhigh (codex:gpt-6-astra:xhigh)); verdict SHIP after 2 round(s)
+DECIDED: finding 1 (P1, the correctness reviewer reproduced it, validator kept it, status now fixed) reverses the worker's deviation "`saveNamingData` reports from a `defer`": `SpeakerNamingStore.save` now hands the path to an `onWritten` closure between the write and the chmod, and `namingFile(slug:)` is gone. A refused chmod still reports the rewrite, a failed write reports nothing (rule 1: spec "Same file, right before removal"; rule 6 for the closure). The worker's summary line is out of date on this point.
+DECIDED: finding 2 (P2, the integration reviewer reproduced it on the naming file, validator kept it, status now fixed) is fixed at its cause in the shared listing hook for every role, not for the naming file alone, because the transcript, segments, 16 kHz copies and protocol lose their entries the same way (rule 1: spec "Reachable versus gone" and "It lists every file the meeting has"). This changes `MeetingFileRecord.swift`, outside the task's Touches, because `list` is where the cause sits.
+DECIDED: this replaces the worker's note for later tasks: any role can now list several files, not only `previousProtocol`, and an entry leaves only when the presence probe answers gone. Code reading by role has to expect several; tasks .3 and .4 as planned filter by role and state, so their text needs no change (rule 6).
+DECIDED: the probe runs on the main actor outside the lock, as `markGone` already does, and only when an entry of the role sits at another path, so a write to the same path costs no probe (rule 6).
+FOLLOW-UP: PipelineQueue+Stages `moveCopy` (from task .1, spec gh-97) reports a 16 kHz copy whenever a file sits at its destination, also when the move failed, so a symbolic link placed there would be listed by its target as owned. Matters if such a link can appear in the recordings folder before stage 3; the spec accepts changes by someone with write access to that folder.
+FOLLOW-UP: SpeakerNamingStore.save (spec gh-97): the branch where the chmod is refused after the write landed has no test, as a normal volume cannot be made to refuse it. Matters if a regression there would otherwise go unseen on a volume that refuses chmod.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: b8dbd497d294a270b0902465bef53ddb3133107e, 2cf9b8398c80ae125356b5626786499eb1a68a34, e4fb6634254df5144aa81a6c280bc87ad971a657, 20f845fa60087ac18a1eb58180750aca6fc50325
+- Tests: CFFIXED_USER_HOME=<scratch> swift test --parallel --filter 'PipelineQueueMeetingFilesEntryTests|PipelineQueueMeetingFilesLifecycleTests|ProtocolRegenerationMeetingFilesTests|PipelineQueueMeetingFilesTests' (exit 0, 49 tests, on the committed tree), CFFIXED_USER_HOME=<scratch> swift test --parallel --filter 'PipelineQueue|SpeakerNaming|LateRerun|NamingSidecar|ProtocolRegenerat|CancelledJob|WorkflowIntegration|NotionExport|MenuBarNotionRetry|AppStateTests|StagedRecovery|MeetingFile|TerminalJob|PipelineController' --skip 'ModelPreloadTests|ParakeetE2ETests|LiveTranscriptionE2ETests|LiveCaptionPipelineTests|EouStreamingE2ETests|WatchLoopE2ETests' (exit 0, 791 tests), CFFIXED_USER_HOME=<scratch> swift test --parallel --filter 'TranscriptionsViewTests|TranscriptionListTests|RecordingRowActionsTests|RowAvailabilityTests|PipelineControllerTranscriptionsTests|TranscriptionsWindowPrivacyTests|TerminalJobStoreTests|TerminalJobRecordTests|AudioPersistencePolicyTests|OutputSettingsViewTests|SpeakerNamingStoreTests|ProcessedRecordingsLedgerTests' (the spec's quick command, exit 0, 101 tests), ./scripts/lint.sh (exit 0, 0 violations)
 - PRs:
