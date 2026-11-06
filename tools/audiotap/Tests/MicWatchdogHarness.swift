@@ -35,11 +35,16 @@ final class MicWatchdogHarness {
     }
 
     /// `pauseGate` is the recording's pause timeline, for a suite that pauses
-    /// the capture.
+    /// the capture; `deviceUID` the microphone it starts on, and
+    /// `isDevicePresent` which devices are connected, for one that chooses a
+    /// microphone. `isDevicePresent` comes last, so a trailing closure still
+    /// goes to `beforeBridgeChunk`.
     func makeHandler(
         debugFault: DebugTapFault? = nil,
         pauseGate: CapturePauseGate = CapturePauseGate(),
+        deviceUID: String? = nil,
         beforeBridgeChunk: @escaping @Sendable () -> Void = {},
+        isDevicePresent: @escaping @Sendable (String) -> Bool = MicCaptureHandler.isDevicePresentOnSystem,
     ) throws -> MicCaptureHandler {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("progress-\(UUID().uuidString).wav")
@@ -50,7 +55,8 @@ final class MicWatchdogHarness {
         let makeSession: () -> any MicEngineSessionProviding = { factory.make() }
         let handler = MicCaptureHandler(
             outputURL: url, debugFault: debugFault, sessionFactory: makeSession,
-            scheduleOnMain: clock.scheduler, clock: clock.reading, pauseGate: pauseGate,
+            scheduleOnMain: clock.scheduler, clock: clock.reading,
+            isDevicePresent: isDevicePresent, pauseGate: pauseGate,
         )
         handler.bridgeGate.beforeChunk = beforeBridgeChunk
         handler.onStall = { [weak self] details in
@@ -61,7 +67,7 @@ final class MicWatchdogHarness {
         handler.onResume = { [weak self] in self?.resumes += 1 }
         handler.onGiveUp = { [weak self] in self?.gaveUp += 1 }
         started = clock.now
-        try handler.start()
+        try handler.start(deviceUID: deviceUID)
         return handler
     }
 

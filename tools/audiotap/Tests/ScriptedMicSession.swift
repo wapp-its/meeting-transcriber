@@ -4,8 +4,12 @@ import XCTest
 
 /// A microphone engine session that never touches audio hardware, scripted per
 /// test: it can throw on start, wedge inside the call that brings the engine
-/// up, and deliver buffers only when told.
+/// up, and deliver buffers only when told. It reports, as the device it is
+/// bound to, the one its bring-up was asked for (`systemDefaultUID` when asked
+/// for none), so the device a handler publishes is assertable.
 final class ScriptedMicSession: MicEngineSessionProviding, @unchecked Sendable {
+    static let systemDefaultUID = "SystemDefaultInputUID"
+
     let followsSystemDefaultInput = false
     // swiftlint:disable:next force_unwrapping
     let format = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 1)!
@@ -33,9 +37,23 @@ final class ScriptedMicSession: MicEngineSessionProviding, @unchecked Sendable {
     private let engineMutex = NSLock()
     private var storedTapBlock: AVAudioNodeTapBlock?
     private var storedTeardowns = 0
+    private var requestedDeviceUIDs: [String?] = []
 
     var teardowns: Int {
         lock.withLock { storedTeardowns }
+    }
+
+    /// The device each bring-up of this session was asked for, in order.
+    var deviceUIDs: [String?] {
+        lock.withLock { requestedDeviceUIDs }
+    }
+
+    var boundInputDevice: MicInputDevice? {
+        lock.withLock { requestedDeviceUIDs.last }.map { Self.device($0 ?? Self.systemDefaultUID) }
+    }
+
+    static func device(_ uid: String) -> MicInputDevice {
+        MicInputDevice(uid: uid, name: "Microphone \(uid)")
     }
 
     var notificationObject: AnyObject {
@@ -46,7 +64,8 @@ final class ScriptedMicSession: MicEngineSessionProviding, @unchecked Sendable {
         return object
     }
 
-    func hardwareFormat(deviceUID _: String?) throws -> AVAudioFormat {
+    func hardwareFormat(deviceUID: String?) throws -> AVAudioFormat {
+        lock.withLock { requestedDeviceUIDs.append(deviceUID) }
         if shouldThrow { throw MicCaptureError.noInputDevice }
         if shouldWedge {
             engineMutex.lock()
