@@ -250,6 +250,9 @@ func makeSilentDetector() -> MeetingDetector {
 /// Creates a WatchLoop backed by a MockRecorder and a silent detector.
 /// Assign the returned loop to `appState.watching.watchLoop` in tests that need
 /// an active loop without calling toggleWatching() (which requires Permissions).
+/// Every detected app asks before recording unless `recordWithoutAskingApps`
+/// names it, so a test that wants a detection to record at once passes
+/// `{ [testMeetingApp] }`.
 @MainActor
 func makeTestWatchLoop(
     detector: any MeetingDetecting = makeSilentDetector(),
@@ -259,6 +262,7 @@ func makeTestWatchLoop(
     notifier: any AppNotifying = SilentNotifier(),
     noMic: Bool = false,
     micDeviceUID: String? = nil,
+    recordWithoutAskingApps: @escaping () -> [String] = { [] },
 ) -> (WatchLoop, MockRecorder) {
     let recorder = makeMockRecorder()
     let loop = WatchLoop(
@@ -271,6 +275,7 @@ func makeTestWatchLoop(
         micDeviceUID: { micDeviceUID },
         recordOnly: recordOnly,
         recordOnlyDestination: { .unscoped(recordOnlyOutputDir()) },
+        recordWithoutAskingApps: recordWithoutAskingApps,
         notifier: notifier,
     )
     loop.permissionChecker = { .allHealthy }

@@ -104,7 +104,9 @@ final class QuitFinishesRecordingTests: XCTestCase {
     /// when it returns.
     func testAnAutoRecordingIsEnqueuedBeforeFinishForQuitReturns() async throws {
         let queue = try PipelineQueue(logDir: makeTempDirectory(prefix: "quit_auto"))
-        let (loop, recorder) = makeTestWatchLoop(detector: FixedMeetingDetector(), pipelineQueue: queue)
+        let (loop, recorder) = makeTestWatchLoop(
+            detector: FixedMeetingDetector(), pipelineQueue: queue, recordWithoutAskingApps: { [testMeetingApp] },
+        )
         loop.start()
         await waitFor(loop.state == .recording, timeout: .seconds(3))
         XCTAssertEqual(loop.state, .recording, "precondition: the loop never started recording")
@@ -144,7 +146,9 @@ final class QuitFinishesRecordingTests: XCTestCase {
     func testTheSnapshotOnDiskAtReplyHoldsTheRecordingInFlightAtQuit() async throws {
         let dir = try makeTempDirectory(prefix: "quit_race")
         let pipeline = try makeIsolatedPipelineController(initialQueue: makeSlowSnapshotQueue(in: dir))
-        let (loop, _) = makeTestWatchLoop(detector: FixedMeetingDetector(), pipelineQueue: pipeline.queue)
+        let (loop, _) = makeTestWatchLoop(
+            detector: FixedMeetingDetector(), pipelineQueue: pipeline.queue, recordWithoutAskingApps: { [testMeetingApp] },
+        )
         loop.start()
         await waitFor(loop.state == .recording, timeout: .seconds(3))
         XCTAssertEqual(loop.state, .recording, "precondition: the loop never started recording")
