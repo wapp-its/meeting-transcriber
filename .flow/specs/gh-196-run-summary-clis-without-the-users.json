@@ -11,9 +11,62 @@
   "impl_review_rounds": {},
   "next_task": 1,
   "no_plan": true,
-  "plan_review_rounds": 0,
-  "plan_review_status": "unknown",
-  "plan_reviewed_at": null,
+  "plan_review_rounds": 1,
+  "plan_review_status": "needs_work",
+  "plan_reviewed_at": "2026-11-06T15:47:34.396159Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "472bbbe5f5f311bccd785a47cd9e63b6db2903e696900ebbf83acceaa11dcb6e",
+      "backend": "codex",
+      "base_sha": "c9951a5251e1f90877fca8866a49eb3b52650694",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-d73f2bb6289be12137eb784c68efb0f5",
+            "classification": "introduced",
+            "findingId": "finding-d73f2bb6289be12137eb784c68efb0f5",
+            "firstSeenThisRound": true,
+            "severity": "P0",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "183593038c9eeb1cfc2656f8ae79e66713600d61",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 582287,
+      "output_sha256": "f9e19f1285eca8a992d0a4497556adebf6df07e63974e9f6f9e26323c8c82991",
+      "reservation_id": "7a6d518b872d4cf8b98339789804a170",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-06T15:47:34.165324Z",
+      "tool_calls": 32,
+      "verdict": "NEEDS_WORK"
+    }
+  ],
+  "review_hash_epoch": {},
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
   "spec_path": ".flow/specs/gh-196-run-summary-clis-without-the-users.md",
   "status": "open",
   "title": "Run summary CLIs without the user's agent setup",
@@ -29,5 +82,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nThe app can write a protocol with the Claude CLI or the Codex CLI preset. That CLI then starts with the user's own setup for the tool. This includes their MCP servers and connectors, tools (also shell commands), hooks, plugins, global instructions and telemetry. The transcript is untrusted input, so these tools should not be in reach. The extra setup also costs input tokens on every summary.\n\n## TASKS\n\n- [ ] Start both CLIs without the user's setup, with the same login and model\n- [ ] Keep the custom command provider as it is",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/196"
   },
-  "updated_at": "2026-11-06T15:42:24.440147Z"
+  "updated_at": "2026-11-06T15:49:07.387201Z"
 }
