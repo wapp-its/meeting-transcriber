@@ -35,8 +35,6 @@ class PipelineQueue {
     /// in-place field updates, snapshot restore (whole-array assign), and
     /// recovery appends.
     var jobs: [PipelineJob] = []
-    @ObservationIgnored private var menuTrackingDepth = 0
-    @ObservationIgnored private var expiredCompletedJobIDs: Set<UUID> = []
     @ObservationIgnored private var completedJobRemovalTokens: [UUID: UUID] = [:]
     /// Fires for every finished export, first attempt or retry, with the short
     /// failure cause or nil on success.
@@ -722,7 +720,6 @@ class PipelineQueue {
         // An export-only retry still needs its job to retain a created page's
         // ID if the remote request completes after the menu closes.
         guard !jobs.contains(where: { $0.id == id && $0.state == .done && $0.notionExportStatus == .inProgress }) else { return }
-        expiredCompletedJobIDs.remove(id)
         completedJobRemovalTokens.removeValue(forKey: id)
         // Read before the job leaves the list: only a job still in work can
         // own a local generation to end (see `cancelWork`).
@@ -774,30 +771,14 @@ class PipelineQueue {
         if endingLocalGeneration { cancelLocalModelGeneration(jobID: id) }
     }
 
-    func beginMenuTracking() {
-        menuTrackingDepth += 1
-    }
-
-    func endMenuTracking() {
-        guard menuTrackingDepth > 0 else { return }
-        menuTrackingDepth -= 1
-        guard menuTrackingDepth == 0 else { return }
-        let expired = expiredCompletedJobIDs
-        expiredCompletedJobIDs.removeAll()
-        for id in expired {
-            expireCompletedJob(id: id)
-        }
-    }
-
+    /// Checked again when the lifetime runs out: an export started or failed
+    /// since keeps the job. Nothing holds the job while the menu is open: the
+    /// menu lists no finished job whose export completed, whether or not the
+    /// queue still holds it, so removing one cannot move a row under the
+    /// pointer.
     private func expireCompletedJob(id: UUID) {
         guard jobs.contains(where: { $0.id == id && $0.state == .done && !$0.hasPendingNotionExport }) else { return }
-        // Native menus update in place. Removing a finished export's row while
-        // the menu is open moves its actions underneath the pointer.
-        if menuTrackingDepth > 0, jobs.contains(where: { $0.id == id && $0.notionExportStatus != nil }) {
-            expiredCompletedJobIDs.insert(id)
-        } else {
-            removeJob(id: id)
-        }
+        removeJob(id: id)
     }
 
     /// Cancel a job. Removes the job + cleans up sidecar files if naming was
@@ -895,7 +876,6 @@ class PipelineQueue {
         guard jobs.contains(where: { $0.id == id && $0.state == .done && !$0.hasPendingNotionExport }) else { return }
         let token = UUID()
         completedJobRemovalTokens[id] = token
-        expiredCompletedJobIDs.remove(id)
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(self?.completedJobLifetime ?? 60))
             guard self?.completedJobRemovalTokens[id] == token else { return }

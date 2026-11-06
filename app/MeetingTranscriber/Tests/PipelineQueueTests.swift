@@ -1088,20 +1088,9 @@ final class PipelineQueueTests: XCTestCase {
         XCTAssertEqual(queue.jobs.first?.notionExportStatus, .failed)
     }
 
-    func testJobWithoutAnExportExpiresWhileAMenuIsOpen() async throws {
-        let queue = PipelineQueue(logDir: tmpDir, completedJobLifetime: 0.2)
-        let job = makeJob()
-        queue.enqueue(job)
-        queue.updateJobState(id: job.id, to: .done)
-        queue.beginMenuTracking()
-
-        try await Task.sleep(for: .milliseconds(400))
-
-        XCTAssertTrue(queue.completedJobs.isEmpty)
-        queue.endMenuTracking()
-    }
-
-    func testCompletedJobExpiryWaitsForMenuTrackingToEnd() async throws {
+    /// The lifetime's end checks the export again: one that failed after the
+    /// removal was scheduled keeps the job for its retry.
+    func testJobWhoseExportFailedAfterItsRemovalWasScheduledIsRetained() async throws {
         let queue = PipelineQueue(logDir: tmpDir, completedJobLifetime: 0.2)
         let job = makeJob()
         var exported = job
@@ -1109,68 +1098,13 @@ final class PipelineQueueTests: XCTestCase {
         exported.finishNotionExport(succeeded: true)
         queue.enqueue(exported)
         queue.updateJobState(id: job.id, to: .done)
-        queue.beginMenuTracking()
-
-        try await Task.sleep(for: .milliseconds(400))
-        XCTAssertEqual(queue.completedJobs.map(\.id), [job.id])
-
-        queue.endMenuTracking()
-        XCTAssertTrue(queue.completedJobs.isEmpty)
-    }
-
-    func testMenuEndRetainsJobThatNeedsNotionRetryAfterItsTimerExpired() async throws {
-        let queue = PipelineQueue(logDir: tmpDir, completedJobLifetime: 0.2)
-        let job = makeJob()
-        var exported = job
-        exported.beginNotionExport(speakerNames: [])
-        exported.finishNotionExport(succeeded: true)
-        queue.enqueue(exported)
-        queue.updateJobState(id: job.id, to: .done)
-        queue.beginMenuTracking()
-        try await Task.sleep(for: .milliseconds(400))
 
         queue.jobs[0].beginNotionExport(speakerNames: [])
         queue.jobs[0].finishNotionExport(succeeded: false)
-        queue.endMenuTracking()
+        try await Task.sleep(for: .milliseconds(400))
 
         XCTAssertEqual(queue.jobs.first?.id, job.id)
         XCTAssertEqual(queue.jobs.first?.notionExportStatus, .failed)
-    }
-
-    func testCompletedJobExpiryWaitsForFinalNestedMenuTrackingEnd() async throws {
-        let queue = PipelineQueue(logDir: tmpDir, completedJobLifetime: 0.2)
-        let job = makeJob()
-        var exported = job
-        exported.beginNotionExport(speakerNames: [])
-        exported.finishNotionExport(succeeded: true)
-        queue.enqueue(exported)
-        queue.updateJobState(id: job.id, to: .done)
-        queue.beginMenuTracking()
-        queue.beginMenuTracking()
-
-        try await Task.sleep(for: .milliseconds(400))
-        queue.endMenuTracking()
-        XCTAssertEqual(queue.completedJobs.map(\.id), [job.id])
-
-        queue.endMenuTracking()
-        XCTAssertTrue(queue.completedJobs.isEmpty)
-    }
-
-    func testManuallyRemovedJobIsNotReRemovedAfterMenuTracking() async throws {
-        let queue = PipelineQueue(logDir: tmpDir, completedJobLifetime: 0.2)
-        let job = makeJob()
-        var exported = job
-        exported.beginNotionExport(speakerNames: [])
-        exported.finishNotionExport(succeeded: true)
-        queue.enqueue(exported)
-        queue.updateJobState(id: job.id, to: .done)
-        queue.beginMenuTracking()
-
-        try await Task.sleep(for: .milliseconds(400))
-        queue.removeJob(id: job.id)
-        queue.endMenuTracking()
-
-        XCTAssertTrue(queue.jobs.isEmpty)
     }
 
     func testErrorJobNotAutoRemoved() async throws {
