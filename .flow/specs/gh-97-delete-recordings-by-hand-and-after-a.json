@@ -8,7 +8,9 @@
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-97-delete-recordings-by-hand-and-after-a",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-97-delete-recordings-by-hand-and-after-a.1": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -603,15 +605,106 @@
       "task": null,
       "timestamp": "2026-11-06T16:00:27.595835Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "7131faa7e62626b5caea396d53d8660522f32ef55f8af9ad67ddca51f3cf91ee",
+      "backend": "codex",
+      "base_sha": "71b2e14e7c8b3173548c9384f33c23de1d246486",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-0926b6c64ec4e641780fd7122b8c0469",
+            "classification": "introduced",
+            "findingId": "finding-0926b6c64ec4e641780fd7122b8c0469",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "06ae58755cf3e610ec16d76895ee3f34da9a2fcf",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1148,
+      "output_sha256": "08de5ae1358d19bc8a6f5508d4e34ea6d4382667c2c8a224e1c4d4ff1824b11c",
+      "reservation_id": "d64c453de40a43bc8ab7240879f5a1ce",
+      "round_consumed": true,
+      "scope": "impl:gh-97-delete-recordings-by-hand-and-after-a.1",
+      "superseded_by": null,
+      "task": "gh-97-delete-recordings-by-hand-and-after-a.1",
+      "timestamp": "2026-11-06T16:51:58.513004Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "498d3dc2f71f70fd152f898883bf02055461c4adecbd7e16f6f275582409efb5",
+      "backend": "codex",
+      "base_sha": "71b2e14e7c8b3173548c9384f33c23de1d246486",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-0926b6c64ec4e641780fd7122b8c0469",
+            "classification": "introduced",
+            "findingId": "finding-0926b6c64ec4e641780fd7122b8c0469",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "68b385546d603524cda27690122b884f26c79aaa",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1246,
+      "output_sha256": "cde7639e831a105284814c1cfa37317a1a1b13ab05f568fd6d4c2c1844f783d9",
+      "reservation_id": "5cd84a5fd2344653a0c3fc0663db1f81",
+      "round_consumed": true,
+      "scope": "impl:gh-97-delete-recordings-by-hand-and-after-a.1",
+      "superseded_by": null,
+      "task": "gh-97-delete-recordings-by-hand-and-after-a.1",
+      "timestamp": "2026-11-06T17:02:34.515034Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-97-delete-recordings-by-hand-and-after-a.1": 1,
     "plan": 2,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-97-delete-recordings-by-hand-and-after-a.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-97-delete-recordings-by-hand-and-after-a.md",
@@ -629,5 +722,5 @@
     "mergeBaseTracker": "## Problem\n\nDas Fenster \u201eTranskriptionen\u201c aus #13 (Spec `gh-13-transcriptions-window`, im Build-Loop) listet jedes Meeting mit Titel, App, Datum, Dauer und Status, \u00f6ffnet Protokoll oder Transkript und zeigt sie im Finder. **Die Tonaufnahme selbst kommt dort nicht vor:** man sieht nicht, ob zu einem Meeting noch Audio gespeichert ist, kann sie nicht \u00f6ffnen und nicht l\u00f6schen.\n\nAudiodateien sind gross und der heikelste Teil einer Aufnahme (Einwilligung aller Beteiligten, siehe #32). Oft braucht man danach nur noch Protokoll und Transkript.\n\n## Wunsch (Owner, 2026-10-08, Auswahl aus den Vorschl\u00e4gen)\n\n1. **Audio in der Liste:** pro Meeting anzeigen, ob eine Aufnahme gespeichert ist (und wie gross), sie \u00f6ffnen und im Finder zeigen. Gilt f\u00fcr Aufnahmen der App selbst (`<Ausgabeordner>/recordings/`); importierte Dateien bleiben, wo sie waren, und werden nur angezeigt, wenn sie dort noch liegen.\n2. **Audio l\u00f6schen, Text behalten:** die Aufnahme eines Meetings in den Papierkorb legen, Transkript und Protokoll bleiben. Mit R\u00fcckfrage; danach zeigt die Liste \u201eAudio gel\u00f6scht\u201c.\n\n## Hinweise\n\n- Baut auf #13 auf; erst planen, wenn #13 gemergt ist.\n- Nach dem L\u00f6schen der Audiodatei sind \u201eErneut versuchen\u201c und eine sp\u00e4tere Sprecher-Neuzuordnung f\u00fcr dieses Meeting nicht mehr m\u00f6glich; das muss die R\u00fcckfrage sagen.\n- Ein noch offenes Benennen der Sprecher braucht die 16-kHz-Dateien; solange es offen ist, L\u00f6schen sperren oder darauf hinweisen.\n- Bewusst **nicht** gew\u00e4hlt (2026-10-08): Kopieren/Verschieben der Dateien in einen anderen Ordner, \u00e4ltere Meetings aus der Zeit vor #13 in die Liste \u00fcbernehmen.\n\n## Abnahme\n\n- Ein aufgenommenes Meeting zeigt in der Liste seine Audiodatei mit Gr\u00f6sse; \u201e\u00d6ffnen\u201c spielt sie ab, \u201eIm Finder zeigen\u201c markiert sie.\n- \u201eAudio l\u00f6schen\u201c legt die Datei(en) nach R\u00fcckfrage in den Papierkorb; Transkript und Protokoll bleiben \u00f6ffnbar; nach einem Neustart steht weiterhin \u201eAudio gel\u00f6scht\u201c.\n\n",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/97"
   },
-  "updated_at": "2026-11-06T16:00:52.048388Z"
+  "updated_at": "2026-11-06T17:02:34.548096Z"
 }
