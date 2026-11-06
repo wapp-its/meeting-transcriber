@@ -166,6 +166,11 @@ class PipelineQueue {
     /// nil (default) disables it; production injects one, tests opt in.
     let terminalJobStore: TerminalJobStore?
 
+    /// Durable record of each meeting's files, which deleting them reads. Same
+    /// wiring as `terminalJobStore`: nil disables it, production injects one
+    /// that outlives queue rebuilds.
+    let meetingFileStore: MeetingFileStore?
+
     /// Cached FluidVAD instance — reused across jobs to avoid model reload.
     /// Internal (not private) because `preprocessWithVAD` in
     /// PipelineQueue+Stages.swift reads and writes it.
@@ -378,6 +383,7 @@ class PipelineQueue {
         completedJobLifetime: TimeInterval = 60,
         notionExportConfigurationProvider: (() -> NotionExportResolution)? = nil,
         terminalJobStore: TerminalJobStore? = nil,
+        meetingFileStore: MeetingFileStore? = nil,
         inFlightRuns: InFlightRunRegistry? = nil,
         echoCancellationEnabled: @escaping () -> Bool = { false },
         echoCancellerFactory: (() -> (any EchoCancelling)?)? = nil,
@@ -419,6 +425,7 @@ class PipelineQueue {
         self.completedJobLifetime = completedJobLifetime
         self.notionExportConfigurationProvider = notionExportConfigurationProvider
         self.terminalJobStore = terminalJobStore
+        self.meetingFileStore = meetingFileStore
         self.inFlightRuns = inFlightRuns ?? .shared
         naming = SpeakerNamingSession(
             namingStore: SpeakerNamingStore(outputDir: nil),
@@ -520,6 +527,7 @@ class PipelineQueue {
         completedJobLifetime: TimeInterval = 60,
         notionExportConfigurationProvider: (() -> NotionExportResolution)? = nil,
         terminalJobStore: TerminalJobStore? = nil,
+        meetingFileStore: MeetingFileStore? = nil,
         inFlightRuns: InFlightRunRegistry? = nil,
         securityScope: SecurityScopeAccess = .live,
     ) {
@@ -566,6 +574,7 @@ class PipelineQueue {
         self.completedJobLifetime = completedJobLifetime
         self.notionExportConfigurationProvider = notionExportConfigurationProvider
         self.terminalJobStore = terminalJobStore
+        self.meetingFileStore = meetingFileStore
         self.inFlightRuns = inFlightRuns ?? .shared
         naming = SpeakerNamingSession(
             namingStore: SpeakerNamingStore(outputDir: outputDir),
@@ -604,10 +613,17 @@ class PipelineQueue {
         jobs.filter { $0.state == .waiting }
     }
 
-    func enqueue(_ inputJob: PipelineJob) {
+    /// A job whose origin is not named counts as an import, the safe side: a
+    /// caller that forgets makes a meeting the app never deletes.
+    func enqueue(_ job: PipelineJob) {
+        enqueue(job, origin: .imported)
+    }
+
+    func enqueue(_ inputJob: PipelineJob, origin: MeetingFileRecord.Origin) {
         var job = inputJob
         stampTranscriptOutputOptions(on: &job)
         jobs.append(job)
+        meetingFileStore?.create(MeetingFileRecord(job: job, origin: origin))
         eventLog.append(jobID: job.id, event: "enqueued", from: nil, to: job.state)
         saveSnapshot()
         logger.info("Enqueued job: \(job.meetingTitle, privacy: .private) (\(job.id))")
@@ -848,6 +864,9 @@ class PipelineQueue {
                 jobs[index].warnings.append(warning)
             }
         }
+        // Before the state-change callback, so whatever it starts reads the
+        // finished meeting's outcome.
+        noteOutcome(jobID: id, of: newState)
         recordStageTransition(from: oldState, to: newState, jobID: id, diarizerMode: diarizerMode)
         eventLog.append(jobID: id, event: "state_change", from: oldState, to: newState)
         saveSnapshot()
@@ -963,6 +982,7 @@ class PipelineQueue {
         guard let index = jobs.firstIndex(where: { $0.id == jobID }) else { return }
         jobs[index].recordRelocatedAudio(paths)
         saveSnapshot()
+        noteWritten(jobID: jobID, [(.mix, paths.mix), (.appTrack, paths.app), (.micTrack, paths.mic)])
     }
 
     func recordEchoVerdict(jobID: UUID, _ verdict: EchoDetectionDTO) {
@@ -1261,6 +1281,71 @@ class PipelineQueue {
     /// drains and clears itself.
     var isSnapshotWorkerActive: Bool {
         PipelineSnapshotStore.existing(for: logDir) != nil
+    }
+}
+
+// MARK: - Meeting file record
+
+/// The hooks that keep a meeting's `MeetingFileRecord` in step with its files.
+/// All on the main actor, like every other change to a job. A failed record
+/// write is logged by the store and goes no further: no hook can fail a job.
+extension PipelineQueue {
+    /// The one way a write of a listed file reaches the record: its path and,
+    /// read now, its identity. An atomic write replaces the file and with it its
+    /// inode, so a writer that skips this leaves the record naming a file that
+    /// is gone, and a later deletion refuses the app's own file as replaced.
+    func noteWritten(jobID: UUID, role: MeetingFile.Role, path: URL) {
+        noteWritten(jobID: jobID, [(role, path)])
+    }
+
+    /// Several files in one record write. A nil path is a slot the job does not
+    /// have, which lists nothing.
+    func noteWritten(jobID: UUID, _ written: [(role: MeetingFile.Role, path: URL?)]) {
+        // Read from memory, so a job without a record costs no lock, and outside
+        // `update`, so the file system calls below do not run under the lock.
+        guard let meetingFileStore, let origin = meetingFileStore.record(for: jobID)?.origin else { return }
+        let files = written.compactMap { role, path in
+            path.map { MeetingFile(role: role, url: $0, owned: origin.owns(role)) }
+        }
+        meetingFileStore.update(jobID: jobID) { record in
+            for file in files {
+                record.list(file)
+            }
+        }
+    }
+
+    /// Files moved on disk by the title rename. Each `source` was resolved before
+    /// its move, and the destination is resolved here, after it, while it exists;
+    /// see `MeetingFile.resolvedPath`.
+    func noteMoved(jobID: UUID, _ moved: [(source: String, destination: URL)]) {
+        guard !moved.isEmpty else { return }
+        let resolved = moved.map { (source: $0.source, destination: MeetingFile.resolvedPath($0.destination)) }
+        meetingFileStore?.update(jobID: jobID) { record in
+            for move in resolved {
+                record.followMove(from: move.source, to: move.destination)
+            }
+        }
+    }
+
+    /// The outcome a terminal state stands for. A state in between changes
+    /// nothing here: a job only gets there with its outcome still in progress.
+    ///
+    /// Whether generation is on is asked here, not recorded by the protocol
+    /// stage, because a naming skipped with no generator or lost at a restore
+    /// reaches `.done` without that stage ever running.
+    private func noteOutcome(jobID: UUID, of state: JobState) {
+        guard let meetingFileStore else { return }
+        switch state {
+        case .done:
+            let generationOn = protocolGeneratorFactory?() != nil
+            meetingFileStore.update(jobID: jobID) { $0.outcome = .finished(protocolExpected: generationOn) }
+
+        case .error:
+            meetingFileStore.update(jobID: jobID) { $0.outcome = .failed }
+
+        default:
+            break
+        }
     }
 }
 

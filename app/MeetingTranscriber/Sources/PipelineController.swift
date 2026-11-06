@@ -44,6 +44,10 @@ final class PipelineController {
     /// by `jobStatus(forID:)` for the automation API. Test-injectable.
     let terminalJobStore: TerminalJobStore
 
+    /// Durable record of each meeting's files, shared across queue rebuilds like
+    /// the finished-job records beside it. Test-injectable.
+    let meetingFileStore: MeetingFileStore
+
     /// Where the queues this controller builds keep their data and how they
     /// reach the output folder, beyond the settings: the logs and snapshot, the
     /// staging folder they may relocate from, how the output folder's security
@@ -115,6 +119,7 @@ final class PipelineController {
         notifier: any AppNotifying,
         queueEnvironment: QueueEnvironment,
         terminalJobStore: TerminalJobStore? = nil,
+        meetingFileStore: MeetingFileStore? = nil,
     ) {
         self.settings = settings
         self.notifier = notifier
@@ -123,6 +128,10 @@ final class PipelineController {
         self.terminalJobStore = terminalJobStore
             ?? TerminalJobStore(
                 path: queueEnvironment.logDir.appendingPathComponent("terminal_jobs.json"),
+            )
+        self.meetingFileStore = meetingFileStore
+            ?? MeetingFileStore(
+                path: queueEnvironment.logDir.appendingPathComponent("meeting_files.json"),
             )
         self.queue = queueEnvironment.initialQueue
             ?? PipelineQueue(
@@ -333,6 +342,7 @@ final class PipelineController {
             stageTimingLog: StageTimingLog(path: queueEnvironment.stageTimingLog),
             notionExportConfigurationProvider: { [settings] in NotionExportConfiguration.resolve(settings: settings) },
             terminalJobStore: terminalJobStore,
+            meetingFileStore: meetingFileStore,
             securityScope: queueEnvironment.securityScope,
         )
     }
