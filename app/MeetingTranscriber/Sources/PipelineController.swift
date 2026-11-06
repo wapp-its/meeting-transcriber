@@ -29,7 +29,7 @@ final class PipelineController {
     /// by `installQueueForTesting`.
     private(set) var queue: PipelineQueue
 
-    private let settings: AppSettings
+    let settings: AppSettings
     private let notifier: any AppNotifying
 
     /// Decides the folder a new queue writes into, and tells the user when it is
@@ -47,6 +47,11 @@ final class PipelineController {
     /// Durable record of each meeting's files, shared across queue rebuilds like
     /// the finished-job records beside it. Test-injectable.
     let meetingFileStore: MeetingFileStore
+
+    /// What moves a meeting's files, and the clock its deletions are dated by.
+    /// Test-injectable, so no test touches the real Trash.
+    let fileRemover: MeetingFileRemover
+    let now: () -> Date
 
     /// Where the queues this controller builds keep their data and how they
     /// reach the output folder, beyond the settings: the logs and snapshot, the
@@ -120,6 +125,8 @@ final class PipelineController {
         queueEnvironment: QueueEnvironment,
         terminalJobStore: TerminalJobStore? = nil,
         meetingFileStore: MeetingFileStore? = nil,
+        fileRemover: MeetingFileRemover = MeetingFileRemover(),
+        now: @escaping () -> Date = { Date() },
     ) {
         self.settings = settings
         self.notifier = notifier
@@ -133,6 +140,8 @@ final class PipelineController {
             ?? MeetingFileStore(
                 path: queueEnvironment.logDir.appendingPathComponent("meeting_files.json"),
             )
+        self.fileRemover = fileRemover
+        self.now = now
         self.queue = queueEnvironment.initialQueue
             ?? PipelineQueue(
                 logDir: queueEnvironment.logDir, stagingDir: queueEnvironment.stagingDir,
@@ -143,6 +152,7 @@ final class PipelineController {
     /// stored-property init.
     func activate(engineProvider: @escaping () -> (any TranscribingEngine)?) {
         self.engineProvider = engineProvider
+        reconcileInterruptedDeletions()
         observeOutputFolder()
     }
 

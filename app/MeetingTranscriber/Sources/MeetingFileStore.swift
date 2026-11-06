@@ -260,3 +260,86 @@ final class MeetingFileStore {
         }
     }
 }
+
+// MARK: - Deletions
+
+/// A second running build reads and writes the same file, so each decision about
+/// a deletion is made under the lock against the file's content, never against
+/// `records`, which can be a write behind.
+extension MeetingFileStore {
+    enum RemovalStart: Equatable {
+        case marked
+        case listedByAnotherMeeting
+        case notSaved
+    }
+
+    /// Save a deletion before it touches its first file. False starts nothing: the
+    /// save failed, the meeting has no record, or a deletion of it is already pending.
+    func beginDeletion(jobID: UUID, kind: MeetingFileRecord.DeletionKind, paths: [String]) -> Bool {
+        transact { document in
+            guard let index = document.records.firstIndex(where: { $0.jobID == jobID }),
+                  document.records[index].pending == nil else { return false }
+            document.records[index].pending = .init(kind: kind, paths: paths)
+            return true
+        }
+    }
+
+    /// Mark one file as being deleted, the last step before it is touched. A path
+    /// another record lists is left alone: that meeting still needs the file. An
+    /// entry the other record knows is gone holds nothing back.
+    func startRemoving(path: String, jobID: UUID) -> RemovalStart {
+        var answer = RemovalStart.notSaved
+        let marked = transact { document in
+            let listedElsewhere = document.records.contains { other in
+                other.jobID != jobID && other.files.contains { $0.path == path && $0.state != .gone }
+            }
+            if listedElsewhere { answer = .listedByAnotherMeeting }
+            guard !listedElsewhere, let index = document.records.firstIndex(where: { $0.jobID == jobID }) else {
+                return false
+            }
+            document.records[index].setState(.deleting, ofFileAt: path)
+            return true
+        }
+        return marked ? .marked : answer
+    }
+
+    func setState(_ state: MeetingFile.State, ofFileAt path: String, jobID: UUID) {
+        update(jobID: jobID) { $0.setState(state, ofFileAt: path) }
+    }
+
+    /// Check every pending deletion whose process no longer runs against the disk.
+    /// Another running build's deletion is not an abandoned one, so it stays.
+    ///
+    /// - Returns: the meetings whose files are all gone and of which only the
+    ///   removal from the lists is left, which is not this store's to do.
+    func reconcileInterruptedDeletions(now: Date, isRunning: (DeletionProcess) -> Bool) -> [UUID] {
+        reload()
+        var onlyTheRecordLeft: [UUID] = []
+        for record in records {
+            guard let pending = record.pending, !isRunning(pending.process) else { continue }
+            // Outside the lock, which is never held while the disk is asked.
+            let gone = Set(record.files.filter { file in
+                file.state != .gone
+                    && (file.state == .deleting || pending.paths.contains(file.path))
+                    && MeetingFilePresence.of(file.path) == .gone
+            }.map(\.path))
+            var recordIsLeft = false
+            let saved = transact { document in
+                guard let index = document.records.firstIndex(where: { $0.jobID == record.jobID }),
+                      document.records[index].pending == pending else { return false }
+                recordIsLeft = document.records[index].settleInterrupted(pending, gone: gone, at: now)
+                return true
+            }
+            if saved, recordIsLeft { onlyTheRecordLeft.append(record.jobID) }
+        }
+        return onlyTheRecordLeft
+    }
+}
+
+private extension MeetingFileRecord {
+    mutating func setState(_ state: MeetingFile.State, ofFileAt path: String) {
+        for index in files.indices where files[index].path == path {
+            files[index].state = state
+        }
+    }
+}

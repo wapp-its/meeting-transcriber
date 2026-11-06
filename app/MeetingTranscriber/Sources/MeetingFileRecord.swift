@@ -64,6 +64,8 @@ struct MeetingFileRecord: Codable, Equatable, Sendable {
     struct PendingDeletion: Codable, Equatable, Sendable {
         let kind: DeletionKind
         let paths: [String]
+        /// Who is doing it: another running build's deletion is not an abandoned one.
+        var process = DeletionProcess.current
     }
 
     let jobID: UUID
@@ -134,6 +136,57 @@ extension MeetingFileRecord {
             files.append(file)
         }
     }
+
+    /// The files a deletion of `kind` covers: what the app owns of the meeting and
+    /// has not seen go, each path once. A path this record also lists as not owned
+    /// stays out: one file can sit under two roles, and it is the user's under either.
+    func filesCovered(by kind: DeletionKind) -> [MeetingFile] {
+        let notOwned = Set(files.filter { !$0.owned }.map(\.path))
+        var seen = Set<String>()
+        return files.filter { file in
+            file.owned && file.state != .gone && !notOwned.contains(file.path)
+                && (kind == .meetingToTrash || file.role.isAudio)
+                && seen.insert(file.path).inserted
+        }
+    }
+
+    /// What a launch makes of a deletion that stopped on its way, from the paths
+    /// the disk answered are `gone`. A file marked as being deleted and still
+    /// there, or out of reach, is listed as present again.
+    ///
+    /// True when only the record itself is left to remove: `pending` then stays, so
+    /// a crash before the caller is through ends up here again at the next launch.
+    mutating func settleInterrupted(_ pending: PendingDeletion, gone: Set<String>, at now: Date) -> Bool {
+        for index in files.indices where files[index].state != .gone {
+            if gone.contains(files[index].path) {
+                files[index].state = .gone
+            } else if files[index].state == .deleting {
+                files[index].state = .present
+            }
+        }
+        let left = files.filter { $0.state != .gone && pending.paths.contains($0.path) }.map(\.path)
+        switch (pending.kind, left.isEmpty) {
+        case (.meetingToTrash, true):
+            return true
+
+        case (.audioToTrash, true):
+            audioDeletion = AudioDeletion(kind: .manual, at: now)
+            incomplete = nil
+
+        case (.automatic, true):
+            audioDeletion = AudioDeletion(kind: .automatic, at: now)
+
+        case (.automatic, false):
+            break // The next check tries again; "incomplete" is for manual deletions.
+
+        case (.audioToTrash, false), (.meetingToTrash, false):
+            incomplete = DeletionFailure(reason: Self.interruptedReason, paths: left, kind: pending.kind)
+        }
+        self.pending = nil
+        return false
+    }
+
+    static let interruptedReason = "the app quit before the deletion finished"
 
     /// Follow a file moved on disk: only its path changes. A rename within a
     /// folder keeps the file, so the recorded identity still names it.

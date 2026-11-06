@@ -47,4 +47,142 @@ extension PipelineController {
         }
         terminalJobStore.remove(jobID: id)
     }
+
+    // MARK: - A meeting's files
+
+    /// Move the meeting's own audio to the Trash; the transcript and the protocol
+    /// stay. Returns false when it refuses and changes nothing; a file it could not
+    /// move is not a refusal, and shows in the record as `incomplete`.
+    @discardableResult
+    func moveAudioToTrash(jobID: UUID) -> Bool {
+        // A half-deleted meeting goes on with Retry: finishing the audio here would
+        // replace the record of the meeting's own unfinished deletion.
+        guard let record = actionableMeetingRecord(jobID: jobID), record.origin == .recorded,
+              record.incomplete?.kind != .meetingToTrash,
+              !record.filesCovered(by: .audioToTrash).isEmpty else { return false }
+        return runManualDeletion(.audioToTrash, of: record)
+    }
+
+    /// Move every file the app owns of the meeting to the Trash, then take the
+    /// meeting off every list. Nothing here talks to Notion: a page stays where it is.
+    @discardableResult
+    func moveMeetingToTrash(jobID: UUID) -> Bool {
+        guard let record = actionableMeetingRecord(jobID: jobID) else { return false }
+        return runManualDeletion(.meetingToTrash, of: record)
+    }
+
+    /// Run an incomplete deletion again, over what the record still lists rather
+    /// than the paths that failed: a retry that finds nothing left completes it.
+    @discardableResult
+    func retryDeletion(jobID: UUID) -> Bool {
+        guard let record = actionableMeetingRecord(jobID: jobID), let kind = record.incomplete?.kind,
+              kind != .automatic else { return false }
+        return runManualDeletion(kind, of: record)
+    }
+
+    @discardableResult
+    func setKeep(jobID: UUID, _ keep: Bool) -> Bool {
+        guard let record = actionableMeetingRecord(jobID: jobID), record.origin == .recorded else { return false }
+        return meetingFileStore.update(jobID: jobID) { $0.keep = keep }
+    }
+
+    /// Finish, at launch, what a quit or a crash stopped. A meeting with nothing
+    /// left to move ends as the action would have.
+    ///
+    /// The queue is not built for this, as that would resume the other jobs waiting
+    /// in the snapshot (see `restorePendingNotionExports`).
+    func reconcileInterruptedDeletions(isRunning: (DeletionProcess) -> Bool = DeletionProcess.isRunning) {
+        guard meetingFileStore.records.contains(where: { $0.pending != nil }) else { return }
+        let finished = withOutputFolderScope {
+            meetingFileStore.reconcileInterruptedDeletions(now: now(), isRunning: isRunning)
+        }
+        for jobID in finished {
+            removeMovedMeeting(jobID: jobID)
+        }
+    }
+
+    /// The record when an action may change this meeting right now, or nil. Asked
+    /// when the action runs, not when its menu was drawn. Only a finished meeting
+    /// qualifies: a run of another build reads as `inProgress` here, a meeting that
+    /// left the queue unfinished keeps its audio. A finished record says nothing
+    /// about a late re-diarization or an export, so the queue is asked as well, and
+    /// it has to be built first to know about a job still only in the snapshot.
+    private func actionableMeetingRecord(jobID: UUID) -> MeetingFileRecord? {
+        ensureQueue()
+        meetingFileStore.reload()
+        guard let record = meetingFileStore.record(for: jobID), record.pending == nil,
+              case .finished = record.outcome else { return nil }
+        if let live = queue.jobs.first(where: { $0.id == jobID }),
+           live.state != .done || live.notionExportStatus == .inProgress {
+            return nil
+        }
+        return record
+    }
+
+    private func runManualDeletion(_ kind: MeetingFileRecord.DeletionKind, of record: MeetingFileRecord) -> Bool {
+        let jobID = record.jobID
+        let files = record.filesCovered(by: kind)
+        guard meetingFileStore.beginDeletion(jobID: jobID, kind: kind, paths: files.map(\.path)) else { return false }
+        let outcomes = withOutputFolderScope {
+            fileRemover.remove(files, mode: .trash, in: meetingFileStore, jobID: jobID)
+        }
+        if let reason = MeetingFileRemover.failureReason(of: outcomes) {
+            let left = outcomes.filter { outcome in
+                if case .failed = outcome.result { return true }
+                return false
+            }.map(\.path)
+            meetingFileStore.update(jobID: jobID) { record in
+                record.incomplete = .init(reason: reason, paths: left, kind: kind)
+                record.pending = nil
+            }
+        } else if kind == .meetingToTrash {
+            removeMovedMeeting(jobID: jobID)
+        } else {
+            let deletion = MeetingFileRecord.AudioDeletion(kind: .manual, at: now())
+            meetingFileStore.update(jobID: jobID) { record in
+                record.audioDeletion = deletion
+                record.incomplete = nil
+                record.pending = nil
+            }
+        }
+        return true
+    }
+
+    /// Take a meeting whose files are gone off every list, the record last: it holds
+    /// the pending mark, so a crash before that is finished at the next launch.
+    private func removeMovedMeeting(jobID: UUID) {
+        if queue.jobs.contains(where: { $0.id == jobID }) {
+            queue.removeJob(id: jobID)
+        } else if queue.engine == nil {
+            guard forgetInUnreadSnapshot(jobID: jobID) else { return }
+        }
+        terminalJobStore.remove(jobID: jobID)
+        meetingFileStore.remove(jobID: jobID)
+    }
+
+    /// A queue that has not read the snapshot must not be told to remove a job:
+    /// `removeJob` saves its own empty list over the file. The file is edited
+    /// instead, or the job would come back when the queue is built.
+    ///
+    /// False when the file could not be written. An unreadable one holds nothing
+    /// that can come back.
+    private func forgetInUnreadSnapshot(jobID: UUID) -> Bool {
+        let logDir = queueEnvironment.logDir
+        guard let saved = try? PipelineSnapshot.load(from: logDir), saved.contains(where: { $0.id == jobID }) else {
+            return true
+        }
+        return (try? PipelineSnapshot.save(saved.filter { $0.id != jobID }, to: logDir)) != nil
+    }
+
+    /// Around any file work on a meeting: in the sandboxed build a chosen folder is
+    /// out of reach without its scope, which only reads as files gone or unavailable.
+    /// Only a folder the bookmark resolved has one; `.fallback` stands in for a folder
+    /// that cannot be reached.
+    private func withOutputFolderScope<T>(_ body: () -> T) -> T {
+        guard case let .custom(root) = settings.outputDirectoryResolution else { return body() }
+        let access = queueEnvironment.securityScope
+        let opened = access.start(root)
+        defer { if opened { access.stop(root) } }
+        return body()
+    }
 }
