@@ -661,6 +661,12 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         didSet { defaults.set(diarizerMode.rawValue, forKey: "diarizerMode") }
     }
 
+    /// When a recorded meeting's audio is deleted automatically (Settings → Output).
+    /// One value for the whole app.
+    var recordingRetention: RecordingRetention {
+        didSet { defaults.set(recordingRetention.rawValue, forKey: "recordingRetention") }
+    }
+
     /// Number of expected speakers. 0 = auto-detect.
     var numSpeakers: Int {
         didSet {
@@ -1084,6 +1090,8 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         echoDedupEnabled = defaults.bool(forKey: "echoDedupEnabled", default: false)
         diarizerMode = (defaults.string(forKey: "diarizerMode")
             .flatMap(DiarizerMode.init(rawValue:))) ?? .offline
+        recordingRetention = (defaults.string(forKey: "recordingRetention")
+            .flatMap(RecordingRetention.init(rawValue:))) ?? .never
         numSpeakers = defaults.object(forKey: "numSpeakers") as? Int ?? 0
 
         let t = Self.loadDiarizerTuning(from: defaults)
