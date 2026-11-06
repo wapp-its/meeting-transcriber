@@ -604,10 +604,6 @@ class PipelineQueue {
         jobs.filter { $0.state == .waiting }
     }
 
-    var completedJobs: [PipelineJob] {
-        jobs.filter { $0.state == .done }
-    }
-
     func enqueue(_ inputJob: PipelineJob) {
         var job = inputJob
         stampTranscriptOutputOptions(on: &job)
