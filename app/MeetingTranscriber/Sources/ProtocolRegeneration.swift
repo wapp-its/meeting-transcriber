@@ -257,6 +257,11 @@ final class ProtocolRegenerator {
         var notifier: any AppNotifying
         var fileOperations: ProtocolRegenerationFileOperations = .live
         var now: () -> Date = Date.init
+        /// Called after a run replaced the notes of a meeting that has a job,
+        /// with the template the run was asked for: a retried Notion export
+        /// reads those notes and titles its page by that template's rule
+        /// (`ProtocolGenerator.aiTitle`).
+        var regenerated: @MainActor (_ jobID: UUID, _ template: ProtocolTemplateID) -> Void = { _, _ in }
     }
 
     static let succeededTitle = "Meeting Notes Regenerated"
@@ -327,6 +332,9 @@ final class ProtocolRegenerator {
         do {
             let warnings = try await run(target, options: options) + notes
             logger.info("protocol_regenerated job=\(target.jobID ?? "none", privacy: .public)")
+            if let jobID = target.jobID.flatMap(UUID.init(uuidString:)) {
+                environment.regenerated(jobID, options.template)
+            }
             phase = .succeeded(target.protocolURL, warnings: warnings)
             environment.notifier.notify(title: Self.succeededTitle, body: ([target.title] + warnings).joined(separator: "\n"))
         } catch {

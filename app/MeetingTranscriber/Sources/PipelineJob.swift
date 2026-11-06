@@ -238,7 +238,8 @@ struct PipelineJob: Identifiable, Codable {
     /// job enters the queue; the file's text is read only when the protocol is
     /// generated. Nil for a job from a snapshot written before templates, which
     /// uses the current default. A retry keeps it: it is the person's choice,
-    /// not something the failed run concluded.
+    /// not something the failed run concluded. "Regenerate Notes" replaces it
+    /// with the template it was asked for, since the notes are then that one's.
     var protocolTemplate: ProtocolTemplateID?
     /// Background info the person gave for this meeting, sent to the protocol
     /// provider inside the prompt. Never logged, put in a warning or reported

@@ -727,7 +727,8 @@ tags and defaults off. Date and Tags are written only when the selected database
 has recognized columns. The page title follows the file-name rule
 (`ProtocolGenerator.aiTitle`): the title the model wrote for notes from the
 built-in template, otherwise the job's title. A retry reads the notes from the
-backup and decides by the template the job asked for.
+backup and decides by the template the job asked for, or by the one a later
+"Regenerate Notes" rewrote them from.
 
 The job records its Notion page and database IDs as soon as the page is created,
 so retries and protocol re-exports can use the same destination. Re-export after

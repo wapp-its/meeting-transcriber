@@ -356,10 +356,11 @@ extension PipelineQueue {
             persistNotionExportChange(jobID: id)
             return false
         }
-        // The template the job asked for, not the one it ran, which nothing
-        // records: they differ only when a missing template fell back to the
-        // built-in one, and then the page keeps the job's title instead of the
-        // model's, which is never a section heading.
+        // The template the job, or a later "Regenerate Notes", asked for; not
+        // the one that ran, which nothing records: they differ only when a
+        // missing template fell back to the built-in one, and then the page
+        // keeps the job's title instead of the model's, which is never a
+        // section heading.
         let succeeded = await exportToNotion(
             jobID: id, protocolMD: markdown, transcript: nil,
             speakerNames: job.notionExportSpeakerNames ?? [], configuration: configuration,
@@ -370,6 +371,15 @@ extension PipelineQueue {
             scheduleCompletedJobRemoval(id: id)
         }
         return succeeded
+    }
+
+    /// "Regenerate Notes" rewrote the job's notes from `template`, so a retried
+    /// export titles the page by that template's rule, not by the one the job
+    /// first ran. A job the queue no longer holds has nothing to retry.
+    func recordRegeneratedTemplate(jobID: UUID, template: ProtocolTemplateID) {
+        guard let index = liveJobIndex(of: jobID), jobs[index].protocolTemplate != template else { return }
+        jobs[index].protocolTemplate = template
+        persistNotionExportChange(jobID: jobID)
     }
 
     private func recordNotionPageExport(jobID: UUID, databaseID: String, page: NotionPageResult) {

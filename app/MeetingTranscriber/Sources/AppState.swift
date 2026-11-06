@@ -173,6 +173,9 @@ final class AppState {
             records: { [pipeline] in pipeline.terminalJobStore.records },
             outputDir: { [settings] in settings.effectiveOutputDir },
             notifier: notifier,
+            // Labelled: a trailing closure would bind to `now`.
+            // swiftlint:disable:next trailing_closure
+            regenerated: { [pipeline] in pipeline.queue.recordRegeneratedTemplate(jobID: $0, template: $1) },
         ))
     }
 
