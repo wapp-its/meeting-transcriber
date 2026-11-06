@@ -85,6 +85,7 @@ final class AppPauseTrackDriver: PauseTrackDriver {
 /// Stands in for the microphone's engine: hands the handler's tap block back
 /// to the test and never touches audio hardware.
 final class PauseTestMicSession: MicEngineSessionProviding, @unchecked Sendable {
+    let followsSystemDefaultInput = false
     let notificationObject: AnyObject = NSObject()
     let format: AVAudioFormat
     private(set) var tapBlock: AVAudioNodeTapBlock?

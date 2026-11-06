@@ -19,7 +19,7 @@ final class LiveTranscriptionGatingTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         testSuiteName = "LiveTranscriptionGatingTests-\(getpid())-\(UUID().uuidString)"
-        guard let suite = UserDefaults(suiteName: testSuiteName) else {
+        guard let suite = DefaultsSuite.open(testSuiteName) else {
             XCTFail("Could not create test UserDefaults suite")
             return
         }
@@ -47,26 +47,26 @@ final class LiveTranscriptionGatingTests: XCTestCase {
 
     // MARK: - shouldShowLiveCaptions (watchLoop nil branch)
 
-    func testShouldShowFalseWhenToggleOff() {
+    func testShouldShowFalseWhenToggleOff() throws {
         settings.transcriptionEngine = .parakeet
         settings.liveTranscriptionEnabled = false
-        let state = AppState(settings: settings)
+        let state = try AppState(pipelineEnvironment: makeIsolatedPipelineEnvironment(), settings: settings)
         XCTAssertFalse(state.shouldShowLiveCaptions)
     }
 
-    func testShouldShowFalseWhenToggleOnSupportedEngineButNoActiveWatchLoop() {
+    func testShouldShowFalseWhenToggleOnSupportedEngineButNoActiveWatchLoop() throws {
         settings.transcriptionEngine = .parakeet
         settings.liveTranscriptionEnabled = true
-        let state = AppState(settings: settings)
+        let state = try AppState(pipelineEnvironment: makeIsolatedPipelineEnvironment(), settings: settings)
         // No watch loop has been started → recording state is unreachable
         XCTAssertNil(state.watching.watchLoop)
         XCTAssertFalse(state.shouldShowLiveCaptions)
     }
 
-    func testShouldShowFalseForWhisperKitWhenNoActiveWatchLoop() {
+    func testShouldShowFalseForWhisperKitWhenNoActiveWatchLoop() throws {
         settings.transcriptionEngine = .whisperKit
         settings.liveTranscriptionEnabled = true
-        let state = AppState(settings: settings)
+        let state = try AppState(pipelineEnvironment: makeIsolatedPipelineEnvironment(), settings: settings)
         XCTAssertNil(state.watching.watchLoop)
         XCTAssertFalse(state.shouldShowLiveCaptions)
     }
@@ -81,7 +81,7 @@ final class LiveTranscriptionGatingTests: XCTestCase {
         settings.parakeetLanguage = "en"
         settings.liveTranscriptionEnabled = true
         settings.liveCaptionsOverlayEnabled = true
-        let state = AppState(settings: settings)
+        let state = try AppState(pipelineEnvironment: makeIsolatedPipelineEnvironment(), settings: settings)
         let (loop, _) = makeTestWatchLoop()
         state.watching.watchLoop = loop
         try await loop.startManualRecording(pid: 1234, appName: "Chrome", title: "Meeting")

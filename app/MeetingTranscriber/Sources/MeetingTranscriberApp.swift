@@ -83,7 +83,13 @@ private struct WindowAccessor: NSViewRepresentable {
 // Not @main — AppLauncher owns the entry point so a selftest launch can
 // divert before this scene (and AppState with it) is ever constructed.
 struct MeetingTranscriberApp: App {
-    @State private var appState = AppState(notifier: NotificationManager.shared)
+    // Holds every quit open until the pending pipeline snapshot is on disk.
+    // Handed `appState` in `init`, through `AppDelegate.install`. Never read:
+    // declaring the adaptor is what makes SwiftUI install the delegate, and
+    // the analyzer cannot see that use.
+    @NSApplicationDelegateAdaptor(AppDelegate.self)
+    private var appDelegate // swiftlint:disable:this unused_declaration
+    @State private var appState: AppState
     @State private var captionsWindow: LiveCaptionsWindowController?
     // The All Recordings window's search text, kept while the window is closed.
     // Read only through `$transcriptionsQuery`. Built with Xcode 27, `swiftlint
@@ -96,8 +102,27 @@ struct MeetingTranscriberApp: App {
     private var openWindow
 
     init() {
+        // Built first, as the property initialiser it replaces was. Handed to
+        // the application delegate here because `init` runs before the run
+        // loop, so every quit request finds it, however early it comes and
+        // whether or not the menu-bar item is ever shown.
+        let state = AppState(pipelineEnvironment: .production, notifier: NotificationManager.shared)
+        #if !APPSTORE
+            PersistentDiagnosticLog.cleanup()
+            // Reap any `log stream` children orphaned by a previous crash/SIGKILL
+            // (re-parented to launchd) so they can't accumulate across launches.
+            // `reapOrphans` is nonisolated, so it runs off the main actor.
+            // The reap is deliberately NOT ordered before the streamer start — an
+            // orphan surviving a few extra ms is benign next to blocking launch,
+            // and the new streamer is matched by parent pid so it's never reaped.
+            Task(priority: .utility) { await PersistentDiagnosticLog.reapOrphans() }
+            state.startPersistentLogStreamer()
+        #endif
+        _appState = State(initialValue: state)
+        AppDelegate.install(state)
         AppPaths.migrateIfNeeded()
         NotificationManager.shared.setUp()
+        state.pipeline.restorePendingNotionExports()
         // The verdict was taken in `AppLauncher.main()`, before `AppState` was
         // built. It is reported here because this is the first point at which
         // the notification centre is set up (issue #703).
@@ -160,6 +185,7 @@ struct MeetingTranscriberApp: App {
             consentQuestion: appState.pendingConsentQuestion,
             microphoneMenu: appState.microphoneMenuState,
             outputMenu: appState.outputMenuState,
+            notionExportEnabled: appState.settings.notionExportEnabled,
             actions: menuActions,
         )
     }
@@ -176,13 +202,11 @@ struct MeetingTranscriberApp: App {
             togglePause: appState.canPauseRecording ? {
                 appState.watching.togglePause()
             } : nil,
-            openProtocol: openJobFile,
-            openLastProtocol: { url in
-                Self.openLastProtocol(url, scopeRoot: appState.settings.effectiveOutputDir, notifier: NotificationManager.shared)
-            },
+            openJob: { Self.openJob($0, scopeRoot: appState.settings.effectiveOutputDir) },
+            openLastNotes: openLastNotes,
             openSettings: { bringWindowToFront(id: "settings") },
             nameSpeakers: appState.hasPendingSpeakerNamingJobs ? {
-                bringWindowToFront(id: "speaker-naming")
+                showNamingWindow()
             } : nil,
             processFiles: processAudioFiles,
             showAllTranscriptions: { bringWindowToFront(id: TranscriptionsView.windowID) },
@@ -201,6 +225,7 @@ struct MeetingTranscriberApp: App {
             openProtocol: { AllRecordingsActions.openFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
             openTranscript: { AllRecordingsActions.openFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
             reveal: { AllRecordingsActions.revealFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
+            openInNotion: { Self.openInNotion(.notion($0)) },
             regenerate: { regenerateSheet.present(entry: $0, using: appState.protocolRegenerator) },
             retry: { appState.pipeline.retryJob(id: $0) },
             remove: { appState.pipeline.removeFailedJob(id: $0) },
@@ -248,7 +273,7 @@ struct MeetingTranscriberApp: App {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .showSpeakerNaming)) { _ in
-            bringWindowToFront(id: "speaker-naming")
+            showNamingWindow()
         }
         .onReceive(NotificationCenter.default.publisher(for: .showSettings)) { _ in
             bringWindowToFront(id: "settings")
@@ -344,6 +369,12 @@ struct MeetingTranscriberApp: App {
                 namingDialogActive: appState.pipeline.queue.pendingSpeakerNaming != nil,
                 pipelineBusy: appState.pipeline.queue.isProcessing,
                 onSpeakerMutate: appState.pipeline.queue.refreshKnownSpeakerNames,
+                // The pipeline's file and the app's notifier, so Known Voices
+                // and enrollment edit the same DB and report through one channel.
+                speakerMatcherFactory: SpeakerMatcher.factory(
+                    dbPath: appState.pipeline.speakersDB, notifier: appState.notifier,
+                ),
+                legacyWhisperModels: appState.engines.legacyWhisperModels,
             )
         }
         .windowResizability(.contentSize)
@@ -412,17 +443,34 @@ struct MeetingTranscriberApp: App {
 
     // MARK: - Speaker Naming Window
 
-    @ViewBuilder private var speakerNamingContent: some View {
-        if let data = appState.pipeline.queue.speakerNamingData(
-            forJobID: appState.selectedNamingJobID,
-        ) {
-            VStack(spacing: 0) {
-                speakerNamingPicker
-                speakerNamingForm(data: data)
+    /// Open the naming window on a pinned job, from the menu and from
+    /// `.showSpeakerNaming` alike.
+    private func showNamingWindow() {
+        appState.pinShownNamingJob()
+        bringWindowToFront(id: "speaker-naming")
+    }
+
+    private var speakerNamingContent: some View {
+        Group {
+            if let data = appState.pipeline.queue.speakerNamingData(
+                forJobID: appState.selectedNamingJobID,
+            ) {
+                VStack(spacing: 0) {
+                    speakerNamingPicker
+                    speakerNamingForm(data: data)
+                }
+            } else {
+                Text("No speaker data available.")
+                    .padding()
             }
-        } else {
-            Text("No speaker data available.")
-                .padding()
+        }
+        // Whatever opened the window or changed what it shows (a restored
+        // window, an RPC answer for the shown job), the selection follows.
+        .onChange(
+            of: appState.pipeline.queue.namingJobID(preferring: appState.selectedNamingJobID),
+            initial: true,
+        ) { _, _ in
+            appState.pinShownNamingJob()
         }
     }
 
@@ -430,8 +478,7 @@ struct MeetingTranscriberApp: App {
         if appState.pipeline.queue.pendingSpeakerNamingJobs.count > 1 {
             Picker("Meeting", selection: Binding(
                 get: {
-                    appState.selectedNamingJobID
-                        ?? appState.pipeline.queue.pendingSpeakerNamingJobs.first?.id
+                    appState.pipeline.queue.namingJobID(preferring: appState.selectedNamingJobID)
                 },
                 set: { appState.selectedNamingJobID = $0 },
             )) {
@@ -448,7 +495,7 @@ struct MeetingTranscriberApp: App {
     private func speakerNamingForm(
         data: PipelineQueue.SpeakerNamingData,
     ) -> some View {
-        SpeakerNamingView(
+        SpeakerNamingView.answering(
             data: data,
             knownSpeakerNames: appState.pipeline.queue.knownSpeakerNames,
             currentDiarizerMode: appState.pipeline.queue.usedDiarizerMode(forJobID: data.jobID)
@@ -456,14 +503,20 @@ struct MeetingTranscriberApp: App {
             pendingJobCount: appState.pipeline.queue.pendingSpeakerNamingJobs.count,
             balanceSampleLevels: appState.settings.levelBalanceEnabled,
             onDismissRequest: { closeWindow(id: "speaker-naming") },
-            onComplete: { result in
-                appState.pipeline.queue.completeSpeakerNaming(jobID: data.jobID, result: result)
-                if appState.pipeline.queue.pendingSpeakerNamingJobs.isEmpty {
-                    closeWindow(id: "speaker-naming")
-                } else {
-                    appState.selectedNamingJobID =
-                        appState.pipeline.queue.pendingSpeakerNamingJobs.first?.id
+            notice: appState.pipeline.queue.lateRerunFailure(forJobID: data.jobID)?.message,
+            // Labelled: `onDismissRequest` is a closure too, and SwiftFormat
+            // and SwiftLint disagree on trailing syntax for the last of two.
+            // swiftlint:disable:next trailing_closure
+            onAnswer: { result in
+                if let refusal = appState.pipeline.queue.completeSpeakerNaming(jobID: data.jobID, result: result) {
+                    return refusal.message
                 }
+                // The next job awaiting naming, pinned; none left closes the
+                // window.
+                appState.selectedNamingJobID = nil
+                appState.pinShownNamingJob()
+                if appState.selectedNamingJobID == nil { closeWindow(id: "speaker-naming") }
+                return nil
             },
         )
     }
@@ -505,73 +558,24 @@ struct MeetingTranscriberApp: App {
         }
     }
 
-    /// A job line's Open, inside the output folder's security scope: after a
-    /// restart a history line can be opened before any queue holds that scope,
-    /// which the App Store build needs. A file that is gone opens nothing.
-    private func openJobFile(_ url: URL) {
-        _ = TranscriptionFileOpener.perform(url, scopeRoot: appState.settings.effectiveOutputDir) { file in
-            NSWorkspace.shared.open(file)
-        }
-    }
-
+    /// Only asks to terminate: stopping watching and finishing a recording
+    /// happen in `AppDelegate`, which every quit path goes through, and this
+    /// one alone used to do them.
     private func quit() {
-        appState.watching.watchLoop?.stop()
+        logger.info("Menu Quit requested")
         NSApplication.shared.terminate(nil)
     }
 
-    // MARK: - Pure Helpers (testable without @main)
+    /// "Open Last Notes": a local file through the output folder's scope and
+    /// its moved-or-deleted notice, a Notion page through `ProtocolOpener`,
+    /// which hands it to a running Notion app.
+    private func openLastNotes(_ target: JobOpenTarget) {
+        switch target {
+        case let .file(url):
+            Self.openLastNotesFile(url, scopeRoot: appState.settings.effectiveOutputDir, notifier: NotificationManager.shared)
 
-    /// Tell the user when the previous run ended without a quit (issue #703),
-    /// the one outcome they cannot see for themselves: a menu bar app that is
-    /// gone looks exactly like one that is idle. A clean quit is the normal
-    /// launch and stays silent; so does a second instance, which is not a
-    /// crash, though it is logged because two instances share one marker and
-    /// only the later one is covered from here on.
-    static func reportPreviousExit(_ exit: PreviousExit, to notifier: any AppNotifying, now: Date = Date()) {
-        switch exit {
-        case .clean:
-            break
-
-        case let .stillRunning(pid):
-            logger.warning("another_instance_running pid=\(pid, privacy: .public)")
-
-        case let .unclean(lastAlive):
-            logger.warning("previous_run_ended_without_quit lastAlive=\(lastAlive.description, privacy: .public)")
-            let notice = PreviousExitNotice(lastAlive: lastAlive, now: now)
-            // `.standard` on purpose, decided rather than defaulted. This is
-            // posted at launch, which after a reboot or a login-item start is
-            // when nobody is looking, and a banner is gone in seconds; but
-            // macOS keeps it in Notification Center until it is dismissed, and
-            // that list is where the user finds it when they next look.
-            // `.timeSensitive` is reserved for a failure the user can still act
-            // on while it is happening (see `NotificationUrgency`), and this
-            // one is over: the app is back by the time it is posted, and
-            // nothing the user does now recovers the window. Breaking through
-            // Focus for a report about the past would spend that entitlement
-            // on the wrong notification. It is the only surface carrying the
-            // information; a second one (a menu item, a `/state` field) is the
-            // follow-up if this proves too easy to miss.
-            notifier.notify(title: PreviousExitNotice.title, body: notice.body, urgency: .standard)
+        case .notion:
+            Self.openInNotion(target)
         }
-    }
-
-    /// Whether auto-watch should be enabled based on CLI flags or user settings.
-    static func shouldAutoWatch(
-        commandLineArgs: [String] = CommandLine.arguments,
-        autoWatchSetting: Bool = UserDefaults.standard.bool(forKey: "autoWatch"),
-    ) -> Bool {
-        commandLineArgs.contains("--auto-watch") || autoWatchSetting
-    }
-
-    /// "Open Last Protocol": the file inside the output folder's security
-    /// scope, through the check the All Recordings window's Open makes. When
-    /// the file is gone the window says "The file was moved or deleted."; the
-    /// menu has closed by then, so the same sentence arrives as a notification.
-    static func openLastProtocol(
-        _ url: URL, scopeRoot: URL, notifier: any AppNotifying,
-        open: (URL) -> Void = { NSWorkspace.shared.open($0) },
-    ) {
-        guard !TranscriptionFileOpener.perform(url, scopeRoot: scopeRoot, action: open) else { return }
-        notifier.notify(title: "Open Last Protocol", body: "The file was moved or deleted.", urgency: .standard)
     }
 }

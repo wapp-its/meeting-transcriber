@@ -8,7 +8,7 @@ final class AppSettingsSilencePromptTests: XCTestCase {
     private func makeDefaults() throws -> UserDefaults {
         let name = "silence-prompt-\(UUID().uuidString)"
         addTeardownBlock { DefaultsSuite.remove(name) }
-        return try XCTUnwrap(UserDefaults(suiteName: name))
+        return try XCTUnwrap(DefaultsSuite.open(name))
     }
 
     func testDefaultsAskAfterFiveMinutes() throws {

@@ -56,7 +56,9 @@ DEV_BUNDLE_DEPLOY="$HOME/Applications/MeetingTranscriber-Dev.app"
 SIMULATOR_PKG="$ROOT/tools/meeting-simulator"
 SIMULATOR_BIN="$SIMULATOR_PKG/.build/release/meeting-simulator"
 DEFAULT_FIXTURE="$ROOT/app/MeetingTranscriber/Tests/Fixtures/two_speakers_de.wav"
+# shellcheck disable=SC2034 # read by the RPC helpers in lib/e2e-helpers.sh
 RPC_TOKEN_FILE="$HOME/Library/Application Support/MeetingTranscriber/.rpc-token"
+# shellcheck disable=SC2034 # read by the RPC helpers in lib/e2e-helpers.sh
 RPC_BASE="http://127.0.0.1:9876"
 # shellcheck source=lib/bundle-ids.sh
 source "$ROOT/scripts/lib/bundle-ids.sh"
@@ -82,18 +84,16 @@ fail() { printf '[e2e-live-captions] FAIL: %s\n' "$*" >&2; exit 1; }
 
 # shellcheck source=scripts/lib/e2e-helpers.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/e2e-helpers.sh"
+# Ends what a timed-out earlier step left running, then records this
+# driver for the next (see e2e_register_driver).
+e2e_register_driver
 
 require_command() {
     command -v "$1" >/dev/null || fail "missing command: $1"
 }
 
+# shellcheck disable=SC2034 # read by the RPC helpers in lib/e2e-helpers.sh
 RPC_TOKEN=""
-rpc() {
-    local path="$1"
-    curl --silent --show-error --max-time 10 \
-        --header "Authorization: Bearer $RPC_TOKEN" \
-        "$RPC_BASE$path" 2>/dev/null || true
-}
 
 # --- preflight ------------------------------------------------------------
 
@@ -186,20 +186,7 @@ log "Launching $DEV_BUNDLE_DEPLOY"
 open "$DEV_BUNDLE_DEPLOY"
 
 log "Waiting up to ${RPC_READY_TIMEOUT_S}s for RPC /healthz"
-# Assigns RPC_TOKEN in caller scope on success so subsequent `rpc` calls
-# carry the bearer token.
-# See the shared note in e2e-app.sh: `rpc` ends in `|| true`, so probing
-# through it reports success for a refused connection and leaves the token
-# file, which outlives every run on the host, as the only real condition.
-# Ask curl directly and let its exit status decide.
-_rpc_ready() {
-    [ -f "$RPC_TOKEN_FILE" ] || return 1
-    RPC_TOKEN="$(cat "$RPC_TOKEN_FILE")"
-    curl --silent --fail --max-time 5 \
-        --header "Authorization: Bearer $RPC_TOKEN" \
-        "$RPC_BASE/healthz" >/dev/null 2>&1
-}
-poll_until "$RPC_READY_TIMEOUT_S" 1 _rpc_ready \
+poll_until "$RPC_READY_TIMEOUT_S" 1 rpc_ready \
     || fail "RPC /healthz did not respond within ${RPC_READY_TIMEOUT_S}s"
 log "RPC up"
 
@@ -216,7 +203,12 @@ on_exit() {
     restore_bool_default "$_STANDARD_PLIST" debugRPCEnabled "$SAVED_DEBUG_RPC"
     restore_bool_default "$_STANDARD_PLIST" autoWatch       "$SAVED_AUTO_WATCH"
 }
-trap on_exit EXIT INT TERM
+# INT/TERM exit (and so run on_exit once, from EXIT): a trap that only ran
+# on_exit would return into the interrupted command and let the lane carry on
+# after its cleanup, which a reaper SIGTERM relies on not happening.
+trap on_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # --- trigger meeting + poll captions --------------------------------------
 
@@ -225,29 +217,24 @@ log "Starting meeting-simulator → $SIMULATOR_FIXTURE"
 SIM_PID=$!
 
 log "Polling /state for liveCaptions.recentFinals (timeout ${CAPTION_DEADLINE_S}s)"
-deadline=$(( $(date +%s) + CAPTION_DEADLINE_S ))
+# poll_state keeps an app that stopped answering apart from one that answers
+# with no captions; before, both read as zero finals.
 finals_count=0
 finals_json="[]"
 last_log_count=-1
-while true; do
-    assert_app_alive
+_finals_arrived() {
     IFS='|' read -r finals_count finals_json < <(
-        rpc /state | jq -r '[(.liveCaptions.recentFinals | length), (.liveCaptions.recentFinals | tojson)] | join("|")'
+        jq -r '[(.liveCaptions.recentFinals | length), (.liveCaptions.recentFinals | tojson)] | join("|")' <<<"$STATE_BODY"
     ) || true
     finals_count="${finals_count:-0}"
-
     if [ "$finals_count" != "$last_log_count" ]; then
         log "  recentFinals.count = $finals_count"
         last_log_count="$finals_count"
     fi
-
-    if [ "$finals_count" -gt 0 ]; then
-        break
-    fi
-
-    [ "$(date +%s)" -lt "$deadline" ] || fail "no liveCaptions.recentFinals appeared within ${CAPTION_DEADLINE_S}s — wiring broken or model didn't produce text"
-    sleep 5
-done
+    [ "$finals_count" -gt 0 ]
+}
+poll_state --each assert_app_alive "$CAPTION_DEADLINE_S" 5 _finals_arrived \
+    || fail "$(state_why $? "no liveCaptions.recentFinals appeared within ${CAPTION_DEADLINE_S}s — wiring broken or model didn't produce text")"
 
 log "Got $finals_count finalised caption(s):"
 echo "$finals_json" | jq . | sed 's/^/    /'

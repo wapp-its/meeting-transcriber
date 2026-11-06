@@ -76,6 +76,7 @@ final class ProtocolRegeneratorTests: XCTestCase {
         recordOnly: Bool = false,
         notifier: RecordingNotifier = RecordingNotifier(),
         jobs: @escaping @MainActor () -> [PipelineJob] = { [] },
+        regenerated: @escaping @MainActor (UUID, ProtocolTemplateID) -> Void = { _, _ in },
     ) -> ProtocolRegenerator {
         let folder: URL = folder
         let stamp = stamp
@@ -91,7 +92,17 @@ final class ProtocolRegeneratorTests: XCTestCase {
             notifier: notifier,
             fileOperations: fileOperations ?? self.fileOperations(),
             now: now,
+            regenerated: regenerated,
         ))
+    }
+
+    /// The meeting of `target()`, belonging to the job `jobID`.
+    private func target(jobID: UUID) throws -> ProtocolRegenerationTarget {
+        let resolved = try target()
+        return ProtocolRegenerationTarget(
+            folder: resolved.folder, basename: resolved.basename, title: resolved.title,
+            meetingStartTime: resolved.meetingStartTime, jobID: jobID.uuidString, files: resolved.files,
+        )
     }
 
     private func job(slug: String, state: JobState) -> PipelineJob {
@@ -317,6 +328,40 @@ final class ProtocolRegeneratorTests: XCTestCase {
         let warning = ProtocolTemplateStore(directory: templates).resolve(.file(name: "Gone")).warning
         XCTAssertNotNil(warning)
         XCTAssertEqual(sut.phase, .succeeded(md, warnings: [warning].compactMap(\.self)))
+    }
+
+    // MARK: - Telling the job
+
+    /// A retried Notion export reads the regenerated notes and titles its page
+    /// by their template's rule, so the job learns which template that was.
+    func testASuccessTellsTheJobTheTemplateItRan() async throws {
+        try writeMeeting()
+        try Data("Board minutes".utf8).write(to: templates.appendingPathComponent("Board.md"))
+        let jobID = UUID()
+        var told: [(UUID, ProtocolTemplateID)] = []
+        // Labelled: a trailing closure would bind to `jobs`.
+        // swiftlint:disable:next trailing_closure
+        let sut = makeRegenerator(regenerated: { told.append(($0, $1)) })
+
+        try await sut.regenerate(target(jobID: jobID), options: MeetingProtocolOptions(template: .file(name: "Board"), rawBackground: ""))
+
+        XCTAssertEqual(sut.phase, .succeeded(md, warnings: []), "test premise: the run succeeded")
+        XCTAssertEqual(told.map(\.0), [jobID])
+        XCTAssertEqual(told.map(\.1), [.file(name: "Board")])
+    }
+
+    /// The notes are unchanged, so the template the job has stays right.
+    func testAFailureTellsTheJobNothing() async throws {
+        try writeMeeting()
+        var told: [(UUID, ProtocolTemplateID)] = []
+        // Labelled: a trailing closure would bind to `jobs`.
+        // swiftlint:disable:next trailing_closure
+        let sut = makeRegenerator(generator: EchoingFailureGenerator(), regenerated: { told.append(($0, $1)) })
+
+        try await sut.regenerate(target(jobID: UUID()), options: Self.options)
+
+        XCTAssertEqual(sut.phase, .failed(ProtocolRegenerationError.generationFailed.localizedDescription), "test premise: the run failed")
+        XCTAssertTrue(told.isEmpty)
     }
 }
 

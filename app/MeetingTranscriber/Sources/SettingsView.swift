@@ -31,6 +31,11 @@ struct SettingsView: View {
     /// True when the pipeline is processing a job — soft hint only.
     var pipelineBusy: Bool = false
     var onSpeakerMutate: (() -> Void)?
+    /// Builds the matcher Known Voices and enrollment edit through.
+    var speakerMatcherFactory: () -> SpeakerMatcher = { SpeakerMatcher() }
+    /// The old-models row's state, built once by `EngineController`. Nil leaves the row
+    /// out, which is what tests and the App Store build get.
+    var legacyWhisperModels: LegacyWhisperModelsState?
     /// Where a tab another part of the app asks for arrives.
     var navigation: SettingsNavigation = .shared
 
@@ -90,6 +95,7 @@ struct SettingsView: View {
                 parakeetEngine: parakeetEngine,
                 remoteVocabulary: remoteVocabulary,
                 modelChoice: whisperKitModelChoice,
+                legacyModels: legacyWhisperModels,
             )
 
         case .speakers:
@@ -101,6 +107,7 @@ struct SettingsView: View {
                 namingDialogActive: namingDialogActive,
                 pipelineBusy: pipelineBusy,
                 onSpeakerMutate: onSpeakerMutate,
+                matcherFactory: speakerMatcherFactory,
             )
 
         case .output:

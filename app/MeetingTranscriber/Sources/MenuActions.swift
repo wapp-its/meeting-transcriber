@@ -20,12 +20,14 @@ struct MenuActions {
     /// Pauses a running recording or resumes a paused one, whatever kind it is;
     /// set only while a recording's capture is running.
     var togglePause: (() -> Void)?
-    /// A job line's Open: the job's protocol, else its transcript.
-    var openProtocol: (URL) -> Void
-    /// "Open Last Protocol": the newest finished job's protocol, else its
-    /// transcript. Separate from a job line's Open because a file that is
-    /// gone is reported here, as the All Recordings window reports it.
-    var openLastProtocol: (URL) -> Void
+    /// A job line's Open: the job's protocol, else its transcript, or its
+    /// Notion page as `JobOpenTarget` decides ("Open in Notion").
+    var openJob: (JobOpenTarget) -> Void
+    /// "Open Last Notes": the newest finished job's protocol, else its
+    /// transcript, or its Notion page as `JobOpenTarget` decides. Separate
+    /// from a job line's Open because a file that is gone is reported here,
+    /// as the All Recordings window reports it.
+    var openLastNotes: (JobOpenTarget) -> Void
     var openSettings: () -> Void
     /// Opens the naming window; set only while a job waits for speaker names.
     var nameSpeakers: (() -> Void)?
@@ -34,7 +36,8 @@ struct MenuActions {
     var showAllTranscriptions: () -> Void
     /// Remove on a failed job: off the menu and out of the history for good.
     var removeFailedJob: (UUID) -> Void
-    /// Dismiss on a job waiting for speaker names.
+    /// Dismiss on a job waiting for speaker names, and "Discard Notion Retry"
+    /// on a finished job whose Notion export failed.
     var dismissJob: (UUID) -> Void
     /// Answers the question the menu displayed, true for Record. Handed the
     /// question rather than reading the open one, so a click on a menu that
@@ -54,8 +57,8 @@ struct MenuActions {
         startStop: {},
         recordApp: {},
         recordMicrophone: {},
-        openProtocol: { _ in },
-        openLastProtocol: { _ in },
+        openJob: { _ in },
+        openLastNotes: { _ in },
         openSettings: {},
         processFiles: {},
         showAllTranscriptions: {},

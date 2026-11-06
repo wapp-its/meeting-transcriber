@@ -46,11 +46,10 @@ struct CaptureFormat {
 @MainActor
 @Observable
 class DualSourceRecorder: RecordingProvider {
-    /// The session capturing right now, nil between recordings. Stored as the
-    /// `AudioCapturing` role rather than the concrete `AudioCaptureSession`,
-    /// which is what removes the `@available` gate from this property — the
-    /// reason the storage used to be a type-erased `AnyObject` plus a cast.
-    /// Readable for the microphone forwarders in `DualSourceRecorder+Microphone.swift`.
+    /// The session capturing right now, nil between recordings. Held as the
+    /// `AudioCapturing` role, which removes the `@available` gate the old
+    /// type-erased `AnyObject` storage worked around. Readable for the
+    /// microphone forwarders in `DualSourceRecorder+Microphone.swift`.
     private(set) var captureSession: (any AudioCapturing)?
     /// The process ids this recording tapped, empty outside one (`RecordingProvider.tappedPIDs`).
     private(set) var tappedPIDs: [pid_t] = []
@@ -90,8 +89,20 @@ class DualSourceRecorder: RecordingProvider {
         captureSession?.micCaptureGaveUp ?? false
     }
 
+    var micCaptureStartTimedOut: Bool {
+        captureSession?.micCaptureStartTimedOut ?? false
+    }
+
     var appSilentTrackWatchdogGaveUp: Bool {
         captureSession?.appSilentTrackWatchdogGaveUp ?? false
+    }
+
+    var appCarriesOnlyNoiseFloor: Bool {
+        captureSession?.appCarriesOnlyNoiseFloor ?? false
+    }
+
+    var micCaptureStall: MicCaptureStall {
+        captureSession?.micCaptureStall ?? MicCaptureStall()
     }
 
     /// Requested app-audio capture format (what the CATap aggregate device is
@@ -163,13 +174,14 @@ class DualSourceRecorder: RecordingProvider {
         recordingsDir: URL,
         minAge: TimeInterval = 30,
         reapMarkersWrittenBefore: Date? = nil,
+        now: Date = Date(),
     ) {
         let fm = FileManager.default
         guard let entries = try? fm.contentsOfDirectory(
             at: recordingsDir,
             includingPropertiesForKeys: nil,
         ) else { return }
-        let cutoff = Date().addingTimeInterval(-minAge)
+        let cutoff = now.addingTimeInterval(-minAge)
         let markerCutoff = reapMarkersWrittenBefore ?? launchedAt
 
         for file in entries where RecordingFileSuffix.stripAppRaw(from: file.lastPathComponent) != nil {
@@ -178,6 +190,7 @@ class DualSourceRecorder: RecordingProvider {
             try? fm.removeItem(at: file)
             logger.info("Removed orphaned temp file: \(file.lastPathComponent)")
         }
+        removeStaleMixStaging(in: entries, olderThan: cutoff)
 
         // Markers whose recording can never be rescued. A start that threw
         // before capture opened leaves one with no tracks at all; a track that
@@ -331,6 +344,12 @@ class DualSourceRecorder: RecordingProvider {
     /// would otherwise be lost. `levelBalance` is handed to the re-mix.
     @discardableResult
     nonisolated static func recoverCrashedRecording(stem: String, in recDir: URL, levelBalance: Bool = false) throws -> URL {
+        // A stem another recovery has already mixed is done. Its raw app temp
+        // is gone by then, so what is left looks like a microphone-only
+        // recording, and rebuilding it would rename a microphone-only mix
+        // over the complete one.
+        let existingMix = recDir.appendingPathComponent(stem + RecordingFileSuffix.mix)
+        if FileManager.default.fileExists(atPath: existingMix.path) { return existingMix }
         let temp = crashedTemp(stem: stem, in: recDir)
         let micWav = recDir.appendingPathComponent(stem + RecordingFileSuffix.mic)
         let hasMic = FileManager.default.fileExists(atPath: micWav.path)
@@ -376,15 +395,20 @@ class DualSourceRecorder: RecordingProvider {
     /// gap). The queue-build Task that calls this is fired by a watch-start
     /// immediately before the loop may begin a new recording, so the guard is
     /// load-bearing — not cosmetic. `levelBalance` is handed to every re-mix.
+    ///
+    /// Not safe to run twice at once on one folder: two overlapping calls
+    /// select the same stem before either has mixed it. Production calls it
+    /// through `StagingRecoveryGate`.
     @discardableResult
     nonisolated static func recoverCrashedRecordings(
         in dir: URL,
         minAge: TimeInterval = 30,
         levelBalance: Bool = false,
+        now: Date = Date(),
     ) -> Int {
         let fm = FileManager.default
         let names = (try? fm.contentsOfDirectory(atPath: dir.path)) ?? []
-        let cutoff = Date().addingTimeInterval(-minAge)
+        let cutoff = now.addingTimeInterval(-minAge)
         var recovered = 0
         for stem in crashedRecordingStems(in: names) {
             // Freshness is read off the TRACKS, not the marker: the marker is
@@ -510,32 +534,60 @@ class DualSourceRecorder: RecordingProvider {
         logger.info("Recording started: \(source.logDescription), \(self.recordRate) Hz, \(self.appChannels)ch")
     }
 
-    /// Stop recording and produce a mixed WAV. The capture session is the only
-    /// hardware-bound part; everything after `session.stop()` is delegated to
-    /// the testable `buildRecording`.
+    /// Stop recording and produce a mixed WAV: `stopCapture` is the only
+    /// hardware-bound part, `finish` the testable file work.
     func stop() throws -> RecordingResult {
-        guard isRecording else {
-            throw RecorderError.notRecording
-        }
+        let stopped = try stopCapture()
         do {
-            return try finishRecording()
+            return try Self.finish(stopped)
         } catch {
-            // The marker survives a stop that throws, so recovery re-mixes the
-            // recording from its tracks. Its stored cut goes along: released
-            // here, recovery applies it as its own, and a later clear no longer
-            // reaches it.
             releasePendingCut()
             throw error
         }
     }
 
-    /// `stop()` once it is known to be recording.
-    private func finishRecording() throws -> RecordingResult {
+    /// `stop()` with `finish` on a detached task: file work that takes
+    /// seconds at the end of a long recording (17 s an hour, debug build).
+    /// `stopCapture` stays on the main actor: the capture objects serialize
+    /// their device and restart callbacks on the main queue, and their stop
+    /// mutates the same state.
+    func stopOffMain() async throws -> RecordingResult {
+        let stopped = try stopCapture()
+        do {
+            return try await Task.detached(priority: .userInitiated) { try Self.finish(stopped) }.value
+        } catch {
+            // Back on the main actor, like the release in `stop()`.
+            releasePendingCut()
+            throw error
+        }
+    }
+
+    /// End the capture session and take what the file work needs.
+    ///
+    /// The marker survives a stop that throws, here or in `finish`, so
+    /// recovery re-mixes the recording from its tracks. Its stored cut goes
+    /// along: released on either throw, recovery applies it as its own, and
+    /// a later clear no longer reaches it. A stop while not recording
+    /// releases nothing: the cut, if any, belongs to the stop that ended the
+    /// recording.
+    private func stopCapture() throws -> StoppedCapture {
+        guard isRecording else {
+            throw RecorderError.notRecording
+        }
+        do {
+            return try endCapture()
+        } catch {
+            releasePendingCut()
+            throw error
+        }
+    }
+
+    /// `stopCapture()` once it is known to be recording.
+    private func endCapture() throws -> StoppedCapture {
         isRecording = false
         tappedPIDs = []
         endPause()
 
-        // Stop capture session and get result
         guard let session = captureSession else {
             throw RecorderError.noAudioData
         }
@@ -549,24 +601,14 @@ class DualSourceRecorder: RecordingProvider {
         // not the device-facing recordRate/appChannels — is the expected file
         // format; a buildRecording mismatch warning then means the resampler
         // fallback wrote raw native-rate audio.
-        let recording = try Self.buildRecording(
-            from: captureResult,
+        return StoppedCapture(
+            captureResult: captureResult,
             recordingsDir: recordingsDir,
             timestamp: ts,
             recordingStartDate: recordingStartDate,
             format: CaptureFormat(requestedChannels: 1, requestedRate: targetRate, targetRate: targetRate),
             levelBalance: levelBalanceEnabled,
         )
-
-        // Dropped only once the mix exists, exactly where `buildRecording`
-        // drops the raw app temp. A stop whose mix write fails has not
-        // finished anything, and the failure (a full disk, say) usually
-        // survives to the next launch: keeping the marker lets that launch
-        // re-mix from the surviving tracks, which is what the app-audio path
-        // has always got from its temp. The mix itself is what stops a
-        // completed recording from being recovered twice.
-        try? FileManager.default.removeItem(at: Self.inProgressMarker(stem: ts, in: recordingsDir))
-        return recording
     }
 
     // MARK: - Stored meeting-end cut
@@ -632,21 +674,5 @@ class DualSourceRecorder: RecordingProvider {
 
     private static func timestamp() -> String {
         timestampFormatter.string(from: Date())
-    }
-}
-
-enum RecorderError: LocalizedError {
-    case notRecording
-    case noAudioData
-    case unsupportedOS
-    case permissionDenied(String)
-
-    var errorDescription: String? {
-        switch self {
-        case .notRecording: "Not currently recording"
-        case .noAudioData: "No audio data recorded"
-        case .unsupportedOS: "macOS 14.2+ required for audio capture"
-        case let .permissionDenied(reason): "Permission problem: \(reason)"
-        }
     }
 }

@@ -35,14 +35,14 @@
 
             let posted = scheduler.added.map { [$0.content.title, $0.content.body, $0.content.categoryIdentifier] }
             XCTAssertEqual(posted, [
-                ["Protocol paused for your recording", "Standup: the protocol is written once the recording has ended.", ""],
+                ["Meeting notes paused for your recording", "Standup: the meeting notes are written once the recording has ended.", ""],
                 [
-                    "Protocol not written: low memory",
+                    "Meeting notes not written: low memory",
                     "Standup: there was not enough free memory for the local model. The transcript is saved.",
                     NotificationManager.localModelLowMemoryCategoryID,
                 ],
                 [
-                    "Protocol not written: no local model",
+                    "Meeting notes not written: no local model",
                     "Standup: no local model is chosen, or it cannot be reached. Choose one in Settings → Output. The transcript is saved.",
                     NotificationManager.localModelNoModelCategoryID,
                 ],
@@ -181,7 +181,7 @@
             let navigation = SettingsNavigation()
             navigation.requestedTab = .output
             let settings = try SettingsView(
-                settings: AppSettings(defaults: XCTUnwrap(UserDefaults(suiteName: suite))),
+                settings: AppSettings(defaults: XCTUnwrap(DefaultsSuite.open(suite))),
                 whisperKitEngine: WhisperKitEngine(), parakeetEngine: ParakeetEngine(),
                 recognitionStatsLog: RecognitionStatsLog(), stageTimingLog: StageTimingLog(), navigation: navigation,
             )

@@ -14,11 +14,11 @@ final class WhisperKitCustomModelSettingsTests: XCTestCase {
     // swiftlint:disable:next implicitly_unwrapped_optional
     private var testSuiteName: String!
 
-    /// Per-test isolated UserDefaults suite — see AppSettingsTests for why.
+    /// Per-test isolated UserDefaults suite, see AppSettingsTests for why.
     override func setUp() {
         super.setUp()
         testSuiteName = "WhisperKitCustomModelSettingsTests-\(getpid())-\(UUID().uuidString)"
-        guard let suite = UserDefaults(suiteName: testSuiteName) else {
+        guard let suite = DefaultsSuite.open(testSuiteName) else {
             XCTFail("Could not create test UserDefaults suite")
             return
         }
@@ -155,8 +155,10 @@ final class WhisperKitCustomModelSettingsTests: XCTestCase {
         )
     }
 
-    /// A half-typed repository must not reach the engine: every keystroke is synced,
-    /// and a failed load there would cost the next recording its transcript.
+    /// An empty or malformed entry is not a model and must not reach the engine as
+    /// one. This is the second line of defence: the Settings fields already hold a
+    /// value back until Return or until the field is left, so what arrives here is
+    /// a finished field, and a value that is filled in is used as entered.
     func testUnfinishedCustomModelFallsBackToTheStockVariant() {
         settings.whisperKitModel = "openai_whisper-base"
         settings.whisperKitCustomModelEnabled = true
@@ -176,7 +178,7 @@ final class WhisperKitCustomModelSettingsTests: XCTestCase {
     /// The variant becomes a path component under the download cache and a glob for
     /// the downloader, so anything that could leave the repository folder is refused.
     func testVariantMustBeASingleFolderName() {
-        for variant in ["..", "a/b", "large*", "with space", "../../etc"] {
+        for variant in [".", "..", "a/b", "large*", "with space", "../../etc"] {
             XCTAssertFalse(AppSettings.isValidVariant(variant), variant)
         }
         for variant in ["openai_whisper-large-v3-v20240930_turbo", "flix-swissgerman-large-v3_8bit", "distil.v3"] {
@@ -185,7 +187,7 @@ final class WhisperKitCustomModelSettingsTests: XCTestCase {
     }
 
     func testRepositoryMustBeOwnerSlashName() {
-        for repoID in ["", "spert", "/flix", "spert/", "a/b/c", "spert/../x", "spe rt/flix"] {
+        for repoID in ["", "spert", "/flix", "spert/", "a/b/c", "spert/../x", "spert/.", "./flix", "spe rt/flix"] {
             XCTAssertFalse(AppSettings.isValidRepoID(repoID), repoID)
         }
         XCTAssertTrue(AppSettings.isValidRepoID("spert/flix-swissgerman-whisperkit"))
@@ -247,5 +249,62 @@ final class WhisperKitCustomModelSettingsTests: XCTestCase {
             AppSettings(defaults: defaults).whisperKitCustomModelValidation,
             .folder(.folderIncomplete(missing: "tokenizer_config.json")),
         )
+    }
+
+    /// While a folder is set it wins, so an edit to the repository fields changes
+    /// nothing about the validation and must not re-walk the folder, which resolves
+    /// its bookmark and checks eleven files on the main actor. The folder is deleted
+    /// between the two reads so that a recompute would be visible.
+    func testRepositoryEditsDoNotRecheckAPickedFolder() throws {
+        let folder = try writeModelFolder(named: "picked")
+        settings.setWhisperKitCustomModelFolder(folder)
+        XCTAssertEqual(settings.whisperKitCustomModelValidation, .folderReady, "Precondition")
+        try FileManager.default.removeItem(at: folder)
+
+        settings.whisperKitCustomRepo = "spert/flix-swissgerman-whisperkit"
+        settings.whisperKitCustomVariant = "flix-swissgerman-large-v3_8bit"
+
+        XCTAssertEqual(settings.whisperKitCustomModelValidation, .folderReady, "The folder must not have been re-read")
+        settings.refreshWhisperKitCustomModelValidation()
+        XCTAssertEqual(settings.whisperKitCustomModelValidation, .folder(.folderUnavailable), "Control: the folder is gone")
+    }
+
+    // MARK: - Stale bookmark
+
+    /// What macOS reports as stale: the folder a bookmark was made for has moved.
+    /// A stale bookmark still resolves, so the load would keep working; the repair
+    /// is what keeps the shown path and the stored bookmark current, the way the
+    /// vocabulary file and the output folder are repaired at launch.
+    func testAStaleFolderBookmarkIsRepairedAtLaunch() throws {
+        let picked = try writeModelFolder(named: "picked")
+        settings.setWhisperKitCustomModelFolder(picked)
+        let stale = try XCTUnwrap(settings.whisperKitCustomModelFolderBookmark)
+        let moved = picked.deletingLastPathComponent().appendingPathComponent("moved", isDirectory: true)
+        try FileManager.default.moveItem(at: picked, to: moved)
+
+        let relaunched = AppSettings(defaults: defaults)
+        relaunched.repairStaleWhisperKitCustomModelFolderBookmark()
+
+        // Compared with symlinks resolved: a bookmark resolves to the canonical
+        // path (`/private/var/...`), the fixture was made under `/var/...`.
+        XCTAssertEqual(
+            URL(fileURLWithPath: relaunched.whisperKitCustomModelFolderPath).resolvingSymlinksInPath().path,
+            moved.resolvingSymlinksInPath().path,
+        )
+        let refreshed = try XCTUnwrap(relaunched.whisperKitCustomModelFolderBookmark)
+        XCTAssertNotEqual(refreshed, stale)
+        var isStale = false
+        _ = try URL(resolvingBookmarkData: refreshed, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale)
+        XCTAssertFalse(isStale, "The refreshed bookmark must be current")
+        XCTAssertEqual(relaunched.whisperKitCustomModelValidation, .folderReady)
+    }
+
+    func testRepairLeavesACurrentFolderBookmarkAlone() throws {
+        try settings.setWhisperKitCustomModelFolder(writeModelFolder(named: "picked"))
+        let bookmark = try XCTUnwrap(settings.whisperKitCustomModelFolderBookmark)
+
+        settings.repairStaleWhisperKitCustomModelFolderBookmark()
+
+        XCTAssertEqual(settings.whisperKitCustomModelFolderBookmark, bookmark)
     }
 }

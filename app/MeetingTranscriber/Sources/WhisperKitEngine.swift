@@ -69,21 +69,28 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
     }
 
     private(set) var modelState: EngineModelState = .unloaded
-    /// Why the last load failed, when Hugging Face refused one of its requests; nil
-    /// otherwise. Settings shows it under "Load Model", and a transcription that
-    /// needed the model throws it. Cleared when the next load starts and when the
-    /// model selection changes, so it never describes an older attempt.
-    private(set) var lastLoadFailure: WhisperKitLoadFailure?
+    /// Why the last load attempt failed, worded for the user
+    /// (`WhisperKitLoadFailureReason`), or nil while nothing has failed. Set only
+    /// where a load gives up with no model loaded, cleared when the next attempt
+    /// starts, when a load succeeds, and when the requested model changes, so it
+    /// never describes a model other than the one the state is about and never
+    /// sits next to a working one.
+    private(set) var loadFailureReason: String?
     private(set) var downloadProgress: Double = 0
     /// Transcription progress (0.0–1.0) based on WhisperKit's 30s window processing.
     private(set) var transcriptionProgress: Double = 0
     private var pipe: WhisperKit?
+    /// Whether a model is loaded, for the load loop in `WhisperKitEngine+ModelLoad.swift`.
+    var pipeInstalled: Bool {
+        pipe != nil
+    }
+
     /// Test-only override of the production decoding boundary. It never reaches
     /// app wiring; production always resolves this to `pipe`.
     private var decodingClientOverride: (any WhisperDecodingClient)?
     /// Test-only loader override used to count content reads on cache hits.
     private var vocabularyTermsLoaderOverride: ((String, WhisperVocabularyPrompt.FileRevision) -> WhisperVocabularyPrompt.VocabularyTermsLoadResult)?
-    private let modelLoad = SingleFlight<LoadAttempt>()
+    let modelLoad = SingleFlight<LoadAttempt>()
     /// A model Settings is asking about, or the user chose to load on first use
     /// ("Later"). A load that would start it stops instead, also one still running for
     /// the previous model; a transcription's load does not, it needs the model now.
@@ -137,7 +144,7 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
         origin: WhisperKitModelOrigin,
         source: WhisperKitModelSource,
     ) async -> Bool {
-        guard let localFolder = source.locateLocal(variant) else { return false }
+        guard let localFolder = await source.prepareAndLocate(variant) else { return false }
         do {
             try await adoptPipe(variant: variant, origin: origin, from: localFolder, source: source)
             return true
@@ -146,79 +153,23 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
             // localizedDescription omits the path, the likely error here is
             // WhisperKit's own `modelsUnavailable("Model file not found at <path>")`,
             // whose message carries the full path and with it the account name. Do
-            // not widen this to .public in a mechanical sweep.
-            logger.warning(
-                "WhisperKit: local model \(variant, privacy: .public) did not load, falling back to download (\(String(describing: type(of: error)), privacy: .public): \(error.localizedDescription, privacy: .private))",
-            )
+            // not widen this to .public in a mechanical sweep. The variant is public
+            // for a Hub model and redacted for a picked folder, whose name is the
+            // user's own and can carry the account name as well; `os_log` privacy is
+            // fixed per interpolation, hence the two lines.
+            let kind = String(describing: type(of: error))
+            switch origin {
+            case .hub:
+                logger.warning(
+                    "WhisperKit: local model \(variant, privacy: .public) did not load, falling back to download (\(kind, privacy: .public): \(error.localizedDescription, privacy: .private))",
+                )
+
+            case .localFolder:
+                logger.warning(
+                    "WhisperKit: picked model folder \(variant, privacy: .private) did not load (\(kind, privacy: .public): \(error.localizedDescription, privacy: .private))",
+                )
+            }
             return false
-        }
-    }
-
-    func loadModel() async {
-        await loadModel(stoppingAtDeferred: true)
-    }
-
-    private func loadModel(stoppingAtDeferred: Bool) async {
-        // Two decisions recorded here so they are not re-derived. The general form
-        // would be a named `loadedVariant`, with readiness defined as
-        // `loadedVariant == modelVariant`, which states the invariant directly and
-        // needs no outcome at all; it also redefines `modelState` from "some model is
-        // loaded" to "the requested one is", and that is protocol surface, `/state`
-        // surface and awaited by an e2e script. Too expensive for this defect.
-        //
-        // Visible while this runs: between the reconcile dropping the superseded pipe
-        // and the next pass setting `.loading`, the engine reports `.unloaded` and
-        // Settings offers "Load Model" for a few main-actor turns. Harmless today
-        // (nothing waits on "no longer loading"), but a driver written against that
-        // phase would read it as a finished failure.
-        //
-        // And the retry sits here rather than in `ensureModel`, although only that
-        // caller needs a model, so the Settings button and the status line are right
-        // too. The cost: a superseded launch preload holds its slot in the serial
-        // model warm-up queue for the whole chain, delaying the live-caption warm-up
-        // by one load (2.5 to 3.5 s warm). Releasing the gate between passes would
-        // bring back the concurrent CoreML peak that queue exists to prevent.
-        while true {
-            // The chain is unbounded by design, so a cancelled owner has to be able
-            // to stop it. Nothing below checks cancellation: the CoreML init is not
-            // interruptible, so this is the only point where it can take effect.
-            if Task.isCancelled { return }
-            // Same point for a deferred model: nothing loads until a pass would start it.
-            if stoppingAtDeferred, deferredSelection == WhisperKitModelSelection(variant: modelVariant, origin: modelOrigin) {
-                return
-            }
-
-            let attempt = await modelLoad.run { [self] in await performLoad() }
-
-            // Nothing is loaded. Run again in two cases. Either the attempt built a
-            // pipe that is now gone, which means the reconcile dropped it because the
-            // variant moved on while it ran. Or it failed for a variant that is no
-            // longer the one requested, in which case the current one has not been
-            // tried yet.
-            //
-            // The variant comparison alone would not do, and that is the subtle part:
-            // the variant can change away and back while this caller is suspended, so
-            // a discarded attempt for A can come back to `attempt.variant == "A" ==
-            // modelVariant` and read as a plain failure. `builtPipe` is what tells the
-            // two apart.
-            //
-            // A failure for the variant still requested is deliberately not repeated,
-            // whether this call ran it or joined it. Repeating it would double the
-            // wait and the failed download for every caller that arrives during an
-            // offline load.
-            //
-            // No iteration cap. Each pass is a whole load, so this cannot spin: it
-            // only goes round again when the variant changed during that pass, which
-            // takes a user action per iteration (nothing in the load path writes
-            // `modelVariant`, and the settings observer tracks only `AppSettings`).
-            // A cap of N would restore the reported symptom on the Nth change.
-            guard attempt.needsAnotherAttempt(
-                pipeInstalled: pipe != nil,
-                requestedVariant: modelVariant,
-                requestedOrigin: modelOrigin,
-            ) else {
-                return
-            }
         }
     }
 
@@ -228,7 +179,7 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
     /// asked for from one that was superseded while it ran. `SingleFlight` hands the
     /// same outcome to callers that joined this run rather than starting their own,
     /// which is what they would otherwise have no way to learn (issue #738).
-    private func performLoad() async -> LoadAttempt {
+    func performLoad() async -> LoadAttempt {
         // Snapshot the requested variant once. `modelVariant` is `@MainActor`
         // mutable (the reactive settings sync calls `applyModelVariant`), so
         // reading it separately for the download and the init could tear
@@ -238,7 +189,7 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
         let variant = modelVariant
         let origin = modelOrigin
         let source = modelSource(origin, hubToken)
-        lastLoadFailure = nil
+        loadFailureReason = nil
 
         // A refusal in the local branch is not recorded: that branch falls back to
         // the download, which makes the same request and reports it.
@@ -260,15 +211,19 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
             // Same reason as the local branch above: since the download path now
             // also ends in `adoptPipe`, this can carry WhisperKit's path-bearing
             // `modelsUnavailable` message, not only a path-free URLError.
+            // Fork diagnostic: the whole error, public, so a failed download can be
+            // read from the log. Not for the original (see its comment above).
             logger.error(
                 "WhisperKit model load failed (\(String(describing: type(of: error)), privacy: .public): \(String(reflecting: error), privacy: .public))",
             )
-            // Recorded only for the selection still in force. A load superseded by a
-            // model change while it ran would otherwise write its refusal back under
-            // the new model, which `applyModelVariant` had just cleared, and a
-            // cancelled owner never runs the attempt that would clear it again.
-            if variant == modelVariant, origin == modelOrigin {
-                lastLoadFailure = error as? WhisperKitLoadFailure
+            // The redacted line above is for the log; the user gets a path-free
+            // sentence in Settings and in the job error (see `ensureModel`). Only
+            // for the model still requested: one changed mid-load has not been
+            // tried yet, and `applyModelVariant` already cleared the reason for it.
+            // And only with no pipe left: one still installed is the requested
+            // model (any model change drops it), working beside "Model ready".
+            if pipe == nil, variant == modelVariant, origin == modelOrigin {
+                loadFailureReason = WhisperKitLoadFailureReason.describe(error, variant: variant, origin: origin)
             }
             // A failed *reload* keeps the prior pipe (see `unloadModel`), and the
             // state has to say so: `ensureModel` short-circuits on a non-nil pipe
@@ -301,7 +256,8 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
         guard variant != modelVariant || origin != modelOrigin else { return }
         modelVariant = variant
         modelOrigin = origin
-        lastLoadFailure = nil
+        // Whatever failed, it was another model.
+        loadFailureReason = nil
         guard pipe != nil else { return }
         unloadModel()
     }
@@ -316,19 +272,26 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
         downloadProgress = 0
     }
 
-    /// Ensure model is loaded, loading it if necessary. A load Hugging Face refused
-    /// throws that refusal, so a failed job says why; any other failure throws
-    /// `modelNotLoaded`.
+    /// Ensure model is loaded, loading it if necessary. A cancelled caller stops
+    /// waiting at once; see `loadModel(untilCancelled:stoppingAtDeferred:)`.
     private func ensureModel() async throws {
         // Production state is defined by the loaded WhisperKit instance. The
         // test decoder is only a narrow decode-boundary substitute and must not
         // make automation report a real model as loaded.
         if pipe != nil || decodingClientOverride != nil { return }
-        logger.info("WhisperKit: model not loaded, loading \(self.modelVariant, privacy: .public)...")
-        await loadModel(stoppingAtDeferred: false)
+        // Same split as in `loadFromLocalSnapshot`: a picked folder's name stays out
+        // of the log.
+        switch modelOrigin {
+        case .hub:
+            logger.info("WhisperKit: model not loaded, loading \(self.modelVariant, privacy: .public)...")
+
+        case .localFolder:
+            logger.info("WhisperKit: model not loaded, loading picked folder \(self.modelVariant, privacy: .private)...")
+        }
+        try await loadModel(untilCancelled: true, stoppingAtDeferred: false)
         guard pipe != nil else {
             logger.error("WhisperKit: model load FAILED, state=\(String(describing: self.modelState), privacy: .public)")
-            throw lastLoadFailure ?? TranscriptionError.modelNotLoaded
+            throw TranscriptionError.modelNotLoaded(reason: loadFailureReason)
         }
         logger.info("WhisperKit: model loaded successfully")
     }
@@ -374,7 +337,7 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
     func transcribeSegments(audioPath: URL) async throws -> [TimestampedSegment] {
         try await ensureModel()
         guard let decodingClient else {
-            throw TranscriptionError.modelNotLoaded
+            throw TranscriptionError.modelNotLoaded()
         }
 
         transcriptionProgress = 0
@@ -403,23 +366,7 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
             return nil // continue transcription
         }
 
-        guard let firstResult = results.first, let transcriptionResults = firstResult else {
-            return []
-        }
-
-        var segments: [TimestampedSegment] = []
-        var lastText = ""
-        for segment in transcriptionResults.flatMap(\.segments) {
-            let text = Self.stripWhisperTokens(segment.text).trimmingCharacters(in: .whitespaces)
-            // Filter hallucinations: skip consecutive identical text
-            if text.isEmpty || text == lastText { continue }
-            lastText = text
-            segments.append(TimestampedSegment(
-                start: TimeInterval(segment.start),
-                end: TimeInterval(segment.end),
-                text: text,
-            ))
-        }
+        let segments = try Self.segments(from: results.first)
         transcriptionProgress = 1.0
         return segments
     }
@@ -429,10 +376,10 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
     /// VAD-bounded windows out of the audio sink and hands them here. The
     /// returned string is the joined plain text (no timestamps, no
     /// segments) because the live overlay only renders one line at a time.
-    /// Hallucination-filter logic matches `transcribeSegments`.
+    /// Same hallucination filter as `transcribeSegments`.
     func transcribeSamples(_ samples: [Float]) async throws -> String {
         try await ensureModel()
-        guard let decodingClient else { throw TranscriptionError.modelNotLoaded }
+        guard let decodingClient else { throw TranscriptionError.modelNotLoaded() }
         // The explicit experimental prompt choice applies to both saved and
         // live WhisperKit transcription while retaining an immutable snapshot.
         let options = Self.decodingOptions(
@@ -443,16 +390,7 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
             samples,
             decodeOptions: options,
         )
-        var lastText = ""
-        var pieces: [String] = []
-        for segment in results.flatMap(\.segments) {
-            let text = Self.stripWhisperTokens(segment.text)
-                .trimmingCharacters(in: .whitespaces)
-            if text.isEmpty || text == lastText { continue }
-            lastText = text
-            pieces.append(text)
-        }
-        return pieces.joined(separator: " ")
+        return Self.filteredSegments(results).map(\.text).joined(separator: " ")
     }
 
     // Build the WhisperKit `DecodingOptions` for a transcription run.
@@ -550,13 +488,20 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
 }
 
 enum TranscriptionError: LocalizedError {
-    case modelNotLoaded
+    /// `reason` is the engine's `loadFailureReason` when the load that was just
+    /// attempted failed, so the job error says why; nil where nothing is known.
+    /// The message keeps its prefix either way, which is what consumers match on.
+    case modelNotLoaded(reason: String? = nil)
     case streamingNotSupported
+    /// WhisperKit failed on a file. Kept whole rather than as its message, so
+    /// `TranscriptionFailureScope` can still tell a bad file from a bad model.
+    case transcriptionFailed(underlying: any Error)
 
     var errorDescription: String? {
         switch self {
-        case .modelNotLoaded: "WhisperKit model not loaded"
+        case let .modelNotLoaded(reason): "WhisperKit model not loaded" + (reason.map { ": \($0)" } ?? "")
         case .streamingNotSupported: "This engine does not support sample-based live transcription"
+        case let .transcriptionFailed(underlying): "WhisperKit transcription failed: \(underlying.localizedDescription)"
         }
     }
 }

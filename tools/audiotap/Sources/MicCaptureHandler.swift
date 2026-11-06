@@ -8,25 +8,27 @@ private let logger = Logger(subsystem: "com.meetingtranscriber.audiotap", catego
 /// Records microphone audio to a WAV file via AVAudioEngine.
 /// Monitors for device changes via CoreAudio property listener (default input device)
 /// and AVAudioEngine configuration change notification (format/route changes).
+/// A handler a test builds on a stand-in session does not follow the system
+/// default input, so the host's device changes cannot restart it.
 /// Automatically restarts the engine on device switch, preserving the selected device
 /// when still available or falling back to system default with a warning.
 ///
 /// Public API (`start`/`stop`/`selectDevice`/`activeInputDevice`/`currentLevelDBFS`) is called from the main actor.
 ///
-/// Mutable state is split by owner. `session`, `configChangeObserver`,
-/// `configChangePolicy`, `pendingConfigChangeRestart` and the retry counter
-/// are confined to the main queue: a restart attempt runs on
+/// Mutable state is split by owner. `session`, `configChangeObserver`, the
+/// device selection state and the retry counter are confined to the main
+/// queue: a restart attempt runs on
 /// `restartQueue`, builds a candidate session from locals, and publishes nothing
 /// until the main queue adopts it with the arbiter's approval, so a stop and an
 /// adoption are totally ordered rather than racing. `outputFile` is created in
-/// `startEngine` on whichever queue runs it (main at first start, `restartQueue`
-/// during an attempt) and only when the arbiter's `mayCreateOutputFile` allows
-/// it under the lock; it is nilled only on the main queue, by stop and by
-/// give-up. The render-thread tap block reads it through optional chaining
-/// behind an `isCapturing` check, so a buffer arriving after a seal is a dropped
-/// write rather than a write to a closed file. Per-buffer level state is guarded
-/// by `LevelPublisher`. `@unchecked Sendable` reflects that this discipline
-/// isn't expressible to the compiler.
+/// `startEngine` on `restartQueue` (first start and every attempt), only when
+/// `mayCreateOutputFile` allows it; it is nilled on the main queue by stop and
+/// give-up, and on `restartQueue` by a stale first start, which only the
+/// terminal `.gaveUp` and `.stopped` reach. The render-thread tap block reads it
+/// through optional chaining behind an `isCapturing` check, so a buffer arriving
+/// after a seal is a dropped write rather than a write to a closed file. Per-buffer
+/// level state is guarded by `LevelPublisher`. `@unchecked Sendable` reflects
+/// that this discipline isn't expressible to the compiler.
 public class MicCaptureHandler: @unchecked Sendable {
     /// Builds a fresh engine session. Injectable so tests can supply one that
     /// never touches audio hardware (the CI runner has no input device) and can
@@ -37,9 +39,9 @@ public class MicCaptureHandler: @unchecked Sendable {
     /// `internal` (not `private`) so the cross-file `+Timeline` extension can
     /// write gap-fill silence to it.
     ///
-    /// Lock-backed because three threads touch it: it is created on whichever
-    /// queue `startEngine` runs (main at first start, the restart queue during
-    /// an attempt), nilled on the main queue by stop and by give-up, and read by
+    /// Lock-backed because three threads touch it: it is created on the restart
+    /// queue, which runs `startEngine`, nilled on the main queue by stop and give-up
+    /// (and on the restart queue by a stale first start), and read by
     /// the render-thread tap block for every buffer. As a plain stored property
     /// that is a load racing a store-and-release. The getter hands out a strong
     /// reference and the write then happens outside the lock, so a buffer
@@ -60,13 +62,14 @@ public class MicCaptureHandler: @unchecked Sendable {
 
     private let outputFileLock = NSLock()
     private var storedOutputFile: AVAudioFile?
-    private let outputURL: URL
+    let outputURL: URL
     private let debugLogging: Bool
     private let liveSink: LiveAudioSink?
-    // Debug fault injection (issue #379 repro): nil in production. An e2e
-    // build's composition root injects one (DualSourceRecorder, gated by
-    // #if E2E_FAULT_INJECTION) to verify the installTap NSException recovery.
-    private let debugFault: DebugTapFault?
+    // Debug fault injection (issues #379, #724/#706 repros): nil in
+    // production. An e2e build's composition root injects one
+    // (`LiveCaptureSession`, gated by #if E2E_FAULT_INJECTION). `internal`
+    // only for the `+DebugFault` extension.
+    let debugFault: DebugTapFault?
     /// Bounds a single restart attempt and decides what a late or superseded
     /// attempt is allowed to do (issue #588). Lock-guarded because the watchdog
     /// fires on main while the attempt runs on `restartQueue`, and the render
@@ -91,6 +94,14 @@ public class MicCaptureHandler: @unchecked Sendable {
     /// rest of the session keeps recording.
     public var onGiveUp: (() -> Void)?
 
+    /// Called when the microphone went without audio for the whole budget and
+    /// was released (issues #724, #706), with what the stall can say about
+    /// itself. Main queue. See `+Progress`.
+    public var onStall: ((MicStallDetails) -> Void)?
+    /// Called when a microphone a device change brought back after a stall
+    /// has delivered again. Main queue.
+    public var onResume: (() -> Void)?
+
     var isRecording: Bool {
         arbiter.withLock { $0.isCapturing }
     }
@@ -104,36 +115,47 @@ public class MicCaptureHandler: @unchecked Sendable {
     /// channels default to the same shared policy; injected only so a test can
     /// use a schedule that does not spend six seconds proving a give-up.
     let decideRetry: @Sendable (Int) -> CaptureRestartRetryAction
-    /// The stall watchdog's judgement (see `+StallWatchdog`). Lock-guarded
-    /// because the render thread reports every buffer and the main-queue timer
-    /// ticks it.
-    let stallWatchdog: OSAllocatedUnfairLock<MicStallWatchdogPolicy>
-    /// Monotonic seconds for the watchdog; injected so a test can cross the
-    /// ten-second trigger without waiting for it.
-    let stallClock: @Sendable () -> TimeInterval
-    /// Main-queue confined, like `session`. Nil when not watching.
-    var stallTimer: (any DispatchSourceTimer)?
+    /// Runs work on the main queue after a delay. Every timer of the restart
+    /// path goes through it, so a test can drive the backoff and the attempt
+    /// deadline on a manual clock instead of waiting them out.
+    let scheduleOnMain: @Sendable (TimeInterval, @escaping @Sendable () -> Void) -> Void
+    /// Seconds on a monotonic clock, for the progress watchdog. Injected for
+    /// the same reason as `scheduleOnMain`.
+    let clock: @Sendable () -> TimeInterval
+    /// Waits at most the given seconds for the first start's block to end, and
+    /// says whether it did; injected so a test can give up at a chosen moment.
+    let awaitFirstStart: @Sendable (DispatchGroup, TimeInterval) -> Bool
+    let startSeams = MicStartSeams()
+    /// What a stall's silence bridge is written under; see `TimelineBridgeGate`.
+    let bridgeGate = TimelineBridgeGate()
+    /// Whether the capture is getting anywhere. Main queue only.
+    var progress = MicProgressState()
+    private(set) var deviceChangeListener: AudioObjectPropertyListenerBlock?
+    /// Registers `deviceChangeListener` with CoreAudio; see the registrar.
+    let inputListenerRegistrar: DefaultInputListenerRegistrar
+    /// Whether `start()` subscribes to the system's default-input-device
+    /// changes. The session decides, see `followsSystemDefaultInput`. Read off
+    /// the session rather than passed in, so no caller can hand in the real
+    /// engine and forget to ask for the listener.
+    var listensForInputDeviceChanges: Bool {
+        session.followsSystemDefaultInput
+    }
+
+    var configChangeObserver: (any NSObjectProtocol)?
+    var selectedDeviceUID: String?
     /// Whether a pinned device is still on the system. Injected so the rule
     /// that a present pinned device is never swapped for the default is
     /// testable on a runner that has no audio device at all.
     let isDevicePresent: @Sendable (String) -> Bool
-    private var deviceChangeListener: AudioObjectPropertyListenerBlock?
-    var configChangeObserver: (any NSObjectProtocol)?
-    /// Paces and caps the restarts a configuration change may launch (see
-    /// `+ConfigChange`). Main-queue confined, like `session`.
-    var configChangePolicy: MicConfigChangePolicy
-    /// The delayed configuration-change restart still waiting out its backoff,
-    /// nil when none is. Main-queue confined, like `session`.
-    var pendingConfigChangeRestart: DispatchWorkItem?
-    var selectedDeviceUID: String?
-    /// The microphone the running engine session reports it records from, read
-    /// where that session came up and published at the first start and at each
-    /// adoption; nil before the first start and after a stop or a give-up.
-    /// Main-queue confined, like `session`. See `+DeviceSelection`.
+    /// The microphone the running engine session reports it records from,
+    /// published at the first start and at each adoption; nil before the first
+    /// start, while stalled, and after a stop or a give-up. See `+DeviceSelection`.
     public internal(set) var activeInputDevice: MicInputDevice?
     /// A selection the arbiter could not launch at once, because a restart
-    /// was outstanding. Main-queue confined. See `+DeviceSelection`.
+    /// was outstanding. See `+DeviceSelection`.
     var selectionPending = false
+    /// The restart out now, or its retries, was launched by a selection.
+    var selectionRestartOutstanding = false
     /// Wall-clock anchoring so a device-restart gap becomes silence in the WAV
     /// instead of an under-run (issue #379 follow-up — see `+Timeline`).
     /// `internal` for that cross-file extension; survives restarts (never reset).
@@ -143,15 +165,29 @@ public class MicCaptureHandler: @unchecked Sendable {
     /// The session's pauses, shared with the app track; see `+Write`.
     let pauseGate: CapturePauseGate
     public private(set) var firstFrameTime: UInt64 = 0
+    /// Mach time `start()` began at.
+    var captureStartTicks: UInt64 = 0
+    /// Mach time the track was anchored at if it was restarted before its
+    /// first buffer (see `+Timeline`), else 0. Becomes `firstFrameTime` once
+    /// a buffer arrives, so the track's sample 0 and its reported start agree.
+    var timelineOriginTicks: UInt64 = 0
 
     // State for an injected DebugTapFault (above). Always compiled but inert
-    // unless a fault was injected — see resolveTapInstallFormat /
-    // armDebugFaultIfNeeded.
-    private var debugFaultArmed = false
-    private var injectBadTapFormatOnce = false
+    // unless a fault was injected; see `+DebugFault`. `internal` only for that
+    // extension.
+    var debugFaultArmed = false
+    var injectBadTapFormatOnce = false
+    /// When the capture started on the handler's clock, for a withheld-buffers
+    /// fault. Written once in `start()`, before any tap is installed.
+    var debugFaultStartedAt: TimeInterval = 0
 
     private var debugRMS = DebugRMSReporter()
     private let levelPublisher = LevelPublisher()
+
+    /// Mach time of the last buffer, for the progress watchdog.
+    var lastBufferTicks: UInt64 {
+        levelPublisher.lastBufferTicks
+    }
 
     /// Returns the instantaneous mic level in dBFS, decayed to -120 if no buffer
     /// arrived in the last 0.5 seconds (e.g. device muted or unplugged) — without
@@ -165,12 +201,6 @@ public class MicCaptureHandler: @unchecked Sendable {
     public var currentSignalAges: ChannelSignalAges {
         levelPublisher.currentSignalAges
     }
-
-    private var defaultInputAddress = AudioObjectPropertyAddress(
-        mSelector: kAudioHardwarePropertyDefaultInputDevice,
-        mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: kAudioObjectPropertyElementMain,
-    )
 
     public convenience init(
         outputURL: URL,
@@ -203,23 +233,27 @@ public class MicCaptureHandler: @unchecked Sendable {
         sessionFactory: @escaping () -> any MicEngineSessionProviding,
         decideRetry: @escaping @Sendable (Int) -> CaptureRestartRetryAction
             = CaptureRestartRetryPolicy.decide,
-        stallWatchdogLimits: MicStallWatchdogPolicy.Limits = .production,
-        stallClock: @escaping @Sendable () -> TimeInterval = MicStallWatchdogPolicy.monotonicNow,
+        scheduleOnMain: @escaping @Sendable (TimeInterval, @escaping @Sendable () -> Void) -> Void
+            = { delay, work in DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work) },
+        clock: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        awaitFirstStart: @escaping @Sendable (DispatchGroup, TimeInterval) -> Bool
+            = { done, timeout in done.wait(timeout: .now() + timeout) == .success },
+        inputListenerRegistrar: DefaultInputListenerRegistrar = .system,
         isDevicePresent: @escaping @Sendable (String) -> Bool = MicCaptureHandler.isDevicePresentOnSystem,
-        configChangeLimits: MicConfigChangePolicy.Limits = .production,
         pauseGate: CapturePauseGate = CapturePauseGate(),
     ) {
-        self.decideRetry = decideRetry
-        stallWatchdog = OSAllocatedUnfairLock(initialState: MicStallWatchdogPolicy(limits: stallWatchdogLimits))
-        configChangePolicy = MicConfigChangePolicy(limits: configChangeLimits)
-        self.stallClock = stallClock
+        self.inputListenerRegistrar = inputListenerRegistrar
         self.isDevicePresent = isDevicePresent
+        self.pauseGate = pauseGate
+        self.clock = clock
+        self.awaitFirstStart = awaitFirstStart
+        self.decideRetry = decideRetry
+        self.scheduleOnMain = scheduleOnMain
         self.outputURL = outputURL
         self.debugLogging = debugLogging
         self.liveSink = liveSink
         self.debugFault = debugFault
         self.sessionFactory = sessionFactory
-        self.pauseGate = pauseGate
         session = sessionFactory()
     }
 
@@ -227,14 +261,21 @@ public class MicCaptureHandler: @unchecked Sendable {
         stop()
     }
 
+    /// Brings up the first engine off the main queue under a deadline (see `+FirstStart`).
+    /// Watch and observers are armed only once it was adopted; a timed-out one is left alone.
     public func start(deviceUID: String? = nil) throws {
+        guard case let .launchAttempt(generation) = arbiter.withLock({ $0.handle(.firstStartRequested) }) else {
+            // A second start(); no production caller makes one.
+            logger.warning("Mic: start() on a capture that was already started, ignoring")
+            return
+        }
         selectedDeviceUID = deviceUID
-        activeInputDevice = try startEngine(deviceUID: deviceUID, on: session).device
-        _ = arbiter.withLock { $0.handle(.startSucceeded) }
-        configChangePolicy.engineStarted(at: stallClock())
+        captureStartTicks = mach_absolute_time()
+        noteDebugFaultStart()
+        try bringUpFirstEngine(deviceUID: deviceUID, generation: generation)
+        beginProgressWatch()
         installDeviceChangeListener()
         installConfigChangeObserver()
-        startStallWatchdog()
     }
 
     /// Validate the live hardware format and derive a tap format that MATCHES
@@ -256,12 +297,15 @@ public class MicCaptureHandler: @unchecked Sendable {
     }
 
     // swiftlint:disable function_body_length
+    /// Runs for the attempt `generation`; a stale one stops at its checks (see `ensureAttemptIsCurrent`).
     /// Returns the hardware rate and the device the session reports, read here
     /// so a restart reads it on the restart queue rather than on main.
     @discardableResult
     func startEngine(
-        deviceUID: String?, on session: any MicEngineSessionProviding,
+        deviceUID: String?, on session: any MicEngineSessionProviding, generation: Int,
+        onOutputFileCreated: () -> Void = {},
     ) throws -> (rate: Double, device: MicInputDevice?) {
+        try ensureAttemptIsCurrent(generation)
         // The one call in here that can block forever (issue #588).
         let hwFormat = try session.hardwareFormat(deviceUID: deviceUID)
         logger.info("Mic hardware format: \(hwFormat.sampleRate) Hz, \(hwFormat.channelCount)ch")
@@ -290,6 +334,7 @@ public class MicCaptureHandler: @unchecked Sendable {
         // this constant, which made it look like per-session state.
         let fileSampleRate = speechSampleRate
         if outputFile == nil, arbiter.withLock({ $0.mayCreateOutputFile }) {
+            startSeams.beforeOutputFile()
             let wavSettings: [String: Any] = [
                 AVFormatIDKey: kAudioFormatLinearPCM,
                 AVSampleRateKey: fileSampleRate,
@@ -300,6 +345,7 @@ public class MicCaptureHandler: @unchecked Sendable {
                 AVLinearPCMIsNonInterleaved: false,
             ]
             outputFile = try AVAudioFile(forWriting: outputURL, settings: wavSettings)
+            onOutputFileCreated()
             // Restrict permissions to owner-only (0600) — audio may contain sensitive meeting content
             try FileManager.default.setAttributes(
                 [.posixPermissions: 0o600],
@@ -339,21 +385,24 @@ public class MicCaptureHandler: @unchecked Sendable {
         // format (issue #379); Swift can't catch that. Build the tap block, then
         // install it through the ObjC shim so a raise becomes a recoverable throw.
         let tapBlock: AVAudioNodeTapBlock = { [weak self] buffer, when in
-            guard let self, self.isRecording else { return }
+            guard let self, self.isRecording, !self.debugFaultWithholdsBuffer() else { return }
             if self.firstFrameTime == 0 {
-                self.firstFrameTime = mach_absolute_time()
+                self.firstFrameTime = self.timelineOriginTicks != 0 ? self.timelineOriginTicks : mach_absolute_time()
             }
-            // Every buffer, whatever it carries and paused or not: zeros are
-            // a working input, and the levels and buffer ages keep reading
-            // the live device during a pause.
-            self.noteBufferForStallWatchdog()
+            // Every buffer is published before the pause cut, whatever it
+            // carries: zeros are a working input, the levels and buffer ages
+            // keep reading the live device during a pause, and the progress
+            // watchdog (`+Progress`) sees the buffers of a paused recording, so
+            // a long pause never releases the microphone as stalled.
             self.accumulateDebugRMS(buffer: buffer)
             self.publishCurrentLevel()
             self.maybeReportDebugRMS()
             self.writeUnpausedFrames(of: buffer, at: when, converter: converter, resampleRatio: resampleRatio)
         }
 
+        try ensureAttemptIsCurrent(generation)
         try session.installTap(format: installFormat, block: tapBlock)
+        try ensureAttemptIsCurrent(generation)
         try session.start()
         logger.info("Mic recording started: \(self.outputURL.lastPathComponent)")
 
@@ -364,16 +413,11 @@ public class MicCaptureHandler: @unchecked Sendable {
     // swiftlint:enable function_body_length
 
     private func installDeviceChangeListener() {
-        guard deviceChangeListener == nil else { return }
+        guard listensForInputDeviceChanges, deviceChangeListener == nil else { return }
         let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
             self?.handleDefaultInputDeviceChanged()
         }
-        let status = AudioObjectAddPropertyListenerBlock(
-            AudioObjectID(kAudioObjectSystemObject),
-            &defaultInputAddress,
-            DispatchQueue.main,
-            listener,
-        )
+        let status = inputListenerRegistrar.add(listener)
         if status == noErr {
             deviceChangeListener = listener
             logger.info("Mic: listening for default input device changes")
@@ -382,9 +426,22 @@ public class MicCaptureHandler: @unchecked Sendable {
         }
     }
 
+    /// Listen for AVAudioEngine configuration changes (format changes on current device).
+    func installConfigChangeObserver() {
+        guard configChangeObserver == nil else { return }
+        configChangeObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: session.notificationObject,
+            queue: .main,
+        ) { [weak self] _ in
+            self?.handleEngineConfigChange()
+        }
+        logger.info("Mic: listening for engine configuration changes")
+    }
+
     private func handleDefaultInputDeviceChanged() {
         logger.info("Mic: default input device changed")
-        handleDeviceChange(.defaultInputChanged)
+        handleDeviceChange()
     }
 
     public func stop() {
@@ -396,16 +453,9 @@ public class MicCaptureHandler: @unchecked Sendable {
         // caller (issue #588). Under `attemptBuildLock`, so an attempt still
         // queued on the restart queue builds nothing once this has returned.
         let decision = attemptBuildLock.withLock { arbiter.withLock { $0.handle(.stopRequested) } }
-        stopStallWatchdog()
-        cancelPendingConfigChangeRestart()
         endDeviceSelection()
         if let listener = deviceChangeListener {
-            AudioObjectRemovePropertyListenerBlock(
-                AudioObjectID(kAudioObjectSystemObject),
-                &defaultInputAddress,
-                DispatchQueue.main,
-                listener,
-            )
+            inputListenerRegistrar.remove(listener)
             deviceChangeListener = nil
         }
         if let observer = configChangeObserver {
@@ -427,12 +477,15 @@ public class MicCaptureHandler: @unchecked Sendable {
         case .sealAndSkipEngine:
             logger.warning("Mic: stopping while a restart attempt is outstanding — leaving its engine alone")
 
+        case .nothingToRelease:
+            logger.info("Mic: stopping a capture that stalled without audio; its engine was already released")
+
         default:
             // Already stopped. Nothing to release, and touching the engine again
             // would be a double teardown via deinit.
             break
         }
-        outputFile = nil
+        closeFileAfterBridgeChunk()
         logger.info("Mic recording stopped")
     }
 }
@@ -526,6 +579,9 @@ private func sumOfSquaresInt16(
 public enum MicCaptureError: LocalizedError {
     case noInputDevice
     case invalidHardwareFormat(sampleRate: Double, channelCount: UInt32)
+    /// The first start did not return within `RestartArbiter.attemptTimeout`
+    /// (issue #778). Its thread stays in the call for as long as it takes.
+    case firstStartTimedOut
 
     public var errorDescription: String? {
         switch self {
@@ -533,41 +589,11 @@ public enum MicCaptureError: LocalizedError {
 
         case let .invalidHardwareFormat(sampleRate, channelCount):
             "Microphone reported an invalid format (\(sampleRate) Hz, \(channelCount) ch)"
-        }
-    }
-}
 
-// MARK: - Debug fault injection (issue #379 recovery verification)
-
-private extension MicCaptureHandler {
-    /// In production (`debugFault == nil`) returns `real` unchanged. Under an
-    /// injected fault it returns an invalid (0 Hz) tap format exactly once —
-    /// the condition that makes installTapOnBus raise
-    /// `IsFormatSampleRateAndChannelCountValid` — so the e2e can verify the
-    /// NSException recovery path end-to-end.
-    func resolveTapInstallFormat(default real: AVAudioFormat) -> AVAudioFormat {
-        guard injectBadTapFormatOnce else { return real }
-        injectBadTapFormatOnce = false
-        guard let bad = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32, sampleRate: 0, channels: 1, interleaved: false,
-        ) else { return real }
-        logger.warning("[debug-fault] installing invalid (0 Hz) tap format (issue #379 repro)")
-        return bad
-    }
-
-    /// No-op in production. When a `DebugTapFault` was injected: once, after the
-    /// first successful start, schedule a single self-triggered device-change
-    /// restart whose tap install uses the bad format. Drives the real
-    /// handleDeviceChange -> launchRestartAttempt -> startEngine path so the
-    /// reproduction exercises production code, not a shortcut.
-    func armDebugFaultIfNeeded() {
-        guard let debugFault, !debugFaultArmed else { return }
-        debugFaultArmed = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + debugFault.triggerRestartAfter) { [weak self] in
-            guard let self, self.isRecording else { return }
-            logger.warning("[debug-fault] firing simulated mic device-change mid-recording (issue #379 repro)")
-            self.injectBadTapFormatOnce = true
-            self.handleDeviceChange()
+        // The recording error when the microphone is the only track; says only what was observed.
+        case .firstStartTimedOut:
+            "The microphone did not respond within \(MicStartLimits.firstStartDeadlineSeconds) seconds of being "
+                + "opened, so the recording could not start."
         }
     }
 }

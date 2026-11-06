@@ -104,7 +104,11 @@ PRs are excluded from the self-hosted runner.
   driving `POST /v1/record` instead of a detected meeting, and asserts the
   record-only sidecar carries a mic track, `trigger` is `manual`, and there is
   **no** app track. That last one is the point: nothing else in the suite would
-  notice a microphone-only recording quietly opening a process tap. It is the
+  notice a microphone-only recording quietly opening a process tap. It also
+  holds the only live check of `POST /v1/watch`'s refusal (`409` during the
+  manual recording); why it never starts watching is at
+  `_mic_only_assert_watch_refused`. The start/stop success path has no live
+  check. It is the
   only lane that mutates a machine-global setting, pointing the default audio
   output at the loopback for its own duration (see setup step 1 for why), so it
   is also the only one whose teardown can leave the host in a worse state than
@@ -164,6 +168,129 @@ PRs are excluded from the self-hosted runner.
   asserts the bundled model is in the deployed bundle up front: without it the
   stage correctly reports a missing model and leaves the track as recorded,
   which would read as a broken canceller.
+- The `--protocol` lane is the only one that asserts the protocol stage writes a
+  protocol. Every other lane runs with the runner's provider, the Claude CLI,
+  which is installed there but not logged in for the runner account, so they all
+  log "Protocol generation failed — transcript saved" and pass on the transcript
+  alone. This lane points the OpenAI-compatible provider at
+  `scripts/fixtures/openai-chat-stub.py` (stdlib Python, `127.0.0.1`, a port the
+  kernel picks, one JSON line per request with no header beyond the content
+  type) and imports a 15 s fixture twice through `POST /v1/jobs`, which runs the
+  same `PipelineQueue` protocol stage a recording does. With the stub answering
+  it asserts the one request it got (model, `stream`, `max_tokens`, temperature
+  set and `top_p` absent, the protocol language in the system prompt, the
+  transcript file as the user message), the job `done` without a protocol
+  warning, and a `protocolPath` in the output folder whose file is exactly the
+  reply plus the transcript. With the stub answering HTTP 500 it asserts the job
+  still `done` with the "transcript saved" warning, no `protocolPath` and no
+  protocol file: the control that shows the first half can tell the outcomes
+  apart. Diarization is off for the run so the job never parks at naming.
+  - **It leaves the API key alone.** The app reads it from the Keychain, and a
+    lane-owned item would mean editing the user keychain search list, which the
+    second runner and an installed app on the host share. The request carries
+    whatever key the host has, the stub never logs it, and where the key goes is
+    covered by `OpenAIProtocolGeneratorTests`.
+  - **It changes host settings** (provider, language, endpoint, model, sampling,
+    diarize, three output options). Their old values go, as plist XML so a double
+    round-trips bit for bit (`defaults write -float` is 32-bit), to a record
+    under `~/Library/Caches/MeetingTranscriber-e2e` before the first write, with
+    the job ids and output files beside it. On exit the stub is stopped and the
+    settings are restored first, with INT/TERM ignored, and only then the app is
+    quit (it holds the settings in memory), its unfinished lane jobs are dropped
+    from the queue snapshot and the files removed. A setting changed after the
+    lane wrote it is kept; a restore that does not read back turns the run red
+    and keeps only the lines that failed.
+  - **A killed run is finished** by the next `e2e-app.sh` run, whatever its lane,
+    which fails hard when a setting will not come back, and in CI at once by an
+    always-run `--protocol-repair` step, so drivers that launch the dev bundle on
+    their own (e2e-browser and others) never see the stub endpoint.
+  - **Nothing else may reach the stub**, since its reply would be saved as that
+    meeting's protocol: the lane requires an idle app before its first job and,
+    outside CI, refuses up front while the queue snapshot or the staging folder
+    holds work.
+
+  The helpers and the stub are tested by
+  `scripts/tests/test_protocol_lane_helpers.sh`.
+- The `--mic-stall` lane (issues #724, #706) covers the microphone progress
+  watchdog in the shipped app, a fault no runner produces on its own (the
+  loopback input always delivers; the field cases need a Bluetooth headset). It
+  builds the fault-injection bundle and launches it with
+  `MEETINGTRANSCRIBER_E2E_MIC_FAULT=stall`, so the real engine starts and runs
+  while the handler drops every buffer; `--mic-stall-late` lets the first ten
+  seconds through. It asserts, each from the layer that owns it: the capture
+  log's rebuilds after 3, 6, 12 and 24 s and its release after the 60 s budget;
+  `/state` reporting `micFault: "stalled"` with `micStallCount: 1` no earlier
+  than the budget, with the recording and the app channel still running after
+  it; one "Capture Channel Lost" notification with the stall wording; and a job
+  that finishes `done` with a German transcript, which can only come from the
+  app track. The microphone file is not empty in the `stall` variant, by design:
+  a capture restarted before it ever delivered bridges each wait with silence,
+  so the track runs to the last rebuild as exact zeros, and that is what is
+  asserted. It is one of two lanes that run the app with an isolated home
+  (`CFFIXED_USER_HOME` set to a temp dir through `open --env`; the other is
+  `--upgrade`, below), so it neither
+  reads nor writes the host's data dir or output folder; UserDefaults are not
+  redirected by that variable, and protocol generation is switched off for the
+  run and restored after it, from a record kept under
+  `~/Library/Caches/MeetingTranscriber-e2e`: a killed run is repaired at the
+  start of the next `e2e-app.sh` run, whatever its lane (not by
+  `e2e-browser.sh`, `e2e-channel-fault.sh` or a hand launch, which run with
+  what is left until then), and only while the setting still reads
+  `none`, so a choice made since is kept. Its temporary home goes at exit
+  unless the app it launched is still running; such a home is listed there
+  and removed by a later run once that app is gone. The helpers behind this
+  and the installed-app guard are tested by
+  `scripts/tests/test_mic_stall_lane_helpers.sh`. The isolated home does not cover a MeetingTranscriber
+  that is not the dev app: it would record the synthetic meeting into the
+  host's real folders, so the lane refuses while one is running and never quits
+  it. The provenance marker of the app it launched lives in that same cache
+  directory, not in the throwaway home, so the next run of any lane recognises
+  an app a failed run left behind. The variable name exists only in a
+  `-DE2E_FAULT_INJECTION` build, and the lane checks the deployed binary for it
+  before recording. With the variable unset that build injects nothing, so the
+  fault bundle a lane leaves at the shared deploy path cannot inject into a
+  later launch; `--mic-device-change` asks for its fault with
+  `MEETINGTRANSCRIBER_E2E_MIC_FAULT=device-change`. It has no workflow yet: it is run by hand.
+- The `--upgrade` lane is the only one that starts the app on data an older
+  release left behind; every other lane runs on a clean or an empty home, and
+  three changes of the release after v0.8.1 act only on such data. In its own
+  temp home it seeds, in v0.8.1's on-disk formats (derived from the sources at
+  that tag, in `scripts/lib/upgrade-seed.sh`): a WhisperKit model in
+  `Documents/huggingface` with its Hub metadata and tokenizer, an incomplete
+  variant and another tool's folder beside it, an undecodable `speakers.json`,
+  a job interrupted while transcribing in the queue snapshot with its recording
+  in staging, and a finished-job record. It asserts the model moved whole
+  (inode-identical fingerprint) and loaded, the tokenizer was copied, nothing
+  else in the shared folder changed, the new folder is excluded from backup; the
+  speaker DB survives the launch byte for byte and is quarantined unchanged on
+  the first write (a `deleteSpeaker` of nobody, answered `409`); the old record
+  is still served; the interrupted job runs to `done`, its recording moves to
+  `<output>/recordings` and into the ledger, and neither that launch nor a
+  relaunch makes a second job of it; and the account's real model folders are
+  unchanged. "Loaded without a download" is enforced, not inferred: the app is
+  started directly under `sandbox-exec` with a profile that closes the network
+  to everything but localhost, so a model not found locally ends in a failed
+  load (measured with an incomplete variant: `HubClientError`, nothing moved).
+  That is also why it cannot use `open` and why it never watches: a binary
+  started directly is not the bundle the runner's grants were made for, so the
+  lane touches nothing TCC guards. Its own settings go in as launch arguments
+  (the argument domain), which override the bundle's stored preferences for that
+  process without being written; the preference writes every e2e-app.sh run
+  makes before launch still happen. The queue,
+  and with it the snapshot restore, is built by an import of the fixture, which
+  runs the same rebuild a watch start does. The model is cloned from
+  `E2E_UPGRADE_MODEL_SOURCE`, in CI the runner's pre-warmed test home.
+- The `--quit-flush` lane (issue #745) quits the app while a manual recording
+  runs and asserts the recording survives as a job. What it proves, its host
+  guards and its state backup/restore are written at `run_quit_flush` in
+  `e2e-app.sh`. It is **not wired into CI and is run by hand as an admin**: two
+  of its checks read the unified log, which the non-admin runner user cannot
+  read on macOS 26. The lane header gives the two refusals and what wiring it
+  would take. The lane checks the precondition first (`unified_log_unusable`
+  in `scripts/lib/e2e-helpers.sh`) and stops with that reason. Measured in
+  three trial runs on the runner while this lane was being considered for CI:
+  the single-quit cycle passed, and the AppleScript quit reached the app
+  without any extra grant.
 - **One driver at a time.** `e2e-app.sh` refuses to start while another
   `e2e-app.sh` is live (they share the deployed bundle, the RPC port and the
   audio device, and each quits the other's app at launch, so neither result
@@ -313,6 +440,61 @@ PRs are excluded from the self-hosted runner.
    one needs the grant. A second runner given that label would need its own node
    binary added, since the grant is per path.
 
+   **macOS 27 renamed Accessibility** to **Device Control and Data Access**
+   (System Settings → Privacy & Security). Same grant, same chooser; every
+   "Accessibility" in this file means that pane on macOS 27.
+
+   **A runner update can move node, and then every grant goes at once.**
+   `runsvc.sh` picks the node directory (`externals/node20` → `externals/node24`
+   after a macOS update and runner restart, measured on the mini), and the
+   grants are per binary path, so the new node holds none of them: not Device
+   Control, not **Files & Folders → Downloads** (the lanes read and write the
+   app's output folder under `~/Downloads`), not **Automation → System Events**,
+   and not **Automation → MeetingTranscriber-Dev** (`quit_running_app` asks the
+   dev app to quit through an Apple Event at the start of nearly every lane,
+   which is what runs the app's quit hold: stopping a recording, flushing the
+   pipeline snapshots. The call is bounded at twice that hold plus a margin.
+   Refused (-1743), it reports `TCC Automation → MeetingTranscriber-Dev not
+   usable`, ends the app by signal so the next lane does not inherit it, and
+   fails the calling lane, since a signal skips the hold. Unanswered, which a
+   pending prompt causes but so do a modal run loop or a slow teardown, it
+   waits for the app as after an answer and, if the app stays, warns `dev app
+   did not quit` with all of those causes and ends it by signal without failing
+   the lane).
+   Each first access then raises a NEW consent prompt on the mini's screen, and
+   while a prompt is open the call that raised it **blocks** rather than fails.
+   Seen that way: a `wc -c` on a transcript hung until the step timeout and the
+   orphaned driver then blocked the rerun ("another e2e-app.sh is already
+   running"); the silent-recording lane printed an empty "Final state:" and
+   blamed the detector; `osascript` timed out with -1712.
+
+   How to recognise it now: the **Preflight TCC grants** step
+   (`scripts/ci/tcc-preflight.sh`), the first step of each self-hosted e2e
+   workflow that touches these resources, probes each one under a short bound
+   (`E2E_TCC_PROMPT_TIMEOUT`, 10 s) and reports `TCC <grant> not usable` with
+   the binary to allow, resolved from the running service rather than assumed,
+   and, for a probe that got no answer, that a prompt is probably waiting on the
+   screen. A missing Downloads grant fails the job there, since nearly every
+   lane would hang or misreport behind it (and a green job that ran nothing
+   would also satisfy the stable-tag check); Device Control only warns, because
+   the two naming lanes that need it host-skip on their own (below). Automation
+   is not probed at job start: on an ungranted host the probe would leave a
+   prompt on screen over every later lane, so the `--naming-escape` lane's own
+   probe (now under a hard bound as well) raises it last and host-skips. Inside
+   the lanes, the first transcript read and the silent lane's `/state` reads
+   are bounded too and say "blocked" rather than give a verdict. The fix:
+   answer the open prompts at the mini's screen, or allow the named node under
+   each of those panes (both Automation entries), then re-run. By hand:
+   `bash scripts/ci/tcc-preflight.sh --downloads --automation --accessibility`.
+
+   A driver that a step timeout leaves behind is ended by the pid and start
+   time each self-hosted `e2e-*.sh` driver records in `$RUNNER_TEMP` right after it sources the
+   helpers (`e2e_reap_registered_drivers` in `scripts/lib/e2e-helpers.sh`),
+   never by name: at the start of every later driver in the job, for the steps
+   that still run after a timeout (`always()`, `!cancelled()`, after a
+   `continue-on-error` lane), and in an `if: always()` step at the end of each
+   job, so the next run does not find it still holding the host.
+
    To raise the prompts by hand, run the lane once in the runner's GUI session:
    `E2E_TCC_PROMPT_TIMEOUT=300 bash scripts/e2e-app.sh --no-build --naming-escape`.
    The env var widens the preflight's probe window from its 10 s CI default so
@@ -320,12 +502,24 @@ PRs are excluded from the self-hosted runner.
    first and the prompt goes with it. `tccutil` can only reset, and the MDM/PPPC
    route is unavailable here (see step 3), so a click is unavoidable.
 
-   Until both are in place the lane **skips loudly and passes**, writing cause
-   and fix to the step summary. Deliberate: an ungranted host would otherwise
-   turn every PR red for a prerequisite unrelated to the change under test, and
-   a silent skip would be worse still, since it would read as coverage. The
-   tolerance is narrow — only the preflight's two missing-grant arms return
-   early; anything failing after them still fails the lane.
+   Until both are in place the lane (and `--naming-switch`, which needs the
+   Accessibility half) **skips and passes**, via `host_skip` in
+   `scripts/lib/e2e-helpers.sh`: cause and fix go to the log and the step
+   summary, a `::warning::` annotation goes on the run page, and the lane is
+   listed in `$RUNNER_TEMP/e2e-host-skips`. Passing is deliberate: an ungranted
+   host would otherwise turn every PR (and every main push, which carries the
+   stable-tag check) red for a prerequisite unrelated to the change under test.
+   A skip nobody sees would be worse still, since it would read as coverage, and
+   that is what happened: both lanes skipped on every main run for a stretch
+   with the step reading green. So the last step of `e2e-app.yml` fails a
+   **scheduled or dispatched** run when that list is not empty: the nightly
+   belongs to no change, and a dispatch is how someone checks a restored grant.
+   Failing at the end rather than in the step keeps every later lane running;
+   the step calls `fail_on_host_skips` from the helper lib. The tolerance is
+   narrow: a lane may skip only on a cause that is certainly the host's. The
+   naming preflights skip only on the driver's explicit `trusted=false` or the
+   specific refusal (a System Events timeout is retried once with a longer
+   window first); anything else fails the lane.
 
 **Launch the app with `open`, never by executing the binary.** TCC answers for
 the process launchd knows, so a bundle started as `"$APP/Contents/MacOS/..." &`

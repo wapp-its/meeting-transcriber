@@ -13,7 +13,7 @@ final class AppSettingsTests: XCTestCase {
     // swiftlint:disable:next implicitly_unwrapped_optional
     private var apiKeyAccount: String!
 
-    /// Each test gets its own volatile `UserDefaults(suiteName:)` so
+    /// Each test gets its own scratch suite (`DefaultsSuite.open`) so
     /// `swift test --parallel` doesn't race on the shared on-disk plist.
     /// AppSettings receives the suite via constructor injection.
     ///
@@ -29,7 +29,7 @@ final class AppSettingsTests: XCTestCase {
         super.setUp()
         testSuiteName = "AppSettingsTests-\(getpid())-\(UUID().uuidString)"
         apiKeyAccount = "AppSettingsTests-openAIAPIKey-\(getpid())-\(UUID().uuidString)"
-        guard let suite = UserDefaults(suiteName: testSuiteName) else {
+        guard let suite = DefaultsSuite.open(testSuiteName) else {
             XCTFail("Could not create test UserDefaults suite")
             return
         }
@@ -449,7 +449,7 @@ final class AppSettingsTests: XCTestCase {
 
     func test_verboseDiagnostics_migratesFromLegacyAudioDebugLoggingKey() {
         let suiteName = "AppSettingsTests-migration-\(UUID().uuidString)"
-        guard let suite = UserDefaults(suiteName: suiteName) else {
+        guard let suite = DefaultsSuite.open(suiteName) else {
             XCTFail("Could not create suite")
             return
         }
@@ -464,7 +464,7 @@ final class AppSettingsTests: XCTestCase {
 
     func test_verboseDiagnostics_newKeyTakesPrecedenceOverLegacy() {
         let suiteName = "AppSettingsTests-precedence-\(UUID().uuidString)"
-        guard let suite = UserDefaults(suiteName: suiteName) else {
+        guard let suite = DefaultsSuite.open(suiteName) else {
             XCTFail("Could not create suite")
             return
         }
@@ -479,7 +479,7 @@ final class AppSettingsTests: XCTestCase {
 
     func test_verboseDiagnostics_migrationRemovesLegacyKey() {
         let suiteName = "AppSettingsTests-cleanup-\(UUID().uuidString)"
-        guard let suite = UserDefaults(suiteName: suiteName) else {
+        guard let suite = DefaultsSuite.open(suiteName) else {
             XCTFail("Could not create suite")
             return
         }
@@ -548,26 +548,6 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(settings.minSegmentDurationSeconds, 1.0)
         XCTAssertTrue(settings.excludeOverlap)
         XCTAssertTrue(settings.diarizerTuningIsAllDefaults)
-    }
-
-    // MARK: - Keychain
-
-    func testKeychainRoundTrip() {
-        KeychainHelper.delete(key: "HF_TOKEN_TEST")
-
-        XCTAssertFalse(KeychainHelper.exists(key: "HF_TOKEN_TEST"))
-        XCTAssertNil(KeychainHelper.read(key: "HF_TOKEN_TEST"))
-
-        KeychainHelper.save(key: "HF_TOKEN_TEST", value: "hf_abc123")
-        XCTAssertTrue(KeychainHelper.exists(key: "HF_TOKEN_TEST"))
-        XCTAssertEqual(KeychainHelper.read(key: "HF_TOKEN_TEST"), "hf_abc123")
-
-        KeychainHelper.save(key: "HF_TOKEN_TEST", value: "hf_xyz789")
-        XCTAssertEqual(KeychainHelper.read(key: "HF_TOKEN_TEST"), "hf_xyz789")
-
-        KeychainHelper.delete(key: "HF_TOKEN_TEST")
-        XCTAssertFalse(KeychainHelper.exists(key: "HF_TOKEN_TEST"))
-        XCTAssertNil(KeychainHelper.read(key: "HF_TOKEN_TEST"))
     }
 
     /// `DiarizerMode` is persisted via `PipelineSnapshot` (PipelineJob.usedDiarizerMode)

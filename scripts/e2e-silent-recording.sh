@@ -56,6 +56,9 @@ done
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/e2e-helpers.sh
 source "$ROOT/scripts/lib/e2e-helpers.sh"
+# Ends what a timed-out earlier step left running, then records this
+# driver for the next (see e2e_register_driver).
+e2e_register_driver
 DEV_BUNDLE_BUILD="$ROOT/app/MeetingTranscriber/.build/MeetingTranscriber-Dev.app"
 # Deploy to a stable path so the dev .app's TCC permissions (granted once
 # manually on the self-hosted runner, keyed on bundle path + cert SHA)
@@ -246,17 +249,18 @@ SIM_PID=$!
 
 # --- 6. Wait for WatchLoop to enter recording state ------------------------
 
+# /state is read through poll_state (scripts/lib/e2e-helpers.sh), which keeps
+# "the flag is false" apart from "the app did not answer". That keeps the
+# verdict honest: an app that does not answer used to read as "flag false" on
+# every poll, and this lane once blamed the detector, with an empty state dump,
+# while the app was blocked behind a TCC consent prompt.
+
 echo "▸ Waiting for app to detect + start recording (max 30 s)…"
 # `isProcessing` flips true while a job is in the queue. It's informational
 # only — if it never flips we still let step 7 run and time out there,
 # which gives a clearer "recordingSilent never went true" failure than
 # bailing here would. Hence `|| true`: a timeout here is non-fatal.
-_processing_started() {
-    assert_app_alive
-    local state; state="$("$MTCLI" state 2>/dev/null || echo '{}')"
-    [ "$(echo "$state" | jq -r '.pipeline.isProcessing // false')" = "true" ]
-}
-poll_until 30 1 _processing_started || true
+poll_state --each assert_app_alive 30 1 state_is '.pipeline.isProcessing == true' || true
 
 # --- 7. Poll for recordingSilent flag -----------------------------------------
 
@@ -268,21 +272,26 @@ echo "▸ Polling for channelHealth.recordingSilent (threshold 30 s + 20 s slack
 # `|`-join (see `_poll_for_new_lastjob_terminal` in e2e-app.sh). MIC_SILENT
 # and APP_SILENT leak to caller scope for the success log line below.
 _recording_silent() {
-    assert_app_alive
-    local state; state="$("$MTCLI" state 2>/dev/null || echo '{}')"
     IFS=$'\t' read -r RECORDING_SILENT MIC_SILENT APP_SILENT < <(
-        echo "$state" \
-            | jq -r '[.channelHealth.recordingSilent // false, .channelHealth.micSilent // false, .channelHealth.appSilent // false] | @tsv'
+        jq -r '[.channelHealth.recordingSilent // false, .channelHealth.micSilent // false, .channelHealth.appSilent // false] | @tsv' <<<"$STATE_BODY"
     )
     [ "$RECORDING_SILENT" = "true" ]
 }
-if poll_until 50 2 _recording_silent; then
-    echo "  recordingSilent=true (mic=$MIC_SILENT app=$APP_SILENT)"
-else
-    echo "Final state:" >&2
-    "$MTCLI" state 2>/dev/null | jq . >&2 || true
-    die "channelHealth.recordingSilent never went true within 50 s"
-fi
+status=0
+poll_state --each assert_app_alive 50 2 _recording_silent || status=$?
+case "$status" in
+    0) echo "  recordingSilent=true (mic=$MIC_SILENT app=$APP_SILENT)" ;;
+    2)
+        assert_app_alive
+        die "the app did not answer /state through the end of the 50 s window, so whether recordingSilent went true is unknown (last error: ${STATE_ERR:-<none>}). The app process is alive. If mt-cli timed out rather than being refused, the app is blocked, and on the runner the likeliest cause is a TCC consent prompt waiting on its screen (this lane starts the binary directly, so TCC may attribute the app's accesses to the runner's node). Fix: $(tcc_fix_hint 'the pane the prompt names')"
+        ;;
+    *)
+        # STATE_BODY is the last answer the app gave, not a later empty read.
+        echo "Last state the app answered:" >&2
+        jq . <<<"$STATE_BODY" >&2 || true
+        die "channelHealth.recordingSilent never went true within 50 s"
+        ;;
+esac
 
 echo
 echo "OK — production chain verified:"

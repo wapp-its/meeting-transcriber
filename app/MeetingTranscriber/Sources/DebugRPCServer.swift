@@ -149,11 +149,10 @@
 
         /// Generate a 32-byte hex token, persist atomically with mode 0600, return it.
         /// Reuses an existing non-empty file so `mt-cli` survives across launches.
-        nonisolated static func loadOrCreateToken() -> String {
-            let url = tokenFileURL
+        nonisolated static func loadOrCreateToken(at url: URL = tokenFileURL) -> String {
             if let data = try? Data(contentsOf: url),
                let existing = String(data: data, encoding: .utf8)?
-               .trimmingCharacters(in: .whitespacesAndNewlines),
+                   .trimmingCharacters(in: .whitespacesAndNewlines),
                !existing.isEmpty {
                 return existing
             }
@@ -515,7 +514,8 @@
         }
 
         /// Map the action outcome to an HTTP response. `notFound` → 404,
-        /// `invalid` → 400, everything else → 200 with the outcome string in the body.
+        /// `invalid` → 400, `notSaved` → 503, `dbReset` → 409, everything else → 200 with the
+        /// outcome string in the body.
         private static func respond(to outcome: SpeakerActionOutcome) -> HTTPResponse {
             switch outcome {
             case .notFound:
@@ -523,6 +523,21 @@
 
             case .invalid:
                 return HTTPResponse.badRequest()
+
+            case .notSaved:
+                return HTTPResponse.serviceUnavailable(
+                    "speaker database could not be read or written; nothing was changed\n",
+                )
+
+            case .dbReset:
+                return HTTPResponse(
+                    status: 409, reason: "Conflict",
+                    body: Data(
+                        ("speaker database was damaged and set aside; only the profiles that could "
+                            + "still be read were kept, and the action found nothing to act on among them\n").utf8,
+                    ),
+                    contentType: "text/plain",
+                )
 
             case .ok, .noop, .merged:
                 let body = Data(#"{"outcome":"\#(outcome.rawValue)"}"#.utf8)
@@ -545,37 +560,6 @@
         static func closeSettings() {
             NotificationCenter.default.post(name: .closeSettings, object: nil)
         }
-    }
-
-    // MARK: - Speaker DB action types
-
-    enum SpeakerActionOutcome: String {
-        case ok
-        case noop
-        case merged
-        case notFound
-        case invalid
-    }
-
-    /// Default `.noop` rejects every request so tests and dry-launches can't
-    /// accidentally mutate state — wire real closures explicitly when starting.
-    /// `@MainActor`-isolated closures so the struct is `Sendable` (every
-    /// invocation happens on MainActor anyway — RPC routing is itself
-    /// MainActor-bound — so the isolation doesn't change call-site semantics).
-    struct SpeakerDBActions {
-        let rename: @MainActor (String, String) -> SpeakerActionOutcome
-        let delete: @MainActor (String) -> SpeakerActionOutcome
-        let merge: @MainActor (String, String) -> SpeakerActionOutcome
-        /// Insert a synthetic speaker with a random embedding. Test-only path
-        /// — production never calls this.
-        let seed: @MainActor (String) -> SpeakerActionOutcome
-
-        static let noop = Self(
-            rename: { _, _ in .invalid },
-            delete: { _ in .invalid },
-            merge: { _, _ in .invalid },
-            seed: { _ in .invalid },
-        )
     }
 
 #endif

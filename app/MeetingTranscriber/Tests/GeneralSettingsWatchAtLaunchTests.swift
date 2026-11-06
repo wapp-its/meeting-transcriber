@@ -9,7 +9,7 @@ import XCTest
 final class GeneralSettingsWatchAtLaunchTests: XCTestCase {
     func testSwitchIsOffByDefaultAndWritesBack() throws {
         let suiteName = "GeneralSettingsWatchAtLaunchTests.\(UUID().uuidString)"
-        let suite = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let suite = try XCTUnwrap(DefaultsSuite.open(suiteName))
         addTeardownBlock { DefaultsSuite.remove(suiteName) }
         let settings = AppSettings(defaults: suite)
         let view = GeneralSettingsView(settings: settings, notificationVisibility: nil)

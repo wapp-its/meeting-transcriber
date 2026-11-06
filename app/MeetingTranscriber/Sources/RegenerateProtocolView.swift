@@ -35,8 +35,8 @@ final class RegenerateProtocolDraft {
 /// `/ui/press` allowlists, as the window it is shown over does.
 @MainActor
 struct RegenerateProtocolView: View {
-    static let trashNote = "The current protocol is moved to the Trash and replaced."
-    static let unknownDateNote = "This meeting's date is not known, so the protocol shows it as Unknown."
+    static let trashNote = "The current meeting notes are moved to the Trash and replaced."
+    static let unknownDateNote = "This meeting's date is not known, so the meeting notes show it as Unknown."
     static let noMeeting = "No recent meeting found"
 
     let phase: ProtocolRegenerator.Phase
@@ -94,7 +94,7 @@ struct RegenerateProtocolView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Regenerate Protocol")
+            Text("Regenerate Meeting Notes")
                 .font(.headline)
             meetingSection
             Divider()
@@ -171,11 +171,11 @@ struct RegenerateProtocolView: View {
             HStack(spacing: 6) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Generating the protocol…")
+                Text("Generating the meeting notes…")
             }
 
         case let .succeeded(url, warnings):
-            Text("Protocol regenerated: \(url.lastPathComponent)")
+            Text("Meeting notes regenerated: \(url.lastPathComponent)")
             ForEach(warnings, id: \.self) { warning in
                 Text(warning)
                     .font(.caption)
@@ -217,7 +217,7 @@ struct RegenerateProtocolView: View {
     /// the protocols folder. Manual-QA-only, like every `NSOpenPanel`.
     static func chooseFile(startingIn outputDir: URL) -> URL? {
         let panel = NSOpenPanel()
-        panel.title = "Choose a Protocol or Transcript"
+        panel.title = "Choose Meeting Notes or a Transcript"
         panel.allowedContentTypes = ["md", "txt"].compactMap { UTType(filenameExtension: $0) }
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false

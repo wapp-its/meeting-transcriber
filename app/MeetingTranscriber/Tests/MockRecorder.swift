@@ -44,9 +44,17 @@ class MockRecorder: RecordingProvider {
     /// false, matching the protocol's default, so existing tests are unaffected.
     var micCaptureGaveUp = false
     var appCaptureGaveUp = false
+    /// Whether the microphone's first start timed out (issue #778). Default
+    /// false, matching the protocol's default.
+    var micCaptureStartTimedOut = false
     /// Whether the silent-track watchdog stopped rebuilding (issue #672).
     /// Default false, matching the protocol's default.
     var appSilentTrackWatchdogGaveUp = false
+    /// Whether the app tap carries only a sub-step noise floor (issue #699).
+    /// Default false, matching the protocol's default.
+    var appCarriesOnlyNoiseFloor = false
+    /// Whether the microphone stalled for lack of audio (issues #724, #706).
+    var micCaptureStall = MicCaptureStall()
 
     /// What the capture layer reports about each channel. Defaults describe a
     /// channel delivering signal right now, so a test has to say explicitly

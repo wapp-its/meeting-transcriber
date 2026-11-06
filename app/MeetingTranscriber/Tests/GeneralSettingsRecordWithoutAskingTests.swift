@@ -9,7 +9,7 @@ import XCTest
 final class GeneralSettingsRecordWithoutAskingTests: XCTestCase {
     private func makeSettings() throws -> AppSettings {
         let suiteName = "GeneralSettingsRecordWithoutAskingTests.\(UUID().uuidString)"
-        let suite = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let suite = try XCTUnwrap(DefaultsSuite.open(suiteName))
         addTeardownBlock { DefaultsSuite.remove(suiteName) }
         let settings = AppSettings(defaults: suite)
         // Watch every app with a switch, so none of them is disabled.
@@ -17,6 +17,7 @@ final class GeneralSettingsRecordWithoutAskingTests: XCTestCase {
         settings.watchTencentMeeting = true
         settings.watchFaceTime = true
         settings.watchWhatsApp = true
+        settings.watchSlack = true
         return settings
     }
 
@@ -32,7 +33,7 @@ final class GeneralSettingsRecordWithoutAskingTests: XCTestCase {
         let apps = AppMeetingPattern.recordWithoutAskingCandidates.map(\.appName)
         XCTAssertEqual(
             apps,
-            ["Microsoft Teams", "Zoom", "Webex", "WeChat", "Tencent Meeting", "FaceTime", "WhatsApp"],
+            ["Microsoft Teams", "Zoom", "Webex", "WeChat", "Tencent Meeting", "FaceTime", "WhatsApp", "Slack"],
         )
 
         for app in apps {

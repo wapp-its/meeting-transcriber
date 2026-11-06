@@ -22,12 +22,19 @@ enum JobState: String, Codable {
         case .waiting: "Waiting..."
         case .transcribing: "Transcribing..."
         case .diarizing: "Diarizing..."
-        case .generatingProtocol: "Generating Protocol..."
+        case .generatingProtocol: "Generating Meeting Notes..."
         case .speakerNamingPending: "Name Speakers..."
         case .done: "Done"
         case .error: "Error"
         }
     }
+}
+
+/// Page creation alone does not mean that all protocol blocks were exported.
+enum NotionExportStatus: String, Codable {
+    case inProgress = "in_progress"
+    case failed
+    case completed
 }
 
 /// Where a job's audio sits once stage 3 has handed it to the output folder:
@@ -97,10 +104,76 @@ struct PipelineJob: Identifiable, Codable {
     /// move had just emptied, so the snapshot restore discarded it although the
     /// audio was sitting in the output folder, and the ledger recorded a path
     /// that no longer existed.
+    /// The mix file, the one a duplicate run would read first, as a list.
+    var mixPaths: [URL] {
+        [mixPath].compactMap(\.self)
+    }
+
+    /// Every audio file the job references.
+    var audioPaths: [URL] {
+        [mixPath, appPath, micPath].compactMap(\.self)
+    }
+
     mutating func recordRelocatedAudio(_ paths: RelocatedAudioPaths) {
         mixPath = paths.mix
         appPath = paths.app
         micPath = paths.mic
+    }
+
+    /// The single writer for the Notion page fields. Called as soon as the page
+    /// exists, before its blocks are appended, so a failed append can be
+    /// finished by the next retry rather than becoming a second page.
+    mutating func recordNotionPage(_ page: NotionPageResult, databaseID: String) {
+        notionPageID = page.pageID
+        if let url = page.url.flatMap(Self.trustedNotionURL) {
+            notionPageURL = url
+        }
+        notionDatabaseID = databaseID
+    }
+
+    /// This URL is later handed to `NSWorkspace.open`, so only a Notion https page qualifies.
+    static func trustedNotionURL(_ string: String) -> URL? {
+        guard let url = URL(string: string), url.scheme?.lowercased() == "https",
+              let host = url.host?.lowercased() else { return nil }
+        let isNotion = ["notion.com", "notion.so", "notion.site"].contains { host == $0 || host.hasSuffix(".\($0)") }
+        return isNotion ? url : nil
+    }
+
+    mutating func beginNotionExport(speakerNames: [String], localBackupSaved: Bool = false) {
+        notionExportStatus = .inProgress
+        notionExportSpeakerNames = speakerNames
+        notionExportBackupSaved = localBackupSaved ? true : nil
+    }
+
+    mutating func finishNotionExport(succeeded: Bool) {
+        notionExportStatus = succeeded ? .completed : .failed
+        notionExportBackupSaved = nil
+    }
+
+    /// The export stopped with this run's Markdown already on disk, so a restore
+    /// can offer the retry instead of generating the protocol again.
+    var hasInterruptedNotionExportWithBackup: Bool {
+        notionExportStatus == .inProgress && notionExportBackupSaved == true
+    }
+
+    var hasCompletedNotionExport: Bool {
+        notionExportStatus == .completed
+    }
+
+    /// Whether the protocol exists somewhere: on disk or as a Notion page.
+    var hasSavedProtocol: Bool {
+        protocolPath != nil || hasCompletedNotionExport
+    }
+
+    /// Whether a failed export has a Markdown backup recorded to retry from.
+    /// State only, never the file system, so a view body can ask it; a file
+    /// removed behind the app's back is found, and reported, by the retry.
+    var hasRetryableNotionBackup: Bool {
+        state == .done && notionExportStatus == .failed && protocolPath != nil
+    }
+
+    var hasPendingNotionExport: Bool {
+        notionExportStatus == .inProgress || notionExportStatus == .failed
     }
 
     var artifactStartTime: Date {
@@ -135,6 +208,23 @@ struct PipelineJob: Identifiable, Codable {
     var echo: EchoDetectionDTO?
     var transcriptPath: URL?
     var protocolPath: URL?
+    /// The Notion page this job created, kept so a retry updates that page
+    /// instead of creating a duplicate. Optional so snapshots written before
+    /// this field existed still decode.
+    private(set) var notionPageID: String?
+    private(set) var notionPageURL: URL?
+    /// The database the page belongs to. A retry against a different database
+    /// must not update a page in the old one.
+    private(set) var notionDatabaseID: String?
+    /// Optional for compatibility with snapshots written before export status
+    /// was tracked independently from the page ID and URL.
+    private(set) var notionExportStatus: NotionExportStatus?
+    /// Structured names retained for export-only retries; never reparse the
+    /// rendered transcript to recover tags.
+    private(set) var notionExportSpeakerNames: [String]? // swiftlint:disable:this discouraged_optional_collection
+    /// Only set while an export is running. An older protocol on disk during a
+    /// re-export must not pass for this run's output.
+    private(set) var notionExportBackupSaved: Bool? // swiftlint:disable:this discouraged_optional_boolean
     var namingSlug: String?
     // Output policy captured when this job enters the queue. Optional so
     // snapshots saved before transcript-output options existed still decode.
@@ -148,12 +238,16 @@ struct PipelineJob: Identifiable, Codable {
     /// job enters the queue; the file's text is read only when the protocol is
     /// generated. Nil for a job from a snapshot written before templates, which
     /// uses the current default. A retry keeps it: it is the person's choice,
-    /// not something the failed run concluded.
+    /// not something the failed run concluded. "Regenerate Notes" replaces it
+    /// with the template it was asked for, since the notes are then that one's.
     var protocolTemplate: ProtocolTemplateID?
     /// Background info the person gave for this meeting, sent to the protocol
     /// provider inside the prompt. Never logged, put in a warning or reported
     /// over RPC; the snapshot that holds it is owner-only. A retry keeps it.
     let protocolBackground: String?
+    // See `includeFullTranscriptInProtocol`.
+    // swiftlint:disable:next discouraged_optional_boolean
+    var useAITitleForFilenames: Bool?
     /// Diarizer mode that produced the *current* `speakerNamingDataByJob`
     /// entry. Set by `PipelineQueue` after diarisation completes (in the
     /// initial pipeline run and after `lateDiarization`). Used by the
@@ -292,6 +386,8 @@ struct PipelineJob: Identifiable, Codable {
         saveRawTranscriptSeparately: Bool? = nil,
         protocolTemplate: ProtocolTemplateID? = nil,
         protocolBackground: String? = nil,
+        // swiftlint:disable:next discouraged_optional_boolean
+        useAITitleForFilenames: Bool? = nil,
     ) {
         self.id = UUID()
         self.meetingTitle = meetingTitle
@@ -315,6 +411,7 @@ struct PipelineJob: Identifiable, Codable {
         self.saveRawTranscriptSeparately = saveRawTranscriptSeparately
         self.protocolTemplate = protocolTemplate
         self.protocolBackground = protocolBackground
+        self.useAITitleForFilenames = useAITitleForFilenames
         self.usedDiarizerMode = nil
         self.autoSkipNaming = autoSkipNaming
     }

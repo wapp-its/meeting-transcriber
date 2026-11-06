@@ -97,7 +97,7 @@ extension PipelineQueue {
             logger.info("[\(job.shortID, privacy: .public)] audio already running under another job")
             updateJobState(id: job.id, to: .error, error: "This recording is already being processed")
         }
-        isProcessing = false
+        releaseProcessingFlag()
         triggerProcessing()
         return false
     }
@@ -118,6 +118,17 @@ extension PipelineQueue {
             // have no recorded start, so fall back to the enqueue time.
             slug: namingSlug(title: job.meetingTitle, jobID: job.id, startTime: job.artifactStartTime),
         )
+    }
+
+    /// Throw `CancellationError` once a job's work has been cancelled or the
+    /// job is no longer in the queue. A cancelled job writes nothing further,
+    /// and this is the check that holds the writes back: run before each write
+    /// that follows an await. Cancelling the task alone does not, because a
+    /// step that ignores cancellation (a model call that cannot be
+    /// interrupted) still returns, and everything after it would then write
+    /// for a job that is gone.
+    func ensureStillQueued(_ jobID: UUID) throws(CancellationError) {
+        guard isStillQueued(jobID) else { throw CancellationError() }
     }
 
     /// Put the transcript on disk as soon as transcription produced it.
@@ -148,11 +159,22 @@ extension PipelineQueue {
         }
     }
 
+    /// Clear `isProcessing` on the way out of `processNext`, unless another
+    /// entry's run is still going: the flag is what keeps `triggerProcessing`
+    /// from starting a second run beside it, and entries overlap whenever
+    /// `processNext` is awaited directly while `processTask` runs.
+    private func releaseProcessingFlag() {
+        if pipelineRuns.isEmpty { isProcessing = false }
+    }
+
     /// Thin orchestrator: take the next waiting job and run it through the
     /// pipeline — transcribe → diarize → generate protocol → done.
     func processNext() async {
-        guard let index = jobs.firstIndex(where: { $0.state == .waiting }) else {
-            isProcessing = false
+        // A job another entry into this method is already running stays
+        // `.waiting` until its run's task first executes; picking it again here
+        // would read the claim below as a duplicate and drop the job.
+        guard let index = jobs.firstIndex(where: { $0.state == .waiting && pipelineRuns[$0.id] == nil }) else {
+            releaseProcessingFlag()
             return
         }
         let job = jobs[index]
@@ -162,9 +184,42 @@ extension PipelineQueue {
         // A claim that outlived one of them would lock the recording out of
         // any later attempt for the rest of the session.
         defer { inFlightRuns.end(jobID: job.id) }
-        processingJobID = job.id
-        defer { processingJobID = nil }
 
+        // On a task of its own, recorded under the job, so that cancelling this
+        // job cancels exactly this run however this method was entered. Only
+        // `cancelWork` cancels it, which is what lets the run read its own
+        // task's cancellation as "my job was cancelled or removed". Nothing
+        // cancels the entering task, and a cancel of it is not passed on.
+        let run = Task { await runPipeline(job) }
+        pipelineRuns[job.id] = run
+        let continues = await run.value
+        pipelineRuns[job.id] = nil
+
+        releaseProcessingFlag()
+        if continues { triggerProcessing() }
+    }
+
+    /// Run one stage of a job's pipeline run under the cancel rule: not at all
+    /// once the job's work is cancelled or the job is gone, and its output
+    /// dropped when that happened while the stage ran. A stage that ignores
+    /// cancellation (an engine or model call that cannot be interrupted)
+    /// still returns, and the next stage would otherwise write for a job that
+    /// is gone. Writes that follow an await inside a stage are guarded where
+    /// they are made: the protocol save, and the naming session's writers.
+    private func stage<T>(_ jobID: UUID, _ body: () async throws -> T) async throws -> T {
+        try ensureStillQueued(jobID)
+        let output = try await body()
+        try ensureStillQueued(jobID)
+        return output
+    }
+
+    /// One claimed job's run. Returns whether the queue moves on to the next
+    /// waiting job, which every exit does except a queue missing its
+    /// dependencies.
+    private func runPipeline(_ job: PipelineJob) async -> Bool {
+        // Cancelled between the claim and this task's first turn: no resume,
+        // no work directory, no transcription for a job that is gone.
+        guard isStillQueued(job.id) else { return true }
         // A job the restore found interrupted while its protocol was being
         // generated already has its transcript on disk. Attempted under the
         // claim, like every other exit here, and ahead of the dependency guard
@@ -172,19 +227,11 @@ extension PipelineQueue {
         // nor the output folder, and leaving it behind a nil engine would strand
         // a job that only wants one LLM call until the marking dies with the
         // session.
-        if await resumeProtocolOnly(job) {
-            // Same reason the `catch` blocks below clear it: an id left behind
-            // is what tells a later generic error apart from a cancellation.
-            cancelledJobIDs.remove(job.id)
-            isProcessing = false
-            triggerProcessing()
-            return
-        }
+        if await resumeProtocolOnly(job) { return true }
 
         guard let engine, let outputDir else {
             logger.warning("Processing dependencies not configured — skipping")
-            isProcessing = false
-            return
+            return false
         }
         let ctx = Self.makeContext(for: job)
 
@@ -201,7 +248,9 @@ extension PipelineQueue {
             try FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: workDir) }
 
-            let transcription = try await transcribe(ctx, engine: engine, workDir: workDir)
+            let transcription = try await stage(ctx.jobID) {
+                try await transcribe(ctx, engine: engine, workDir: workDir)
+            }
 
             // The transcript WITHOUT its recording-level note or its pause
             // markers. A dropped track renders that one line even when the
@@ -221,42 +270,40 @@ extension PipelineQueue {
                     "[\(ctx.shortID, privacy: .public)] transcription_empty inputRMSdBFS=\(inputRMS, privacy: .public). Likely silent input or ASR misconfiguration — check microphone level and engine settings.",
                 )
                 updateJobState(id: ctx.jobID, to: .error, error: "Empty transcript")
-                isProcessing = false
-                triggerProcessing()
-                return
+                return true
             }
 
             saveTranscriptDraft(transcription.transcript, ctx: ctx, outputDir: outputDir)
 
-            let finalTranscript = await diarize(
-                transcription, ctx: ctx, engine: engine,
-                workDir: workDir, outputDir: outputDir,
-            )
+            let diarization = try await stage(ctx.jobID) {
+                try await diarize(
+                    transcription, ctx: ctx, engine: engine,
+                    workDir: workDir, outputDir: outputDir,
+                )
+            }
 
-            try await generateAndSaveProtocol(
-                finalTranscript: finalTranscript, transcription: transcription,
-                ctx: ctx, workDir: workDir, outputDir: outputDir,
-            )
-        } catch is CancellationError {
-            // Cleared here too, not only in the branch below. The set is what
-            // tells a later generic error apart from a cancellation, so an ID
-            // left in it outlives the job it described for the rest of the
-            // session. Nothing threw this out of a stage until the echo
-            // cancellation did, which is what made the leak reachable.
-            cancelledJobIDs.remove(ctx.jobID)
-            logger.info("Job \(ctx.jobID) cancelled")
-            // Job already removed by cancelJob()
+            try await stage(ctx.jobID) {
+                try await generateAndSaveProtocol(
+                    diarization: diarization, transcription: transcription,
+                    ctx: ctx, workDir: workDir, outputDir: outputDir,
+                )
+            }
         } catch {
-            if cancelledJobIDs.remove(ctx.jobID) != nil {
+            // This run's task is cancelled only when its own job is cancelled
+            // or removed, so the task's flag and the job's absence are the
+            // record of it, whatever the error says: a stage stopped by the
+            // cancellation may report a failure of its own rather than
+            // `CancellationError`. Conversely a `CancellationError` for a job
+            // still here is a failure, or the job would sit in its working
+            // state for good.
+            if !isStillQueued(ctx.jobID) {
                 logger.info("Job \(ctx.jobID) cancelled")
             } else {
                 logger.error("Pipeline error for job \(ctx.jobID): \(error.localizedDescription, privacy: .public)")
                 updateJobState(id: ctx.jobID, to: .error, error: error.localizedDescription)
             }
         }
-
-        isProcessing = false
-        triggerProcessing()
+        return true
     }
 
     // MARK: - Pipeline stages
@@ -325,6 +372,71 @@ extension PipelineQueue {
         )
         addWarning(id: ctx.jobID, warning)
         return viability
+    }
+
+    /// Transcribe the viable tracks of a dual-source pair, keeping whichever
+    /// transcribed when the other fails on its own file
+    /// (`DualTrackTranscription`). A dropped track downgrades the stored
+    /// verdict, which is what the transcript note and both diarization runs
+    /// read.
+    private func transcribeTracks(
+        viability: DualTrackViability, echoRemoved: Bool, tracks: (app: URL, mic: URL),
+        ctx: JobContext, engine: any TranscribingEngine,
+    ) async throws -> DualTrackTranscription.Kept {
+        // Only a `.both` pair has a track to fall back on. With one viable
+        // track, or with `.neither`, the first failure is the job's error and
+        // the other file is not decoded just to report it.
+        let canDropTrack = viability == .both
+        let appAttempt = viability == .micOnly
+            ? nil
+            : try await transcribeTrack(tracks.app, canDrop: canDropTrack, ctx: ctx, engine: engine)
+        // An engine that ignores cancellation still returns; the second track
+        // is not transcribed for a job that is gone.
+        try ensureStillQueued(ctx.jobID)
+        let micAttempt = viability == .appOnly
+            ? nil
+            : try await transcribeTrack(tracks.mic, canDrop: canDropTrack, ctx: ctx, engine: engine)
+        let kept = try DualTrackTranscription.resolve(app: appAttempt, mic: micAttempt, viability: viability)
+        if kept.viability != viability {
+            setTrackViability(id: ctx.jobID, kept.viability)
+        }
+        for warning in kept.warnings {
+            logger.warning("[\(ctx.shortID, privacy: .public)] \(warning, privacy: .public)")
+            addWarning(id: ctx.jobID, warning)
+        }
+        if echoRemoved, !kept.viability.carriesAppAudio {
+            // The canceller took the far end out of the microphone track
+            // before the app track failed, so neither track has it any more.
+            // Close to unreachable, since the canceller has just read the app
+            // file, but if it happens the note alone would say the microphone
+            // holds everything there is.
+            addWarning(
+                id: ctx.jobID,
+                "Echo cancellation had removed the other participants from the microphone track, so they are missing from this transcript",
+            )
+        }
+        return kept
+    }
+
+    /// Transcribe one track of a dual-source pair. With `canDrop`, a failure
+    /// on the track's own file is returned instead of thrown, so
+    /// `DualTrackTranscription` can keep the other track. Everything else
+    /// still ends the run here: a cancellation (a `CancellationError`, or any
+    /// error once the job is gone), and an engine-wide failure, which would
+    /// only repeat on the other track after loading the same model a second
+    /// time.
+    private func transcribeTrack(
+        _ url: URL, canDrop: Bool, ctx: JobContext, engine: any TranscribingEngine,
+    ) async throws -> DualTrackTranscription.Attempt {
+        do {
+            return try await .success(engine.transcribeSegments(audioPath: url))
+        } catch let cancellation as CancellationError {
+            throw cancellation
+        } catch {
+            try ensureStillQueued(ctx.jobID)
+            guard canDrop, TranscriptionFailureScope.of(error) == .file else { throw error }
+            return .failure(error)
+        }
     }
 
     /// The dual-source half of stage 1: resample both tracks, measure the echo
@@ -398,24 +510,31 @@ extension PipelineQueue {
         announceEchoBleed(echoAnalysis, jobID: ctx.jobID, echoRemoved: echoRemoved)
 
         // The drop itself: a track with nothing in it is never handed to the
-        // engine. `.neither` deliberately stays on the unguarded path — with
-        // nothing on either side there is no transcript to save, so that job
-        // fails exactly as it did before, carrying the engine's own message.
-        let appSegments = viability == .micOnly
-            ? []
-            : try await engine.transcribeSegments(audioPath: app16k)
-        let micSegments = viability == .appOnly
-            ? []
-            : try await engine.transcribeSegments(audioPath: mic16k)
+        // engine. `.neither` still hands both over: with nothing on either
+        // side there is no transcript to save, and the job fails with what the
+        // engine says, its refusal on the first track or, from an engine that
+        // returns nothing, "Empty transcript". A track of a `.both` pair that
+        // fails on its own file is dropped after the fact, and
+        // `transcribed.viability` says so.
+        let transcribed = try await transcribeTracks(
+            viability: viability, echoRemoved: echoRemoved,
+            tracks: (app: app16k, mic: mic16k), ctx: ctx, engine: engine,
+        )
+        let appSegments = transcribed.app
+        let micSegments = transcribed.mic
 
         // On an affected recording, work out which microphone segments are only
         // the loudspeaker coming back, so the merge can leave them out of the
-        // transcript instead of writing the far end twice.
-        let micEchoVerdicts = await classifyMicEcho(
-            remedy: remedy, analysis: echoAnalysis,
-            tracks: (app: app16k, mic: mic16k, micDelay: ctx.micDelay),
-            micSegments: micSegments,
-        )
+        // transcript instead of writing the far end twice. Not once the app
+        // track is lost: whatever is left of the far end is then on the
+        // microphone alone, and removing it as a copy would remove the only one.
+        let micEchoVerdicts = transcribed.viability.carriesAppAudio
+            ? await classifyMicEcho(
+                remedy: remedy, analysis: echoAnalysis,
+                tracks: (app: app16k, mic: mic16k, micDelay: ctx.micDelay),
+                micSegments: micSegments,
+            )
+            : []
 
         let segments = DiarizationProcess.mergeDualSourceSegments(
             appSegments: appSegments,
@@ -428,21 +547,24 @@ extension PipelineQueue {
         if suppressed > 0 {
             recordSuppressedSegments(jobID: ctx.jobID, suppressed)
         }
-        if !micEchoVerdicts.isEmpty {
-            // The whole distribution, not just the count that was acted on. The
-            // threshold between "copy" and "someone spoke" is the one number a
-            // field report will dispute ("it deleted my sentence"), and without
-            // seeing how the segments fell there is nothing to reason from.
-            // Numbers only: no audio, no transcript, nothing said.
-            let kept = micEchoVerdicts.count { $0 == .ownVoice }
-            let mixed = micEchoVerdicts.count { $0 == .mixed }
-            let unknown = micEchoVerdicts.count { $0 == .undecided }
-            logger
-                .info(
-                    "echo_dedup suppressed=\(suppressed, privacy: .public) mixed=\(mixed, privacy: .public) own=\(kept, privacy: .public) undecided=\(unknown, privacy: .public) of=\(micSegments.count, privacy: .public)",
-                )
-        }
+        logEchoDedup(micEchoVerdicts, suppressed: suppressed, of: micSegments.count)
         return segments
+    }
+
+    /// The whole distribution, not just the count that was acted on. The
+    /// threshold between "copy" and "someone spoke" is the one number a field
+    /// report will dispute ("it deleted my sentence"), and without seeing how the
+    /// segments fell there is nothing to reason from. Numbers only: no audio, no
+    /// transcript, nothing said. Silent when no segment was classified.
+    private func logEchoDedup(_ micEchoVerdicts: [EchoSegmentVerdict], suppressed: Int, of total: Int) {
+        guard !micEchoVerdicts.isEmpty else { return }
+        let kept = micEchoVerdicts.count { $0 == .ownVoice }
+        let mixed = micEchoVerdicts.count { $0 == .mixed }
+        let unknown = micEchoVerdicts.count { $0 == .undecided }
+        logger
+            .info(
+                "echo_dedup suppressed=\(suppressed, privacy: .public) mixed=\(mixed, privacy: .public) own=\(kept, privacy: .public) undecided=\(unknown, privacy: .public) of=\(total, privacy: .public)",
+            )
     }
 
     /// Stage 1 — resample source audio to 16 kHz and transcribe. Dual-source
@@ -510,8 +632,10 @@ extension PipelineQueue {
         let segCount = cachedSegments?.count ?? 0
         let totalSecs = cachedSegments?.last?.end ?? 0
         // Stash for stage-timing RTF: diarization/protocol of this job process
-        // the same audio length.
-        jobAudioSeconds[ctx.jobID] = totalSecs
+        // the same audio length. Not for a job cancelled while it was
+        // transcribed: removing it cleared this bookkeeping, and writing it
+        // back would leave an entry nothing removes again.
+        if isStillQueued(ctx.jobID) { jobAudioSeconds[ctx.jobID] = totalSecs }
         logger.info(
             "[\(ctx.shortID, privacy: .public)] transcription_complete segments=\(segCount, privacy: .public) duration=\(totalSecs, privacy: .public)s",
         )
@@ -541,23 +665,26 @@ extension PipelineQueue {
         }
     }
 
-    /// Stage 2 — optional speaker diarization. Returns the transcript with
-    /// speaker labels applied, or the original transcript unchanged when
-    /// diarization is disabled, unavailable, or fails. Drives the speaker-naming
+    /// Stage 2 — optional speaker diarization. Returns the labeled transcript
+    /// with its structured speaker names, or the original transcript and no names
+    /// when diarization is disabled, unavailable, or fails. Drives the speaker-naming
     /// dialog loop and persists naming data + recognition forensics as side
     /// effects.
-    /// Cannot throw, and that is the point: every failure inside is caught and
-    /// downgraded to a warning, so a diarization problem costs the speaker
-    /// labels and never the transcript. Keeping that in the signature means the
-    /// compiler, not a comment, refuses the next throwing call added outside the
-    /// block.
+    /// Throws only `CancellationError`, and that is the point: every failure
+    /// inside is caught and downgraded to a warning, so a diarization problem
+    /// costs the speaker labels and never the transcript. A cancellation is not
+    /// a diarization problem. Downgraded with the rest, it carried a cancelled
+    /// run on into stage 3, which saved the transcript, moved the recording
+    /// and asked for a protocol for a job that was gone. The typed throw keeps
+    /// what the old non-throwing signature gave: the compiler, not a comment,
+    /// refuses any other error escaping past the block.
     private func diarize(
         _ transcription: TranscriptionOutput, ctx: JobContext,
         engine: any TranscribingEngine, workDir: URL, outputDir: URL,
-    ) async -> String {
-        var finalTranscript = transcription.transcript
+    ) async throws(CancellationError) -> (transcript: String, speakerNames: [String]) {
+        var output = (transcript: transcription.transcript, speakerNames: [String]())
 
-        guard diarizeEnabled, let diarizationFactory else { return finalTranscript }
+        guard diarizeEnabled, let diarizationFactory else { return output }
         // An engine without per-utterance timestamps (one that emits a single
         // whole-recording segment) can't be diarized — assignSpeakers would
         // collapse the entire meeting onto one speaker. Skip it and tell the
@@ -569,12 +696,12 @@ extension PipelineQueue {
                 id: ctx.jobID,
                 "Speaker diarization needs per-utterance timestamps, which the selected transcription engine doesn't produce — speakers not labeled",
             )
-            return finalTranscript
+            return output
         }
         let diarizeProcess = diarizationFactory()
         guard diarizeProcess.isAvailable else {
             logger.info("[\(ctx.shortID, privacy: .public)] diarization_skipped")
-            return finalTranscript
+            return output
         }
 
         startDiarizing(jobID: ctx.jobID, mode: diarizeProcess.mode)
@@ -610,17 +737,22 @@ extension PipelineQueue {
                 from: run, autoNames: autoNames, transcription: transcription,
                 engine: engine, mix16k: mix16k,
             ) {
-                finalTranscript = labeled
+                output = (transcript: labeled, speakerNames: Array(autoNames.values))
             }
             let segCount = run.combined?.segments.count ?? 0
             logger.info("[\(ctx.shortID, privacy: .public)] diarization_complete segments=\(segCount, privacy: .public)")
         } catch {
+            // A cancelled job ends the run here, whatever the diarizer reported:
+            // one stopped by the cancellation may throw an error of its own.
+            // Nothing failed, and the job is gone. Any other error, including a
+            // stray `CancellationError` for a job still ours, costs the labels.
+            guard isStillQueued(ctx.jobID) else { throw CancellationError() }
             logger.warning("[\(ctx.shortID, privacy: .public)] diarization_failed error=\(error.localizedDescription, privacy: .public)")
             addWarning(id: ctx.jobID, "Diarization failed — speakers not identified")
             // Continue with original transcript
         }
 
-        return finalTranscript
+        return output
     }
 
     /// Ensure a 16 kHz mix exists for diarization, returning its path. Single
@@ -709,6 +841,10 @@ extension PipelineQueue {
                 appError = error
             }
         }
+        // A cancelled run must not go on to the second track: the app track's
+        // `CancellationError` is caught above like any track failure, and the
+        // mic track would then be diarized in full for a job that is gone.
+        try Task.checkCancellation()
 
         var micDiarization: DiarizationResult?
         var micError: (any Error)?
@@ -727,6 +863,10 @@ extension PipelineQueue {
                 micError = error
             }
         }
+        // Again after the mic track, so that a cancellation arriving during it
+        // is not taken for a failed track: the fallback below would log it as
+        // one and put a warning on the job.
+        try Task.checkCancellation()
 
         // Tolerate one silent/failed track and fall back to the other: a silent
         // local mic on a host without a real input device (app-only), or a silent
@@ -845,7 +985,7 @@ extension PipelineQueue {
     /// (unless speaker naming is still pending), and transition the job to its
     /// terminal state.
     private func generateAndSaveProtocol(
-        finalTranscript: String, transcription: TranscriptionOutput,
+        diarization: (transcript: String, speakerNames: [String]), transcription: TranscriptionOutput,
         ctx: JobContext, workDir: URL, outputDir: URL,
     ) async throws {
         // --- Save Transcript & Audio ---
@@ -853,7 +993,7 @@ extension PipelineQueue {
         // opted out of a separate raw file: late speaker naming still needs to
         // rewrite it before generating the final protocol.
         let protocolsDir = outputDir.appendingPathComponent("protocols")
-        let txtPath = try ProtocolGenerator.saveTranscript(finalTranscript, basename: ctx.slug, dir: protocolsDir)
+        let txtPath = try ProtocolGenerator.saveTranscript(diarization.transcript, basename: ctx.slug, dir: protocolsDir)
         logger.info("[\(ctx.shortID, privacy: .public)] transcript_saved file=\(txtPath.lastPathComponent, privacy: .private)")
 
         if let idx = jobs.firstIndex(where: { $0.id == ctx.jobID }) {
@@ -904,9 +1044,9 @@ extension PipelineQueue {
         // the current auto-names). Saves an LLM call we'd otherwise
         // have to redo.
         if naming.speakerNamingDataByJob[ctx.jobID] == nil {
-            await generateProtocol(
-                jobID: ctx.jobID, transcript: finalTranscript, title: ctx.title,
-                protocolsDir: protocolsDir,
+            try await generateProtocol(
+                jobID: ctx.jobID, transcript: diarization.transcript, title: ctx.title,
+                protocolsDir: protocolsDir, speakerNames: diarization.speakerNames,
             )
         }
 
@@ -933,30 +1073,41 @@ extension PipelineQueue {
     // MARK: - Protocol generation
 
     /// Run the LLM protocol generator over a transcript, save the .md file,
-    /// stash its path on the job. No-op if no protocol generator is configured.
+    /// stash its path on the job. Without a protocol generator nothing is generated,
+    /// but an export that is switched on and cannot run still gets its warning.
     /// Used by: main pipeline (if no naming pending) and the session's
     /// reapplySpeakerNames / skipped / stale paths. Internal (not private)
     /// because it is a `SpeakerNamingSessionDelegate` witness.
+    ///
+    /// Throws only `CancellationError`: when the job was cancelled or removed
+    /// before the call, during it, or while the model was writing. Nothing is
+    /// generated or saved for it then, and nothing is reported as a failure.
     func generateProtocol(
         jobID: UUID, transcript: String, title: String, protocolsDir: URL,
-    ) async {
+        speakerNames: [String] = [],
+    ) async throws(CancellationError) {
+        // No generator and no LLM call for a job that is already gone.
+        try ensureStillQueued(jobID)
+        guard let job = job(withID: jobID) else { return }
         guard let protocolGeneratorFactory, let generator = protocolGeneratorFactory() else {
+            // No protocol, so no export, but an export that is switched on and
+            // cannot run is still worth a reason on the job.
+            resolveNotionExport(jobID: jobID)
             return
         }
         let shortID = PipelineJob.shortID(for: jobID)
         // Reuse the basename fixed when the transcript was saved (persisted as
         // namingSlug), so the .md shares the .txt/audio stem exactly. This runs
         // only after a transcript exists, so namingSlug is set on every real
-        // path; the fallback just keeps generation working if the job is gone.
-        let job = jobs.first { $0.id == jobID }
-        let basename = job?.namingSlug
+        // path; the fallback only keeps generation working without one.
+        let initialBasename = job.namingSlug
             ?? Self.namingSlug(title: title, jobID: jobID, startTime: Date())
-        let meetingStartTime = job?.meetingStartTime
-        // A job from an older snapshot, or one no longer queued, takes the
-        // current default; only a queued job can carry background info.
-        let templateID = job?.protocolTemplate ?? defaultProtocolTemplateProvider()
-        let (instructions, templateWarning) = protocolTemplateStore.instructions(
-            for: templateID, background: job?.protocolBackground,
+        let meetingStartTime = job.meetingStartTime
+        // A job from a snapshot written before templates takes the current
+        // default.
+        let templateID = job.protocolTemplate ?? defaultProtocolTemplateProvider()
+        let (instructions, usedTemplate, templateWarning) = protocolTemplateStore.instructions(
+            for: templateID, background: job.protocolBackground,
         )
         if let templateWarning { addWarning(id: jobID, templateWarning) }
         let backgroundPresence = instructions.background == nil ? "absent" : "present"
@@ -964,27 +1115,88 @@ extension PipelineQueue {
             "[\(shortID, privacy: .public)] protocol_template template=\(templateID.storedValue, privacy: .private) fallback=\(templateWarning != nil, privacy: .public) background=\(backgroundPresence, privacy: .public)",
         )
         updateJobState(id: jobID, to: .generatingProtocol)
-        guard let protocolMD = await protocolText(
+        guard let protocolMD = try await protocolText(
             from: generator, jobID: jobID,
             request: (transcript: transcript, title: title, meetingStartTime: meetingStartTime, instructions: instructions),
-            meeting: (folder: protocolsDir, basename: basename, template: templateID, background: job?.protocolBackground),
-        ) else { return }
+            meeting: (folder: protocolsDir, basename: initialBasename, template: templateID, background: job.protocolBackground),
+        ) else {
+            // No protocol, so no export, but an export that is switched on and
+            // cannot run is still worth a reason on the job.
+            resolveNotionExport(jobID: jobID)
+            return
+        }
+
+        // A job cancelled or removed during the call gets no protocol file and
+        // no renamed artifacts: a generator that ignores cancellation still
+        // returns its text. Checked here, after the await, because the job's
+        // own output options are only answered while it is in the queue.
+        try ensureStillQueued(jobID)
+
+        let outputOptions = transcriptOutputOptions(forJobID: jobID)
+        var basename = initialBasename
+        if let titleSlug = ProtocolGenerator.fileTitleSlug(
+            from: protocolMD, enabled: outputOptions.useAITitleForFilenames, template: usedTemplate,
+        ) {
+            basename = renameJobArtifacts(
+                jobID: jobID, from: initialBasename, titleSlug: titleSlug, protocolsDir: protocolsDir,
+            )
+        }
+
         let markdown = ProtocolGenerator.composeDocument(
             protocolMarkdown: protocolMD,
             transcript: transcript,
-            includeFullTranscript: transcriptOutputOptions(forJobID: jobID).includeFullTranscriptInProtocol,
+            includeFullTranscript: outputOptions.includeFullTranscriptInProtocol,
         )
+
+        let configuration = resolveNotionExport(jobID: jobID).configuration
+        // Saved first, even for a Notion-only export: the job reaches `.done` and
+        // the queue moves on while the export runs, so this is what a quit or a
+        // failed export falls back on. A successful Notion-only export removes it.
+        let savedLocally = saveProtocolLocally(markdown, basename: basename, jobID: jobID, protocolsDir: protocolsDir)
+        if let configuration {
+            queueNotionExport(
+                PendingNotionExport(
+                    protocolMD: protocolMD,
+                    transcript: outputOptions.includeFullTranscriptInProtocol ? transcript : nil,
+                    speakerNames: speakerNames,
+                    configuration: configuration,
+                    savedLocally: savedLocally,
+                    template: usedTemplate,
+                ),
+                jobID: jobID,
+            )
+        }
+    }
+
+    /// Reads the export configuration and, when the export is on but cannot run
+    /// (no token or no database), tells the job why. Every way out of
+    /// `generateProtocol` asks, not only the one that produced a protocol,
+    /// because the user who switched the export on wants the reason in each.
+    @discardableResult
+    private func resolveNotionExport(jobID: UUID) -> NotionExportResolution {
+        let resolution = notionExportConfigurationProvider?() ?? .disabled
+        if case .unconfigured = resolution {
+            addWarning(id: jobID, Self.notionExportUnconfiguredWarning)
+        }
+        return resolution
+    }
+
+    private func saveProtocolLocally(_ markdown: String, basename: String, jobID: UUID, protocolsDir: URL) -> Bool {
+        let shortID = PipelineJob.shortID(for: jobID)
         do {
             let mdPath = try ProtocolGenerator.saveProtocol(markdown, basename: basename, dir: protocolsDir)
             logger.info("[\(shortID, privacy: .public)] protocol_saved file=\(mdPath.lastPathComponent, privacy: .private)")
             if let idx = jobs.firstIndex(where: { $0.id == jobID }) {
                 jobs[idx].protocolPath = mdPath
             }
+            return true
         } catch {
             // Private, unlike the generation failure above: a file-write
             // CocoaError names the file, and the file name is the meeting title.
             logger.warning("[\(shortID, privacy: .public)] protocol_save_failed error=\(error.localizedDescription, privacy: .private)")
+            // Matched by /v1 clients and persisted jobs; keep the text stable.
             addWarning(id: jobID, "Protocol was generated but could not be saved; the transcript was saved")
+            return false
         }
     }
 
@@ -993,11 +1205,13 @@ extension PipelineQueue {
     /// generation's outcome is told apart (spec R11); every other failure is
     /// the generic one, as it always was. `meeting` is where the transcript was
     /// saved and what the protocol was due with, for a notice's actions.
+    /// Throws only `CancellationError`, for a job cancelled or removed while
+    /// its protocol was being written.
     private func protocolText(
         from generator: sending any ProtocolGenerating, jobID: UUID,
         request: (transcript: String, title: String, meetingStartTime: Date?, instructions: ProtocolInstructions),
         meeting: (folder: URL, basename: String, template: ProtocolTemplateID, background: String?),
-    ) async -> String? {
+    ) async throws(CancellationError) -> String? {
         #if !APPSTORE
             // Read before the generator is handed over.
             let isLocal = generator is LocalModelProtocolGenerator
@@ -1009,6 +1223,11 @@ extension PipelineQueue {
             #endif
             return text
         } catch {
+            // Cancelled while the model was writing. A generator stopped this
+            // way may report an error of its own (the CLI one does, and a local
+            // helper the gate ended does too), and either way it is no
+            // failure, and there is no job left to warn or notify about.
+            try ensureStillQueued(jobID)
             #if !APPSTORE
                 if let outcome = error as? LocalModelOutcome {
                     return localModelResult(outcome, meeting: LocalModelNoticeMeeting(
@@ -1028,6 +1247,92 @@ extension PipelineQueue {
             addWarning(id: jobID, "Protocol generation failed — transcript saved")
             return nil
         }
+    }
+
+    /// Gives a job's artifacts the stem built from the AI meeting title
+    /// (`titleSlug`), and returns the stem the job carries afterwards: the new
+    /// one, or `oldStem` when nothing was renamed.
+    ///
+    /// All-or-nothing. The plan names every file explicitly (see
+    /// `ArtifactRenamePlan`) and never overwrites: a stem is only taken when none
+    /// of its artifacts exist, so another meeting's audio can't be replaced, and
+    /// a move onto an existing file fails instead of deleting it. If any move
+    /// fails the ones already done are undone and the job keeps its old stem and
+    /// paths, so the paths on the job never point at files that aren't there.
+    /// Only a failed undo (a file that moved and cannot move back) leaves files
+    /// under the new name, and the warning on the job says so.
+    ///
+    /// Job paths are repointed only for files that actually moved, and
+    /// `meetingTitle` is left alone: it is the caller's title, read back through
+    /// `/state` and `/v1/jobs`, and it is the input to later protocol runs.
+    @discardableResult
+    func renameJobArtifacts(
+        jobID: UUID,
+        from oldStem: String,
+        titleSlug: String,
+        protocolsDir: URL,
+    ) -> String {
+        let fm = FileManager.default
+        let shortID = PipelineJob.shortID(for: jobID)
+        let dirs = ArtifactRenamePlan.Directories(
+            protocols: protocolsDir,
+            recordings: protocolsDir.deletingLastPathComponent().appendingPathComponent("recordings"),
+        )
+        let exists: (URL) -> Bool = { fm.fileExists(atPath: $0.path) }
+
+        guard let newStem = ArtifactRenamePlan.availableStem(
+            titleSlug: titleSlug, shortID: shortID, currentStem: oldStem, in: dirs, exists: exists,
+        ) else {
+            logger.warning("[\(shortID, privacy: .public)] ai_title_rename_skipped reason=no_free_name")
+            return oldStem
+        }
+        guard newStem != oldStem else { return oldStem }
+
+        let moves = ArtifactRenamePlan.moves(from: oldStem, to: newStem, in: dirs, exists: exists)
+        var done: [ArtifactRenamePlan.Move] = []
+        do {
+            for move in moves {
+                try fm.moveItem(at: move.from, to: move.to)
+                done.append(move)
+            }
+        } catch {
+            var undoFailed = false
+            for move in done.reversed() {
+                do {
+                    try fm.moveItem(at: move.to, to: move.from)
+                } catch {
+                    undoFailed = true
+                    logger
+                        .error(
+                            "[\(shortID, privacy: .public)] ai_title_rename_undo_failed file=\(move.from.lastPathComponent, privacy: .private) error=\(error.localizedDescription, privacy: .private)",
+                        )
+                }
+            }
+            logger.warning("[\(shortID, privacy: .public)] ai_title_rename_failed error=\(error.localizedDescription, privacy: .private)")
+            addWarning(
+                id: jobID,
+                undoFailed
+                    ? "Could not rename the output files to the AI meeting title, and some could not be moved back; check the output folder"
+                    : "Could not rename the output files to the AI meeting title; the original names were kept",
+            )
+            return oldStem
+        }
+        logger.info("[\(shortID, privacy: .public)] ai_title_rename moved=\(done.count, privacy: .public)")
+
+        if let idx = jobs.firstIndex(where: { $0.id == jobID }) {
+            func moved(_ url: URL?) -> URL? {
+                guard let url else { return nil }
+                return done.first { $0.from.standardizedFileURL == url.standardizedFileURL }?.to ?? url
+            }
+            jobs[idx].namingSlug = newStem
+            jobs[idx].transcriptPath = moved(jobs[idx].transcriptPath)
+            jobs[idx].protocolPath = moved(jobs[idx].protocolPath)
+            jobs[idx].recordRelocatedAudio(RelocatedAudioPaths(
+                mix: moved(jobs[idx].mixPath), app: moved(jobs[idx].appPath), mic: moved(jobs[idx].micPath),
+            ))
+            saveSnapshot()
+        }
+        return newStem
     }
 
     // MARK: - VAD Preprocessing
@@ -1067,12 +1372,97 @@ extension PipelineQueue {
 
     // MARK: - Audio File Copy
 
+    /// Hand a cancelled job's recording to the output folder, and nothing else
+    /// of it: no transcript, sidecars, protocol or naming data.
+    ///
+    /// The recording is the user's data, not something derived from it. Left
+    /// in the staging folder it would sit where nobody looks, hundreds of MB of
+    /// private audio per cancel, with nothing that ever cleans it up: the ledger
+    /// marks it processed at the cancel. The same ownership rule as a finished job
+    /// (`AudioPersistencePolicy`), so a file the user picked for import is
+    /// never touched, and a recording stage 3 already moved stays where it is.
+    ///
+    /// Left alone while another job of this queue points at the same files,
+    /// a failed one included: a failed job keeps its recording for Retry, and
+    /// a recovered orphan or a re-import can share the staged file.
+    ///
+    /// Best effort. The ledger does not wait for it: `cancelJob` marks the
+    /// recording processed straight away, because orphan recovery does not
+    /// merely offer an unmarked recording, it enqueues and processes it, and a
+    /// cancelled meeting must not come back as a transcript and protocol. A
+    /// move that fails or is cut short by a quit leaves the recording in
+    /// staging, marked, never deleted and never processed again; a half copy
+    /// never takes a recording's name (`moveIntoPlace`).
+    ///
+    /// Off the main actor, because Cancel is a click: with the output folder
+    /// on another volume the move is a copy of hundreds of MB. The task holds
+    /// the queue, and with it the output folder's security scope, until the
+    /// move is done.
+    func relocateRecordingOfCancelledJob(_ job: PipelineJob) {
+        guard let outputDir else { return }
+        let destination = outputDir.appendingPathComponent("recordings")
+        let staged = job.audioPaths.filter { path in
+            AudioPersistencePolicy.action(source: path, stagingDir: stagingDir, destinationDir: destination) == .move
+        }
+        guard !staged.isEmpty, !otherJobHoldsAudio(of: job, in: \.audioPaths, includingFailed: true) else {
+            return
+        }
+        let ctx = Self.makeContext(for: job)
+        let staging = stagingDir
+        lastRecordingRelocation = Task.detached(priority: .utility) { [self] in
+            withExtendedLifetime(self) {
+                _ = Self.persistAudioToOutput(ctx: ctx, outputDir: destination, stagingDir: staging)
+                if staged.contains(where: { FileManager.default.fileExists(atPath: $0.path) }) {
+                    logger.warning("[\(ctx.shortID, privacy: .public)] cancelled_recording_left_in_staging")
+                }
+            }
+        }
+    }
+
+    /// Move `source` to `destination` so that `destination` only ever names a
+    /// complete file. On one volume a move is a rename, which is atomic. Across
+    /// volumes it is a copy, so the copy is built under a hidden `.partial`
+    /// name no reader takes for a recording, renamed into place once it is
+    /// complete, and only then is the source removed: a copy that fails leaves
+    /// the source untouched and nothing in the destination folder, and one cut
+    /// short by a quit leaves at worst a hidden `.partial`, which the next
+    /// attempt replaces. `asIfAcrossVolumes` takes the copy path regardless, for tests.
+    nonisolated static func moveIntoPlace(_ source: URL, to destination: URL, asIfAcrossVolumes: Bool = false) throws {
+        let fm = FileManager.default
+        let crossing = asIfAcrossVolumes || !onSameVolume(source, destination.deletingLastPathComponent())
+        guard crossing else {
+            if fm.fileExists(atPath: destination.path) { try fm.removeItem(at: destination) }
+            try fm.moveItem(at: source, to: destination)
+            return
+        }
+        let partial = destination.deletingLastPathComponent()
+            .appendingPathComponent(".\(destination.lastPathComponent).partial")
+        try? fm.removeItem(at: partial)
+        do {
+            try fm.copyItem(at: source, to: partial)
+        } catch {
+            try? fm.removeItem(at: partial)
+            throw error
+        }
+        if fm.fileExists(atPath: destination.path) { try fm.removeItem(at: destination) }
+        try fm.moveItem(at: partial, to: destination)
+        try fm.removeItem(at: source)
+    }
+
+    nonisolated private static func onSameVolume(_ lhs: URL, _ rhs: URL) -> Bool {
+        let key = URLResourceKey.volumeIdentifierKey
+        guard let left = try? lhs.resourceValues(forKeys: [key]).volumeIdentifier,
+              let right = try? rhs.resourceValues(forKeys: [key]).volumeIdentifier
+        else { return false }
+        return left.isEqual(right)
+    }
+
     /// Hand the app's own staging recordings over to the protocol output
     /// directory, per `AudioPersistencePolicy`. Nil `mixPath` (paired imports
     /// without a `_mix.wav` source) → mix slot is skipped, no persistent mix is
     /// written. `outputDir` here is `<root>/recordings`, reachable because the
     /// queue holds the security scope on the root.
-    private static func persistAudioToOutput(
+    nonisolated private static func persistAudioToOutput(
         ctx: JobContext, outputDir: URL, stagingDir: URL,
     ) -> RelocatedAudioPaths {
         let (mixPath, appPath, micPath) = (ctx.mixPath, ctx.appPath, ctx.micPath)
@@ -1127,8 +1517,7 @@ extension PipelineQueue {
                 return fm.fileExists(atPath: dst.path) ? dst : src
             }
             do {
-                if fm.fileExists(atPath: dst.path) { try fm.removeItem(at: dst) }
-                try fm.moveItem(at: src, to: dst)
+                try moveIntoPlace(src, to: dst)
                 logger.info("Audio moved: \(name, privacy: .private)")
                 return dst
             } catch {

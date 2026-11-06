@@ -82,27 +82,49 @@ final class DiarizationModeComparisonTests: XCTestCase {
         return result
     }
 
-    /// One-to-one hypothesis → reference mapping with the most shared time,
-    /// by exhaustive search (at most eight hypothesis speakers). One-to-one so
-    /// that a speaker split in two costs the turns of the smaller half.
+    /// One-to-one hypothesis → reference mapping with the most shared time.
+    /// One-to-one so that a speaker split in two costs the turns of the
+    /// smaller half. Dynamic programming over which references are already
+    /// taken: H × 2^R states for H hypothesis and R reference speakers,
+    /// instead of the (R+1)^H paths of an exhaustive search, which offline
+    /// mode with auto-detect (no speaker cap) can make unaffordable.
     private static func bestMapping(_ overlap: [String: [String: Double]], references: [String]) -> [String: String] {
         let hyps = overlap.keys.sorted()
-        var best: (score: Double, mapping: [String: String]) = (-1, [:])
-        func search(_ index: Int, _ used: Set<String>, _ score: Double, _ mapping: [String: String]) {
-            guard index < hyps.count else {
-                if score > best.score { best = (score, mapping) }
-                return
+        precondition(
+            references.count <= 16,
+            "bestMapping keeps 2^R states per hypothesis; \(references.count) reference speakers is too many",
+        )
+        let refCount = references.count
+        var memo: [Int: Double] = [:]
+        func shared(_ hyp: Int, _ ref: Int) -> Double {
+            overlap[hyps[hyp]]?[references[ref]] ?? 0
+        }
+        func best(_ index: Int, _ taken: Int) -> Double {
+            guard index < hyps.count else { return 0 }
+            let key = index << refCount | taken
+            if let known = memo[key] { return known }
+            var value = best(index + 1, taken)
+            for ref in 0 ..< refCount where taken & (1 << ref) == 0 {
+                value = max(value, shared(index, ref) + best(index + 1, taken | 1 << ref))
             }
-            let hyp = hyps[index]
-            search(index + 1, used, score, mapping)
-            for ref in references where !used.contains(ref) {
-                var next = mapping
-                next[hyp] = ref
-                search(index + 1, used.union([ref]), score + (overlap[hyp]?[ref] ?? 0), next)
+            memo[key] = value
+            return value
+        }
+        // Walk the optimum back. The comparisons are exact: each target is the
+        // max over exactly these sums, memoised, so one of them reproduces it.
+        var mapping: [String: String] = [:]
+        var taken = 0
+        for index in hyps.indices {
+            let target = best(index, taken)
+            if best(index + 1, taken) == target { continue }
+            for ref in 0 ..< refCount where taken & (1 << ref) == 0
+                && shared(index, ref) + best(index + 1, taken | 1 << ref) == target {
+                mapping[hyps[index]] = references[ref]
+                taken |= 1 << ref
+                break
             }
         }
-        search(0, [], 0, [:])
-        return best.mapping
+        return mapping
     }
 
     /// Reference turns whose dominant hypothesis speaker (most time inside the

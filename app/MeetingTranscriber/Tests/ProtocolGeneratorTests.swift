@@ -509,14 +509,3 @@ final class ProtocolGeneratorTests: XCTestCase {
         XCTAssertEqual(mode & 0o777, 0o600)
     }
 }
-
-/// The call shape from before protocol templates, for tests that are not about
-/// the prompt: the built-in template and no background.
-extension ProtocolGenerating {
-    func generate(transcript: String, title: String, diarized: Bool, meetingStartTime: Date? = nil) async throws -> String {
-        try await generate(
-            transcript: transcript, title: title, diarized: diarized, meetingStartTime: meetingStartTime,
-            instructions: ProtocolInstructions(template: ProtocolGenerator.protocolPrompt, background: nil),
-        )
-    }
-}

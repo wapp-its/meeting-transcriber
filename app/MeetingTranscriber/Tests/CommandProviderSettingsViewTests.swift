@@ -19,7 +19,7 @@
         override func setUp() async throws {
             try await super.setUp()
             suiteName = "CommandProviderSettingsViewTests-\(getpid())-\(UUID().uuidString)"
-            defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+            defaults = try XCTUnwrap(DefaultsSuite.open(suiteName))
         }
 
         override func tearDown() async throws {

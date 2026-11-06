@@ -143,18 +143,22 @@ struct ProtocolTemplateStore {
         return Resolution(
             text: ProtocolGenerator.protocolPrompt,
             used: .builtIn,
+            // Matched by /v1 clients and persisted jobs; keep the text stable.
             warning: "Protocol template \"\(id.storedValue)\" was not found or is empty, so the built-in template was used",
         )
     }
 
-    /// The instructions a protocol run sends for a template and background, and
-    /// the warning to add to the job when the template fell back. The one place
-    /// a job's choice becomes what the provider is asked.
+    /// The instructions a protocol run sends for a template and background, the
+    /// template they came from (`.builtIn` after a fallback), and the warning
+    /// to add to the job when the template fell back. The one place a job's
+    /// choice becomes what the provider is asked.
     func instructions(
         for id: ProtocolTemplateID, background: String?,
-    ) -> (instructions: ProtocolInstructions, warning: String?) {
+    ) -> (instructions: ProtocolInstructions, used: ProtocolTemplateID, warning: String?) {
         let resolution = resolve(id)
-        return (ProtocolInstructions(template: resolution.text, background: background), resolution.warning)
+        return (
+            ProtocolInstructions(template: resolution.text, background: background), resolution.used, resolution.warning,
+        )
     }
 
     /// Creates a template under a name `ProtocolTemplateName.validate` accepts,

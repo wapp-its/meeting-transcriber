@@ -26,6 +26,17 @@ struct TranscriptionEntry: Identifiable, Equatable {
     let warnings: [String]
     let protocolURL: URL?
     let transcriptURL: URL?
+    /// The Notion page of a completed export; nil when the job was not
+    /// exported, or the export has not completed, so nothing opens a partial
+    /// page. `JobOpenTarget.resolve(forEntry:preferNotion:)` decides between it
+    /// and the local file.
+    let notionPageURL: URL?
+    /// The Notion export of a job in the pipeline's queue: running, failed or
+    /// completed. Nil when the job was not exported, and for an entry known
+    /// only from the history: only the queue can retry or discard an export,
+    /// and a record keeps the status it was written with, also after the
+    /// retry was discarded.
+    let liveNotionExport: NotionExportStatus?
     /// Whether the job is in the pipeline's queue. Only a live job can be
     /// retried; one known only from the history waits for the pipeline to load
     /// it from the snapshot.
@@ -43,6 +54,14 @@ struct TranscriptionEntry: Identifiable, Equatable {
         protocolURL ?? transcriptURL
     }
 
+    /// The export a finished job still has open, running or failed, which
+    /// keeps the job in the menu until the export completes or its retry is
+    /// discarded. Nil otherwise.
+    var openNotionExport: NotionExportStatus? {
+        guard state == .done, let export = liveNotionExport, export != .completed else { return nil }
+        return export
+    }
+
     init(job: PipelineJob, finishOrder: Int?) {
         id = job.id
         title = job.meetingTitle
@@ -57,6 +76,8 @@ struct TranscriptionEntry: Identifiable, Equatable {
         warnings = job.warnings
         protocolURL = job.protocolPath
         transcriptURL = job.transcriptPath
+        notionPageURL = job.hasCompletedNotionExport ? job.notionPageURL : nil
+        liveNotionExport = job.notionExportStatus
         isLive = true
         self.finishOrder = job.state.isTerminal ? finishOrder : nil
     }
@@ -78,6 +99,9 @@ struct TranscriptionEntry: Identifiable, Equatable {
         warnings = status.warnings
         protocolURL = status.protocolPath.map { URL(fileURLWithPath: $0) }
         transcriptURL = status.transcriptPath.map { URL(fileURLWithPath: $0) }
+        // `JobExportDTO.url` is set only once the export completed.
+        notionPageURL = status.export?.url.flatMap { URL(string: $0) }
+        liveNotionExport = nil
         isLive = false
         self.finishOrder = status.state.isTerminal ? finishOrder : nil
     }
@@ -150,8 +174,11 @@ enum TranscriptionList {
 
     /// The menu's share, in two groups: jobs waiting or running ("In
     /// progress") and jobs waiting on the user, for speaker names or because
-    /// they failed ("Needs you"). Finished jobs, with or without warnings, are
-    /// left to the Transcriptions window. Each group lists its jobs in the
+    /// they failed ("Needs you"). A finished job whose Notion export is still
+    /// open counts as one of them: in progress while the export runs, needing
+    /// the user once it failed, since only the menu offers its retry. Other
+    /// finished jobs, with or without warnings, are left to the Transcriptions
+    /// window. Each group lists its jobs in the
     /// order they were added (oldest first), so the menu reads top to bottom
     /// as it always has; entries without an enqueue time predate every other
     /// and come first, in the order they were stored.
@@ -164,19 +191,22 @@ enum TranscriptionList {
                 return (lhs.element.finishOrder ?? .min, lhs.offset) < (rhs.element.finishOrder ?? .min, rhs.offset)
             }
             .map(\.element)
+        let running: [JobState] = [.waiting, .transcribing, .diarizing, .generatingProtocol]
         return MenuJobSections(
-            inProgress: oldestFirst.filter { [.waiting, .transcribing, .diarizing, .generatingProtocol].contains($0.state) },
-            needsYou: oldestFirst.filter { $0.state == .speakerNamingPending || $0.state == .error },
+            inProgress: oldestFirst.filter { running.contains($0.state) || $0.openNotionExport == .inProgress },
+            needsYou: oldestFirst.filter { entry in
+                entry.state == .speakerNamingPending || entry.state == .error || entry.openNotionExport == .failed
+            },
         )
     }
 
-    /// What "Open Last Protocol" opens: of the jobs that finished with a
-    /// protocol or a transcript, the one that finished last, by the history's
-    /// finish order rather than by when it was added, since a retry keeps its
-    /// enqueue time. Nil when none has. A failed job does not count: it is
-    /// listed under "Needs you" with its own Open.
+    /// What "Open Last Notes" opens: of the jobs that finished with a
+    /// protocol, a transcript or a completed Notion page, the one that finished
+    /// last, by the history's finish order rather than by when it was added,
+    /// since a retry keeps its enqueue time. Nil when none has. A failed job
+    /// does not count: it is listed under "Needs you" with its own Open.
     static func lastFinished(_ entries: [TranscriptionEntry]) -> TranscriptionEntry? {
-        entries.filter { $0.state == .done && $0.fileToOpen != nil }
+        entries.filter { $0.state == .done && ($0.fileToOpen != nil || $0.notionPageURL != nil) }
             .max { ($0.finishOrder ?? .min) < ($1.finishOrder ?? .min) }
     }
 }
@@ -185,4 +215,21 @@ enum TranscriptionList {
 struct MenuJobSections: Equatable {
     let inProgress: [TranscriptionEntry]
     let needsYou: [TranscriptionEntry]
+}
+
+extension JobOpenTarget {
+    /// `resolve(for:preferNotion:)`'s rule for a job the menu knows from the
+    /// queue or the history: the Notion page when export is on and the page
+    /// exists, else the local protocol or transcript, else the page, since a
+    /// "skip local markdown" export leaves no file.
+    static func resolve(forEntry entry: TranscriptionEntry?, preferNotion: Bool) -> Self? {
+        guard let entry else { return nil }
+        if preferNotion, let page = entry.notionPageURL {
+            return .notion(page)
+        }
+        if let file = entry.fileToOpen {
+            return .file(file)
+        }
+        return entry.notionPageURL.map(Self.notion)
+    }
 }

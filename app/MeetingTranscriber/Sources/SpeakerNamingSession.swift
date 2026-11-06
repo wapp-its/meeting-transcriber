@@ -3,64 +3,6 @@ import os.log
 
 private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "SpeakerNamingSession")
 
-/// Collaborator that `PipelineQueue` calls for whatever it still owns while the
-/// naming session runs. Strictly id-based (never index-based): a job index goes
-/// stale across an `await` when another finished job is evicted by
-/// `completedJobLifetime`, a documented past bug — so the session only ever
-/// addresses a job by its `UUID`. The queue owns the session strongly
-/// (`let naming`); the session holds this delegate weakly at rest (no retain
-/// cycle) but captures it strongly per async flow, so an in-flight naming flow
-/// keeps the queue alive to completion while a flow started against an
-/// already-gone queue no-ops harmlessly. See `SpeakerNamingSession.delegate`.
-@MainActor
-protocol SpeakerNamingSessionDelegate: AnyObject {
-    /// A value copy of the job, or nil if it is no longer tracked.
-    func job(withID id: UUID) -> PipelineJob?
-    func updateJobState(id: UUID, to newState: JobState, error: String?)
-    func addWarning(id: UUID, _ message: String)
-    /// Persist the per-job naming metadata on the (queue-owned) job. `nil`
-    /// for either field means "leave unchanged".
-    /// `wroteSidecarsIn` records a folder as holding this job's sidecars, and
-    /// only a write that succeeded may pass one: the recorded order is what a
-    /// read trusts to find the newest payload.
-    func setNamingMetadata(
-        jobID: UUID, slug: String?, usedDiarizerMode: DiarizerMode?, wroteSidecarsIn: URL?,
-    )
-    /// Apply a speaker DB update AND refresh the queue's cached known-names in
-    /// one step (issue #155): the write+refresh pairing must stay atomic.
-    func updateSpeakerDB(
-        matcher: SpeakerMatcher, mapping: [String: String],
-        embeddings: [String: [Float]], speakingTimes: [String: TimeInterval],
-    )
-    /// Run the LLM protocol generator over a transcript (a queue pipeline stage).
-    func generateProtocol(jobID: UUID, transcript: String, title: String, protocolsDir: URL) async
-    /// Diarize app + mic tracks separately with the shared single-track fallback
-    /// (app-only on mic failure, mic-only on app failure; a queue pipeline stage,
-    /// reused by the late re-run).
-    func runDualTrackDiarization(
-        diarizeProcess: any DiarizationProvider,
-        tracks: (app: URL, mic: URL, micDelay: TimeInterval, viability: DualTrackViability?),
-        speakerCount: Int?, title: String, jobID: UUID,
-    ) async throws -> DiarizationRun
-    /// Render the speaker-labeled transcript from a diarization run + cached
-    /// transcript segments (a queue pipeline stage, reused by the late rewrite).
-    func renderLabeledTranscript(
-        run: DiarizationRun, cachedSegments: [TimestampedSegment],
-        isDualSource: Bool, autoNames: [String: String], annotations: (note: String?, pauses: [RecordingPause]),
-    ) -> String?
-    /// Enter the diarizing stage for a late re-run that diarizes in `mode`,
-    /// the mode its expected finish is read from.
-    func startDiarizing(jobID: UUID, mode: DiarizerMode)
-}
-
-extension SpeakerNamingSessionDelegate {
-    /// Convenience wrapper so call sites that never carry an error message can
-    /// omit the `error:` argument.
-    func updateJobState(id: UUID, to newState: JobState) {
-        updateJobState(id: id, to: newState, error: nil)
-    }
-}
-
 /// Owns the speaker-naming half of the pipeline: the (possibly late) naming
 /// dialog, its persisted sidecars + recognition forensics, and the late
 /// re-diarization / re-apply paths. `PipelineQueue` holds this strongly as
@@ -118,6 +60,20 @@ final class SpeakerNamingSession {
     /// confirms in a fresh session, the recognition log row will have nil/empty
     /// `autoName` (acceptable; user data is the real signal).
     private var stashedSuggestedAtDialog: [UUID: [String: String]] = [:]
+    /// The late-naming tasks still running per job (re-run, confirm, protocol
+    /// for accepted auto-names), so cancelling a job can stop its own work.
+    /// They run outside the queue's processing task, which is why the queue's
+    /// cancel cannot reach them. Keyed per task as well, because one job can
+    /// hold two at once: a re-run hands its result to the naming handler,
+    /// whose answer starts the next task before the re-run's has returned.
+    /// Internal (not private) because the helpers that fill and cancel it live
+    /// in SpeakerNamingSession+Late.swift.
+    @ObservationIgnored var lateWork: [UUID: [UUID: Task<Void, Never>]] = [:]
+    /// Why a job's last re-run came back with nothing, for the dialog it
+    /// reopens: the re-run answers after the dialog closed, so the refusal
+    /// cannot travel back as the answer's return value. Cleared by the next
+    /// answer the session takes for the job, and with its naming data.
+    var lateRerunFailures: [UUID: SpeakerNamingRefusal] = [:]
     private var stashedTopCandidates: [UUID: [String: [TopCandidate]]] = [:]
 
     init(
@@ -148,11 +104,32 @@ final class SpeakerNamingSession {
     /// decision came from. An unattributed row would be indistinguishable from
     /// one written before the field existed, which is exactly the ambiguity
     /// this field was added to remove.
+    ///
+    /// Only a job awaiting naming takes an answer. Confirm, re-run and skip all
+    /// move the job out of `.speakerNamingPending` before they return, so a second
+    /// answer for the same job (a double click, Re-run then Confirm, a handler
+    /// answering after the dialog did) finds it elsewhere and is dropped,
+    /// instead of starting a second late flow that races the first. Without a
+    /// delegate there is no state to ask, and the session still drops its own
+    /// data for the job.
+    ///
+    /// Returns why an answer was not taken, nil when it was, so the dialog can
+    /// say so and stay usable rather than wait for a flow that never started.
+    @discardableResult
     func completeSpeakerNaming(
         jobID: UUID, result: SpeakerNamingResult, source: RecognitionSource,
-    ) {
-        guard let data = speakerNamingDataByJob[jobID] else { return }
-        let slug = delegate?.job(withID: jobID)?.namingSlug
+    ) -> SpeakerNamingRefusal? {
+        guard let data = speakerNamingDataByJob[jobID] else { return .notAwaitingNaming }
+        let job = delegate?.job(withID: jobID)
+        if delegate != nil, job?.state != .speakerNamingPending {
+            // A job the queue dropped without the session hearing of it leaves
+            // nothing to resolve; its in-memory naming goes, its files are not
+            // this path's to find.
+            if job == nil { forgetNamingData(jobID: jobID) }
+            return .notAwaitingNaming
+        }
+        let slug = job?.namingSlug
+        lateRerunFailures.removeValue(forKey: jobID)
 
         switch result {
         case let .confirmed(userMapping):
@@ -166,16 +143,14 @@ final class SpeakerNamingSession {
             // pending → generatingProtocol hop is the RPC idempotency contract; a
             // duplicate confirm is rejected before it can double-record. The
             // transcript rewrite + protocol generation happen async below.
-            if delegate?.job(withID: jobID)?.state == .speakerNamingPending {
-                delegate?.updateJobState(id: jobID, to: .generatingProtocol)
-            }
-            Task { await reapplySpeakerNames(jobID: jobID, mapping: userMapping) }
+            delegate?.updateJobState(id: jobID, to: .generatingProtocol)
+            startLateWork(jobID: jobID) { await self.reapplySpeakerNames(jobID: jobID, mapping: userMapping) }
 
         case let .rerun(count):
-            Task { await lateDiarization(jobID: jobID, speakerCount: count) }
+            return startRerun(jobID: jobID, speakerCount: count, mode: nil)
 
         case let .rerunWithMode(mode, count):
-            Task { await lateDiarization(jobID: jobID, speakerCount: count, mode: mode) }
+            return startRerun(jobID: jobID, speakerCount: count, mode: mode)
 
         case .skipped:
             recordRecognition(
@@ -185,20 +160,7 @@ final class SpeakerNamingSession {
             )
             acceptAutoNames(jobID: jobID, slug: slug)
         }
-    }
-
-    /// Re-invoke the injected naming handler after the job reached
-    /// `.speakerNamingPending`. Mirrors the late-rerun re-invocation so the test
-    /// path runs the exact same `completeSpeakerNaming` flow the production UI
-    /// does. Captures `self` strongly for the op duration (bounded); the delegate
-    /// stays weak. No-op when no handler is set (the interactive/production path).
-    func invokeHandler(jobID: UUID, data: SpeakerNamingData) {
-        guard let handler = speakerNamingHandler else { return }
-        Task {
-            let result = await handler(data)
-            // The handler stands in for the dialog, so it reports as the dialog.
-            completeSpeakerNaming(jobID: jobID, result: result, source: .dialog)
-        }
+        return nil
     }
 
     /// Skipped or stale-cleanup path: the user accepted (implicitly or by
@@ -215,63 +177,25 @@ final class SpeakerNamingSession {
         let canGenerateProtocol = (protocolGeneratorFactory?() != nil)
             && delegate?.job(withID: jobID)?.transcriptPath != nil
 
+        let speakerNames = speakerNamingDataByJob[jobID].map { Array($0.mapping.values) } ?? []
         removeNamingData(jobID: jobID, slug: slug)
 
         // `canGenerateProtocol == true` implies the delegate was alive above
         // (it resolved the job's transcriptPath); binding it here lets the Task
         // closure hold the queue strongly from spawn (see `delegate`).
         if canGenerateProtocol, let delegate {
-            Task { await generateProtocolForExistingJob(jobID: jobID, delegate: delegate) }
+            // Out of `.speakerNamingPending` now, like a confirm, not on the
+            // late task's first turn: until then the job counted as awaiting
+            // naming with its naming data already gone, and the dialog would
+            // offer it again instead of moving on.
+            if delegate.job(withID: jobID)?.state == .speakerNamingPending {
+                delegate.updateJobState(id: jobID, to: .generatingProtocol)
+            }
+            startLateWork(jobID: jobID) {
+                await self.generateProtocolForExistingJob(jobID: jobID, delegate: delegate, speakerNames: speakerNames)
+            }
         } else if delegate?.job(withID: jobID)?.state == .speakerNamingPending {
             delegate?.updateJobState(id: jobID, to: .done)
-        }
-    }
-
-    /// Takes the delegate as a strong parameter (captured by the spawning Task
-    /// in `acceptAutoNames`) so the queue stays alive across the LLM-generation
-    /// await; see `delegate` for the keep-alive rationale.
-    private func generateProtocolForExistingJob(
-        jobID: UUID, delegate: any SpeakerNamingSessionDelegate,
-    ) async {
-        // A job that is gone needs no transition. Anything else must reach a
-        // terminal state on every exit: `acceptAutoNames` has already deleted
-        // the naming sidecars by the time we get here, so bailing out without a
-        // transition would strand the job in `.speakerNamingPending` with
-        // nothing left to name — the naming window would keep reopening on an
-        // empty placeholder, and the next launch would drop the job with no
-        // protocol ever written.
-        guard let job = delegate.job(withID: jobID) else { return }
-        guard let transcriptPath = job.transcriptPath,
-              let transcript = try? String(contentsOf: transcriptPath, encoding: .utf8)
-        else {
-            // Reachable when the transcript was moved or deleted between the
-            // pipeline writing it and the user resolving naming: the caller's
-            // readiness probe only checks that `transcriptPath` is non-nil.
-            delegate.addWarning(id: jobID, "Protocol not generated — transcript file is missing")
-            finishIfUnresolved(jobID: jobID, delegate: delegate)
-            return
-        }
-        await delegate.generateProtocol(
-            jobID: jobID,
-            transcript: transcript,
-            title: job.meetingTitle,
-            // Beside the transcript it is made from, which is the rule the
-            // protocol-only resume uses too.
-            protocolsDir: transcriptPath.deletingLastPathComponent(),
-        )
-        finishIfUnresolved(jobID: jobID, delegate: delegate)
-    }
-
-    /// Move a job to `.done` unless something already advanced it. Accepts
-    /// `.speakerNamingPending` as well as `.generatingProtocol` because the
-    /// generation call can return before its own `.generatingProtocol`
-    /// transition — it guards on the protocol factory, which can go nil between
-    /// the readiness probe and the call. Both shapes leave the job pending, and
-    /// pending with its sidecars deleted is unrecoverable.
-    private func finishIfUnresolved(jobID: UUID, delegate: any SpeakerNamingSessionDelegate) {
-        let state = delegate.job(withID: jobID)?.state
-        if state == .generatingProtocol || state == .speakerNamingPending {
-            delegate.updateJobState(id: jobID, to: .done)
         }
     }
 
@@ -292,7 +216,11 @@ final class SpeakerNamingSession {
     ) -> [String: String] {
         let (jobID, title, slug, participants) = job
         // No embeddings → no matching or dialog; keep the diarizer's own names.
-        guard let embeddings = diarization.embeddings else { return diarization.autoNames }
+        // A job cancelled while it was diarized gets no naming data, sidecar or
+        // stashed forensics: this is where the run's naming writes start.
+        guard let embeddings = diarization.embeddings, delegate?.isStillQueued(jobID) ?? true else {
+            return diarization.autoNames
+        }
 
         let matcher = speakerMatcherFactory()
         let verbose = matcher.matchVerbose(embeddings: embeddings)
@@ -392,8 +320,13 @@ final class SpeakerNamingSession {
     /// received the payload may be recorded on the job. Recording one that did
     /// not is what made the recorded order unable to answer "which of these
     /// files is newest".
+    ///
+    /// Nothing is written for a job that is gone: a sidecar for it would be an
+    /// orphan nothing ever cleans up.
     @discardableResult
     func saveNamingData(_ data: SpeakerNamingData, slug: String, in outputDir: URL) -> Bool {
+        // Without a delegate nobody is left to say the job is gone.
+        guard delegate?.isStillQueued(data.jobID) ?? true else { return false }
         do {
             try SpeakerNamingStore(outputDir: outputDir).save(data, slug: slug)
             return true
@@ -458,9 +391,7 @@ final class SpeakerNamingSession {
     /// the queue writes to, so the only way to reach it with an empty list is a
     /// queue with no output folder, whose store is a no-op anyway.
     func removeNamingData(jobID: UUID, slug: String?, in outputDirs: [URL] = []) {
-        speakerNamingDataByJob.removeValue(forKey: jobID)
-        stashedSuggestedAtDialog.removeValue(forKey: jobID)
-        stashedTopCandidates.removeValue(forKey: jobID)
+        forgetNamingData(jobID: jobID)
         let resolved = outputDirs.isEmpty
             ? (delegate?.job(withID: jobID)?.sidecarOutputDirs ?? [])
             : outputDirs
@@ -468,6 +399,15 @@ final class SpeakerNamingSession {
             store.deleteNamingJSON(slug: slug)
             store.cleanupSidecarFiles(slug: slug)
         }
+    }
+
+    /// The in-memory half of `removeNamingData`: the naming data and the
+    /// recognition stashes, no files.
+    private func forgetNamingData(jobID: UUID) {
+        speakerNamingDataByJob.removeValue(forKey: jobID)
+        lateRerunFailures.removeValue(forKey: jobID)
+        stashedSuggestedAtDialog.removeValue(forKey: jobID)
+        stashedTopCandidates.removeValue(forKey: jobID)
     }
 
     /// Removes only the transcript-bearing segment sidecar. The queue uses this

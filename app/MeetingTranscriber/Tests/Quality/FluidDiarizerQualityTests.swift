@@ -79,6 +79,19 @@ final class FluidDiarizerQualityTests: XCTestCase {
         try await runDERFixture(named: "four_speakers_en_ami", mode: .nemotron, threshold: 0.50)
     }
 
+    /// The default-lane test `testNemotronLoadRequestsCpuAndNeuralEngine`
+    /// only sees what reaches the injected loader. This drives the default
+    /// loader a `FluidDiarizer` is built with, i.e. the real
+    /// `Nemotron3Models.loadFromHuggingFace` call, and reads the compute units
+    /// back from the loaded `MLModel`. A dropped `computeUnits:` argument
+    /// leaves FluidAudio at its default `.all` and fails here.
+    func test_nemotron_loadedModelRunsOnCpuAndNeuralEngine() async throws {
+        try skipUnlessQualityRun()
+        let diarizer = FluidDiarizer(mode: .nemotron)
+        let (_, routed) = try await diarizer.makeNemotronDiarizer(FluidDiarizer.nemotronComputeUnits)
+        XCTAssertEqual(routed, .cpuAndNeuralEngine)
+    }
+
     // MARK: - Helpers
 
     /// Each test method already names exactly one (fixture, mode) pair, so the

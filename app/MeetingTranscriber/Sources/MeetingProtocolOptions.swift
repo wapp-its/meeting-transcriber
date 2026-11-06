@@ -77,13 +77,13 @@ enum ProtocolDestination: Equatable {
     var notice: String {
         switch self {
         case let .remote(name):
-            "Background info is sent with the transcript to \(name) to write the protocol."
+            "Background info is sent with the transcript to \(name) to write the meeting notes."
 
         case let .local(host):
             "Background info stays on this Mac: it goes with the transcript to the local model at \(host)."
 
         case .off:
-            "Protocol generation is off (Settings → Output), so the template and background info are not used."
+            "Meeting notes generation is off (Settings → Output), so the template and background info are not used."
         }
     }
 

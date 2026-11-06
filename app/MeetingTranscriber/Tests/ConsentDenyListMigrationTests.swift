@@ -17,7 +17,7 @@ final class ConsentDenyListMigrationTests: XCTestCase {
     private func makeDefaults() throws -> UserDefaults {
         let suiteName = "ConsentDenyListMigrationTests.\(UUID().uuidString)"
         addTeardownBlock { DefaultsSuite.remove(suiteName) }
-        return try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        return try XCTUnwrap(DefaultsSuite.open(suiteName))
     }
 
     func testFirstLaunchAddsTheAddedAppsKeyAndNeverMigratesAgain() throws {

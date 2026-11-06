@@ -26,6 +26,9 @@ import Observation
 final class EngineController {
     let whisperKit: WhisperKitEngine
     let parakeetEngine: ParakeetEngine
+    /// The Settings row for WhisperKit models earlier builds left in
+    /// `Documents`, built once here rather than on every Settings body pass.
+    let legacyWhisperModels: LegacyWhisperModelsState?
 
     private let settings: AppSettings
 
@@ -48,11 +51,25 @@ final class EngineController {
         ParakeetEngine()
     }
 
+    /// Nil in the App Store build, which leaves the row out. Its `Documents` is
+    /// the container's own, which iCloud does not sync, and that sync was the
+    /// reason for the row; worse, a sandboxed `trashItem` moves container items
+    /// into the container's private Trash, so nothing would be freed and
+    /// Finder's Trash would never show them.
+    private static func makeLegacyWhisperModels(settings: AppSettings) -> LegacyWhisperModelsState? {
+        #if APPSTORE
+            nil
+        #else
+            LegacyWhisperModelsState(settings: settings)
+        #endif
+    }
+
     init(settings: AppSettings, warmupQueue: ModelWarmupQueue = ModelWarmupQueue()) {
         self.settings = settings
         self.warmupQueue = warmupQueue
         self.whisperKit = Self.makeWhisperKit()
         self.parakeetEngine = Self.makeParakeet()
+        self.legacyWhisperModels = Self.makeLegacyWhisperModels(settings: settings)
         // Read at each Hub request rather than copied here, so a token saved or
         // removed in Settings applies to the next download without a restart.
         whisperKit.hubToken = { [settings] in settings.huggingFaceToken }
@@ -105,15 +122,17 @@ final class EngineController {
             if whisperKit.customVocabularyPath != nextVocab { whisperKit.customVocabularyPath = nextVocab }
             let nextBookmark = settings.effectiveVocabularyBookmark
             if whisperKit.customVocabularyBookmark != nextBookmark { whisperKit.customVocabularyBookmark = nextBookmark }
-            let nextVocabularyPromptEnabled = settings.whisperKitVocabularyPromptEnabled
+            let nextVocabularyPromptEnabled = settings.customVocabularyEnabled
             if whisperKit.vocabularyPromptEnabled != nextVocabularyPromptEnabled {
                 whisperKit.vocabularyPromptEnabled = nextVocabularyPromptEnabled
             }
 
         case .parakeet:
-            let nextVocab = settings.effectiveVocabularyPath
+            // Off means no vocabulary at all, whichever source supplies it.
+            let vocabularyOn = settings.customVocabularyEnabled
+            let nextVocab = vocabularyOn ? settings.effectiveVocabularyPath : ""
             if parakeetEngine.customVocabularyPath != nextVocab { parakeetEngine.customVocabularyPath = nextVocab }
-            let nextBookmark = settings.effectiveVocabularyBookmark
+            let nextBookmark = vocabularyOn ? settings.effectiveVocabularyBookmark : nil
             if parakeetEngine.customVocabularyBookmark != nextBookmark { parakeetEngine.customVocabularyBookmark = nextBookmark }
             let nextLang = settings.parakeetLanguageOrNil
             if parakeetEngine.language != nextLang { parakeetEngine.language = nextLang }
@@ -137,7 +156,7 @@ final class EngineController {
             _ = settings.customVocabularyBookmark
             _ = settings.vocabularySource
             _ = settings.remoteVocabularyURL
-            _ = settings.whisperKitVocabularyPromptEnabled
+            _ = settings.customVocabularyEnabled
             _ = settings.parakeetLanguage
         } onChange: { [weak self] in
             Task { @MainActor in

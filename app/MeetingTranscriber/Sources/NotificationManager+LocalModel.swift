@@ -103,6 +103,7 @@
             case noModel = "no-model"
 
             /// The job's warning; the transcript is kept in both cases.
+            /// Matched by /v1 clients and persisted jobs; keep the text stable.
             var warning: String {
                 switch self {
                 case .lowMemory: "Protocol not written: low memory — transcript saved"
@@ -112,7 +113,8 @@
         }
 
         /// The warning of a protocol saved although the model stopped at its
-        /// output limit (spec R7).
+        /// output limit (spec R7). Matched by /v1 clients and persisted jobs;
+        /// keep the text stable.
         static let incompleteWarning = "Protocol incomplete — the local model stopped at its output limit"
 
         /// A recording ended the job's helper; the protocol is written by
@@ -314,18 +316,18 @@
         ) -> (title: String, body: String, categoryID: String?) {
             switch notice {
             case let .paused(_, title):
-                ("Protocol paused for your recording", "\(title): the protocol is written once the recording has ended.", nil)
+                ("Meeting notes paused for your recording", "\(title): the meeting notes are written once the recording has ended.", nil)
 
             case .notWritten(.lowMemory, _):
                 (
-                    "Protocol not written: low memory",
+                    "Meeting notes not written: low memory",
                     "\(naming(meetings)): there was not enough free memory for the local model. \(transcriptsSaved(meetings))",
                     localModelLowMemoryCategoryID,
                 )
 
             case .notWritten(.noModel, _):
                 (
-                    "Protocol not written: no local model",
+                    "Meeting notes not written: no local model",
                     "\(naming(meetings)): no local model is chosen, or it cannot be reached. Choose one in Settings → Output. \(transcriptsSaved(meetings))",
                     localModelNoModelCategoryID,
                 )

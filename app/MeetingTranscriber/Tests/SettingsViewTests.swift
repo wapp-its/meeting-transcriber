@@ -17,7 +17,7 @@ final class SettingsViewTests: XCTestCase { // swiftlint:disable:this type_body_
     override func setUp() async throws {
         try await super.setUp()
         testSuiteName = "SettingsViewTests-\(getpid())-\(UUID().uuidString)"
-        guard let suite = UserDefaults(suiteName: testSuiteName) else {
+        guard let suite = DefaultsSuite.open(testSuiteName) else {
             XCTFail("Could not create test UserDefaults suite")
             return
         }
@@ -205,6 +205,7 @@ final class SettingsViewTests: XCTestCase { // swiftlint:disable:this type_body_
     func testParakeetShowsCustomVocabularyField() throws {
         let settings = makeSettings()
         settings.transcriptionEngine = .parakeet
+        settings.customVocabularyEnabled = true
         let body = try makeTranscription(settings: settings).inspect()
         XCTAssertNoThrow(try body.find(text: "Custom vocabulary file"))
     }
@@ -212,6 +213,7 @@ final class SettingsViewTests: XCTestCase { // swiftlint:disable:this type_body_
     func testWhisperKitShowsCustomVocabularyField() throws {
         let settings = makeSettings()
         settings.transcriptionEngine = .whisperKit
+        settings.customVocabularyEnabled = true
         let body = try makeTranscription(settings: settings).inspect()
         XCTAssertNoThrow(try body.find(text: "Custom vocabulary file"))
     }
@@ -221,6 +223,7 @@ final class SettingsViewTests: XCTestCase { // swiftlint:disable:this type_body_
         // field, but the WhisperKit-specific Model picker must not leak through.
         let settings = makeSettings()
         settings.transcriptionEngine = .parakeet
+        settings.customVocabularyEnabled = true
         let body = try makeTranscription(settings: settings).inspect()
         XCTAssertNoThrow(try body.find(text: "Custom vocabulary file"))
         XCTAssertNoThrow(try body.find(text: "Language"))
@@ -528,7 +531,7 @@ final class SettingsViewTests: XCTestCase { // swiftlint:disable:this type_body_
         settings.protocolProvider = .none
         let body = try makeOutput(settings: settings).inspect()
         XCTAssertNoThrow(
-            try body.find(text: "No LLM summarization will be generated. Raw transcripts are retained if no protocol is saved."),
+            try body.find(text: "No LLM summarization will be generated. Raw transcripts are retained if no meeting notes are saved."),
         )
     }
 
@@ -541,7 +544,7 @@ final class SettingsViewTests: XCTestCase { // swiftlint:disable:this type_body_
 
     func testProtocolLanguagePickerExists() throws {
         let body = try makeOutput().inspect()
-        XCTAssertNoThrow(try body.find(text: "Protocol Language"))
+        XCTAssertNoThrow(try body.find(text: "Notes Language"))
     }
 
     func testOutputFolderSectionExists() throws {

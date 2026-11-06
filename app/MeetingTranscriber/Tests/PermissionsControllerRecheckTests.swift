@@ -1,5 +1,6 @@
 import AppKit
 @testable import MeetingTranscriber
+import os
 import XCTest
 
 /// When the permission check runs again without a click: after a wake from
@@ -17,8 +18,8 @@ final class PermissionsControllerRecheckTests: XCTestCase {
     /// window coming to the front, and a second wake right after it falls
     /// inside the debounce.
     func testAWakeReplacesABrokenMicrophoneVerdict() async {
-        let script = MicProbeScript([.failed(.noBufferBeforeTimeout), .failed(.noBufferBeforeTimeout), .delivered])
-        let clock = ManualClock()
+        let script = MicProbeScript([.failed(.noBufferBeforeTimeout), .failed(.noBufferBeforeTimeout), .answered(bufferCount: 1)])
+        let clock = RecheckClock()
         let center = NotificationCenter()
         let notifier = RecordingNotifier()
         let controller = PermissionsController(notifier: notifier, probe: script.check, now: clock.read)
@@ -77,8 +78,8 @@ final class PermissionsControllerRecheckTests: XCTestCase {
     /// does not open the microphone, the previous verdict stays and is not
     /// counted as a new check, and one check runs after the recording.
     func testARecordingThatStartsBeforeTheRetryGetsNoSecondProbeAndOneCheckAfterIt() async {
-        let script = MicProbeScript([.delivered, .failed(.noBufferBeforeTimeout), .delivered])
-        let clock = ManualClock()
+        let script = MicProbeScript([.answered(bufferCount: 1), .failed(.noBufferBeforeTimeout), .answered(bufferCount: 1)])
+        let clock = RecheckClock()
         let notifier = RecordingNotifier()
         let controller = PermissionsController(notifier: notifier, probe: script.check, now: clock.read)
         await controller.check()
@@ -176,7 +177,7 @@ final class PermissionsControllerRecheckTests: XCTestCase {
 
 /// The controller's clock, moved by hand.
 @MainActor
-private final class ManualClock {
+private final class RecheckClock {
     private var current = Date(timeIntervalSinceReferenceDate: 0)
 
     func read() -> Date {
@@ -236,12 +237,15 @@ private final class HeldChecks {
 /// actor.
 private final class MicProbeScript: @unchecked Sendable {
     private let lock = NSLock()
-    private let outcomes: [PermissionHealthCheck.MicProbeOutcome]
+    private let outcomes: [MicProbeOutcome]
     private var count = 0
     private var holdNext = false
     private var heldPause: CheckedContinuation<Void, Never>?
+    /// This script's own memory of the last verdict, so no other test's check
+    /// leaks in through the process-wide one.
+    private let lastAnswered = OSAllocatedUnfairLock<PermissionStatus?>(initialState: nil)
 
-    init(_ outcomes: [PermissionHealthCheck.MicProbeOutcome]) {
+    init(_ outcomes: [MicProbeOutcome]) {
         self.outcomes = outcomes
     }
 
@@ -273,11 +277,12 @@ private final class MicProbeScript: @unchecked Sendable {
             sleep: { _ in await self.pause() },
             logFailure: { _, _ in },
             mayRetry: mayRetry,
+            lastAnswered: lastAnswered,
         )
         return microphone.map { HealthCheckResult(screenRecording: .healthy, microphone: $0) }
     }
 
-    private func attempt() -> PermissionHealthCheck.MicProbeOutcome {
+    private func attempt() -> MicProbeOutcome {
         lock.withLock {
             defer { count += 1 }
             return outcomes[min(count, outcomes.count - 1)]

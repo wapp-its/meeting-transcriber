@@ -2,6 +2,18 @@ import FluidAudio
 import Foundation
 import os
 
+/// The part of `Nemotron3Diarizer` that `FluidDiarizer` streams audio
+/// through. A protocol so tests can drive the streaming loop without the
+/// ~200 MB model: `Nemotron3Diarizer` cannot be built without one.
+protocol NemotronStreamingDiarizing: AnyObject {
+    func reset()
+    func appendAudio(_ samples: [Float])
+    func processBufferedAudio() throws -> [Nemotron3ChunkResult]
+    func finishStream() throws -> [Nemotron3ChunkResult]
+}
+
+extension Nemotron3Diarizer: NemotronStreamingDiarizing {}
+
 private let nemotronLogger = Logger(subsystem: AppPaths.logSubsystem, category: "FluidDiarizer+Nemotron")
 
 extension FluidDiarizer {
@@ -12,6 +24,19 @@ extension FluidDiarizer {
     /// audio on top of the samples (which are held either way: the embedding
     /// pass reads them again). Both paths produce the same probabilities.
     static let nemotronFeedSamples = 60 * 16000
+
+    /// One Nemotron 3 model load at a time in this process, across all
+    /// instances. Each pipeline job, speaker-naming re-run and voice
+    /// enrollment builds its own `FluidDiarizer`, so two can start the
+    /// first-time download together. `Nemotron3Models.loadFromHuggingFace`
+    /// deletes the whole model folder when its version marker is missing,
+    /// and writes the marker only after a complete download, so a second
+    /// load starting mid-download would delete the first one's files. Behind
+    /// the gate the second load finds the marker and loads from the cache.
+    /// The loaded models are not shared: their inference buffers are
+    /// per-instance state (see `runNemotron`). A second app process is not
+    /// covered.
+    static let nemotronLoadGate = AsyncSerialGate()
 
     /// Nemotron 3 Diarization (NVIDIA, 8-speaker streaming Sortformer), end
     /// to end on device. Loads the model on first use (one ~200 MB download
@@ -24,10 +49,10 @@ extension FluidDiarizer {
     /// checkpoint's eight output slots, which `DiarizerMode.speakerCap` keeps
     /// the Settings and re-run steppers within.
     ///
-    /// This file is `.codecov.yml`-ignored: everything in it needs the
-    /// downloaded model. The segment conversion and timeline configuration are
-    /// pure and live in `FluidDiarizer.swift`, covered by the default lane;
-    /// this glue is exercised by `FluidDiarizerQualityTests` and
+    /// The model load goes through `makeNemotronDiarizer`, so the default
+    /// lane drives this function with a stub; only the real loader in
+    /// `FluidDiarizer+NemotronModelLoad.swift` needs the downloaded model.
+    /// The real model runs in `FluidDiarizerQualityTests` and
     /// `SortformerEmbeddingsE2ETests` under `RUN_QUALITY_TESTS=1`.
     func runNemotron(audioPath: URL, numSpeakers: Int?) async throws -> MeetingTranscriber.DiarizationResult {
         if let numSpeakers, numSpeakers > 0 {
@@ -38,60 +63,53 @@ extension FluidDiarizer {
         // Decode first: an unreadable file then fails before a first run
         // starts a 200 MB download it cannot use.
         let audio = try AudioConverter(sampleRate: 16000.0).resampleAudioFile(audioPath)
-        let diarizer = try await loadNemotronDiarizer()
 
-        nemotronLogger.info("Starting Nemotron 3 diarization: \(audioPath.lastPathComponent)")
-        let started = Date()
-        let timeline = try Self.streamNemotron(audio: audio, through: diarizer)
-        let seconds = Double(audio.count) / 16000
-        let elapsed = Date().timeIntervalSince(started)
-        nemotronLogger.info(
-            "Nemotron 3 diarized \(Int(seconds), privacy: .public) s of audio in \(String(format: "%.1f", elapsed), privacy: .public) s",
-        )
+        // One run at a time per instance. The cached diarizer holds stream
+        // state and is not thread-safe, and the lazily loaded models behind
+        // `nemotronDiarizer` and `sortformerEmbeddingModels` are plain stored
+        // properties. Caching only the models and building a fresh diarizer
+        // per run would not help: `Nemotron3Models` itself holds preallocated
+        // input and output buffers that every inference step writes into.
+        return try await nemotronRunGate.withGate {
+            // A job cancelled while it waited for the gate stops here rather
+            // than loading or streaming for nobody.
+            try Task.checkCancellation()
+            let diarizer = try await loadedNemotronDiarizer()
 
-        let embeddings = try await extractSortformerEmbeddings(audio: audio, timeline: timeline)
-        return Self.buildResult(segments: Self.segments(from: timeline), speakerDatabase: embeddings)
-    }
+            nemotronLogger.info("Starting Nemotron 3 diarization: \(audioPath.lastPathComponent)")
+            let started = Date()
+            let timeline = try Self.streamNemotron(audio: audio, through: diarizer)
+            let seconds = Double(audio.count) / 16000
+            let elapsed = Date().timeIntervalSince(started)
+            nemotronLogger.info(
+                "Nemotron 3 diarized \(Int(seconds), privacy: .public) s of audio in \(String(format: "%.1f", elapsed), privacy: .public) s",
+            )
 
-    private func loadNemotronDiarizer() async throws -> Nemotron3Diarizer {
-        if let nemotronDiarizer { return nemotronDiarizer }
-        let config = Self.nemotronConfig
-        // FluidAudio downloads only when the compiled bundle or its assets are
-        // missing from the cache; a complete copy loads with no network access.
-        let models = try await Nemotron3Models.loadFromHuggingFace(
-            config: config,
-            progressHandler: Self.nemotronDownloadProgressLogger(),
-        )
-        let diarizer = Nemotron3Diarizer(config: config, models: models)
-        nemotronDiarizer = diarizer
-        nemotronLogger.info(
-            "Nemotron 3 model ready (\(config.modelFileName, privacy: .public), loaded in \(String(format: "%.1f", models.compilationDuration), privacy: .public) s)",
-        )
-        return diarizer
-    }
-
-    /// Download progress in tenths, so a first run shows where it is in the
-    /// log without a line per file.
-    private static func nemotronDownloadProgressLogger() -> ProgressHandler {
-        let lastTenth = OSAllocatedUnfairLock(initialState: -1)
-        return { progress in
-            let tenth = Int(progress.fractionCompleted * 10)
-            let isNew = lastTenth.withLock { last in
-                guard tenth > last else { return false }
-                last = tenth
-                return true
-            }
-            if isNew {
-                nemotronLogger.info("Nemotron 3 model download \(tenth * 10, privacy: .public) %")
-            }
+            let embeddings = try await extractSortformerEmbeddings(audio: audio, timeline: timeline)
+            return Self.buildResult(segments: Self.segments(from: timeline), speakerDatabase: embeddings)
         }
+    }
+
+    private func loadedNemotronDiarizer() async throws -> any NemotronStreamingDiarizing {
+        if let nemotronDiarizer { return nemotronDiarizer }
+        let (diarizer, routed) = try await Self.nemotronLoadGate.withGate {
+            // Checked again behind the load gate: a job cancelled while
+            // another instance held it must not start a ~200 MB download.
+            try Task.checkCancellation()
+            return try await makeNemotronDiarizer(Self.nemotronComputeUnits)
+        }
+        nemotronDiarizer = diarizer
+        // `routed` is read back from the loaded model, so the log shows the
+        // routing Core ML was given rather than the value this file asked for.
+        nemotronLogger.info("Nemotron 3 model ready (computeUnits: \(Self.computeUnitsLabel(routed), privacy: .public))")
+        return diarizer
     }
 
     /// Feed `audio` through the streaming path in `nemotronFeedSamples`
     /// pieces and collect the frame probabilities into a finalized timeline.
     /// Synchronous and CPU/ANE-bound like `SortformerDiarizer.processComplete`;
     /// checks for cancellation between pieces.
-    private static func streamNemotron(audio: [Float], through diarizer: Nemotron3Diarizer) throws -> DiarizerTimeline {
+    private static func streamNemotron(audio: [Float], through diarizer: any NemotronStreamingDiarizing) throws -> DiarizerTimeline {
         diarizer.reset()
         let timeline = DiarizerTimeline(config: nemotronTimelineConfig)
         var offset = 0

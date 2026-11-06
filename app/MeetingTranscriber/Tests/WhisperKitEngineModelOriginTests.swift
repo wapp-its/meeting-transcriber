@@ -104,6 +104,41 @@ final class WhisperKitEngineModelOriginTests: XCTestCase {
         XCTAssertEqual(engine.modelOrigin, swissGerman)
     }
 
+    /// Well past the one attempt expected, so the bound never interferes with the
+    /// behaviour under test.
+    private static let runawayBound = 4
+
+    /// The stock rule applies to a custom model as well: a load that failed for the
+    /// model still requested is not repeated, because repeating it would double
+    /// the wait and the failed download for every caller that arrives meanwhile.
+    /// The chain is unbounded in production, so a regression that keeps retrying
+    /// would hang this test rather than fail it; the bound cancels the chain, which
+    /// the loop head honours, and the count then reports the extra attempts.
+    func testAFailedCustomModelLoadIsAttemptedOnce() async {
+        let engine = WhisperKitEngine()
+        engine.applyModelVariant("flix-swissgerman-large-v3_8bit", origin: swissGerman)
+        var downloads = 0
+        var load: Task<Void, Never>?
+        engine.installModelSourceForTesting(WhisperKitModelSource(
+            locateLocal: { _ in nil },
+            download: { _, _ in
+                downloads += 1
+                if downloads > Self.runawayBound {
+                    load?.cancel()
+                }
+                throw URLError(.networkConnectionLost)
+            },
+            makePipe: { _, _ in throw WhisperError.modelsUnavailable() },
+        ))
+
+        let task = Task { @MainActor in await engine.loadModel() }
+        load = task
+        await task.value
+
+        XCTAssertEqual(downloads, 1, "A failure for the model still requested must not be retried")
+        XCTAssertEqual(engine.modelState, .unloaded)
+    }
+
     // MARK: - Production source for a picked folder
 
     private func writeCompleteModel(in folder: URL, omitting omitted: String? = nil) throws {
@@ -139,6 +174,26 @@ final class WhisperKitEngineModelOriginTests: XCTestCase {
             XCTFail("A picked folder must never be downloaded")
         } catch {
             XCTAssertEqual(error as? WhisperKitModelError, .folderIncomplete(missing: "TextDecoder.mlmodelc/model.mil"))
+        }
+    }
+
+    /// A picked folder is never downloaded, so WhisperKit would fetch a missing
+    /// tokenizer from the Hub, which is what loading from a folder must not need.
+    /// Both tokenizer files are tried, since the incomplete-folder case above omits
+    /// a CoreML file and says nothing about the tokenizer check.
+    func testAFolderWithoutItsTokenizerFilesIsRefused() async throws {
+        for file in ["tokenizer.json", "tokenizer_config.json"] {
+            let folder = try makeTempDirectory(prefix: "wk-folder")
+            try writeCompleteModel(in: folder, omitting: file)
+            let source = WhisperKitModelSource.production(for: .localFolder(path: folder.path, bookmark: nil))
+
+            XCTAssertNil(source.locateLocal(folder.lastPathComponent), "A folder without \(file) must not be loaded")
+            do {
+                _ = try await source.download(folder.lastPathComponent) { _ in }
+                XCTFail("A picked folder must never be downloaded")
+            } catch {
+                XCTAssertEqual(error as? WhisperKitModelError, .folderIncomplete(missing: file))
+            }
         }
     }
 

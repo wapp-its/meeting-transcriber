@@ -50,10 +50,17 @@ final class PipelineController {
     /// scope is opened, the recovery of that staging folder a new queue runs,
     /// and how the output folder is resolved. Production uses `.production`,
     /// the app's own data directories; a test passes temp folders so a queue it
-    /// builds never reads or writes the installed app's data.
+    /// builds never reads or writes the installed app's data. Required wherever
+    /// it is taken, never defaulted, so leaving it out cannot silently mean the
+    /// app's own folders.
     struct QueueEnvironment {
-        var logDir: URL?
+        var logDir: URL
         var stagingDir: URL
+        /// The speaker database and the two history logs a queue appends to as
+        /// jobs run. Files, not folders; production names the app's own.
+        var speakersDB: URL
+        var recognitionStatsLog: URL
+        var stageTimingLog: URL
         var securityScope: SecurityScopeAccess = .live
         /// Rescues crashed recordings from the staging folder and enqueues
         /// orphans into the queue it is handed, balancing each rebuilt mix
@@ -67,7 +74,14 @@ final class PipelineController {
         var initialQueue: PipelineQueue?
     }
 
-    @ObservationIgnored private let queueEnvironment: QueueEnvironment
+    @ObservationIgnored let queueEnvironment: QueueEnvironment
+
+    /// The speaker database this controller's queues use, for the rest of the
+    /// app state that reads or changes it alongside them (the RPC snapshot and
+    /// speaker actions), so all of them agree on one file.
+    var speakersDB: URL {
+        queueEnvironment.speakersDB
+    }
 
     #if !APPSTORE
         /// The one gate every local-model protocol goes through (spec R10).
@@ -99,8 +113,8 @@ final class PipelineController {
     init(
         settings: AppSettings,
         notifier: any AppNotifying,
+        queueEnvironment: QueueEnvironment,
         terminalJobStore: TerminalJobStore? = nil,
-        queueEnvironment: QueueEnvironment = .production,
     ) {
         self.settings = settings
         self.notifier = notifier
@@ -108,7 +122,7 @@ final class PipelineController {
         self.outputDirectory = OutputDirectoryResolver(settings: settings, notifier: notifier)
         self.terminalJobStore = terminalJobStore
             ?? TerminalJobStore(
-                path: (queueEnvironment.logDir ?? AppPaths.ipcDir).appendingPathComponent("terminal_jobs.json"),
+                path: queueEnvironment.logDir.appendingPathComponent("terminal_jobs.json"),
             )
         self.queue = queueEnvironment.initialQueue
             ?? PipelineQueue(
@@ -172,6 +186,7 @@ final class PipelineController {
         guard let built = makeQueue() else { return }
         if let replaced {
             built.adoptJobs(of: replaced)
+            replaced.retire()
         } else {
             built.loadSnapshot()
         }
@@ -197,6 +212,7 @@ final class PipelineController {
     /// every job done or failed (a job parked for naming is neither).
     private var canReplaceQueue: Bool {
         !queue.isProcessing && queue.jobs.allSatisfy(\.state.isTerminal)
+            && queue.canHandOverNotionExports(builtHere: queueWasBuiltHere)
     }
 
     /// Rebuild the queue when the output folder has changed since it was built,
@@ -296,23 +312,26 @@ final class PipelineController {
             micLabel: settings.micName,
             includeFullTranscriptInProtocol: settings.includeFullTranscriptInProtocol,
             saveRawTranscriptSeparately: settings.saveRawTranscriptSeparately,
+            useAITitleForFilenames: settings.useAITitleForFilenames,
             transcriptOutputOptionsProvider: { [settings] in
                 TranscriptOutputOptions(
                     includeFullTranscriptInProtocol: settings.includeFullTranscriptInProtocol,
                     saveRawTranscriptSeparately: settings.saveRawTranscriptSeparately,
+                    useAITitleForFilenames: settings.useAITitleForFilenames,
                 )
             },
             defaultProtocolTemplateProvider: { [settings] in
                 ProtocolTemplateStore.production.effectiveDefault(settings.defaultProtocolTemplate)
             },
             protocolTemplateStore: .production,
-            speakerMatcherFactory: { SpeakerMatcher() },
+            speakerMatcherFactory: SpeakerMatcher.factory(dbPath: speakersDB, notifier: notifier),
             vadConfig: settings.vadEnabled ? VADConfig(threshold: settings.vadThreshold) : nil,
-            recognitionStatsLog: RecognitionStatsLog(),
+            recognitionStatsLog: RecognitionStatsLog(path: queueEnvironment.recognitionStatsLog),
             terminologyNormalizer: { [weak settings] in
-                TerminologyNormalizer(rulesText: settings?.terminologyRulesText ?? "")
+                settings?.terminologyNormalizerForJob() ?? TerminologyNormalizer()
             },
-            stageTimingLog: StageTimingLog(),
+            stageTimingLog: StageTimingLog(path: queueEnvironment.stageTimingLog),
+            notionExportConfigurationProvider: { [settings] in NotionExportConfiguration.resolve(settings: settings) },
             terminalJobStore: terminalJobStore,
             securityScope: queueEnvironment.securityScope,
         )
@@ -370,6 +389,10 @@ final class PipelineController {
                 model: settings.openAIModel,
                 language: settings.protocolLanguage,
                 apiKey: settings.openAIAPIKey.isEmpty ? nil : settings.openAIAPIKey,
+                apiKeyPlacement: settings.openAIAPIKeyPlacement,
+                apiKeyHeaderName: settings.openAIAPIKeyHeaderName,
+                temperature: settings.openAITemperature,
+                topP: settings.openAITopP,
             )
 
         case .none:
@@ -378,11 +401,11 @@ final class PipelineController {
     }
 
     func configureCallbacks() {
+        queue.onNotionExportFinished = { [notifier] in notifier.notifyNotionExport(job: $0, failureReason: $1) }
         queue.onJobStateChange = { [notifier] job, _, newState in
             switch newState {
             case .done:
-                let title = job.protocolPath != nil ? "Protocol Ready" : "Transcript Saved"
-                notifier.notify(title: title, body: job.meetingTitle)
+                notifier.notify(title: job.hasSavedProtocol ? "Meeting Notes Ready" : "Transcript Saved", body: job.meetingTitle)
 
             case .error:
                 if let err = job.error {
@@ -392,6 +415,9 @@ final class PipelineController {
             default:
                 break
             }
+        }
+        queue.onUnusableVoices = { [notifier] job, names in
+            notifier.notify(title: "Voice not saved", body: PipelineQueue.unusableVoicesMessage(names, in: job))
         }
         #if !APPSTORE
             LocalModelJobNotices(notifier: notifier, settings: settings).install(on: queue)
@@ -492,61 +518,6 @@ final class PipelineController {
         return terminalJobStore.lookup(jobID: id)
     }
 
-    // MARK: - Speaker naming (automation API)
-
-    /// Naming data for a job that is *actually* awaiting resolution — both in
-    /// `.speakerNamingPending` state and with stashed data. Guarding on the
-    /// state (not just the dict) makes confirm/skip idempotent: confirming
-    /// transitions the job out of `.speakerNamingPending` synchronously, so a
-    /// duplicate call (e.g. an automation retry) is rejected before it can
-    /// double-record recognition or spawn a second re-apply.
-    private func pendingNamingData(forID id: UUID) -> PipelineQueue.SpeakerNamingData? {
-        guard queue.jobs.first(where: { $0.id == id })?.state == .speakerNamingPending else { return nil }
-        return queue.speakerNamingDataByJob[id]
-    }
-
-    /// The speaker-naming choice awaiting resolution for a job, or nil when the
-    /// job has no naming pending (unknown ID → the RPC layer 404s). Excludes
-    /// embeddings.
-    func namingStatus(forID id: UUID) -> NamingStatusDTO? {
-        guard let data = pendingNamingData(forID: id) else { return nil }
-        let speakers = data.mapping.keys.sorted().map { label in
-            NamingStatusDTO.Speaker(
-                label: label,
-                suggested: data.mapping[label] ?? label,
-                speakingSeconds: data.speakingTimes[label] ?? 0,
-            )
-        }
-        return NamingStatusDTO(
-            jobID: id.uuidString, meetingTitle: data.meetingTitle,
-            speakers: speakers, participants: data.participants,
-        )
-    }
-
-    /// Confirm speaker names for a pending job. Returns false when the job has no
-    /// naming awaiting resolution (→ the RPC layer 404s); idempotent on retry.
-    @discardableResult
-    func confirmNaming(jobID: UUID, mapping: [String: String]) -> Bool {
-        resolveNaming(jobID: jobID, result: .confirmed(mapping))
-    }
-
-    /// Skip speaker naming for a single pending job (accept the auto-names).
-    /// Returns false when the job has no naming awaiting resolution.
-    @discardableResult
-    func skipNaming(jobID: UUID) -> Bool {
-        resolveNaming(jobID: jobID, result: .skipped)
-    }
-
-    /// Shared guard + dispatch for confirm/skip: act only on a job actually
-    /// awaiting naming, returning whether it did (false → 404).
-    private func resolveNaming(jobID: UUID, result: PipelineQueue.SpeakerNamingResult) -> Bool {
-        guard pendingNamingData(forID: jobID) != nil else { return false }
-        // Tagged `.rpc`: nobody was looking at a dialog, so a row from here must
-        // not read as a human decision in the recognition log.
-        queue.completeSpeakerNaming(jobID: jobID, result: result, source: .rpc)
-        return true
-    }
-
     // MARK: - Blocking transcribe (one-call automation API)
 
     /// Enqueue a single file with `autoSkipNaming` so it completes headlessly
@@ -555,7 +526,7 @@ final class PipelineController {
     /// state. Returns `.noFile` when the path doesn't exist, `.timedOut` with
     /// the in-flight status once `maxWaitSeconds` elapses (the job keeps running
     /// and will still finish on its own), else `.completed` with the terminal
-    /// status.
+    /// status. A Notion export is not waited for: `export` says if it is pending.
     func transcribeAndWait(
         path: URL,
         maxWaitSeconds: Double,
@@ -572,9 +543,8 @@ final class PipelineController {
             }
             try? await Task.sleep(for: pollInterval)
         }
-        // Final read: a job that went terminal in the last sub-interval window
-        // (or while we were enqueuing with maxWaitSeconds==0) is completed, not
-        // timed out.
+        // Final read: a job that went terminal in the last sub-interval window (or
+        // while enqueuing with maxWaitSeconds==0) is completed, not timed out.
         let final = jobStatus(forID: jobID)
         if let final, final.state.isTerminal { return .completed(final) }
         return .timedOut(final)

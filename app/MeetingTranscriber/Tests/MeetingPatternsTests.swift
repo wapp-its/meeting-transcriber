@@ -21,7 +21,7 @@ final class AppMeetingPatternTests: XCTestCase {
     // MARK: - All Patterns
 
     func testAllPatternsCount() {
-        XCTAssertEqual(AppMeetingPattern.all.count, 9)
+        XCTAssertEqual(AppMeetingPattern.all.count, 10)
     }
 
     // MARK: - Browser meetings category (issue #503)
@@ -59,9 +59,9 @@ final class AppMeetingPatternTests: XCTestCase {
             PowerAssertionDetector.defaultPatterns.first { $0.appName == AppMeetingPattern.browserMeetings.appName },
         )
         let chrome = PowerAssertionDetector.meetingIdentity(pattern: category, processName: "Google Chrome")
-        let unknown = AppMeetingPattern(appName: "Slack", ownerNames: ["Slack"], meetingPatterns: [])
+        let unknown = AppMeetingPattern(appName: "Discord", ownerNames: ["Discord"], meetingPatterns: [])
         let everyName = AppMeetingPattern.recordWithoutAskingCandidates.map(\.appName)
-            + ["Google Chrome", AppMeetingPattern.browserMeetings.appName, "Slack"]
+            + ["Google Chrome", AppMeetingPattern.browserMeetings.appName, "Discord"]
 
         let cases: [(String, AppMeetingPattern, [String], Bool)] = [
             // Every watchable app asks by default, and stops asking once listed.

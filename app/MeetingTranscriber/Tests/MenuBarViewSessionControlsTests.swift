@@ -33,11 +33,11 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
         meeting: MeetingInfo? = nil,
         error: String? = nil,
         taps: Taps = Taps(),
-    ) -> MenuBarView {
+    ) throws -> MenuBarView {
         var actions = MenuActions.noop
         actions.startStop = { taps.toggles += 1 }
         actions.stopManualRecording = recording ? { taps.stops += 1 } : nil
-        return MenuBarView(
+        return try MenuBarView(
             status: TranscriberStatus(
                 version: 1,
                 timestamp: "2024-01-01T00:00:00",
@@ -49,7 +49,7 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
                 pid: nil,
             ),
             isWatching: isWatching,
-            pipelineQueue: PipelineQueue(),
+            pipelineQueue: makeIsolatedQueue(),
             updateChecker: nil,
             noMic: false,
             manualRecordingPendingOrActive: false,
@@ -75,7 +75,7 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
 
     func testWhileRecordingStopRecordingIsTheFirstLineUnderTheStatus() throws {
         let taps = Taps()
-        let sut = makeView(
+        let sut = try makeView(
             state: .recording,
             isWatching: true,
             recording: true,
@@ -98,7 +98,7 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
         ]
         for testCase in cases {
             let taps = Taps()
-            let sut = makeView(state: testCase.state, isWatching: testCase.isWatching, error: testCase.error, taps: taps)
+            let sut = try makeView(state: testCase.state, isWatching: testCase.isWatching, error: testCase.error, taps: taps)
 
             XCTAssertEqual(
                 try Array(lines(of: sut, state: testCase.state).prefix(2)),
@@ -137,7 +137,7 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
             ("recording without a stop", .recording, true, false),
         ]
         for testCase in cases {
-            let sut = makeView(state: testCase.state, isWatching: testCase.isWatching, recording: testCase.recording)
+            let sut = try makeView(state: testCase.state, isWatching: testCase.isWatching, recording: testCase.recording)
             let menu = try lines(of: sut, state: testCase.state)
 
             let toggles = menu.filter { $0 == .button(Self.stopWatching) || $0 == .button(Self.startWatching) }

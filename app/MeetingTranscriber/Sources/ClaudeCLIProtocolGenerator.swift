@@ -10,7 +10,7 @@
         let claudeBin: String
         let language: String
 
-        /// User-supplied key from Settings → Protocol Generation (`AppSettings.claudeAPIKey`),
+        /// User-supplied key from Settings → Meeting Notes (`AppSettings.claudeAPIKey`),
         /// injected only when the user has explicitly typed one in. Not
         /// auto-discovered: an implicit switch away from the CLI's own OAuth
         /// login would silently move a healthy subscription session onto
@@ -18,23 +18,56 @@
         /// previously-working install (both measured — see PR #692 review).
         let anthropicAPIKey: String?
 
-        /// Wall-clock limit for one run.
+        /// How long one run may take before the CLI is stopped and the run
+        /// fails with `ProtocolError.timeout`. Production uses
+        /// `timeoutSeconds`; tests pass a short one.
         let timeout: TimeInterval
+
+        /// How long a CLI sent SIGTERM, for a run or for its `--help` probe,
+        /// may take to exit before it gets SIGKILL.
+        let terminationGrace: TimeInterval
+
+        /// How long the CLI's output is still read after it has exited
+        /// (`ProcessOutput.defaultDrainGrace` in production).
+        let outputDrainGrace: TimeInterval
+
+        /// What `timeout` and `helpProbeTimeout` are measured on; see
+        /// `BoundedProcess.init`.
+        let clock: any Clock<Duration>
+
+        /// How long the `--help` probe may take, on `clock`
+        /// (`helpProbeTimeoutSeconds` in production).
+        let helpProbeTimeout: TimeInterval
 
         init(
             claudeBin: String,
             language: String,
             anthropicAPIKey: String? = nil,
-            timeout: TimeInterval = CLIProcessRunner.defaultTimeout,
+            timeout: TimeInterval = Self.timeoutSeconds,
+            terminationGrace: TimeInterval = BoundedProcess.defaultTerminationGrace,
+            outputDrainGrace: TimeInterval = ProcessOutput.defaultDrainGrace,
+            clock: any Clock<Duration> = SuspendingClock(),
+            helpProbeTimeout: TimeInterval = Self.helpProbeTimeoutSeconds,
         ) {
             self.claudeBin = claudeBin
             self.language = language
             self.anthropicAPIKey = anthropicAPIKey
             self.timeout = timeout
+            self.terminationGrace = terminationGrace
+            self.outputDrainGrace = outputDrainGrace
+            self.clock = clock
+            self.helpProbeTimeout = helpProbeTimeout
         }
 
-        /// Search paths for Claude CLI binaries: the shared runner's.
-        static let searchPaths = CLIProcessRunner.searchPaths
+        static let timeoutSeconds: TimeInterval = 600
+
+        /// Search paths for Claude CLI binaries.
+        static let searchPaths = [
+            "\(NSHomeDirectory())/.local/bin",
+            "/usr/local/bin",
+            "\(NSHomeDirectory())/.npm-global/bin",
+            "/opt/homebrew/bin",
+        ]
 
         // MARK: - ProtocolGenerating
 
@@ -49,57 +82,39 @@
                 transcript: transcript, diarized: diarized, language: language, meetingStartTime: meetingStartTime,
                 instructions: instructions,
             )
+            let launch = await launchConfiguration()
+            try Task.checkCancellation()
+            do {
+                return try await run(prompt: prompt, launch: launch)
+            } catch let rejection as NoSessionPersistenceRejected {
+                let retry = await launchWithoutRejectedFlag(after: launch)
+                try Task.checkCancellation()
+                guard let retry else { throw rejection.error }
+                return try await run(prompt: prompt, launch: retry)
+            }
+        }
 
-            let launch = await Self.launchConfiguration(claudeBin: claudeBin, anthropicAPIKey: anthropicAPIKey)
+        /// One CLI run with `launch`, up to the validated protocol text.
+        private func run(prompt: String, launch: LaunchConfiguration) async throws -> String {
+            let process = Process()
+            let resolvedBin = launch.resolvedBin
+            process.executableURL = URL(fileURLWithPath: resolvedBin)
+            process.arguments = launch.arguments
+            process.environment = launch.environment
             let workingDirectory = try Self.makeWorkingDirectory()
             let projectFolder = Self.cliProjectFolder(workingDirectory: workingDirectory, environment: launch.environment)
             defer { Self.removeRunFolders(workingDirectory: workingDirectory, projectFolder: projectFolder) }
+            process.currentDirectoryURL = workingDirectory
 
-            let promptData = Data(prompt.utf8)
-            logger.info("claude_cli_subprocess_start prompt_bytes=\(promptData.count, privacy: .public)")
-            let output = try await run(
-                CLIProcessRunner.Request(
-                    executable: URL(fileURLWithPath: launch.resolvedBin),
-                    arguments: launch.arguments,
-                    environment: launch.environment,
-                    workingDirectory: workingDirectory,
-                    standardInput: promptData,
-                    timeout: timeout,
-                ),
-                resolvedBin: launch.resolvedBin,
-            )
-
-            // The newline makes a last line the CLI did not terminate count too.
-            var buffer = output.stdout
-            buffer.append(0x0A)
-            var resultEvent: ResultEventInfo?
-            let text = Self.drainStreamJSONLines(buffer: &buffer, resultEvent: &resultEvent).joined()
-
-            if output.status != 0 {
+            let output = try await runCLI(process, prompt: prompt)
+            if output.exitCode != 0 {
                 throw Self.handleFailure(
-                    exitCode: output.status, stderrData: output.stderr, text: text, resultEvent: resultEvent,
+                    exitCode: output.exitCode, stderrData: output.stderrData,
+                    text: output.text, resultEvent: output.resultEvent, arguments: launch.arguments,
                 )
             }
 
-            return try Self.validateGeneratedText(text)
-        }
-
-        /// Runs the CLI on the shared runner and turns its failures into the
-        /// errors and log lines this provider has always reported.
-        private func run(_ request: CLIProcessRunner.Request, resolvedBin: String) async throws -> CLIProcessRunner.Output {
-            do {
-                return try await CLIProcessRunner.run(request)
-            } catch let CLIProcessRunner.Failure.couldNotStart(reason) {
-                logger.error(
-                    "claude_cli_not_found bin=\(self.claudeBin, privacy: .public) resolvedPath=\(resolvedBin, privacy: .public) error=\(reason, privacy: .public)",
-                )
-                throw ProtocolError.cliNotFound(claudeBin)
-            } catch CLIProcessRunner.Failure.timedOut {
-                logger.error("claude_cli_timeout timeout=\(request.timeout, privacy: .public)s")
-                throw ProtocolError.timeout
-            } catch CLIProcessRunner.Failure.stdoutTooLarge {
-                throw ProtocolError.commandOutputTooLarge(tool: "Claude CLI")
-            }
+            return try Self.validateGeneratedText(output.text)
         }
 
         /// Pair an already-decoded stderr string with `exitCode` as a
@@ -110,7 +125,10 @@
 
         /// Decodes `stderrData`, logs the exit and the sizes of what the CLI
         /// wrote, and builds the error `generate()` throws on a nonzero exit —
-        /// pulled out of `generate()` itself to keep that function's body short.
+        /// pulled out of `generate()` itself to keep that function's body
+        /// short. A run with `arguments` that the CLI refused
+        /// `noSessionPersistenceFlag` gets its error wrapped as
+        /// `NoSessionPersistenceRejected`.
         ///
         /// Nothing the subprocess wrote reaches the log: the prompt carries
         /// the meeting's background info, and a CLI that echoes its input on
@@ -119,8 +137,8 @@
         /// enough, never safe to log either). The failure message still
         /// reaches the person through the error's description.
         static func handleFailure(
-            exitCode: Int32, stderrData: Data, text: String, resultEvent: ResultEventInfo?,
-        ) -> ProtocolError {
+            exitCode: Int32, stderrData: Data, text: String, resultEvent: ResultEventInfo?, arguments: [String],
+        ) -> any Error {
             let stderrText = String(data: stderrData, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let publicMessage = publicFailureMessage(resultEvent: resultEvent, stderrText: stderrText)
@@ -128,7 +146,9 @@
             logger.error(
                 "claude_cli_failed exit=\(exitCode, privacy: .public) stderr_bytes=\(stderrData.count, privacy: .public) text_bytes=\(text.utf8.count, privacy: .public) reason_source=\(reasonSource, privacy: .public)",
             )
-            return makeFailureError(exitCode: exitCode, stderrText: publicMessage)
+            let error = makeFailureError(exitCode: exitCode, stderrText: publicMessage)
+            let rejected = rejectedNoSessionPersistence(stderr: stderrText, message: publicMessage, arguments: arguments)
+            return rejected ? NoSessionPersistenceRejected(error: error) : error
         }
 
         /// Where `publicFailureMessage` took its text from, for the log line
@@ -162,6 +182,30 @@
         }
 
         // MARK: - Stream JSON
+
+        /// Parse Claude CLI stream-json output, accumulate text, and capture
+        /// the terminal `result` event (if any) for failure diagnostics.
+        /// Reads until `chunks` ends; a last line the CLI did not terminate
+        /// with a newline counts too.
+        static func readStreamJSON(
+            from chunks: AsyncStream<Data>,
+        ) async -> (text: String, resultEvent: ResultEventInfo?) {
+            var parts: [String] = []
+            var resultEvent: ResultEventInfo?
+
+            // Read line-by-line from stdout
+            var buffer = Data()
+            for await chunk in chunks {
+                buffer.append(chunk)
+                parts.append(contentsOf: drainStreamJSONLines(buffer: &buffer, resultEvent: &resultEvent))
+            }
+            if !buffer.isEmpty {
+                buffer.append(0x0A)
+                parts.append(contentsOf: drainStreamJSONLines(buffer: &buffer, resultEvent: &resultEvent))
+            }
+
+            return (parts.joined(), resultEvent)
+        }
 
         /// Drain every newline-terminated line currently in `buffer`, parsing
         /// each via `parseStreamJSONLine`. Returns the extracted text
@@ -341,7 +385,7 @@
         /// `/usr/bin/env` fallback, prepend `claudeBin` so env can resolve
         /// it from PATH. `noSessionPersistence` adds
         /// `noSessionPersistenceFlag`; pass what
-        /// `cliSupportsNoSessionPersistence` found for this binary.
+        /// the CLI's `--help` lists it (see `launchConfiguration`).
         static func buildSubprocessArgs(claudeBin: String, resolvedBin: String, noSessionPersistence: Bool) -> [String] {
             var args = ["-p", "-", "--output-format", "stream-json", "--verbose", "--model", "sonnet"]
             if noSessionPersistence {
@@ -354,13 +398,14 @@
         }
 
         /// Strip `CLAUDECODE` (avoid nested-session detection by the child
-        /// CLI) and prepend `searchPaths` to `PATH` (app bundles inherit
+        /// CLI), force `disableAutoMemoryVariable` to `1` (see there), and
+        /// prepend `searchPaths` to `PATH` (app bundles inherit
         /// a minimal `PATH`). `anthropicAPIKey`, when non-empty and not
         /// already set in `baseEnvironment`, is injected so the subprocess
         /// can authenticate via API key instead of the CLI's own OAuth
         /// session. The key is never auto-discovered — it only arrives here
-        /// when the user has explicitly typed one into Settings → Protocol
-        /// Generation (`AppSettings.claudeAPIKey`), so a healthy OAuth
+        /// when the user has explicitly typed one into Settings → Meeting
+        /// Notes (`AppSettings.claudeAPIKey`), so a healthy OAuth
         /// session is never silently switched to metered billing and a bad
         /// key can never silently break a previously-working install.
         static func buildEnvironment(
@@ -368,7 +413,11 @@
             searchPaths: [String],
             anthropicAPIKey: String? = nil,
         ) -> [String: String] {
-            var env = CLIProcessRunner.environment(base: baseEnvironment, searchPaths: searchPaths)
+            var env = baseEnvironment
+            env.removeValue(forKey: "CLAUDECODE")
+            env[disableAutoMemoryVariable] = "1"
+            let extraPaths = searchPaths.joined(separator: ":")
+            env["PATH"] = "\(extraPaths):\(env["PATH"] ?? "/usr/bin:/bin")"
             if env["ANTHROPIC_API_KEY"]?.isEmpty ?? true,
                let anthropicAPIKey, !anthropicAPIKey.isEmpty {
                 env["ANTHROPIC_API_KEY"] = anthropicAPIKey
@@ -376,12 +425,33 @@
             return env
         }
 
-        /// A new, empty, owner-only run folder for one CLI run (see
-        /// `CLIProcessRunner.makeRunDirectory`). The CLI needs no folder at
-        /// all, the transcript arrives on stdin; it gets one of its own so it
-        /// never starts in the app's working directory.
+        /// Create a new, empty, owner-only (`0700`) directory under `parent`
+        /// for one CLI run, and return it. `generate()` starts the CLI there
+        /// and removes the directory again when it returns or throws; a
+        /// removal that fails is ignored.
+        ///
+        /// Without a working directory of its own the child inherits the
+        /// app's, which for a launched app is `/`, and Claude Code looks
+        /// around its working directory at startup, so macOS asked the user
+        /// for Desktop, Documents, Downloads and iCloud Drive on the app's
+        /// behalf. The CLI needs no folder at all: the transcript arrives on
+        /// stdin. The default parent is the per-user temporary directory,
+        /// which is private to the user and has no privacy-protected folder
+        /// on its path or beneath it.
+        ///
+        /// A new directory per run, not one shared folder, so a run never
+        /// sees what an earlier or concurrent run left there. The name is
+        /// unique and creation fails rather than reuse a directory that
+        /// already exists. Throws when the directory cannot be created;
+        /// there is deliberately no fallback to the inherited directory.
         static func makeWorkingDirectory(in parent: URL = FileManager.default.temporaryDirectory) throws -> URL {
-            try CLIProcessRunner.makeRunDirectory(in: parent)
+            let directory = parent.appendingPathComponent(
+                "MeetingTranscriber-claude-cli-\(UUID().uuidString)", isDirectory: true,
+            )
+            try FileManager.default.createDirectory(
+                at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700],
+            )
+            return directory
         }
     }
 

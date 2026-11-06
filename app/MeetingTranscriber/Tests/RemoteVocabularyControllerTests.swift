@@ -73,8 +73,9 @@ final class RemoteVocabularyControllerTests: XCTestCase {
         tokenAccount = "RemoteVocabularyControllerTests-token-\(getpid())-\(UUID().uuidString)"
         cacheDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("RemoteVocabularyControllerTests-\(UUID().uuidString)", isDirectory: true)
-        defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults = try XCTUnwrap(DefaultsSuite.open(suiteName))
         settings = makeSettings()
+        settings.customVocabularyEnabled = true
         settings.vocabularySource = .url
         settings.remoteVocabularyURL = Self.address
         fetcher = RemoteVocabularyFetcherFake()
@@ -98,6 +99,21 @@ final class RemoteVocabularyControllerTests: XCTestCase {
     }
 
     // MARK: - When it checks
+
+    /// The vocabulary switch covers the URL source too: switched off, no engine
+    /// reads a vocabulary, so the address is not fetched either.
+    func testNoCheckWhileTheVocabularyIsSwitchedOff() async throws {
+        settings.customVocabularyEnabled = false
+        let controller = makeController(interval: .milliseconds(10))
+
+        controller.start()
+        controller.refreshNow()
+        try await Task.sleep(for: .milliseconds(100))
+
+        XCTAssertEqual(controller.status, .inactive)
+        XCTAssertEqual(fetcher.requests, [])
+        XCTAssertFalse(controller.isChecking)
+    }
 
     func testNoCheckWhileTheSourceIsLocalFileOrTheAddressIsInvalid() async throws {
         settings.vocabularySource = .file
@@ -340,7 +356,7 @@ final class RemoteVocabularyControllerTests: XCTestCase {
         let appSettings = makeSettings(defaultOutputDir: logDir.appendingPathComponent("output", isDirectory: true))
 
         let state = AppState(
-            settings: appSettings, notifier: SilentNotifier(), pipelineEnvironment: IsolatedQueueEnvironment.make(logDir: logDir),
+            pipelineEnvironment: IsolatedQueueEnvironment.make(logDir: logDir), settings: appSettings, notifier: SilentNotifier(),
         )
         appSettings.remoteVocabularyURL = "https://lists.example.org/third/vocabulary.txt"
         try await Task.sleep(for: .milliseconds(50))

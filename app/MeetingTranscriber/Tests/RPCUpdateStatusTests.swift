@@ -23,7 +23,7 @@
         // MARK: - Wiring: snapshot.updateStatus follows updateChecker (non-vacuous)
 
         func testSnapshotUpdatesReflectAvailableUpdate() throws {
-            let state = makeRPCTestState()
+            let state = try makeRPCTestState()
 
             // Fresh app: no update, not checking, no error.
             let idle = state.rpcStateSnapshot().updateStatus
@@ -54,8 +54,8 @@
 
         /// mt-update mode has no release, only a build summary: the badge and
         /// `/state.updateStatus` report it all the same.
-        func testSnapshotReportsAnMtUpdateBuild() {
-            let state = makeRPCTestState()
+        func testSnapshotReportsAnMtUpdateBuild() throws {
+            let state = try makeRPCTestState()
             state.updateChecker.availableBuildSummary = "upstream 1a2b3c4 · wapp/main 5d6e7f8"
 
             let snap = state.rpcStateSnapshot()

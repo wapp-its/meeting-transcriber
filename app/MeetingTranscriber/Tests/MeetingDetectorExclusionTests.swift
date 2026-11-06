@@ -78,7 +78,7 @@ final class MeetingDetectorExclusionTests: XCTestCase {
     @MainActor
     func testDefaultDetectorsHonourTheDenyListForMicInputApps() throws {
         let suiteName = "MeetingDetectorExclusionTests.\(UUID().uuidString)"
-        let suite = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let suite = try XCTUnwrap(DefaultsSuite.open(suiteName))
         addTeardownBlock { DefaultsSuite.remove(suiteName) }
         let settings = AppSettings(defaults: suite)
         settings.watchWeChat = true

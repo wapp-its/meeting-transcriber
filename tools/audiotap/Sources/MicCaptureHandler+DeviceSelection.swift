@@ -1,3 +1,4 @@
+import CoreAudio
 import Foundation
 import os.log
 
@@ -39,13 +40,15 @@ enum MicSelectionLogLine: Equatable {
 /// Moving a running microphone capture to another device: the app's
 /// microphone choice changed during a recording.
 ///
-/// **Same path as a device change.** A selection claims the arbiter's single
-/// attempt through `claimRestartAttempt` and launches it through
-/// `launchRestartAttempt`, so it gets a fresh session, the arbiter's
-/// generation and deadline, the shared retry budget and the gap written as
-/// silence. It is charged neither to the stall watchdog's budget nor to
-/// `MicConfigChangePolicy`'s window, and to the arbiter it is a plain
-/// `deviceChanged` event: its transition table knows nothing of selections.
+/// **Same path as a device change.** A selection goes through
+/// `handleDeviceChange`, so it gets a fresh session, the arbiter's single
+/// attempt, generation and deadline, the shared retry budget and the gap
+/// written as silence, and on a capture that stalled for lack of audio
+/// (`+Progress`) it is a revival: `mayRevive` decides whether it may, and
+/// `noteRevival` bridges the stall, exactly as a change of the input. It is
+/// charged to none of the progress watchdog's budgets, and to the arbiter it
+/// is a plain `deviceChanged` event: its transition table knows nothing of
+/// selections.
 ///
 /// **Deferred, never dropped.** The arbiter launches an attempt only while
 /// capturing normally and ignores the event during an outstanding attempt or
@@ -70,7 +73,7 @@ extension MicCaptureHandler {
         if launchSelectionRestart() { return }
         guard restartOutstanding else { return }
         selectionPending = true
-        log(.deferred)
+        logSelection(.deferred)
     }
 
     /// Main queue, from every adoption, once the adopted session is published:
@@ -88,36 +91,39 @@ extension MicCaptureHandler {
     func endDeviceSelection() {
         activeInputDevice = nil
         selectionPending = false
+        selectionRestartOutstanding = false
     }
 
-    /// Ask the arbiter, and launch what it granted. Like the stall watchdog,
-    /// this takes the claim and the launch separately so its line is written
-    /// between them, before the attempt's own lines; unlike it, it charges
-    /// nothing, exactly as `handleDeviceChange` does.
+    /// Production device lookup for `isDevicePresent`: plain CoreAudio, no
+    /// engine, so it cannot reach the calls that wedge.
+    static func isDevicePresentOnSystem(_ uid: String) -> Bool {
+        deviceIDForUID(uid) != kAudioObjectUnknown
+    }
+
+    /// Ask for a restart the way a device change does, and log the line once
+    /// it was granted and before it is launched, ahead of the attempt's own
+    /// lines.
     @discardableResult
     private func launchSelectionRestart() -> Bool {
-        guard let claim = claimRestartAttempt() else { return false }
-        log(.restarting)
-        // Not the watchdog's budget, but it ends the wait for a stall
-        // restart's first buffer: what arrives next is this restart's.
-        stallWatchdog.withLock { _ = $0.restartLaunched(byStall: false) }
-        launchRestartAttempt(deviceUID: claim.deviceUID, generation: claim.generation, trigger: .deviceSelected)
-        return true
+        handleDeviceChange {
+            logSelection(.restarting)
+            selectionRestartOutstanding = true
+        }
     }
 
     /// Whether the arbiter declined because a restart is outstanding (an
     /// attempt in flight, its backoff or its commit), as opposed to a capture
-    /// that never started or is sealed.
+    /// that never started, is sealed, or stalled and may not be revived.
     private var restartOutstanding: Bool {
         arbiter.withLock { state in
             switch state.phase {
             case .attemptInFlight, .backingOff, .committing: true
-            case .idle, .capturing, .gaveUp, .stopped: false
+            case .idle, .capturing, .stalled, .gaveUp, .stopped: false
             }
         }
     }
 
-    private func log(_ line: MicSelectionLogLine) {
+    func logSelection(_ line: MicSelectionLogLine) {
         logger.log(level: line.level, "\(line.text, privacy: .public)")
     }
 }

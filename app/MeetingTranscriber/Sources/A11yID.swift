@@ -23,6 +23,7 @@ enum A11yID {
     static let watchAtLaunchToggle = "watchAtLaunchToggle"
     static let silencePromptToggle = "silencePromptToggle"
     static let silencePromptMinutesStepper = "silencePromptMinutesStepper"
+    static let watchSlackToggle = "watchSlackToggle"
     static let browserConsentWarning = "browserConsentWarning"
     static let consentDenyListSection = "consentDenyListSection"
     /// Per-row Remove button in the never-record list, addressed by ROW INDEX,
@@ -61,6 +62,12 @@ enum A11yID {
         "jobRetryButton.\(index)"
     }
 
+    /// Menu bar job row's "Retry Notion Export" on a finished job whose
+    /// export failed, by ROW INDEX like `jobRetryButton`.
+    static func jobNotionRetryButton(_ index: Int) -> String {
+        "jobNotionRetryButton.\(index)"
+    }
+
     /// The device picker in the menu bar's Microphone submenu. One fixed
     /// value: no device UID or name in it, for the reason the job rows give.
     static let menuMicrophonePicker = "menuMicrophonePicker"
@@ -82,13 +89,13 @@ enum A11yID {
     /// "Name Speakers..." too.
     static let nameSpeakersMenuItem = "nameSpeakersMenuItem"
 
-    /// The menu's items under "Record & Import" and "Open Last Protocol".
+    /// The menu's items under "Record & Import" and "Open Last Notes".
     /// Tests find them by these values: the open recording prompt has a
     /// "Record with Options…" button of its own.
     static let recordMicrophoneMenuItem = "recordMicrophoneMenuItem"
     static let recordWithOptionsMenuItem = "recordWithOptionsMenuItem"
     static let importFilesMenuItem = "importFilesMenuItem"
-    static let openLastProtocolMenuItem = "openLastProtocolMenuItem"
+    static let openLastNotesMenuItem = "openLastNotesMenuItem"
 
     /// The menu's Pause Recording / Resume Recording item: one identifier for
     /// both labels, since it is one item whose label follows the state.
@@ -105,7 +112,7 @@ enum A11yID {
     // path.
     static let transcriptionsSearchField = "transcriptionsSearchField"
 
-    /// The toolbar's "Open Protocols Folder" and "Regenerate from File…".
+    /// The toolbar's "Open Notes Folder" and "Regenerate from File…".
     static let recordingsOpenFolderButton = "recordingsOpenFolderButton"
     static let recordingsRegenerateFromFileButton = "recordingsRegenerateFromFileButton"
 
@@ -125,6 +132,10 @@ enum A11yID {
 
     static func recordingMenuOpenTranscript(_ index: Int) -> String {
         "recordingMenuOpenTranscript.\(index)"
+    }
+
+    static func recordingMenuOpenInNotion(_ index: Int) -> String {
+        "recordingMenuOpenInNotion.\(index)"
     }
 
     static func recordingMenuShowInFinder(_ index: Int) -> String {
@@ -160,6 +171,16 @@ enum A11yID {
 
     static let recordOnlyBanner = "recordOnlyBanner"
     static let transcriptionSection = "transcriptionSection"
+    static let vocabularySection = "vocabularySection"
+    /// Opens a confirmation dialog, so it stays off the `/ui/press` allowlist.
+    static let legacyWhisperModelsTrashButton = "legacyWhisperModelsTrashButton"
+
+    /// Per-variant checkbox in the old-models row, addressed by ROW INDEX like
+    /// `consentDeniedAppRemove`.
+    static func legacyWhisperModelToggle(_ index: Int) -> String {
+        "legacyWhisperModelToggle.\(index)"
+    }
+
     static let protocolSection = "protocolSection"
     static let protocolProviderPicker = "protocolProviderPicker"
     static let codexProviderNote = "codexProviderNote"
@@ -201,6 +222,29 @@ enum A11yID {
 
     static let includeFullTranscriptToggle = "includeFullTranscriptToggle"
     static let saveRawTranscriptToggle = "saveRawTranscriptToggle"
+    static let useAITitleForFilenamesToggle = "useAITitleForFilenamesToggle"
+    static let openAIAPIKeyPlacementPicker = "openAIAPIKeyPlacementPicker"
+    static let openAIAPIKeyHeaderNameField = "openAIAPIKeyHeaderNameField"
+    static let openAIAPIKeyHeaderNameWarning = "openAIAPIKeyHeaderNameWarning"
+    static let openAITemperatureToggle = "openAITemperatureToggle"
+    static let openAITemperatureValue = "openAITemperatureValue"
+    static let openAITopPToggle = "openAITopPToggle"
+    static let openAITopPValue = "openAITopPValue"
+    static let notionSection = "notionSection"
+    static let notionExportToggle = "notionExportToggle"
+    static let notionConfigurationNotice = "notionConfigurationNotice"
+    static let notionSkipLocalMarkdownToggle = "notionSkipLocalMarkdownToggle"
+    static let notionSpeakerTagsToggle = "notionSpeakerTagsToggle"
+    static let notionConfirmDatabaseButton = "notionConfirmDatabaseButton"
+    static let notionAPIKeyField = "notionAPIKeyField"
+    static let notionDatabasePicker = "notionDatabasePicker"
+    static let notionDatabaseIDField = "notionDatabaseIDField"
+    static let notionTestConnectionButton = "notionTestConnectionButton"
+    static let notionParentPagePicker = "notionParentPagePicker"
+    static let notionParentPageField = "notionParentPageField"
+    static let notionInitDatabaseButton = "notionInitDatabaseButton"
+    static let notionUpgradeSchemaButton = "notionUpgradeSchemaButton"
+    static let notionRefreshButton = "notionRefreshButton"
     static let outputFolderSection = "outputFolderSection"
     static let vadSection = "vadSection"
     static let echoCancellationToggle = "echoCancellationToggle"
@@ -236,7 +280,7 @@ enum A11yID {
     static let remoteVocabularyTokenField = "remoteVocabularyTokenField"
     static let remoteVocabularyUpdateButton = "remoteVocabularyUpdateButton"
     static let remoteVocabularyStatus = "remoteVocabularyStatus"
-    static let whisperKitVocabularyPromptToggle = "whisperKitVocabularyPromptToggle"
+    static let customVocabularyToggle = "customVocabularyToggle"
     static let whisperKitModelPicker = "whisperKitModelPicker"
     static let whisperKitCustomRepoField = "whisperKitCustomRepoField"
     static let whisperKitCustomVariantField = "whisperKitCustomVariantField"
@@ -267,6 +311,8 @@ enum A11yID {
     static let huggingFaceCancelButton = "huggingFaceCancelButton"
     static let whisperKitLoadFailureMessage = "whisperKitLoadFailureMessage"
     static let terminologyRulesEditor = "terminologyRulesEditor"
+    static let terminologyRulesFilePathField = "terminologyRulesFilePathField"
+    static let terminologyRulesFilePreview = "terminologyRulesFilePreview"
 
     /// Settings sidebar row for one tab (`settings-tab-<rawValue>`). The detail
     /// pane renders only the selected tab, so a control in another tab is absent
@@ -287,6 +333,10 @@ enum A11yID {
     /// `/ui/press` allowlist (`AboutSettingsViewTests`).
     static let updateInstallButton = "updateInstallButton"
 
+    // About tab, update actions: one per install route.
+    static let updateDownload = "update-download"
+    static let updateCopyBrewCommand = "update-copy-brew-command"
+
     // Speaker-naming dialog.
     static let confirmButton = "confirm-button"
     static let skipButton = "skip-button"
@@ -299,6 +349,8 @@ enum A11yID {
     /// The line under the Standard count of a two-track job saying the
     /// microphone side is counted automatically; absent for a single file.
     static let rerunMicSideNote = "rerun-mic-side-note"
+    /// Why the session did not take the last answer (`SpeakerNamingRefusal`).
+    static let namingRefusalMessage = "naming-refusal-message"
 
     /// Per-speaker play button (`play-<label>`); the label varies at runtime.
     static func play(_ speakerLabel: String) -> String {

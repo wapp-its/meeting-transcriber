@@ -9,7 +9,7 @@ struct MenuBarView: View {
     /// set, it disables the menu's install item.
     var updateInstallBlockedReason: String?
     /// The finished-job history, read with the queue's jobs so a failed line
-    /// and "Open Last Protocol" outlive the queue's one-minute reap and a
+    /// and "Open Last Notes" outlive the queue's one-minute reap and a
     /// restart.
     var history: [TerminalJobRecord] = []
     /// Whether the user set "No Microphone (app audio only)". Only reaches the
@@ -30,6 +30,11 @@ struct MenuBarView: View {
     var microphoneMenu: MicrophoneMenuState?
     /// The Output entry; nil leaves it out.
     var outputMenu: OutputMenuState?
+    /// Whether Notion export is on, which makes "Open Last Notes" prefer the
+    /// job's Notion page. A page exported before the setting was turned off
+    /// is still the fallback when no local file exists; `JobOpenTarget` owns
+    /// that rule.
+    var notionExportEnabled = false
     /// What the menu's items do; a nil optional action hides or disables its
     /// item (see `MenuActions`).
     let actions: MenuActions
@@ -245,72 +250,22 @@ struct MenuBarView: View {
         }
     }
 
-    /// The jobs under way and the jobs waiting on the user, each group under
-    /// its own header and only when it has a line. Row indexes run on across
-    /// both groups and count only job rows, so every row's identifiers stay
-    /// unique and "Name Speakers…" shifts none of them.
-    @ViewBuilder private var jobSections: some View {
-        let sections = TranscriptionList.menuSections(transcriptionEntries)
-        if !sections.inProgress.isEmpty {
-            jobGroupHeader("In progress", systemImage: "gearshape.2.fill")
-            jobRows(sections.inProgress, firstIndex: 0)
-        }
-        if !sections.needsYou.isEmpty || actions.nameSpeakers != nil {
-            jobGroupHeader("Needs you", systemImage: "exclamationmark.circle")
-            nameSpeakersItem
-            jobRows(sections.needsYou, firstIndex: sections.inProgress.count)
-        }
-    }
-
-    @ViewBuilder
-    private func jobGroupHeader(_ title: String, systemImage: String) -> some View {
-        Divider()
-        Label(title, systemImage: systemImage)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-    }
-
-    private func jobRows(_ entries: [TranscriptionEntry], firstIndex: Int) -> some View {
-        ForEach(Array(entries.enumerated()), id: \.element.id) { offset, entry in
-            jobRow(entry, index: firstIndex + offset)
-        }
-    }
-
-    /// The first line of "Needs you" while a job waits for speaker names. A
-    /// hidden item registers no shortcut, so ⌘N exists only while it shows.
-    @ViewBuilder private var nameSpeakersItem: some View {
-        if let nameSpeakers = actions.nameSpeakers {
-            Button {
-                nameSpeakers()
-            } label: {
-                Label("Name Speakers…", systemImage: "person.2.fill")
-            }
-            .keyboardShortcut("n")
-            .accessibilityIdentifier(A11yID.nameSpeakersMenuItem)
-        }
-    }
-
-    /// The same list as the All Recordings window, so the two cannot disagree
-    /// about which jobs exist or what state they are in.
-    private var transcriptionEntries: [TranscriptionEntry] {
-        TranscriptionList.entries(liveJobs: pipelineQueue.jobs, records: history)
-    }
-
     /// The way to the results: the newest one and every job. "Open Last
-    /// Protocol" is the menu's one click to the newest result now that
-    /// finished jobs are not listed, shown while the history holds a finished
-    /// job with a file. "All Recordings…" is shown at all times: finished jobs
-    /// are listed in the window, not in the menu.
+    /// Notes" is the menu's one click to the newest result now that finished
+    /// jobs are not listed, shown while the history holds a finished job with
+    /// a file or a Notion page, and named after where it goes. "All
+    /// Recordings…" is shown at all times: finished jobs are listed in the
+    /// window, not in the menu.
     private var recordingsSection: some View {
         Section("Recordings") {
-            if let url = TranscriptionList.lastFinished(transcriptionEntries)?.fileToOpen {
+            if let target = lastNotesTarget {
                 Button {
-                    actions.openLastProtocol(url)
+                    actions.openLastNotes(target)
                 } label: {
-                    Label("Open Last Protocol", systemImage: "doc.text")
+                    Label(target.lastNotesLabel, systemImage: target.systemImage)
                 }
                 .keyboardShortcut("o")
-                .accessibilityIdentifier(A11yID.openLastProtocolMenuItem)
+                .accessibilityIdentifier(A11yID.openLastNotesMenuItem)
             }
 
             Button {
@@ -323,19 +278,38 @@ struct MenuBarView: View {
         }
     }
 
+    /// Hoisted out of the `ViewBuilder` for the type-check budget (see the
+    /// note on `body`).
+    private var lastNotesTarget: JobOpenTarget? {
+        JobOpenTarget.resolve(
+            forEntry: TranscriptionList.lastFinished(transcriptionEntries),
+            preferNotion: notionExportEnabled,
+        )
+    }
+
+    /// mt-update mode first; otherwise a GitHub release, installed the way
+    /// this copy was: a Homebrew install copies its `brew upgrade` command,
+    /// anything else opens the download.
     @ViewBuilder private var updateSection: some View {
         if let updateChecker, updateChecker.isMtUpdateMode {
             mtUpdateItem(updateChecker)
-        } else if let update = updateChecker?.availableUpdate {
+        } else if let updateChecker, let update = updateChecker.availableUpdate {
+            let route = updateChecker.installRoute(for: update)
             Divider()
             Button {
-                NSWorkspace.shared.open(update.dmgURL ?? update.htmlURL)
+                route.perform()
             } label: {
-                Label(
-                    "Update Available: \(update.tagName)",
-                    systemImage: "arrow.down.circle.fill",
-                )
+                Label(updateTitle(update, route: route), systemImage: "arrow.down.circle.fill")
             }
+        }
+    }
+
+    /// The menu closes on click, so the title has to say up front that the
+    /// item copies a command rather than opening a download.
+    private func updateTitle(_ update: ReleaseInfo, route: UpdateInstallRoute) -> String {
+        switch route {
+        case .homebrew: "Update Available: \(update.tagName) (Copy brew Command)"
+        case .download: "Update Available: \(update.tagName)"
         }
     }
 
@@ -390,94 +364,5 @@ struct MenuBarView: View {
             Text("Quit")
         }
         .keyboardShortcut("q")
-    }
-
-    // MARK: - Helpers
-
-    /// One menu item per job, its actions in a submenu. A menu-style
-    /// `MenuBarExtra` cannot lay anything out side by side: an `HStack` row
-    /// came out as one menu item per part, so the status dot and the spacer
-    /// became empty lines and the buttons stood one below the other.
-    private func jobRow(_ entry: TranscriptionEntry, index: Int) -> some View {
-        Menu {
-            Text(entry.title)
-            jobStateLabel(entry)
-            Divider()
-            jobActions(entry, index: index)
-        } label: {
-            Label(jobMenuTitle(entry), systemImage: jobSymbol(entry))
-        }
-    }
-
-    /// Hoisted out of the `ViewBuilder` for the type-check budget (see the
-    /// note on `body`).
-    private func jobMenuTitle(_ entry: TranscriptionEntry) -> String {
-        let status = JobMenuSummary.status(
-            state: entry.state, hasWarnings: !entry.warnings.isEmpty, progress: stageProgress(entry),
-        )
-        return "\(entry.title) — \(status)"
-    }
-
-    private func jobSymbol(_ entry: TranscriptionEntry) -> String {
-        JobMenuSummary.symbol(state: entry.state, hasWarnings: !entry.warnings.isEmpty)
-    }
-
-    /// A failed line is taken off for good by Remove; Dismiss is left to a
-    /// job waiting for speaker names.
-    @ViewBuilder
-    private func jobActions(_ entry: TranscriptionEntry, index: Int) -> some View {
-        if entry.state.isTerminal, let url = entry.fileToOpen {
-            Button("Open") { actions.openProtocol(url) }
-        }
-        if entry.state == .speakerNamingPending {
-            Button("Name Speakers") { actions.nameSpeakers?() }
-        }
-        if entry.state == .waiting || entry.state == .transcribing
-            || entry.state == .diarizing || entry.state == .generatingProtocol {
-            Button("Cancel") { pipelineQueue.cancelJob(id: entry.id) }
-        }
-        retryButton(entry, index: index)
-        if entry.state == .error {
-            Button("Remove") { actions.removeFailedJob(entry.id) }
-                .accessibilityIdentifier(A11yID.jobRemoveButton(index))
-        }
-        if entry.state == .speakerNamingPending {
-            Button("Dismiss") { actions.dismissJob(entry.id) }
-        }
-    }
-
-    /// Runs a failed job again from its audio, instead of the user having to
-    /// find the staged recording and import it by hand. A failed job known
-    /// only from the history is not in the queue, so the queue refuses it
-    /// until the pipeline has loaded it.
-    @ViewBuilder
-    private func retryButton(_ entry: TranscriptionEntry, index: Int) -> some View {
-        if pipelineQueue.canRetryJob(id: entry.id) {
-            Button("Retry") { pipelineQueue.retryJob(id: entry.id) }
-                .accessibilityIdentifier(A11yID.jobRetryButton(index))
-        }
-    }
-
-    private func jobStateLabel(_ entry: TranscriptionEntry) -> some View {
-        Group {
-            if [.transcribing, .diarizing, .generatingProtocol].contains(entry.state) {
-                Text(stageProgress(entry))
-                    .foregroundStyle(.secondary)
-            } else if entry.state == .error, let msg = entry.error {
-                Text(msg)
-                    .foregroundStyle(.red)
-            } else {
-                Text(entry.state.label)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .font(.caption2)
-    }
-
-    /// The running stage's start and expected finish, read from the queue's
-    /// clock for the job. Nothing here reads the time, so the line changes
-    /// only when the clock does, at a job event.
-    private func stageProgress(_ entry: TranscriptionEntry) -> String {
-        JobMenuSummary.stageProgress(state: entry.state, clock: pipelineQueue.stageClock(forJobID: entry.id))
     }
 }

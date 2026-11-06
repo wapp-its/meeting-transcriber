@@ -113,6 +113,10 @@ final class UpdateChecker {
     var lastCheckDate: Date?
     var lastError: String?
 
+    /// The Homebrew cask this app was installed from, `nil` for a DMG install.
+    /// Read only in GitHub mode: an mt-update install is never a cask.
+    let installedCask: String?
+
     // mt-update mode (`UpdateChecker+MtUpdate.swift`); unused in GitHub mode.
 
     /// What the newer build mt-update found brings; nil when none was found.
@@ -135,14 +139,20 @@ final class UpdateChecker {
     private var checkTask: Task<Void, Never>?
     private var periodicTask: Task<Void, Never>?
 
+    /// `installedCask` defaults to `nil` rather than probing the Caskroom, so a
+    /// test never depends on whether the machine running it has the cask
+    /// installed. The app passes `UpdateInstallRoute.installedCask()` in
+    /// GitHub mode.
     init(
         provider: any UpdateProviding = GitHubReleaseProvider(),
+        installedCask: String? = nil,
         installer: (any MtUpdateInstalling)? = nil,
         notifier: any AppNotifying = SilentNotifier(),
         pendingStore: PendingUpdateInstallStore = .init(defaults: .standard),
         recheckInterval: Duration = .seconds(30),
     ) {
         self.provider = provider
+        self.installedCask = installedCask
         self.installer = installer
         self.notifier = notifier
         self.pendingStore = pendingStore
@@ -150,6 +160,11 @@ final class UpdateChecker {
         let version =
             Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
         self.currentVersion = Self.parseVersion(version) ?? (0, 0, 0)
+    }
+
+    /// How `update` should be installed on this machine.
+    func installRoute(for update: ReleaseInfo) -> UpdateInstallRoute {
+        UpdateInstallRoute.resolve(update: update, installedCask: installedCask)
     }
 
     func checkNow(includePreReleases: Bool = false) {

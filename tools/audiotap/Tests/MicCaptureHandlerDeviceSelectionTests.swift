@@ -2,16 +2,6 @@
 @preconcurrency import AVFoundation
 import XCTest
 
-/// The handler's clock in the tests below: it moves only when told to.
-private final class SelectionTestClock: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value: TimeInterval = 1000
-
-    var now: TimeInterval {
-        lock.withLock { value }
-    }
-}
-
 /// A session that never touches audio hardware. It records the device every
 /// bring-up was asked for and reports, as the device it is bound to, the one it
 /// was asked for (`systemDefaultUID` when asked for none), so an adoption is
@@ -20,6 +10,8 @@ private final class SelectionTestClock: @unchecked Sendable {
 /// bring-up, after the hold when both are set.
 private final class SelectionTestSession: MicEngineSessionProviding, @unchecked Sendable {
     static let systemDefaultUID = "SystemDefaultInputUID"
+
+    let followsSystemDefaultInput = false
 
     private let stateLock = NSLock()
     private var recordedDeviceUIDs: [String?] = []
@@ -97,7 +89,6 @@ private final class SelectionTestSessionQueue: @unchecked Sendable {
 private struct SelectionTestFixture {
     let handler: MicCaptureHandler
     let url: URL
-    let clock: SelectionTestClock
     let sessions: SelectionTestSessionQueue
 }
 
@@ -106,16 +97,6 @@ private struct SelectionTestFixture {
 /// time, the arbiter's deadline, the retry budget), is applied after a
 /// restart that is already running, and is what a retry aims at.
 final class MicCaptureHandlerDeviceSelectionTests: XCTestCase {
-    /// The stall watchdog's production limits with a poll interval no test
-    /// reaches, so it never launches anything of its own here.
-    private static let manualStallLimits = MicStallWatchdogPolicy.Limits(
-        pollIntervalSeconds: 3600,
-        stallSeconds: 10,
-        graceAfterAdoptionSeconds: 15,
-        maxConsecutiveFruitlessRestarts: 3,
-        maxRestartsPerRecording: 6,
-    )
-
     /// A backoff long enough that a test can act inside it, short enough to
     /// wait out.
     private static let slowRetry: @Sendable (Int) -> CaptureRestartRetryAction = { attempts in
@@ -131,21 +112,17 @@ final class MicCaptureHandlerDeviceSelectionTests: XCTestCase {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("selection-\(UUID().uuidString).wav")
         let queue = SelectionTestSessionQueue(sessions)
-        let clock = SelectionTestClock()
         // Typed locals, not trailing closures: SwiftFormat restyles a labelled
         // closure argument into a trailing one and mangles the call.
         let factory: () -> any MicEngineSessionProviding = { queue.next() }
-        let manualNow: @Sendable () -> TimeInterval = { clock.now }
         let isPresent: @Sendable (String) -> Bool = { Self.present.contains($0) }
         let handler = MicCaptureHandler(
             outputURL: url,
             sessionFactory: factory,
             decideRetry: decideRetry,
-            stallWatchdogLimits: Self.manualStallLimits,
-            stallClock: manualNow,
             isDevicePresent: isPresent,
         )
-        return SelectionTestFixture(handler: handler, url: url, clock: clock, sessions: queue)
+        return SelectionTestFixture(handler: handler, url: url, sessions: queue)
     }
 
     /// Drain the main queue until `condition` holds. Adoption runs on the
@@ -175,18 +152,14 @@ final class MicCaptureHandlerDeviceSelectionTests: XCTestCase {
         (handler.session as AnyObject) === session
     }
 
-    /// A selection restart is charged to neither the stall watchdog's budget
-    /// nor the configuration-change window (R7).
+    /// A selection restart is charged to none of the progress watchdog's
+    /// budgets: no rebuild and no revival is counted for it (R7).
     private func assertNoBudgetCharged(
         _ fixture: SelectionTestFixture, file: StaticString = #filePath, line: UInt = #line,
     ) {
-        let stall = fixture.handler.stallWatchdog.withLock { ($0.restartsLaunched, $0.consecutiveFruitless) }
-        XCTAssertEqual(stall.0, 0, "stall restarts launched", file: file, line: line)
-        XCTAssertEqual(stall.1, 0, "fruitless stall restarts", file: file, line: line)
-        XCTAssertEqual(
-            fixture.handler.configChangePolicy.launchedInWindow(at: fixture.clock.now), 0,
-            "configuration-change restarts in the window", file: file, line: line,
-        )
+        let progress = fixture.handler.progress
+        XCTAssertEqual(progress.rebuildsWithoutAudio, 0, "rebuilds without audio", file: file, line: line)
+        XCTAssertEqual(progress.revivalsWithoutAudio, 0, "revivals without audio", file: file, line: line)
     }
 
     // MARK: - Selecting while capturing
@@ -205,7 +178,8 @@ final class MicCaptureHandlerDeviceSelectionTests: XCTestCase {
         XCTAssertEqual(handler.activeInputDevice, SelectionTestSession.device("HeadsetUID"))
 
         handler.selectDevice(uid: "USBMicUID")
-        XCTAssertEqual(handler.arbiter.withLock { $0.phase }, .attemptInFlight(generation: 1))
+        // Generation 1 was the first start, which runs as an attempt too.
+        XCTAssertEqual(handler.arbiter.withLock { $0.phase }, .attemptInFlight(generation: 2))
         wait(for: [candidate.entered], timeout: 5)
         XCTAssertEqual(
             handler.activeInputDevice, SelectionTestSession.device("HeadsetUID"),
@@ -262,7 +236,7 @@ final class MicCaptureHandlerDeviceSelectionTests: XCTestCase {
         defer { handler.stop(); inFlight.release(); try? FileManager.default.removeItem(at: fixture.url) }
 
         try handler.start(deviceUID: "HeadsetUID")
-        XCTAssertTrue(handler.handleDeviceChange(.defaultInputChanged))
+        XCTAssertTrue(handler.handleDeviceChange())
         wait(for: [inFlight.entered], timeout: 5)
 
         handler.selectDevice(uid: "USBMicUID")
@@ -291,7 +265,7 @@ final class MicCaptureHandlerDeviceSelectionTests: XCTestCase {
         defer { handler.stop(); try? FileManager.default.removeItem(at: fixture.url) }
 
         try handler.start(deviceUID: "HeadsetUID")
-        XCTAssertTrue(handler.handleDeviceChange(.defaultInputChanged))
+        XCTAssertTrue(handler.handleDeviceChange())
         waitUntil("the failed attempt is backing off") { handler.restartRetryCount == 1 }
 
         handler.selectDevice(uid: "USBMicUID")
@@ -317,7 +291,7 @@ final class MicCaptureHandlerDeviceSelectionTests: XCTestCase {
             defer { handler.stop(); try? FileManager.default.removeItem(at: fixture.url) }
 
             try handler.start(deviceUID: "HeadsetUID")
-            XCTAssertTrue(handler.handleDeviceChange(.defaultInputChanged))
+            XCTAssertTrue(handler.handleDeviceChange())
             waitUntil("the failed attempt is backing off") { handler.restartRetryCount == 1 }
 
             handler.selectDevice(uid: choice)
@@ -342,7 +316,7 @@ final class MicCaptureHandlerDeviceSelectionTests: XCTestCase {
             if gaveUpFirst {
                 let gaveUp = expectation(description: "give-up reported")
                 handler.onGiveUp = { gaveUp.fulfill() }
-                XCTAssertTrue(handler.handleDeviceChange(.defaultInputChanged))
+                XCTAssertTrue(handler.handleDeviceChange())
                 wait(for: [gaveUp], timeout: 5)
             } else {
                 handler.stop()

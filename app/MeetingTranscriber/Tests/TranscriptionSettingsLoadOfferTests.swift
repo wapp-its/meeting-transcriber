@@ -16,7 +16,7 @@ final class TranscriptionSettingsLoadOfferTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         suiteName = "TranscriptionSettingsLoadOfferTests-\(UUID().uuidString)"
-        defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults = try XCTUnwrap(DefaultsSuite.open(suiteName))
     }
 
     override func tearDown() async throws {
@@ -39,6 +39,23 @@ final class TranscriptionSettingsLoadOfferTests: XCTestCase {
         )
         view.isModelOnDisk = { _ in false }
         return view
+    }
+
+    /// What appearing on screen does to the custom model fields: each draft starts
+    /// from the setting it edits. "Load Model" hands the drafts over before it
+    /// loads, so drafts never filled would erase the custom model it is meant to
+    /// load; on screen the fields are always shown before the button is.
+    private func showCustomFields(in view: TranscriptionSettingsView) throws {
+        for identifier in [
+            A11yID.whisperKitCustomRepoField,
+            A11yID.whisperKitCustomVariantField,
+            A11yID.whisperKitCustomModelFolderField,
+        ] {
+            try view.inspect()
+                .find(DraftTextField.self) { try $0.accessibilityIdentifier() == identifier }
+                .find(ViewType.TextField.self)
+                .callOnAppear()
+        }
     }
 
     private func modelPicker(in view: TranscriptionSettingsView) throws -> InspectableView<ViewType.Picker> {
@@ -96,8 +113,9 @@ final class TranscriptionSettingsLoadOfferTests: XCTestCase {
             )
         }
 
-        try makeView(settings: settings, choice: WhisperKitModelChoice(), engine: engine).inspect()
-            .find(button: "Load Model").tap()
+        let view = makeView(settings: settings, choice: WhisperKitModelChoice(), engine: engine)
+        try showCustomFields(in: view)
+        try view.inspect().find(button: "Load Model").tap()
         await fulfillment(of: [loaded], timeout: 5)
 
         XCTAssertEqual(located, [settings.whisperKitModelSelection])

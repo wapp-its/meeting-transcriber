@@ -1,6 +1,6 @@
 name: E2E (Production App)
 
-# Live-recording E2E. Background and rationale: CLAUDE.md > E2E Architecture.
+# Live-recording E2E. Background and rationale: e2e-architecture skill.
 # Runner prerequisites: scripts/setup-self-hosted-runner.sh.
 
 on:
@@ -86,6 +86,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+
+      # A pending TCC prompt blocks the call that raised it, so a missing
+      # grant fails here, named, instead of hanging a lane into its timeout.
+      # Which probes fail and which warn: scripts/ci/tcc-preflight.sh.
+      - name: Preflight TCC grants
+        timeout-minutes: 2
+        run: bash scripts/ci/tcc-preflight.sh --downloads --accessibility
 
       - uses: ./.github/actions/verify-xcode
 
@@ -204,6 +211,9 @@ jobs:
       # detected meeting and asserts the sidecar carries a mic track and NO app
       # track. Nothing else in this workflow would notice if a microphone-only
       # recording quietly opened a process tap.
+      # It also holds the only live check of POST /v1/watch's refusal: a start
+      # during the manual recording must answer 409 and change nothing (see
+      # `_mic_only_assert_watch_refused` in scripts/e2e-app.sh).
       #
       # It reroutes the machine's default OUTPUT into the loopback device that is
       # the default INPUT, for its own duration, because nothing else feeds that
@@ -367,9 +377,10 @@ jobs:
       # unfocused path is the one the fix nearly shipped broken.
       # RUNNER PREREQUISITE: the runner shell needs an Accessibility grant, a
       # one-time setup step alongside the mic / screen-recording grants (see the
-      # e2e-architecture skill). The driver preflights it and fails with its own
-      # message, so a missing grant reads as a missing grant rather than as a
-      # broken dismiss.
+      # e2e-architecture skill). The driver preflights it and, when it is
+      # missing, skips: green, with a warning annotation, and recorded for the
+      # host-skip gate at the end of this job, which turns a scheduled or
+      # dispatched run red.
       # PLACEMENT: cheap and non-level-sensitive, so it sits next to the other
       # naming lane and still ahead of crash-recovery.
       - name: Run live-recording E2E driver (speaker-naming escape)
@@ -394,7 +405,8 @@ jobs:
       # name into the speaker DB (read over RPC, no ~/Downloads dependency).
       # Keystrokes go through scripts/drive-naming-field.swift (AX + CGEvent),
       # which needs the Accessibility grant only, not Automation; the driver
-      # preflights it and skips loudly when it is missing. Switching via the
+      # preflights it and skips when it is missing, reported like the Escape
+      # lane's skip above. Switching via the
       # picker (not resolving the first job) is load-bearing: resolving it drops
       # the picker, shifts the view's slot, and SwiftUI rebuilds it with fresh
       # fields so the defect cannot show. Measured on the unfixed build.
@@ -473,6 +485,69 @@ jobs:
         timeout-minutes: 10
         run: bash scripts/e2e-app.sh --no-build --echo-cancel
 
+      # Protocol lane: every other lane leaves the protocol provider at its
+      # default, the Claude CLI, which is not logged in for the runner account,
+      # so each of them logs "Protocol generation failed — transcript saved" and
+      # nothing ever checks that a protocol gets written. This one points the
+      # OpenAI-compatible provider at a local stub on a free 127.0.0.1 port and
+      # imports a short fixture twice: once with the stub answering (asserts the
+      # exact request, the job done without a protocol warning, and the protocol
+      # file's contents) and once with it answering HTTP 500 (asserts the
+      # warning and no protocol file). The host's settings are restored on exit,
+      # and by the always-run step below when the step is killed (a timeout);
+      # the API key is left alone. What each check means is written at
+      # `run_protocol_lane` in scripts/e2e-app.sh.
+      # PLACEMENT: file-driven, no audio device, two short imports; with the
+      # other file-driven lanes and ahead of crash-recovery's SIGKILL teardown.
+      - id: protocol-lane
+        name: "Run protocol-generation E2E (local OpenAI-compatible stub)"
+        env:
+          DEVELOPER_ID: ${{ secrets.DEVELOPER_ID }}
+        # Two imports of a 15 s fixture; under a minute typical. Each job poll is
+        # capped at 240 s, so 10 min covers both and still ends a hang.
+        timeout-minutes: 10
+        run: bash scripts/e2e-app.sh --no-build --protocol
+
+      # A killed lane step (timeout, cancel) cannot run its own exit trap to the
+      # end. Without this, the stub endpoint and diarize=false would stay set for
+      # every driver that launches the dev bundle without going through
+      # e2e-app.sh (e2e-browser.yml, the channel and soak lanes) until the next
+      # e2e-app.sh run repairs it. A no-op when the lane cleaned up after itself.
+      - name: "Repair what the protocol lane left"
+        if: always() && steps.protocol-lane.outcome != 'skipped'
+        timeout-minutes: 2
+        run: bash scripts/e2e-app.sh --protocol-repair
+
+      # Upgrade lane: every lane above starts the app on a clean or empty home,
+      # so none runs this build on the data an older release left behind. This
+      # one seeds, in a throwaway home, what v0.8.1 writes (a WhisperKit model
+      # in Documents/huggingface, an unreadable speakers.json, an interrupted
+      # job in the queue snapshot, a finished-job record), launches the app
+      # with the network closed but for localhost, and asserts the model
+      # migration, the speaker-DB quarantine and the job restore. What each
+      # check means is written at `run_upgrade` in scripts/e2e-app.sh.
+      # The model it seeds is cloned from this runner's test home, which the
+      # step below pre-warms; that is a file check once warm. It records
+      # nothing, so it needs no TCC grant.
+      # PLACEMENT: file-driven and not level-sensitive, so with the other
+      # file-driven lanes and ahead of crash-recovery's SIGKILL teardown.
+      - id: upgrade-home
+        name: Prepare the model the upgrade lane seeds
+        uses: ./.github/actions/runner-home
+        timeout-minutes: 20
+        with:
+          prewarm: "true"
+
+      - name: "Run upgrade-from-v0.8.1 E2E"
+        env:
+          DEVELOPER_ID: ${{ secrets.DEVELOPER_ID }}
+          E2E_UPGRADE_MODEL_SOURCE: "${{ steps.upgrade-home.outputs.home }}/Library/Application Support/MeetingTranscriber/huggingface"
+        # Two model loads and three transcriptions of the 50 s fixture with the
+        # small model; each model wait is capped at 300 s and each job at
+        # 240 s, so 15 min covers a slow run and still ends a hang.
+        timeout-minutes: 15
+        run: bash scripts/e2e-app.sh --no-build --upgrade
+
       # Crash-recovery lane (issue #379 part 3, PR #385/#386): start a meeting,
       # SIGKILL the app mid-recording (no stop() → orphaned _app16k_raw.tmp +
       # unfinalized _mic.wav, no _mix.wav survive), relaunch, and assert the
@@ -490,8 +565,17 @@ jobs:
         timeout-minutes: 10
         run: bash scripts/e2e-app.sh --no-build --crash-recovery
 
+      # A step timeout does not reliably end its driver, and a leftover one
+      # blocks the next run; this ends exactly the drivers this job recorded
+      # (see e2e_reap_registered_drivers in scripts/lib/e2e-helpers.sh).
+      - name: End e2e drivers a step timeout left behind
+        if: always()
+        timeout-minutes: 3
+        run: source scripts/lib/e2e-helpers.sh && e2e_reap_registered_drivers
+
       # Best-effort: capture the simulator's stdout for post-mortem if
-      # the driver failed before tearing it down.
+      # the driver failed before tearing it down. Above the host-skip gate, so
+      # a run that failed only there does not upload a log nobody needs.
       - name: Upload simulator log
         if: failure()
         uses: actions/upload-artifact@v7
@@ -499,6 +583,16 @@ jobs:
           name: meeting-simulator.log
           path: /tmp/e2e-app-sim.log
           if-no-files-found: ignore
+
+      # Host-skip gate: lanes that could not run for a host condition pass on
+      # PR and push runs with a warning, and this fails a scheduled or
+      # dispatched run instead, at the end so no later lane is lost. Why:
+      # the e2e-architecture skill, runner setup step 6.
+      - name: Fail a scheduled or dispatched run when a lane skipped for the host
+        if: >-
+          always() &&
+          (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        run: source scripts/lib/e2e-helpers.sh && fail_on_host_skips
 
       - name: Cleanup signing keychain
         if: always() && env.E2E_SIGNING_KEYCHAIN != ''

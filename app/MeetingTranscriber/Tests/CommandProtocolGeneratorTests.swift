@@ -137,7 +137,7 @@
                     continue
                 }
                 XCTAssertEqual(tool, "Custom command", name)
-                XCTAssertEqual(error?.errorDescription, "Custom command produced no protocol", name)
+                XCTAssertEqual(error?.errorDescription, "Custom command produced no meeting notes", name)
             }
         }
 

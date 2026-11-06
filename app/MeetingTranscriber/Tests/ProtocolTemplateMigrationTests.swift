@@ -31,7 +31,7 @@ final class ProtocolTemplateMigrationTests: XCTestCase {
     /// A fresh defaults domain, standing in for one build's UserDefaults.
     private func makeDefaults() throws -> UserDefaults {
         let name = "ProtocolTemplateMigrationTests-\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        let defaults = try XCTUnwrap(DefaultsSuite.open(name))
         addTeardownBlock { DefaultsSuite.remove(name) }
         return defaults
     }

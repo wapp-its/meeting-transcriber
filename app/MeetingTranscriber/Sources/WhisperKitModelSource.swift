@@ -1,7 +1,7 @@
 import Foundation
 import WhisperKit
 
-/// The three steps `WhisperKitEngine.loadModel()` takes to reach a usable pipe,
+/// The steps `WhisperKitEngine.loadModel()` takes to reach a usable pipe,
 /// named so a test can observe which of them ran. Production resolves every step
 /// against WhisperKit itself. Why the local step comes first is written down once,
 /// on `WhisperKitLocalSnapshot`.
@@ -18,6 +18,17 @@ struct WhisperKitModelSource {
     /// copy the locator waved through but CoreML cannot use still fails into the
     /// download.
     let makePipe: (String, URL) async throws -> WhisperKit
+    /// Awaited before `locateLocal`, for one-time work on the model's files that
+    /// must not run on the main actor: the Hub origin moves a copy earlier builds
+    /// left in Documents (`WhisperKitModelMigration`). Nothing by default.
+    var prepare: (String) async -> Void = { _ in }
+
+    /// `prepare`, then `locateLocal`: the lookup waits for the one-time work, so it
+    /// never sees a model folder halfway through being moved.
+    func prepareAndLocate(_ variant: String) async -> URL? {
+        await prepare(variant)
+        return locateLocal(variant)
+    }
 
     /// The folder as WhisperKit needs it. Named and separate because the conversion
     /// is load-bearing and wrong by default. `WhisperKitConfig` takes a `String` and
@@ -27,6 +38,36 @@ struct WhisperKitModelSource {
     /// offline that ends in a failed download instead of a loaded model.
     nonisolated static func modelFolderArgument(_ folder: URL) -> String {
         folder.path(percentEncoded: false)
+    }
+
+    /// The configuration both origins build their pipe from. `downloadBase` is
+    /// passed although the model folder is already resolved, because WhisperKit
+    /// also takes the tokenizer cache from it (`tokenizerFolder ?? downloadBase`):
+    /// left out, the tokenizer would be looked up, and fetched, in
+    /// `Documents/huggingface` after all. `HubTokenScopedWhisperKit` reads the same
+    /// `tokenizerFolder`, so its own fetch with the app's token lands there too. A
+    /// parameter only so a test can check the wiring without creating the real
+    /// folder.
+    nonisolated static func pipeConfig(
+        variant: String,
+        folder: URL,
+        downloadBase: URL = WhisperKitLocalSnapshot.downloadBase,
+    ) -> WhisperKitConfig {
+        WhisperKitConfig(
+            model: variant,
+            downloadBase: downloadBase,
+            modelFolder: modelFolderArgument(folder),
+        )
+    }
+
+    /// Whether `error` is the Hub refusing the request's credentials:
+    /// `authorizationRequired(statusCode:)`, which WhisperKit throws for a 401 or
+    /// 403 answer and, with nil, when it has no token where one is required.
+    /// WhisperKit keeps its Hub error type internal, so it is matched by its fully
+    /// qualified case name, whatever the status code, which
+    /// `testRejectedTokenMatchesWhisperKitsOwnError` pins against the real type.
+    nonisolated static func isRejectedToken(_ error: any Error) -> Bool {
+        String(reflecting: error).hasPrefix("ArgmaxCore.Hub.HubClientError.authorizationRequired(")
     }
 
     /// Run one Hub-facing step with `token`, and name a refusal: a request Hugging
@@ -44,13 +85,42 @@ struct WhisperKitModelSource {
         }
     }
 
+    /// Run a Hub download for `variant` and accept only a folder of exactly that
+    /// name.
+    ///
+    /// `WhisperKit.download` matches the variant as the glob `*<variant>/*` and
+    /// returns the folder that matched, so a variant typed as the tail of the real
+    /// folder name downloads fine: `large-v3_8bit` fetches
+    /// `flix-swissgerman-large-v3_8bit`. The engine would load it once and then
+    /// never again offline, because the locator looks for a folder of the typed
+    /// name, finds none, and every later load goes back to the Hub (issue #736 for
+    /// one model). A neighbour that merely ends in the variant could be picked the
+    /// same way. Refusing the mismatch here turns that into one error that names
+    /// the exact folder. The files the refused download left in the cache sit under
+    /// the real name, where the locator never serves them for the typed one.
+    ///
+    /// There is no retry without a token: the download is always handed the app's
+    /// own token or `""`, never nil, so WhisperKit never sends a token it found in
+    /// the environment (see `production(for:hubToken:)`), and a refusal of the app's
+    /// token is reported as such (`WhisperKitLoadFailure`).
+    static func downloadExactly(
+        _ variant: String,
+        _ attempt: () async throws -> URL,
+    ) async throws -> URL {
+        let folder = try await attempt()
+        guard folder.lastPathComponent == variant else {
+            throw WhisperKitModelError.variantNameMismatch(requested: variant, repositoryFolder: folder.lastPathComponent)
+        }
+        return folder
+    }
+
     /// Resolve every step against WhisperKit itself, for the model's origin.
     ///
     /// `hubToken` is the Hugging Face token every Hub request carries, `""` for none,
     /// read as the download or the pipe construction starts. Never nil: WhisperKit
-    /// sends the machine's own token (`HF_TOKEN`, `~/.cache/huggingface/token` and four
-    /// more places) when it is handed nil, and the Hub refuses some stale ones, an old
-    /// `hf` CLI OAuth token for one, with 401 even for a public model.
+    /// sends the machine's own token (`HF_TOKEN` or `HUGGING_FACE_HUB_TOKEN`) when it
+    /// is handed nil, and the Hub refuses a stale one with 401 even for a public
+    /// model.
     static func production(
         for origin: WhisperKitModelOrigin,
         hubToken: @escaping @MainActor () -> String = { "" },
@@ -75,23 +145,29 @@ struct WhisperKitModelSource {
                 // id, and a changed default would otherwise have the two point at
                 // different repositories, which shows up as "the model is never found".
                 try await classifyingHubFailure(token: hubToken()) { token in
-                    try await WhisperKit.download(
-                        variant: variant,
-                        from: repoID,
-                        token: token,
-                        progressCallback: progress,
-                    )
+                    try await downloadExactly(variant) {
+                        try await WhisperKit.download(
+                            variant: variant,
+                            downloadBase: WhisperKitLocalSnapshot.downloadBase,
+                            from: repoID,
+                            token: token,
+                            progressCallback: progress,
+                        )
+                    }
                 }
             },
             makePipe: { variant, folder in
                 // The tokenizer is fetched inside the init when none is cached.
                 try await classifyingHubFailure(token: hubToken()) { token in
                     try await HubTokenScopedWhisperKit(
-                        WhisperKitConfig(model: variant, modelFolder: modelFolderArgument(folder)),
+                        pipeConfig(variant: variant, folder: folder),
                         hubToken: token,
                         mayFetchTokenizer: true,
                     )
                 }
+            },
+            prepare: { variant in
+                await WhisperKitModelMigration.migrateIfNeeded(repoID: repoID, variant: variant)
             },
         )
     }
@@ -102,8 +178,14 @@ struct WhisperKitModelSource {
     ///
     /// The folder is checked for the tokenizer too, unlike a Hub variant, because its
     /// pipe never fetches one (`mayFetchTokenizer: false`): a picked folder is expected
-    /// to load offline. Sandbox access goes through `VocabularyFileAccess`, whose two
-    /// helpers are not specific to vocabulary.
+    /// to load offline. No `tokenizerFolder` is passed, so the pipe uses
+    /// `downloadBase` in its place (see `pipeConfig`) and searches, in order: the
+    /// app's stock tokenizer cache `<downloadBase>/models/openai/whisper-<detected
+    /// size>`, the top of `downloadBase` itself, the picked folder, and that folder's
+    /// own `models/openai/whisper-<size>` (`WhisperTokenizerCache.searchPaths`). When
+    /// none of them holds a tokenizer that loads, the load fails rather than going to
+    /// the Hub. Sandbox access goes through `VocabularyFileAccess`, whose two helpers
+    /// are not specific to vocabulary.
     private static func localFolder(path: String, bookmark: Data?, hubToken: @escaping @MainActor () -> String) -> Self {
         Self(
             locateLocal: { _ in
@@ -130,7 +212,7 @@ struct WhisperKitModelSource {
                 }
                 return try await classifyingHubFailure(token: hubToken()) { token in
                     try await HubTokenScopedWhisperKit(
-                        WhisperKitConfig(model: variant, modelFolder: modelFolderArgument(folder)),
+                        pipeConfig(variant: variant, folder: folder),
                         hubToken: token,
                         mayFetchTokenizer: false,
                     )

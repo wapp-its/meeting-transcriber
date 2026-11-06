@@ -16,7 +16,7 @@ final class AppSettingsRemoteVocabularyTests: XCTestCase {
         super.setUp()
         suiteName = "AppSettingsRemoteVocabularyTests-\(getpid())-\(UUID().uuidString)"
         tokenAccount = "AppSettingsRemoteVocabularyTests-token-\(getpid())-\(UUID().uuidString)"
-        guard let suite = UserDefaults(suiteName: suiteName) else {
+        guard let suite = DefaultsSuite.open(suiteName) else {
             XCTFail("Could not create test UserDefaults suite")
             return
         }

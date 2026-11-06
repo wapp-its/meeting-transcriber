@@ -159,14 +159,22 @@ extension AppMeetingPattern {
         meetingPatterns: [],
     )
 
-    static let all: [AppMeetingPattern] = [teams, zoom, webex, simulator, browserMeetings, wechat, tencentMeeting, faceTime, whatsApp]
+    static let slack = AppMeetingPattern(
+        appName: "Slack",
+        ownerNames: ["Slack"],
+        meetingPatterns: [],
+    )
+
+    static let all: [AppMeetingPattern] = [
+        teams, zoom, webex, simulator, browserMeetings, wechat, tencentMeeting, faceTime, whatsApp, slack,
+    ]
 
     /// The apps Settings offers a "record without asking" switch for, in the
     /// order "Apps to Watch" lists them. Browser meetings are not among them
     /// (see `requiresRecordingConsent`), and neither is the simulator, which
     /// never asks.
     static let recordWithoutAskingCandidates: [AppMeetingPattern] = [
-        teams, zoom, webex, wechat, tencentMeeting, faceTime, whatsApp,
+        teams, zoom, webex, wechat, tencentMeeting, faceTime, whatsApp, slack,
     ]
 
     /// Whether a meeting detected under this pattern waits for the user's

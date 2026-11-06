@@ -10,13 +10,14 @@ final class ManualRecordingTests: XCTestCase {
     ) -> (WatchLoop, MockRecorder) {
         let mock = recorder ?? MockRecorder()
         mock.mixPath = URL(fileURLWithPath: "/tmp/test_mix.wav")
+        let noMicSetting: () -> Bool = { noMic }
         let loop = WatchLoop(
             detector: MeetingDetector(patterns: AppMeetingPattern.all),
             recorderFactory: { mock },
             pipelineQueue: pipelineQueue,
             pollInterval: 0.05,
             maxDuration: 10,
-            noMic: noMic,
+            noMic: noMicSetting,
         )
         loop.permissionChecker = {
             HealthCheckResult(screenRecording: .healthy, microphone: .healthy)
@@ -70,7 +71,7 @@ final class ManualRecordingTests: XCTestCase {
     // MARK: - Stop
 
     func testStopManualRecordingEnqueuesJob() async throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         let (loop, _) = makeLoop(pipelineQueue: queue)
         try await loop.startManualRecording(pid: 1234, appName: "Chrome", title: "Standup")
 
@@ -92,7 +93,11 @@ final class ManualRecordingTests: XCTestCase {
         // rewritten into a trailing closure that binds to another parameter.
         let defaultTemplate: () -> ProtocolTemplateID = { .file(name: "Default") }
         for (name, start) in starts {
-            let queue = PipelineQueue(defaultProtocolTemplateProvider: defaultTemplate)
+            let environment = try makeIsolatedPipelineEnvironment()
+            let queue = PipelineQueue(
+                logDir: environment.logDir, stagingDir: environment.stagingDir,
+                defaultProtocolTemplateProvider: defaultTemplate,
+            )
             let (loop, _) = makeLoop(pipelineQueue: queue)
             try await start(loop)
 
@@ -107,7 +112,11 @@ final class ManualRecordingTests: XCTestCase {
     /// gets the default template stamped when queued, and no background.
     func testARecordingStartedWithoutOptionsGetsTheDefaultTemplateAndNoBackground() async throws {
         let defaultTemplate: () -> ProtocolTemplateID = { .file(name: "Default") }
-        let queue = PipelineQueue(defaultProtocolTemplateProvider: defaultTemplate)
+        let environment = try makeIsolatedPipelineEnvironment()
+        let queue = PipelineQueue(
+            logDir: environment.logDir, stagingDir: environment.stagingDir,
+            defaultProtocolTemplateProvider: defaultTemplate,
+        )
         let (loop, _) = makeLoop(pipelineQueue: queue)
         try await loop.startMicrophoneRecording()
 
@@ -239,7 +248,7 @@ final class ManualRecordingTests: XCTestCase {
     }
 
     func testStopMicrophoneRecordingEnqueuesJob() async throws {
-        let queue = PipelineQueue()
+        let queue = try makeIsolatedQueue()
         let (loop, _) = makeLoop(pipelineQueue: queue)
         try await loop.startMicrophoneRecording()
 

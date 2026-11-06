@@ -54,6 +54,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # See the same step in e2e-app.yml: the soak records into ~/Downloads.
+      - name: Preflight TCC grants
+        timeout-minutes: 2
+        run: bash scripts/ci/tcc-preflight.sh --downloads
+
       - uses: ./.github/actions/verify-xcode
 
       # Same signing flow as the sibling lanes: Developer ID cert when the
@@ -84,6 +89,12 @@ jobs:
           set -o pipefail
           bash scripts/e2e-soak.sh --minutes "$SOAK_MINUTES" \
               --sample-every "$SOAK_SAMPLE_EVERY" | tee /tmp/e2e-soak-run.log
+
+      # See the same step in e2e-app.yml.
+      - name: End e2e drivers a step timeout left behind
+        if: always()
+        timeout-minutes: 3
+        run: source scripts/lib/e2e-helpers.sh && e2e_reap_registered_drivers
 
       # The RESULT line carries the fitted growth plus the full sample series,
       # so trend analysis across weeks needs no log scraping.

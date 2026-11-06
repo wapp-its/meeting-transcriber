@@ -146,13 +146,76 @@ enum ProtocolProvider: String, CaseIterable {
     }
 }
 
+enum OpenAIAPIKeyPlacement: String, CaseIterable {
+    case bearerToken
+    case customHeader
+
+    /// The header name a fresh install starts with.
+    static let defaultHeaderName = "api-key"
+
+    var label: String {
+        switch self {
+        case .bearerToken: "Bearer token"
+        case .customHeader: "Custom header"
+        }
+    }
+}
+
+/// A sampling parameter the user may override for the OpenAI-compatible
+/// provider. The raw value is the field name in the chat-completions body. An
+/// override that is not set is left out of the request entirely, so the server
+/// applies its own default (LM Studio and Ollama keep a per-model one) rather
+/// than one invented here.
+enum OpenAISamplingParameter: String, CaseIterable {
+    case temperature
+    case topP = "top_p"
+
+    /// Value an override starts at when the user switches it on: the OpenAI
+    /// API's documented default for both. Local servers often default lower
+    /// (Ollama and LM Studio ship around 0.7 to 0.8 for temperature), so
+    /// switching an override on is itself a change for them.
+    static let initialOverride = 1.0
+
+    var label: String {
+        switch self {
+        case .temperature: "Temperature"
+        case .topP: "Top P"
+        }
+    }
+
+    /// UserDefaults key the override is stored under.
+    var defaultsKey: String {
+        switch self {
+        case .temperature: "openAITemperature"
+        case .topP: "openAITopP"
+        }
+    }
+
+    /// The range the OpenAI API accepts for this parameter.
+    var range: ClosedRange<Double> {
+        switch self {
+        case .temperature: 0 ... 2
+        case .topP: 0 ... 1
+        }
+    }
+
+    /// Clamp a value into `range`, rounded to two decimals so stepping by
+    /// hundredths never sends float residue like 0.7000000000000001.
+    /// Non-finite input yields nil (no override): JSON cannot carry it.
+    func normalized(_ value: Double) -> Double? {
+        guard value.isFinite else { return nil }
+        let clamped = min(max(value, range.lowerBound), range.upperBound)
+        return (clamped * 100).rounded() / 100
+    }
+}
+
 // The class body is the registry itself (`@Observable` needs every stored
 // setting inside the class), so its 400-line cap counts features for the same
 // reason the file length does; see the note at the top of the file.
 @Observable
 final class AppSettings { // swiftlint:disable:this type_body_length
     /// Backing store. Production callers pass nothing → `.standard`. Tests
-    /// inject their own `UserDefaults(suiteName:)` so parallel test
+    /// inject a scratch suite (`DefaultsSuite.open` in the tests) so parallel test
     /// processes don't race on the shared on-disk plist.
     @ObservationIgnored private let defaults: UserDefaults
 
@@ -180,6 +243,10 @@ final class AppSettings { // swiftlint:disable:this type_body_length
     /// pass nothing → the account `remoteVocabularyToken`; tests inject a
     /// unique account, for the reason given at `apiKeyAccount`.
     @ObservationIgnored private let remoteVocabularyTokenAccount: String
+
+    /// Keychain account backing `notionAPIKey`, same injection reasoning as
+    /// `apiKeyAccount` above.
+    @ObservationIgnored private let notionAPIKeyAccount: String
 
     // MARK: - Apps to Watch
 
@@ -238,6 +305,10 @@ final class AppSettings { // swiftlint:disable:this type_body_length
 
     var watchWhatsApp: Bool {
         didSet { defaults.set(watchWhatsApp, forKey: "watchWhatsApp") }
+    }
+
+    var watchSlack: Bool {
+        didSet { defaults.set(watchSlack, forKey: "watchSlack") }
     }
 
     var watchCustomApps: [String] {
@@ -320,7 +391,7 @@ final class AppSettings { // swiftlint:disable:this type_body_length
     /// Overlay-window visibility only. Live transcription still runs when the
     /// master toggle is on; this setting only hides `LiveCaptionsOverlay`.
     /// Default on, so existing users keep seeing the bar. Missing UserDefaults
-    /// key reads as true (`defaults.object(forKey:) as? Bool ?? true`).
+    /// key reads as true (`defaults.bool(forKey:default: true)`).
     var liveCaptionsOverlayEnabled: Bool {
         didSet { defaults.set(liveCaptionsOverlayEnabled, forKey: "liveCaptionsOverlayEnabled") }
     }
@@ -396,7 +467,7 @@ final class AppSettings { // swiftlint:disable:this type_body_length
     var whisperKitCustomRepo: String {
         didSet {
             defaults.set(whisperKitCustomRepo, forKey: "whisperKitCustomRepo")
-            refreshWhisperKitCustomModelValidation()
+            refreshWhisperKitRepositoryValidation()
         }
     }
 
@@ -404,7 +475,7 @@ final class AppSettings { // swiftlint:disable:this type_body_length
     var whisperKitCustomVariant: String {
         didSet {
             defaults.set(whisperKitCustomVariant, forKey: "whisperKitCustomVariant")
-            refreshWhisperKitCustomModelValidation()
+            refreshWhisperKitRepositoryValidation()
         }
     }
 
@@ -456,9 +527,26 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         didSet { defaults.set(customVocabularyBookmark, forKey: "customVocabularyBookmark") }
     }
 
-    /// Experimental opt-in: WhisperKit's prompt can reduce transcript completeness.
-    var whisperKitVocabularyPromptEnabled: Bool {
-        didSet { defaults.set(whisperKitVocabularyPromptEnabled, forKey: "whisperKitVocabularyPromptEnabled") }
+    /// Whether any engine reads the vocabulary file: Parakeet's CTC boosting and
+    /// WhisperKit's experimental prompt, which can reduce transcript completeness.
+    var customVocabularyEnabled: Bool {
+        didSet { defaults.set(customVocabularyEnabled, forKey: "customVocabularyEnabled") }
+    }
+
+    /// Upgrade value for `customVocabularyEnabled`: what the engine in use did
+    /// before the one switch. Only WhisperKit was gated, by its own prompt flag.
+    static func initialCustomVocabularyEnabled(
+        whisperKitPromptEnabled: Bool,
+        hasVocabularyFile: Bool,
+        whisperKit: Bool,
+    ) -> Bool {
+        whisperKit ? whisperKitPromptEnabled : hasVocabularyFile
+    }
+
+    func updateWhisperKitCustomModelFolder(path: String, bookmark: Data?) {
+        whisperKitCustomModelFolderPath = path
+        whisperKitCustomModelFolderBookmark = bookmark
+        refreshWhisperKitCustomModelValidation()
     }
 
     /// Where the vocabulary comes from. `.file` (the default, also for existing
@@ -479,12 +567,6 @@ final class AppSettings { // swiftlint:disable:this type_body_length
     /// that the token changed. Not persisted.
     private(set) var remoteVocabularyTokenRevision = 0
 
-    func updateWhisperKitCustomModelFolder(path: String, bookmark: Data?) {
-        whisperKitCustomModelFolderPath = path
-        whisperKitCustomModelFolderBookmark = bookmark
-        refreshWhisperKitCustomModelValidation()
-    }
-
     func updateCustomVocabularySelection(path: String, bookmark: Data?) {
         customVocabularyPath = path
         customVocabularyBookmark = bookmark
@@ -493,11 +575,42 @@ final class AppSettings { // swiftlint:disable:this type_body_length
     var terminologyRulesText: String {
         didSet {
             defaults.set(terminologyRulesText, forKey: "terminologyRulesText")
-            terminologyRulesValidation = TerminologyNormalizer(rulesText: terminologyRulesText).diagnostics
+            guard terminologyRulesFilePath.isEmpty else { return }
+            terminologyRulesValidation = .rules(TerminologyNormalizer(rulesText: terminologyRulesText).diagnostics)
         }
     }
 
-    var terminologyRulesValidation: TerminologyNormalizer.Diagnostics
+    /// Optional rules file that replaces the text area as the source of the
+    /// terminology rules. Like the vocabulary file, the plain path is for
+    /// display; reads go through the bookmark.
+    private(set) var terminologyRulesFilePath: String {
+        didSet { defaults.set(terminologyRulesFilePath, forKey: "terminologyRulesFilePath") }
+    }
+
+    private(set) var terminologyRulesFileBookmark: Data? {
+        didSet { defaults.set(terminologyRulesFileBookmark, forKey: "terminologyRulesFileBookmark") }
+    }
+
+    func updateTerminologyRulesFileSelection(path: String, bookmark: Data?) {
+        terminologyRulesFilePath = path
+        terminologyRulesFileBookmark = bookmark
+    }
+
+    /// Every persisted bookmark's stale repair, for the one launch-time call
+    /// in `AppState`. `customVocabularyFile` also repairs from its getter; the
+    /// others rely on this call, for the reason given there.
+    func repairStaleBookmarks() {
+        repairStaleCustomOutputDirBookmark()
+        repairStaleCustomVocabularyBookmark()
+        repairStaleTerminologyRulesFileBookmark()
+        repairStaleWhisperKitCustomModelFolderBookmark()
+    }
+
+    var terminologyRulesValidation: TerminologyRulesStatus
+
+    /// Ephemeral read-only preview of the selected rules file, refreshed with
+    /// its status. Empty while the text area is the source.
+    var terminologyRulesFileContents: String
 
     /// Ephemeral UI status; recalculated when the selected vocabulary changes.
     var customVocabularyValidation: CustomVocabularyValidation
@@ -647,12 +760,18 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         didSet { defaults.set(saveRawTranscriptSeparately, forKey: "saveRawTranscriptSeparately") }
     }
 
+    /// Format output filenames using the AI-generated meeting title in snake_case without timestamps.
+    /// Only for a job that ran the built-in template (`ProtocolGenerator.fileTitleSlug`).
+    var useAITitleForFilenames: Bool {
+        didSet { defaults.set(useAITitleForFilenames, forKey: "useAITitleForFilenames") }
+    }
+
     static let protocolLanguages = [
         "German", "English", "French", "Spanish", "Italian",
         "Dutch", "Portuguese", "Japanese", "Chinese", "Korean",
-        "Russian", "Arabic", "Turkish", "Hindi", "Swedish",
-        "Danish", "Finnish", "Polish", "Czech", "Greek",
-        "Hungarian", "Romanian",
+        "Russian", "Arabic", "Turkish", "Hindi", "Indonesian",
+        "Swedish", "Danish", "Finnish", "Polish", "Czech",
+        "Greek", "Hungarian", "Romanian",
     ]
 
     #if !APPSTORE
@@ -696,6 +815,44 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         didSet { defaults.set(openAIModel, forKey: "openAIModel") }
     }
 
+    /// Sampling overrides for the OpenAI-compatible provider. Nil (the
+    /// default) leaves the key out of the request so the server's own default
+    /// applies; a set value is clamped into the API's range on write.
+    var openAITemperature: Double? {
+        didSet { storeSamplingOverride(\.openAITemperature, .temperature) }
+    }
+
+    var openAITopP: Double? {
+        didSet { storeSamplingOverride(\.openAITopP, .topP) }
+    }
+
+    /// Normalize a just-written sampling override and persist it (nil removes
+    /// the key). Reassigns only on change, because under @Observable the write
+    /// re-enters the observer and an unconditional one would recurse forever.
+    /// Persists here either way, so storage does not depend on that re-entry.
+    private func storeSamplingOverride(
+        _ keyPath: ReferenceWritableKeyPath<AppSettings, Double?>,
+        _ parameter: OpenAISamplingParameter,
+    ) {
+        let normalized = self[keyPath: keyPath].flatMap(parameter.normalized)
+        if normalized != self[keyPath: keyPath] { self[keyPath: keyPath] = normalized }
+        defaults.set(normalized, forKey: parameter.defaultsKey)
+    }
+
+    private static func loadSamplingOverride(
+        _ defaults: UserDefaults, _ parameter: OpenAISamplingParameter,
+    ) -> Double? {
+        (defaults.object(forKey: parameter.defaultsKey) as? Double).flatMap(parameter.normalized)
+    }
+
+    var openAIAPIKeyPlacement: OpenAIAPIKeyPlacement {
+        didSet { defaults.set(openAIAPIKeyPlacement.rawValue, forKey: "openAIAPIKeyPlacement") }
+    }
+
+    var openAIAPIKeyHeaderName: String {
+        didSet { defaults.set(openAIAPIKeyHeaderName, forKey: "openAIAPIKeyHeaderName") }
+    }
+
     var openAIAPIKey: String {
         get { KeychainHelper.read(key: apiKeyAccount) ?? "" }
         set {
@@ -725,7 +882,7 @@ final class AppSettings { // swiftlint:disable:this type_body_length
 
     #if !APPSTORE
         /// API key for the Claude CLI protocol generator, entered by the user
-        /// in Settings → Protocol Generation. Empty means use the CLI's own
+        /// in Settings → Meeting Notes. Empty means use the CLI's own
         /// `claude login` session; this is never populated automatically.
         var claudeAPIKey: String {
             get { KeychainHelper.read(key: claudeAPIKeyAccount) ?? "" }
@@ -738,6 +895,42 @@ final class AppSettings { // swiftlint:disable:this type_body_length
             }
         }
     #endif
+
+    // MARK: - Notion Export
+
+    var notionExportEnabled: Bool {
+        didSet { defaults.set(notionExportEnabled, forKey: "notionExportEnabled") }
+    }
+
+    var notionDatabaseID: String {
+        didSet { defaults.set(notionDatabaseID, forKey: "notionDatabaseID") }
+    }
+
+    var notionSkipLocalMarkdownOnSuccess: Bool {
+        didSet { defaults.set(notionSkipLocalMarkdownOnSuccess, forKey: "notionSkipLocalMarkdownOnSuccess") }
+    }
+
+    var notionSpeakerTagsEnabled: Bool {
+        didSet { defaults.set(notionSpeakerTagsEnabled, forKey: "notionSpeakerTagsEnabled") }
+    }
+
+    var notionAPIKey: String {
+        get {
+            access(keyPath: \.notionAPIKey)
+            return KeychainHelper.read(key: notionAPIKeyAccount) ?? ""
+        }
+        set {
+            withMutation(keyPath: \.notionAPIKey) {
+                // Discarded explicitly: both return a Bool here, which would
+                // make this `if` an expression and `withMutation` return it.
+                if newValue.isEmpty {
+                    _ = KeychainHelper.delete(key: notionAPIKeyAccount)
+                } else {
+                    _ = KeychainHelper.save(key: notionAPIKeyAccount, value: newValue)
+                }
+            }
+        }
+    }
 
     // MARK: - Output Directory
 
@@ -797,6 +990,7 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         claudeAPIKeyAccount: String = "claudeAPIKey",
         huggingFaceTokenStore: HuggingFaceTokenStore = .keychain(account: "huggingFaceToken"),
         remoteVocabularyTokenAccount: String = "remoteVocabularyToken",
+        notionAPIKeyAccount: String = "notionAPIKey",
         defaultOutputDir: URL = AppPaths.downloadsProtocolsDir,
         remoteVocabularyCacheDirectory: URL = AppPaths.remoteVocabularyCacheDirectory,
     ) {
@@ -805,45 +999,47 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         self.claudeAPIKeyAccount = claudeAPIKeyAccount
         self.huggingFaceTokenStore = huggingFaceTokenStore
         self.remoteVocabularyTokenAccount = remoteVocabularyTokenAccount
+        self.notionAPIKeyAccount = notionAPIKeyAccount
         self.defaultOutputDir = defaultOutputDir
         self.remoteVocabularyCacheDirectory = remoteVocabularyCacheDirectory
 
-        watchTeams = defaults.object(forKey: "watchTeams") as? Bool ?? true
-        watchZoom = defaults.object(forKey: "watchZoom") as? Bool ?? true
-        watchWebex = defaults.object(forKey: "watchWebex") as? Bool ?? true
-        watchBrowserMeetings = defaults.object(forKey: "watchBrowserMeetings") as? Bool ?? false
+        watchTeams = defaults.bool(forKey: "watchTeams", default: true)
+        watchZoom = defaults.bool(forKey: "watchZoom", default: true)
+        watchWebex = defaults.bool(forKey: "watchWebex", default: true)
+        watchBrowserMeetings = defaults.bool(forKey: "watchBrowserMeetings", default: false)
         let storedCustomApps = defaults.stringArray(forKey: "watchCustomApps") ?? []
         consentDeniedApps = Self.loadConsentDeniedApps(from: defaults, addedBundleIDs: storedCustomApps)
         recordWithoutAskingApps = defaults.stringArray(forKey: "recordWithoutAskingApps") ?? []
-        watchWeChat = defaults.object(forKey: "watchWeChat") as? Bool ?? false
-        watchTencentMeeting = defaults.object(forKey: "watchTencentMeeting") as? Bool ?? false
-        watchFaceTime = defaults.object(forKey: "watchFaceTime") as? Bool ?? false
-        watchWhatsApp = defaults.object(forKey: "watchWhatsApp") as? Bool ?? false
+        watchWeChat = defaults.bool(forKey: "watchWeChat", default: false)
+        watchTencentMeeting = defaults.bool(forKey: "watchTencentMeeting", default: false)
+        watchFaceTime = defaults.bool(forKey: "watchFaceTime", default: false)
+        watchWhatsApp = defaults.bool(forKey: "watchWhatsApp", default: false)
+        watchSlack = defaults.bool(forKey: "watchSlack", default: false)
         watchCustomApps = storedCustomApps
-        autoWatch = defaults.object(forKey: "autoWatch") as? Bool ?? false
+        autoWatch = defaults.bool(forKey: "autoWatch", default: false)
 
         pollInterval = defaults.object(forKey: "pollInterval") as? Double ?? 3.0
         endGrace = defaults.object(forKey: "endGrace") as? Double ?? 15.0
-        noMic = defaults.object(forKey: "noMic") as? Bool ?? false
-        recordOnly = defaults.object(forKey: "recordOnly") as? Bool ?? false
+        noMic = defaults.bool(forKey: "noMic", default: false)
+        recordOnly = defaults.bool(forKey: "recordOnly", default: false)
         micDeviceUID = defaults.object(forKey: "micDeviceUID") as? String ?? ""
         micName = defaults.object(forKey: "micName") as? String ?? "Me"
-        perChannelIndicatorEnabled = defaults.object(forKey: "perChannelIndicatorEnabled") as? Bool ?? true
-        silentTrackWatchdogEnabled = defaults.object(forKey: "silentTrackWatchdogEnabled") as? Bool ?? false
-        levelBalanceEnabled = defaults.object(forKey: "levelBalanceEnabled") as? Bool ?? true
-        liveTranscriptionEnabled = defaults.object(forKey: "liveTranscriptionEnabled") as? Bool ?? false
-        liveCaptionsOverlayEnabled = defaults.object(forKey: "liveCaptionsOverlayEnabled") as? Bool ?? true
+        perChannelIndicatorEnabled = defaults.bool(forKey: "perChannelIndicatorEnabled", default: true)
+        silentTrackWatchdogEnabled = defaults.bool(forKey: "silentTrackWatchdogEnabled", default: false)
+        levelBalanceEnabled = defaults.bool(forKey: "levelBalanceEnabled", default: true)
+        liveTranscriptionEnabled = defaults.bool(forKey: "liveTranscriptionEnabled", default: false)
+        liveCaptionsOverlayEnabled = defaults.bool(forKey: "liveCaptionsOverlayEnabled", default: true)
         liveCaptionsSize = defaults.string(forKey: "liveCaptionsSize")
             .flatMap(LiveCaptionsSize.init(rawValue:)) ?? .medium
         asymmetricSilenceWarningSeconds = max(30, min(300, defaults.object(forKey: "asymmetricSilenceWarningSeconds") as? Double ?? 90))
-        silencePromptEnabled = defaults.object(forKey: "silencePromptEnabled") as? Bool ?? true
+        silencePromptEnabled = defaults.bool(forKey: "silencePromptEnabled", default: true)
         silencePromptMinutes = max(1, min(60, defaults.object(forKey: "silencePromptMinutes") as? Int ?? 5))
 
         transcriptionEngine = (defaults.string(forKey: "transcriptionEngine")
             .flatMap(TranscriptionEngineSetting.init(rawValue:))) ?? .whisperKit
         whisperKitModel = defaults.object(forKey: "whisperKitModel") as? String
             ?? "openai_whisper-large-v3-v20240930_turbo"
-        whisperKitCustomModelEnabled = defaults.object(forKey: "whisperKitCustomModelEnabled") as? Bool ?? false
+        whisperKitCustomModelEnabled = defaults.bool(forKey: "whisperKitCustomModelEnabled", default: false)
         whisperKitCustomRepo = defaults.string(forKey: "whisperKitCustomRepo") ?? ""
         whisperKitCustomVariant = defaults.string(forKey: "whisperKitCustomVariant") ?? ""
         whisperKitCustomModelFolderPath = defaults.string(forKey: "whisperKitCustomModelFolderPath") ?? ""
@@ -853,19 +1049,39 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         parakeetLanguage = defaults.object(forKey: "parakeetLanguage") as? String ?? ""
         customVocabularyPath = defaults.string(forKey: "customVocabularyPath") ?? ""
         customVocabularyBookmark = defaults.data(forKey: "customVocabularyBookmark")
-        whisperKitVocabularyPromptEnabled = defaults.object(forKey: "whisperKitVocabularyPromptEnabled") as? Bool ?? false
+        if let stored = defaults.flag(forKey: "customVocabularyEnabled") {
+            customVocabularyEnabled = stored
+        } else {
+            let storedEngine = defaults.string(forKey: "transcriptionEngine")
+                .flatMap(TranscriptionEngineSetting.init(rawValue:)) ?? .whisperKit
+            // A vocabulary configured as a URL counts like a file: Parakeet
+            // applied it with no switch, so it must stay on after the upgrade.
+            let hasFile = !(defaults.string(forKey: "customVocabularyPath") ?? "").isEmpty
+            let hasURL = defaults.string(forKey: "vocabularySource") == VocabularySource.url.rawValue
+                && !(defaults.string(forKey: "remoteVocabularyURL") ?? "").isEmpty
+            let derived = Self.initialCustomVocabularyEnabled(
+                whisperKitPromptEnabled: defaults.bool(forKey: "whisperKitVocabularyPromptEnabled", default: false),
+                hasVocabularyFile: hasFile || hasURL,
+                whisperKit: storedEngine == .whisperKit,
+            )
+            customVocabularyEnabled = derived
+            defaults.set(derived, forKey: "customVocabularyEnabled")
+        }
         vocabularySource = defaults.string(forKey: "vocabularySource")
             .flatMap(VocabularySource.init(rawValue:)) ?? .file
         remoteVocabularyURL = defaults.string(forKey: "remoteVocabularyURL") ?? ""
         let savedTerminologyRules = defaults.string(forKey: "terminologyRulesText") ?? ""
         terminologyRulesText = savedTerminologyRules
-        terminologyRulesValidation = TerminologyNormalizer(rulesText: savedTerminologyRules).diagnostics
+        terminologyRulesFilePath = defaults.string(forKey: "terminologyRulesFilePath") ?? ""
+        terminologyRulesFileBookmark = defaults.data(forKey: "terminologyRulesFileBookmark")
+        terminologyRulesValidation = .rules(TerminologyNormalizer(rulesText: savedTerminologyRules).diagnostics)
+        terminologyRulesFileContents = ""
         customVocabularyValidation = .notConfigured
-        diarize = defaults.object(forKey: "diarize") as? Bool ?? true
-        vadEnabled = defaults.object(forKey: "vadEnabled") as? Bool ?? false
+        diarize = defaults.bool(forKey: "diarize", default: true)
+        vadEnabled = defaults.bool(forKey: "vadEnabled", default: false)
         vadThreshold = defaults.object(forKey: "vadThreshold") as? Float ?? 0.5
-        echoCancellationEnabled = defaults.object(forKey: "echoCancellationEnabled") as? Bool ?? false
-        echoDedupEnabled = defaults.object(forKey: "echoDedupEnabled") as? Bool ?? false
+        echoCancellationEnabled = defaults.bool(forKey: "echoCancellationEnabled", default: false)
+        echoDedupEnabled = defaults.bool(forKey: "echoDedupEnabled", default: false)
         diarizerMode = (defaults.string(forKey: "diarizerMode")
             .flatMap(DiarizerMode.init(rawValue:))) ?? .offline
         numSpeakers = defaults.object(forKey: "numSpeakers") as? Int ?? 0
@@ -888,19 +1104,29 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         #endif
         protocolLanguage = defaults.string(forKey: "protocolLanguage") ?? "German"
         defaultProtocolTemplate = ProtocolTemplateID(storedValue: defaults.string(forKey: Self.defaultProtocolTemplateKey) ?? "")
-        includeFullTranscriptInProtocol = defaults.object(forKey: "includeFullTranscriptInProtocol") as? Bool ?? true
-        saveRawTranscriptSeparately = defaults.object(forKey: "saveRawTranscriptSeparately") as? Bool ?? true
+        includeFullTranscriptInProtocol = defaults.bool(forKey: "includeFullTranscriptInProtocol", default: true)
+        saveRawTranscriptSeparately = defaults.bool(forKey: "saveRawTranscriptSeparately", default: true)
+        useAITitleForFilenames = defaults.bool(forKey: "useAITitleForFilenames", default: false)
 
         openAIEndpoint = defaults.object(forKey: "openAIEndpoint") as? String
             ?? Self.defaultOpenAIEndpoint
         openAIModel = defaults.object(forKey: "openAIModel") as? String ?? "llama3.1"
+        openAITemperature = Self.loadSamplingOverride(defaults, .temperature)
+        openAITopP = Self.loadSamplingOverride(defaults, .topP)
+        openAIAPIKeyPlacement = defaults.string(forKey: "openAIAPIKeyPlacement")
+            .flatMap(OpenAIAPIKeyPlacement.init(rawValue:)) ?? .bearerToken
+        openAIAPIKeyHeaderName = defaults.string(forKey: "openAIAPIKeyHeaderName") ?? OpenAIAPIKeyPlacement.defaultHeaderName
         customOutputDirBookmark = defaults.data(forKey: "customOutputDirBookmark")
+        notionExportEnabled = defaults.object(forKey: "notionExportEnabled") as? Bool ?? false
+        notionDatabaseID = defaults.string(forKey: "notionDatabaseID") ?? ""
+        notionSkipLocalMarkdownOnSuccess = defaults.object(forKey: "notionSkipLocalMarkdownOnSuccess") as? Bool ?? false
+        notionSpeakerTagsEnabled = defaults.object(forKey: "notionSpeakerTagsEnabled") as? Bool ?? false
 
         // Migrate legacy "audioDebugLogging" key (renamed to "verboseDiagnostics" 2026-05-04).
         // New key wins if both are set; legacy value seeds the new key on first launch.
-        if let new = defaults.object(forKey: "verboseDiagnostics") as? Bool {
+        if let new = defaults.flag(forKey: "verboseDiagnostics") {
             verboseDiagnostics = new
-        } else if let legacy = defaults.object(forKey: "audioDebugLogging") as? Bool {
+        } else if let legacy = defaults.flag(forKey: "audioDebugLogging") {
             verboseDiagnostics = legacy
             defaults.set(legacy, forKey: "verboseDiagnostics")
         } else {
@@ -913,11 +1139,12 @@ final class AppSettings { // swiftlint:disable:this type_body_length
             defaults.removeObject(forKey: "audioDebugLogging")
         }
         #if !APPSTORE
-            debugRPCEnabled = defaults.object(forKey: "debugRPCEnabled") as? Bool ?? false
+            debugRPCEnabled = defaults.bool(forKey: "debugRPCEnabled", default: false)
         #endif
-        checkForUpdates = defaults.object(forKey: "checkForUpdates") as? Bool ?? true
-        includePreReleases = defaults.object(forKey: "includePreReleases") as? Bool ?? false
+        checkForUpdates = defaults.bool(forKey: "checkForUpdates", default: true)
+        includePreReleases = defaults.bool(forKey: "includePreReleases", default: false)
         refreshCustomVocabularyValidation()
+        refreshTerminologyRulesValidation()
         refreshWhisperKitCustomModelValidation()
     }
 }
@@ -962,8 +1189,7 @@ extension AppSettings {
                 ?? DiarizerTuningDefaults.warmStartFb,
             minSegmentDuration: defaults.object(forKey: "diarizerMinSegmentDuration") as? Double
                 ?? DiarizerTuningDefaults.minSegmentDurationSeconds,
-            excludeOverlap: defaults.object(forKey: "diarizerExcludeOverlap") as? Bool
-                ?? DiarizerTuningDefaults.excludeOverlap,
+            excludeOverlap: defaults.bool(forKey: "diarizerExcludeOverlap", default: DiarizerTuningDefaults.excludeOverlap),
         )
     }
 }

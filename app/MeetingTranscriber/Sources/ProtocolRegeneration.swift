@@ -36,32 +36,32 @@ enum ProtocolRegenerationError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .noTranscript:
-            "No transcript was found for this meeting: there is no transcript file beside it, and its protocol has no Full Transcript section."
+            "No transcript was found for this meeting: there is no transcript file beside it, and its meeting notes have no Full Transcript section."
 
         case .providerOff:
             ProtocolDestination.off.notice
 
         case .recordOnly:
-            "Record-only mode is on: no protocol is made on this Mac."
+            "Record-only mode is on: no meeting notes are made on this Mac."
 
         case .meetingBusy:
             "This meeting is still being processed. Try again once it has finished."
 
         case .filesChanged:
-            "The meeting's files changed while the protocol was being made, so nothing was replaced."
+            "The meeting's files changed while the meeting notes were being made, so nothing was replaced."
 
         case .generationFailed:
-            "Protocol generation failed, so nothing was replaced."
+            "Meeting notes generation failed, so nothing was replaced."
 
         case let .writeFailed(reason):
-            "The new protocol could not be saved, so the previous one was left in place: \(reason)"
+            "The new meeting notes could not be saved, so the previous ones were left in place: \(reason)"
 
         case let .restoreFailed(keptAs):
-            "The new protocol could not be saved, and the previous one could not be put back. It is kept as \(keptAs)."
+            "The new meeting notes could not be saved, and the previous ones could not be put back. They are kept as \(keptAs)."
 
         #if !APPSTORE
             case .recording:
-                "The protocol was not made because a recording is running. Start it again once the recording has ended."
+                "The meeting notes were not made because a recording is running. Start it again once the recording has ended."
 
             case .lowMemory:
                 "There was not enough free memory for the local model, so nothing was replaced."
@@ -70,7 +70,7 @@ enum ProtocolRegenerationError: LocalizedError, Equatable {
                 "No local model is chosen, or it cannot be reached, so nothing was replaced. Choose one in Settings → Output."
 
             case .regenerationRunning:
-                "Another protocol is being made. Try again once it has finished."
+                "Other meeting notes are being made. Try again once they are finished."
         #endif
         }
     }
@@ -257,10 +257,15 @@ final class ProtocolRegenerator {
         var notifier: any AppNotifying
         var fileOperations: ProtocolRegenerationFileOperations = .live
         var now: () -> Date = Date.init
+        /// Called after a run replaced the notes of a meeting that has a job,
+        /// with the template the run was asked for: a retried Notion export
+        /// reads those notes and titles its page by that template's rule
+        /// (`ProtocolGenerator.aiTitle`).
+        var regenerated: @MainActor (_ jobID: UUID, _ template: ProtocolTemplateID) -> Void = { _, _ in }
     }
 
-    static let succeededTitle = "Protocol Regenerated"
-    static let failedTitle = "Protocol Not Regenerated"
+    static let succeededTitle = "Meeting Notes Regenerated"
+    static let failedTitle = "Meeting Notes Not Regenerated"
 
     private static let previousStamp = DateFormatter.filenameStamp("yyyyMMdd_HHmmss")
 
@@ -327,6 +332,9 @@ final class ProtocolRegenerator {
         do {
             let warnings = try await run(target, options: options) + notes
             logger.info("protocol_regenerated job=\(target.jobID ?? "none", privacy: .public)")
+            if let jobID = target.jobID.flatMap(UUID.init(uuidString:)) {
+                environment.regenerated(jobID, options.template)
+            }
             phase = .succeeded(target.protocolURL, warnings: warnings)
             environment.notifier.notify(title: Self.succeededTitle, body: ([target.title] + warnings).joined(separator: "\n"))
         } catch {
@@ -347,7 +355,7 @@ final class ProtocolRegenerator {
         guard let transcript = files.transcript else { throw ProtocolRegenerationError.noTranscript }
         // The only copy of the transcript is never left in the Trash alone.
         let includeFullTranscript = environment.includeFullTranscript() || transcript.fromProtocol
-        let (instructions, templateWarning) = environment.templateStore.instructions(
+        let (instructions, _, templateWarning) = environment.templateStore.instructions(
             for: options.template, background: options.background,
         )
         let (protocolMarkdown, incompleteWarning) = try await makeProtocol(
@@ -482,7 +490,7 @@ final class ProtocolRegenerator {
             try ops.trash(previous)
             return nil
         } catch {
-            return "The previous protocol could not be moved to the Trash and was kept as \(previous.lastPathComponent)."
+            return "The previous meeting notes could not be moved to the Trash and were kept as \(previous.lastPathComponent)."
         }
     }
 
@@ -499,7 +507,7 @@ final class ProtocolRegenerator {
     // MARK: - Local model
 
     extension ProtocolRegenerator: LocalModelNoticeResponding {
-        static let backgroundLostNote = "The background info was not used: the app has restarted since the protocol was due."
+        static let backgroundLostNote = "The background info was not used: the app has restarted since the meeting notes were due."
 
         /// How a regeneration ends for a local outcome other than a protocol
         /// (spec R11). A recording ending the helper is not resumed; in

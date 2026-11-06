@@ -23,7 +23,7 @@
         func testEachLocalOutcomeEndsTheJobAsR11Says() async throws {
             let (incomplete, short) = (LocalModelNotice.incompleteWarning, LocalModelNotice.Shortfall.self)
             let expectations = [
-                Expectation(outcome: .incomplete(text: "Partial minutes"), warning: incomplete, doneTitle: "Protocol Ready", shortfall: nil),
+                Expectation(outcome: .incomplete(text: "Partial minutes"), warning: incomplete, doneTitle: "Meeting Notes Ready", shortfall: nil),
                 Expectation(outcome: .lowMemory(lowMemory), warning: short.lowMemory.warning, doneTitle: nil, shortfall: .lowMemory),
                 Expectation(outcome: .noModel, warning: short.noModel.warning, doneTitle: nil, shortfall: .noModel),
                 Expectation(outcome: .promptTooLong, warning: failureWarning, doneTitle: "Transcript Saved", shortfall: nil),
@@ -101,7 +101,7 @@
             XCTAssertEqual(Set(scheduler.added.map(\.identifier)).count, 1, "\(scheduler.added.map(\.identifier))")
             let shown = try XCTUnwrap(scheduler.added.last?.content)
             XCTAssertEqual(shown.categoryIdentifier, NotificationManager.localModelLowMemoryCategoryID)
-            XCTAssertEqual(shown.title, "Protocol not written: low memory")
+            XCTAssertEqual(shown.title, "Meeting notes not written: low memory")
             XCTAssertEqual(
                 shown.body,
                 "Third and 2 more meetings: there was not enough free memory for the local model. The transcripts are saved.",
@@ -133,7 +133,7 @@
             try await pipeline.waitUntilDone([id])
 
             XCTAssertEqual(notifier.notices, [.paused(jobID: id, title: "Standup")])
-            XCTAssertEqual(notifier.notifications.map(\.title), ["Protocol Ready"])
+            XCTAssertEqual(notifier.notifications.map(\.title), ["Meeting Notes Ready"])
             XCTAssertEqual(notifier.episodeEnds, 1)
         }
 
@@ -174,7 +174,7 @@
             let suite = "LocalModelOutcomeMappingTests-\(UUID().uuidString)"
             addTeardownBlock { DefaultsSuite.remove(suite) }
             return try AppSettings(
-                defaults: XCTUnwrap(UserDefaults(suiteName: suite)),
+                defaults: XCTUnwrap(DefaultsSuite.open(suite)),
                 defaultOutputDir: makeTempDirectory(prefix: "LocalModelOutcomeOutput"),
             )
         }

@@ -12,12 +12,6 @@ final class WatchLoopE2ETests: XCTestCase { // swiftlint:disable:this balanced_x
     override func setUp() async throws {
         try await super.setUp()
         tmpDir = try makeTempDirectory(prefix: "watchloop_e2e")
-
-        // Ensure recordingsDir exists (handleMeeting writes intermediate 16kHz files there)
-        try FileManager.default.createDirectory(
-            at: AppPaths.recordingsDir,
-            withIntermediateDirectories: true,
-        )
     }
 
     // MARK: - Helpers
@@ -86,7 +80,6 @@ final class WatchLoopE2ETests: XCTestCase { // swiftlint:disable:this balanced_x
             pollInterval: 0.05,
             endGracePeriod: 0.1,
             maxDuration: 0.1,
-            noMic: false,
         )
     }
 

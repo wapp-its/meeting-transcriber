@@ -61,7 +61,8 @@ enum SettingsHelp {
     static let silentTrackWatchdog =
         """
         When the app-audio track has carried only silence for \
-        \(Int(SilentTrackWatchdogLimits.secondsOfZerosBeforeRebuild)) seconds while the \
+        \(Int(SilentTrackWatchdogLimits.secondsOfZerosBeforeRebuild)) seconds, or has \
+        delivered nothing at all since the capture started, while the \
         meeting app still reports playing audio, rebuild the capture, at most \
         once every \(Int(SilentTrackWatchdogLimits.secondsBetweenRebuilds)) seconds \
         and \(SilentTrackWatchdogLimits.rebuildsPerRecording) times per recording. \
@@ -80,8 +81,52 @@ enum SettingsHelp {
         "whether to stop the recording. Stop now ends it, cuts off the silence at the end and " +
         "processes it. Without an answer it keeps recording and asks again after the same time."
 
+    static let notionExport =
+        """
+        Sends each finished set of meeting notes (and the full transcript when it is \
+        included) to a Notion database.
+
+        Setup:
+        1. In Notion, create an internal integration at notion.so/profile/\
+        integrations and copy its token.
+        2. Share the target page or database with that integration: open it in \
+        Notion → "..." → "Connect to" → your integration. The integration only \
+        sees content explicitly shared with it.
+        3. Paste the token here and press "Test Connection".
+        4. Choose an existing database, or create a "Meeting Transcriber" \
+        database under one of your shared pages.
+        5. Local Markdown backups are kept by default. Leave "Skip local markdown \
+        file on success" off to keep all meeting notes locally.
+
+        Only Title is required. Tags and Date are used when the database has a \
+        recognized column; use "Add Optional Columns" to create them. If Notion \
+        export fails, the local Markdown file is kept. The job finishes first and \
+        the export runs in the background. If a request times \
+        out while a page is being created, a retry can leave a second page in \
+        the database.
+
+        Speaker names are only added to Tags when "Include speaker names \
+        as tags" is enabled. Re-exporting after speaker naming replaces \
+        the exported page content, including text edited in Notion. \
+        Sub-pages, databases, images and embeds added under the page are kept.
+        """
+
     static let asymmetricSilenceWarning =
         "How long the condition must last before the indicator turns red and, for a channel " +
         "that has stopped delivering, before you are notified. Lower reacts faster to a dead " +
         "channel; higher ignores natural speaking pauses."
+
+    static let customVocabulary =
+        "Helps transcription recognize the names and terms listed in your vocabulary file."
+
+    static let aiTitleForFilenames =
+        """
+        Names the files after the meeting title the AI writes into the meeting \
+        notes, but only for notes made with the built-in template; notes from \
+        your own template keep the date-based name.
+        """
+
+    static let customVocabularyWhisperKit = customVocabulary + "\n\n"
+        + "Experimental with WhisperKit: on busy audio it can leave out whole sentences. "
+        + "Parakeet is the better engine for vocabulary."
 }

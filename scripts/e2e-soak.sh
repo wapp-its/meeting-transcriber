@@ -75,11 +75,13 @@ DEV_BUNDLE_DEPLOY="$HOME/Applications/MeetingTranscriber-Dev.app"
 SIMULATOR_PKG="$ROOT/tools/meeting-simulator"
 SIMULATOR_BIN="$SIMULATOR_PKG/.build/release/meeting-simulator"
 DEFAULT_FIXTURE="$ROOT/app/MeetingTranscriber/Tests/Fixtures/two_speakers_de.wav"
+# shellcheck disable=SC2034 # read by the RPC helpers in lib/e2e-helpers.sh
 RPC_TOKEN_FILE="$HOME/Library/Application Support/MeetingTranscriber/.rpc-token"
 # Record-only writes to `<effectiveOutputDir>/recordings`, which defaults to
 # Downloads — NOT the Application Support path that only appears as a default
 # initializer argument. e2e-app.sh asserts against this same directory.
 REC_DIR="$HOME/Downloads/MeetingTranscriber/recordings"
+# shellcheck disable=SC2034 # read by the RPC helpers in lib/e2e-helpers.sh
 RPC_BASE="http://127.0.0.1:9876"
 # shellcheck source=lib/bundle-ids.sh
 source "$ROOT/scripts/lib/bundle-ids.sh"
@@ -108,30 +110,16 @@ fail() { printf '[e2e-soak] FAIL: %s\n' "$*" >&2; exit 1; }
 
 # shellcheck source=scripts/lib/e2e-helpers.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/e2e-helpers.sh"
+# Ends what a timed-out earlier step left running, then records this
+# driver for the next (see e2e_register_driver).
+e2e_register_driver
 
 require_command() {
     command -v "$1" >/dev/null || fail "missing command: $1"
 }
 
+# shellcheck disable=SC2034 # read by the RPC helpers in lib/e2e-helpers.sh
 RPC_TOKEN=""
-rpc() {
-    local path="$1"
-    curl --silent --show-error --max-time 10 \
-        --header "Authorization: Bearer $RPC_TOKEN" \
-        "$RPC_BASE$path" 2>/dev/null || true
-}
-
-# Fetch /metrics, refusing anything that is not a usable snapshot. The
-# non-empty guard matters: jq 1.6 exits 0 on EMPTY input even with -e, so a
-# timed-out curl would otherwise masquerade as a valid reading and silently
-# flatten the growth curve.
-metrics_snapshot() {
-    local m
-    m="$(rpc /metrics)"
-    { [ -n "$m" ] && jq -e '.monotonicTimeSeconds > 0' <<<"$m" >/dev/null 2>&1; } \
-        || fail "/metrics returned no usable snapshot: $m"
-    printf '%s' "$m"
-}
 
 # Least-squares slope of footprint over time, in MB per hour, plus the summary
 # numbers worth logging. Reads a JSON array of {minutes, footprintMB} samples.
@@ -157,18 +145,6 @@ growth_summary() {
             deltaMB:        (($s | last | .footprintMB) - ($s | first | .footprintMB)),
             growthMBPerHour: (($slopePerMin * 60) * 10 | round / 10)
         }'
-}
-
-# See the shared note in e2e-app.sh: `rpc` ends in `|| true`, so probing
-# through it reports success for a refused connection and leaves the token
-# file, which outlives every run on the host, as the only real condition.
-# Ask curl directly and let its exit status decide.
-_rpc_ready() {
-    [ -f "$RPC_TOKEN_FILE" ] || return 1
-    RPC_TOKEN="$(cat "$RPC_TOKEN_FILE")"
-    curl --silent --fail --max-time 5 \
-        --header "Authorization: Bearer $RPC_TOKEN" \
-        "$RPC_BASE/healthz" >/dev/null 2>&1
 }
 
 # --- preflight ------------------------------------------------------------
@@ -211,7 +187,12 @@ on_exit() {
     fi
     rm -f "${RUN_START_MARKER:-}" 2>/dev/null || true
 }
-trap on_exit EXIT INT TERM
+# INT/TERM exit (and so run on_exit once, from EXIT): a trap that only ran
+# on_exit would return into the interrupted command and let the lane carry on
+# after its cleanup, which a reaper SIGTERM relies on not happening.
+trap on_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # --- build + launch -------------------------------------------------------
 
@@ -240,10 +221,7 @@ quit_running_app || true
 log "Launching $DEV_BUNDLE_DEPLOY"
 open "$DEV_BUNDLE_DEPLOY"
 
-RPC_TOKEN="$(cat "$RPC_TOKEN_FILE" 2>/dev/null || true)"
-[ -n "$RPC_TOKEN" ] || fail "no RPC token at $RPC_TOKEN_FILE"
-
-poll_until "$RPC_READY_TIMEOUT_S" 1 _rpc_ready \
+poll_until "$RPC_READY_TIMEOUT_S" 1 rpc_ready \
     || fail "RPC /healthz did not respond within ${RPC_READY_TIMEOUT_S}s"
 log "RPC up"
 
@@ -269,20 +247,16 @@ log "Starting meeting-simulator for ${MEETING_SECONDS}s (${SOAK_MINUTES}min meas
 "$SIMULATOR_BIN" "$SIMULATOR_FIXTURE" --silent --duration "$MEETING_SECONDS" >/dev/null 2>&1 &
 SIM_PID=$!
 
-_is_recording() {
-    local state
-    state="$(rpc /state)"
-    [ -n "$state" ] && jq -e '.watchState == "recording"' <<<"$state" >/dev/null 2>&1
-}
-poll_until "$RECORDING_DEADLINE_S" 2 _is_recording \
-    || fail "app did not reach watchState=recording within ${RECORDING_DEADLINE_S}s"
+poll_state "$RECORDING_DEADLINE_S" 2 state_is '.watchState == "recording"' \
+    || fail "$(state_why $? "app did not reach watchState=recording within ${RECORDING_DEADLINE_S}s")"
 log "Recording started; letting the allocation ramp settle for ${RECORDING_SETTLE_S}s"
 sleep "$RECORDING_SETTLE_S"
 
 SAMPLES="[]"
 ELAPSED_MIN=0
 while [ "$ELAPSED_MIN" -lt "$SOAK_MINUTES" ]; do
-    snap="$(metrics_snapshot)"
+    metrics_snapshot || fail "$(rpc_why $? /metrics "the CPU/RAM snapshot was not taken")"
+    snap="$RPC_BODY"
     footprint_mb="$(jq -r '(.physFootprintBytes / 1048576) | round' <<<"$snap")"
     SAMPLES="$(jq -n --argjson s "$SAMPLES" --argjson m "$ELAPSED_MIN" --argjson f "$footprint_mb" \
         '$s + [{minutes: $m, footprintMB: $f}]')"
@@ -295,7 +269,8 @@ while [ "$ELAPSED_MIN" -lt "$SOAK_MINUTES" ]; do
     ELAPSED_MIN=$((ELAPSED_MIN + SAMPLE_EVERY_MIN))
 done
 
-snap="$(metrics_snapshot)"
+metrics_snapshot || fail "$(rpc_why $? /metrics "the CPU/RAM snapshot was not taken")"
+snap="$RPC_BODY"
 footprint_mb="$(jq -r '(.physFootprintBytes / 1048576) | round' <<<"$snap")"
 SAMPLES="$(jq -n --argjson s "$SAMPLES" --argjson m "$ELAPSED_MIN" --argjson f "$footprint_mb" \
     '$s + [{minutes: $m, footprintMB: $f}]')"

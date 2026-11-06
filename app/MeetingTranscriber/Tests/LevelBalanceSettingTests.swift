@@ -10,7 +10,7 @@ import XCTest
 final class LevelBalanceSettingTests: XCTestCase {
     private func freshSettings() -> AppSettings {
         let name = "level-balance-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: name)!
+        let defaults = DefaultsSuite.open(name)!
         // swiftlint:disable:previous force_unwrapping
         addTeardownBlock { DefaultsSuite.remove(name) }
         return AppSettings(defaults: defaults)
@@ -25,7 +25,7 @@ final class LevelBalanceSettingTests: XCTestCase {
     func testTheChoicePersists() throws {
         let name = "level-balance-persist-\(UUID().uuidString)"
         addTeardownBlock { DefaultsSuite.remove(name) }
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        let defaults = try XCTUnwrap(DefaultsSuite.open(name))
         AppSettings(defaults: defaults).levelBalanceEnabled = false
         XCTAssertFalse(
             AppSettings(defaults: defaults).levelBalanceEnabled,

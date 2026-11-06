@@ -31,6 +31,13 @@ final class AppState {
     /// The recording prompt the Record Meeting window was last opened for (`AppState+ConsentPrompt.swift`).
     var consentOptionsQuestion: ConsentQuestion?
 
+    /// Pin the naming selection to the job the naming window shows. Unpinned,
+    /// a job reaching naming could switch the window and lose typed names.
+    func pinShownNamingJob() {
+        let shown = pipeline.queue.namingJobID(preferring: selectedNamingJobID)
+        if selectedNamingJobID != shown { selectedNamingJobID = shown }
+    }
+
     /// Transcription-engine concern (the three engine instances, active-engine
     /// selection, and settings → engine language/vocabulary sync), extracted
     /// into its own controller. Read as `engines.activeTranscriptionEngine` by
@@ -125,11 +132,10 @@ final class AppState {
             defaults: .standard, legacyPrompt: AppPaths.customPromptFile, store: .production,
         )
         let settings = AppSettings()
-        // Once, here, rather than from `customOutputDir` — that getter is read
-        // during view updates, and repairing there would write observed state
-        // mid-`body`.
-        settings.repairStaleCustomOutputDirBookmark()
-        settings.repairStaleCustomVocabularyBookmark()
+        // Once, here, rather than from `customOutputDir` or
+        // `terminologyRulesFile` — those getters are read during view updates,
+        // and repairing there would write observed state mid-`body`.
+        settings.repairStaleBookmarks()
         return settings
     }
 
@@ -137,12 +143,16 @@ final class AppState {
     /// installed development build with mt-update present; otherwise the
     /// GitHub release check, and always in the App Store build.
     private static func makeUpdateChecker(notifier: any AppNotifying) -> UpdateChecker {
-        #if !APPSTORE
+        // The sandboxed App Store build is never a cask install, so it must
+        // never be offered a brew command.
+        #if APPSTORE
+            return UpdateChecker()
+        #else
             if let provider = MtUpdateProvider.detect() {
                 return UpdateChecker(installer: provider, notifier: notifier, pendingStore: PendingUpdateInstallStore(defaults: .standard))
             }
+            return UpdateChecker(installedCask: UpdateInstallRoute.installedCask())
         #endif
-        return UpdateChecker()
     }
 
     private static func makeRemoteVocabulary(settings: AppSettings) -> RemoteVocabularyController {
@@ -161,16 +171,19 @@ final class AppState {
             records: { [pipeline] in pipeline.terminalJobStore.records },
             outputDir: { [settings] in settings.effectiveOutputDir },
             notifier: notifier,
+            // Labelled: a trailing closure would bind to `now`.
+            // swiftlint:disable:next trailing_closure
+            regenerated: { [pipeline] in pipeline.queue.recordRegeneratedTemplate(jobID: $0, template: $1) },
         ))
     }
 
     // MARK: - Init
 
     init(
+        pipelineEnvironment: PipelineController.QueueEnvironment,
         settings: AppSettings = AppState.makeDefaultSettings(),
         notifier: any AppNotifying = SilentNotifier(),
         updateChecker: UpdateChecker? = nil,
-        pipelineEnvironment: PipelineController.QueueEnvironment = .production,
     ) {
         // Dependency defaults are resolved through explicitly-typed factory
         // helpers (above) rather than inline `?? SomeType()` expressions (and an
@@ -243,40 +256,10 @@ final class AppState {
             // server. The closure is set here (post stored-property init) so it
             // can capture self.
             rpcController.activate { [weak self] in self?.buildDebugRPCServer() }
-
-            PersistentDiagnosticLog.cleanup()
-            // Reap any `log stream` children orphaned by a previous crash/SIGKILL
-            // (re-parented to launchd) so they can't accumulate across launches.
-            // Off the main thread: it shells out to `ps` + waitUntilExit(), which
-            // would otherwise stall launch proportional to the process-table size.
-            // The reap is deliberately NOT ordered before `startForToday()` — an
-            // orphan surviving a few extra ms is benign next to blocking launch,
-            // and the new streamer is matched by parent pid so it's never reaped.
-            Task.detached(priority: .utility) { PersistentDiagnosticLog.reapOrphans() }
-            do {
-                self.persistentLogStreamer = try PersistentDiagnosticLog.startForToday()
-            } catch {
-                Logger(subsystem: AppPaths.logSubsystem, category: "AppState")
-                    .error("persistent_log_streamer_failed_to_start error=\(error.localizedDescription, privacy: .public)")
-                self.persistentLogStreamer = nil
-            }
-            // Stop the streamer cleanly when the app terminates so the file
-            // handle flushes and the child `log` process exits. Done via
-            // NotificationCenter rather than a SwiftUI `.onReceive` so the
-            // observer doesn't churn through the SwiftUI modifier-chain
-            // `#if APPSTORE` minefield.
-            // AppState lives for the entire process lifetime, so leaking
-            // this notification observer until app exit is intentional —
-            // there's no point removing it in a deinit that won't run.
-            // swiftlint:disable:next discarded_notification_center_observer
-            NotificationCenter.default.addObserver(
-                forName: NSApplication.willTerminateNotification,
-                object: nil, queue: .main,
-            ) { [weak self] _ in
-                Task { @MainActor in
-                    self?.stopPersistentLogStreamer()
-                }
-            }
+            // The diagnostic log's launch steps (cleanup of expired files, the
+            // orphan reap and `startPersistentLogStreamer`) run from the app's
+            // entry point, not here: tests construct `AppState` too, and those
+            // steps touch the user's diagnostics folder and spawn `log stream`.
             Self.endLocalModelOnQuit(pipeline.localModelGate)
         #endif
     }
@@ -286,7 +269,7 @@ final class AppState {
         /// SIGKILL after the gate's quit grace, so no helper outlives the app
         /// holding the model's memory. Registered with no queue so it runs
         /// synchronously before `terminate` calls `exit` (as `LivenessMarker`
-        /// does); it leaks for the process's life like the streamer's observer.
+        /// does); it leaks for the process's life.
         static func endLocalModelOnQuit(_ gate: LocalModelGate, center: NotificationCenter = .default) {
             // swiftlint:disable:next discarded_notification_center_observer
             center.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: nil) { _ in
@@ -294,8 +277,28 @@ final class AppState {
             }
         }
 
-        /// Stop the persistent log streamer cleanly. Called from the
-        /// `NSApplication.willTerminateNotification` handler.
+        /// Start mirroring the app's log into `directory`. Stopped on the quit
+        /// path (`tearDownBeforeExit`). A running streamer is kept: replacing it
+        /// would leave its `log stream` child writing on with nothing to stop it.
+        func startPersistentLogStreamer(in directory: URL = PersistentDiagnosticLog.logDirectory) {
+            guard persistentLogStreamer == nil else { return }
+            do {
+                persistentLogStreamer = try PersistentDiagnosticLog.startForToday(in: directory)
+            } catch {
+                Logger(subsystem: AppPaths.logSubsystem, category: "AppState")
+                    .error("persistent_log_streamer_failed_to_start error=\(error.localizedDescription, privacy: .public)")
+                persistentLogStreamer = nil
+            }
+        }
+    #endif
+
+    #if !APPSTORE
+        /// Stop the persistent log streamer cleanly, so the file handle
+        /// flushes and the child `log` process exits. Called by the
+        /// application delegate right before a quit is let through. It used
+        /// to run from a `willTerminateNotification` observer that hopped
+        /// onto the main actor through a `Task`, and `terminate` calls `exit`
+        /// right after posting that notification, so the hop never ran.
         func stopPersistentLogStreamer() {
             persistentLogStreamer?.stop()
             persistentLogStreamer = nil

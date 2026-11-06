@@ -95,7 +95,7 @@ struct TranscriptionsView: View {
             Button {
                 actions.openProtocolsFolder()
             } label: {
-                Label("Open Protocols Folder", systemImage: "folder")
+                Label("Open Notes Folder", systemImage: "folder")
                     .labelStyle(.titleAndIcon)
             }
             .accessibilityIdentifier(A11yID.recordingsOpenFolderButton)
@@ -163,7 +163,9 @@ struct TranscriptionsView: View {
     private func row(_ entry: TranscriptionEntry, index: Int) -> some View {
         let canRetry = actions.canRetry(entry.id)
         let onDisk = availability.filesOnDisk(for: entry, resolve: actions.filesOnDisk)
-        let items = RecordingRowActions.menuItems(state: entry.state, onDisk: onDisk, canRetry: canRetry)
+        let items = RecordingRowActions.menuItems(
+            state: entry.state, onDisk: onDisk, canRetry: canRetry, hasNotionPage: entry.notionPageURL != nil,
+        )
         return HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(entry.title)
@@ -234,6 +236,7 @@ struct TranscriptionsView: View {
     private func mainButton(_ entry: TranscriptionEntry, canRetry: Bool, index: Int) -> some View {
         let recorded = RecordingRowActions.RecordedFiles(
             hasProtocol: entry.protocolURL != nil, hasTranscript: entry.transcriptURL != nil,
+            hasNotionPage: entry.notionPageURL != nil,
         )
         if let action = RecordingRowActions.mainAction(state: entry.state, files: recorded, canRetry: canRetry) {
             Button(Self.title(of: action)) { perform(action, on: entry) }
@@ -258,6 +261,7 @@ struct TranscriptionsView: View {
         case .nameSpeakers: actions.nameSpeakers(entry.id)
         case .openProtocol: open(entry.protocolURL, with: actions.openProtocol)
         case .openTranscript: open(entry.transcriptURL, with: actions.openTranscript)
+        case .openInNotion: openInNotion(entry)
         case .retry: actions.retry(entry.id)
         case .remove: actions.remove(entry.id)
         }
@@ -270,6 +274,7 @@ struct TranscriptionsView: View {
         switch item {
         case .openProtocol: open(entry.protocolURL, with: actions.openProtocol)
         case .openTranscript: open(entry.transcriptURL, with: actions.openTranscript)
+        case .openInNotion: openInNotion(entry)
         case .showInFinder: open(onDisk.protocolExists ? entry.protocolURL : entry.transcriptURL, with: actions.reveal)
         case .regenerate: notice.fileMissing = !actions.regenerate(entry)
         case .retry: actions.retry(entry.id)
@@ -277,6 +282,12 @@ struct TranscriptionsView: View {
         case .dismiss: actions.dismiss(entry.id)
         }
         availability.refresh()
+    }
+
+    /// A page is not a file, so nothing here can find it gone; the message
+    /// of an earlier Open stays as it was.
+    private func openInNotion(_ entry: TranscriptionEntry) {
+        if let page = entry.notionPageURL { actions.openInNotion(page) }
     }
 
     /// A file that is gone says so in the window, and the next action that
@@ -290,8 +301,9 @@ struct TranscriptionsView: View {
         switch action {
         case .cancel: "Cancel"
         case .nameSpeakers: "Name Speakers"
-        case .openProtocol: "Open Protocol"
+        case .openProtocol: "Open Notes"
         case .openTranscript: "Open Transcript"
+        case .openInNotion: "Open in Notion"
         case .retry: "Retry"
         case .remove: "Remove"
         }
@@ -299,10 +311,11 @@ struct TranscriptionsView: View {
 
     static func title(of item: MenuItem) -> String {
         switch item {
-        case .openProtocol: "Open Protocol"
+        case .openProtocol: "Open Notes"
         case .openTranscript: "Open Transcript"
+        case .openInNotion: "Open in Notion"
         case .showInFinder: "Show in Finder"
-        case .regenerate: "Regenerate Protocol…"
+        case .regenerate: "Regenerate Notes…"
         case .retry: "Retry"
         case .remove: "Remove"
         case .dismiss: "Dismiss"
@@ -313,6 +326,7 @@ struct TranscriptionsView: View {
         switch item {
         case .openProtocol: A11yID.recordingMenuOpenProtocol(index)
         case .openTranscript: A11yID.recordingMenuOpenTranscript(index)
+        case .openInNotion: A11yID.recordingMenuOpenInNotion(index)
         case .showInFinder: A11yID.recordingMenuShowInFinder(index)
         case .regenerate: A11yID.recordingMenuRegenerate(index)
         case .retry: A11yID.recordingMenuRetry(index)

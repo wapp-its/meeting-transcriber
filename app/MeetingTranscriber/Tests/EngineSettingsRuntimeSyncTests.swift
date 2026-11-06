@@ -21,7 +21,7 @@ final class EngineSettingsRuntimeSyncTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         testSuiteName = "EngineSettingsRuntimeSyncTests-\(getpid())-\(UUID().uuidString)"
-        guard let suite = UserDefaults(suiteName: testSuiteName) else {
+        guard let suite = DefaultsSuite.open(testSuiteName) else {
             XCTFail("Could not create test UserDefaults suite")
             return
         }
@@ -48,9 +48,41 @@ final class EngineSettingsRuntimeSyncTests: XCTestCase {
 
     func test_initialSync_propagatesCustomVocabularyPathToParakeet() {
         settings.transcriptionEngine = .parakeet
+        settings.customVocabularyEnabled = true
         settings.setCustomVocabularyPath("/tmp/init-vocab.txt")
         let engines = EngineController(settings: settings)
         XCTAssertEqual(engines.parakeetEngine.customVocabularyPath, "/tmp/init-vocab.txt")
+    }
+
+    func test_vocabularySwitchOff_keepsTheFileFromParakeet() async {
+        settings.transcriptionEngine = .parakeet
+        settings.customVocabularyEnabled = false
+        settings.setCustomVocabularyPath("/tmp/off-vocab.txt")
+        let engines = EngineController(settings: settings)
+        XCTAssertEqual(engines.parakeetEngine.customVocabularyPath, "")
+
+        settings.customVocabularyEnabled = true
+
+        await waitFor(engines.parakeetEngine.customVocabularyPath == "/tmp/off-vocab.txt")
+        XCTAssertEqual(engines.parakeetEngine.customVocabularyPath, "/tmp/off-vocab.txt")
+    }
+
+    func test_vocabularySwitchOff_keepsTheBookmarkFromParakeet() async throws {
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocabulary-switch-\(UUID().uuidString).txt")
+        try "Northstar\n".write(to: file, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: file) }
+        settings.transcriptionEngine = .parakeet
+        settings.customVocabularyEnabled = false
+        settings.setCustomVocabularyFile(file)
+        let bookmark = try XCTUnwrap(settings.customVocabularyBookmark)
+        let engines = EngineController(settings: settings)
+        XCTAssertNil(engines.parakeetEngine.customVocabularyBookmark)
+
+        settings.customVocabularyEnabled = true
+
+        await waitFor(engines.parakeetEngine.customVocabularyBookmark == bookmark)
+        XCTAssertEqual(engines.parakeetEngine.customVocabularyBookmark, bookmark)
     }
 
     func test_initialSync_propagatesCustomVocabularyPathToWhisperKit() {
@@ -62,7 +94,7 @@ final class EngineSettingsRuntimeSyncTests: XCTestCase {
 
     func test_initialSync_propagatesWhisperKitVocabularyPromptChoice() {
         settings.transcriptionEngine = .whisperKit
-        settings.whisperKitVocabularyPromptEnabled = true
+        settings.customVocabularyEnabled = true
 
         XCTAssertTrue(EngineController(settings: settings).whisperKit.vocabularyPromptEnabled)
     }
@@ -133,17 +165,49 @@ final class EngineSettingsRuntimeSyncTests: XCTestCase {
         settings.whisperKitCustomModelEnabled = true
 
         let swissGerman = WhisperKitModelOrigin.hub(repoID: "spert/flix-swissgerman-whisperkit")
+        // `waitFor` only waits; the origin is asserted explicitly because a timeout
+        // would otherwise pass straight through to the variant check.
         await waitFor(engines.whisperKit.modelOrigin == swissGerman)
+        XCTAssertEqual(engines.whisperKit.modelOrigin, swissGerman)
         XCTAssertEqual(engines.whisperKit.modelVariant, "flix-swissgerman-large-v3_8bit")
 
         settings.whisperKitCustomModelEnabled = false
 
         await waitFor(engines.whisperKit.modelOrigin == .stock)
+        XCTAssertEqual(engines.whisperKit.modelOrigin, .stock)
         XCTAssertEqual(engines.whisperKit.modelVariant, "openai_whisper-small")
+    }
+
+    /// With the custom model on, each of its fields is a key the observer has to
+    /// track on its own: a changed repository, variant or folder is a different
+    /// model, and one that is not observed would reach the engine only at relaunch.
+    func test_runtimeChange_customModelFields_propagateToEngine() async throws {
+        settings.transcriptionEngine = .whisperKit
+        settings.whisperKitCustomModelEnabled = true
+        settings.whisperKitCustomRepo = "spert/flix-swissgerman-whisperkit"
+        settings.whisperKitCustomVariant = "flix-swissgerman-large-v3_8bit"
+        let engines = EngineController(settings: settings)
+        XCTAssertEqual(engines.whisperKit.modelOrigin, .hub(repoID: "spert/flix-swissgerman-whisperkit"))
+
+        settings.whisperKitCustomRepo = "someone/else"
+        await waitFor(engines.whisperKit.modelOrigin == .hub(repoID: "someone/else"))
+        XCTAssertEqual(engines.whisperKit.modelOrigin, .hub(repoID: "someone/else"))
+
+        settings.whisperKitCustomVariant = "other-large-v3"
+        await waitFor(engines.whisperKit.modelVariant == "other-large-v3")
+        XCTAssertEqual(engines.whisperKit.modelVariant, "other-large-v3")
+
+        let folder = try makeTempDirectory(prefix: "wk-folder")
+        settings.setWhisperKitCustomModelFolderPath(folder.path)
+        let picked = WhisperKitModelOrigin.localFolder(path: folder.path, bookmark: nil)
+        await waitFor(engines.whisperKit.modelOrigin == picked)
+        XCTAssertEqual(engines.whisperKit.modelOrigin, picked)
+        XCTAssertEqual(engines.whisperKit.modelVariant, folder.lastPathComponent)
     }
 
     func test_runtimeChange_customVocabularyPath_propagatesToParakeet() async {
         settings.transcriptionEngine = .parakeet
+        settings.customVocabularyEnabled = true
         let engines = EngineController(settings: settings)
         XCTAssertEqual(engines.parakeetEngine.customVocabularyPath, "")
 
@@ -169,7 +233,7 @@ final class EngineSettingsRuntimeSyncTests: XCTestCase {
         let engines = EngineController(settings: settings)
         XCTAssertFalse(engines.whisperKit.vocabularyPromptEnabled)
 
-        settings.whisperKitVocabularyPromptEnabled = true
+        settings.customVocabularyEnabled = true
 
         await waitFor(engines.whisperKit.vocabularyPromptEnabled)
         XCTAssertTrue(engines.whisperKit.vocabularyPromptEnabled)
@@ -182,6 +246,7 @@ final class EngineSettingsRuntimeSyncTests: XCTestCase {
     /// the first change would propagate and subsequent ones silently no-op.
     func test_observation_rearmsForMultipleChanges() async {
         settings.transcriptionEngine = .parakeet
+        settings.customVocabularyEnabled = true
         let engines = EngineController(settings: settings)
 
         settings.setCustomVocabularyPath("/tmp/v1.txt")
@@ -205,6 +270,7 @@ final class EngineSettingsRuntimeSyncTests: XCTestCase {
     func test_engineSwitch_syncsNewlyActiveEngine() async {
         settings.transcriptionEngine = .whisperKit
         settings.whisperLanguage = "de"
+        settings.customVocabularyEnabled = true
         settings.setCustomVocabularyPath("/tmp/parakeet-vocab.txt")
         let engines = EngineController(settings: settings)
 
@@ -276,8 +342,35 @@ final class EngineSettingsRuntimeSyncTests: XCTestCase {
         }
     }
 
+    /// The switch covers the URL source as well: off, Parakeet reads no
+    /// vocabulary at all, and WhisperKit gets no prompt.
+    func test_vocabularySwitchOff_alsoTurnsOffTheURLSource() async throws {
+        for engine in TranscriptionEngineSetting.allCases {
+            let source = try makeSourceSettings(engine: engine)
+            source.vocabularySource = .url
+            source.remoteVocabularyURL = Self.addressA
+            source.customVocabularyEnabled = false
+            let engines = EngineController(settings: source)
+
+            switch engine {
+            case .parakeet:
+                XCTAssertEqual(engines.parakeetEngine.customVocabularyPath, "")
+                XCTAssertNil(engines.parakeetEngine.customVocabularyBookmark)
+
+            case .whisperKit:
+                XCTAssertFalse(engines.whisperKit.vocabularyPromptEnabled)
+            }
+
+            source.customVocabularyEnabled = true
+
+            await waitFor(vocabulary(of: engines, engine).path == cacheFile(source, address: Self.addressA))
+            XCTAssertEqual(vocabulary(of: engines, engine).path, cacheFile(source, address: Self.addressA), "\(engine)")
+        }
+    }
+
     /// Settings with their own cache directory (never created: only paths are
-    /// derived here) and a local file selected through its bookmark.
+    /// derived here), the vocabulary switched on, and a local file selected
+    /// through its bookmark.
     private func makeSourceSettings(engine: TranscriptionEngineSetting) throws -> AppSettings {
         let source = AppSettings(
             defaults: defaults,
@@ -285,6 +378,7 @@ final class EngineSettingsRuntimeSyncTests: XCTestCase {
                 .appendingPathComponent("EngineSettingsRuntimeSyncTests-\(UUID().uuidString)", isDirectory: true),
         )
         source.transcriptionEngine = engine
+        source.customVocabularyEnabled = true
         source.vocabularySource = .file
         let file = makeTempFile(suffix: ".txt")
         try Data("Northstar\n".utf8).write(to: file)

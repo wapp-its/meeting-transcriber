@@ -88,7 +88,7 @@ final class UpdateInstallOutcomeTests: XCTestCase {
 
     func testTheStoreRoundTripsClearsAndDropsUndecodableData() throws {
         let suiteName = "UpdateInstallOutcomeTests-\(getpid())-\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let defaults = try XCTUnwrap(DefaultsSuite.open(suiteName))
         defer { DefaultsSuite.remove(suiteName) }
         let store = PendingUpdateInstallStore(defaults: defaults)
 

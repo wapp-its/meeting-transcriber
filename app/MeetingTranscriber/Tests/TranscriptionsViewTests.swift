@@ -42,6 +42,7 @@ final class TranscriptionsViewTests: XCTestCase {
         actions.openProtocol = { calls("openProtocol \($0.path)"); return true }
         actions.openTranscript = { calls("openTranscript \($0.path)"); return true }
         actions.reveal = { calls("reveal \($0.path)"); return true }
+        actions.openInNotion = { calls("openInNotion \($0.absoluteString)") }
         actions.regenerate = { calls("regenerate \($0?.id.uuidString ?? "none")"); return true }
         actions.retry = { calls("retry \($0)") }
         actions.remove = { calls("remove \($0)") }
@@ -121,14 +122,14 @@ final class TranscriptionsViewTests: XCTestCase {
 
     // MARK: - Toolbar
 
-    /// "Open Protocols Folder", moved here from the menu, is there with or
+    /// "Open Notes Folder", moved here from the menu, is there with or
     /// without a recording, and opens the folder.
     func testOpenProtocolsFolderCallsItsAction() throws {
         var calls: [String] = []
         let sut = makeView([], actions: recording { calls.append($0) })
 
         let folder = try button(A11yID.recordingsOpenFolderButton, in: sut)
-        XCTAssertNoThrow(try folder.find(text: "Open Protocols Folder"))
+        XCTAssertNoThrow(try folder.find(text: "Open Notes Folder"))
         try folder.tap()
 
         XCTAssertEqual(calls, ["openProtocolsFolder"])
@@ -148,7 +149,7 @@ final class TranscriptionsViewTests: XCTestCase {
 
     // MARK: - Regenerate sheet
 
-    /// Through the presenter the App wires in: a row's "Regenerate Protocol…"
+    /// Through the presenter the App wires in: a row's "Regenerate Notes…"
     /// opens the sheet over the window with that row's meeting, the
     /// regenerator's state and no "Choose File…"; Cancel closes it; the
     /// toolbar's "Regenerate from File…" opens it without a meeting and with
@@ -224,7 +225,7 @@ final class TranscriptionsViewTests: XCTestCase {
         let expected: [(label: String, call: String)] = [
             ("Cancel", "cancel \(running.id)"),
             ("Name Speakers", "nameSpeakers \(naming.id)"),
-            ("Open Protocol", "openProtocol /out/p.md"),
+            ("Open Notes", "openProtocol /out/p.md"),
             ("Open Transcript", "openTranscript /out/t.txt"),
             ("Retry", "retry \(retryable.id)"),
             ("Remove", "remove \(refused.id)"),
@@ -239,6 +240,29 @@ final class TranscriptionsViewTests: XCTestCase {
         XCTAssertEqual(calls, expected.map(\.call))
         XCTAssertNoThrow(try sut.inspect().find(text: "Audio file missing"))
         XCTAssertThrowsError(try button(A11yID.recordingMainButton(6), in: sut), "a finished job with neither file")
+    }
+
+    /// A finished job whose notes went only to Notion opens its page from
+    /// the row's button and from its "…" menu.
+    func testANotionOnlyRowOpensItsPage() throws {
+        var job = PipelineJob(
+            meetingTitle: "Notion only", appName: "Teams",
+            mixPath: URL(fileURLWithPath: "/rec/n_mix.wav"), appPath: nil, micPath: nil, micDelay: 0,
+        )
+        job.state = .done
+        job.recordNotionPage(NotionPageResult(pageID: "page-1", url: "https://www.notion.so/page-1"), databaseID: "db")
+        job.finishNotionExport(succeeded: true)
+        var calls: [String] = []
+        let sut = makeView([TranscriptionEntry(job: job, finishOrder: nil)], actions: recording { calls.append($0) })
+
+        let main = try button(A11yID.recordingMainButton(0), in: sut)
+        XCTAssertEqual(try main.labelView().text().string(), "Open in Notion")
+        try main.tap()
+        let item = try button(A11yID.recordingMenuOpenInNotion(0), in: sut)
+        XCTAssertEqual(try item.labelView().text().string(), "Open in Notion")
+        try item.tap()
+
+        XCTAssertEqual(calls, Array(repeating: "openInNotion https://www.notion.so/page-1", count: 2))
     }
 
     // MARK: - The "…" menu
@@ -264,10 +288,10 @@ final class TranscriptionsViewTests: XCTestCase {
             actions: recording(into: { calls.append($0) }, base: base),
         )
         let taps: [(id: String, label: String, call: String)] = [
-            (A11yID.recordingMenuOpenProtocol(0), "Open Protocol", "openProtocol /out/f.md"),
+            (A11yID.recordingMenuOpenProtocol(0), "Open Notes", "openProtocol /out/f.md"),
             (A11yID.recordingMenuOpenTranscript(0), "Open Transcript", "openTranscript /out/f.txt"),
             (A11yID.recordingMenuShowInFinder(0), "Show in Finder", "reveal /out/f.md"),
-            (A11yID.recordingMenuRegenerate(0), "Regenerate Protocol…", "regenerate \(finished.id)"),
+            (A11yID.recordingMenuRegenerate(0), "Regenerate Notes…", "regenerate \(finished.id)"),
             (A11yID.recordingMenuShowInFinder(1), "Show in Finder", "reveal /out/g.txt"),
             (A11yID.recordingMenuRetry(2), "Retry", "retry \(failed.id)"),
             (A11yID.recordingMenuRemove(2), "Remove", "remove \(failed.id)"),

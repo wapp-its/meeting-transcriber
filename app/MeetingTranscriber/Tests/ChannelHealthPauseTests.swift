@@ -167,8 +167,11 @@ final class ChannelHealthPauseTests: XCTestCase {
     /// The watchdog's give-up stays set for the rest of the recording. Raised
     /// during the pause, it rests on silence nothing was recording, so after
     /// the resume it counts only beside silence heard since the resume:
-    /// nothing while the app track carries signal, and the report once the
-    /// track has been silent for the window.
+    /// nothing while the app track carries signal. The track carried signal
+    /// after the give-up, so the give-up is retired, and silence that follows
+    /// is reported once the window has passed, as plain digital silence: the
+    /// give-up was about a run of zeros that ended, and the watchdog does not
+    /// rebuild again in this recording.
     func testAWatchdogGiveUpDuringThePauseIsNotReportedWhileTheAppTrackCarriesSignal() {
         let (controller, recorder, notifier) = make(Self.healthy)
         tick(controller, recorder, from: 0, through: 10)
@@ -193,7 +196,7 @@ final class ChannelHealthPauseTests: XCTestCase {
             if firstReport == nil, !notifier.calls.isEmpty { firstReport = offset - silentFrom }
         }
         XCTAssertEqual(firstReport, window, "seconds into the silence when it was reported")
-        XCTAssertEqual(controller.appFault, .rebuildsExhausted)
+        XCTAssertEqual(controller.appFault, .digitalSilence, "a give-up the track carried signal after is retired")
         XCTAssertEqual(notifier.calls.map(\.title), ["Capture Channel Silent"])
     }
 

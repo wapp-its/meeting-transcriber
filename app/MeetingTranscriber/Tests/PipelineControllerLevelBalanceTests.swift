@@ -20,23 +20,20 @@ final class PipelineControllerLevelBalanceTests: XCTestCase {
         let suiteName = "PipelineControllerLevelBalanceTests-\(getpid())-\(UUID().uuidString)"
         addTeardownBlock { DefaultsSuite.remove(suiteName) }
         let settings = try AppSettings(
-            defaults: XCTUnwrap(UserDefaults(suiteName: suiteName)),
+            defaults: XCTUnwrap(DefaultsSuite.open(suiteName)),
             apiKeyAccount: "\(suiteName)-openAI", claudeAPIKeyAccount: "\(suiteName)-claude",
             defaultOutputDir: tmpDir.appendingPathComponent("default-output", isDirectory: true),
         )
         let logDir = tmpDir.appendingPathComponent("log", isDirectory: true)
         try FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
         let handed = Handed()
-        var environment = PipelineController.QueueEnvironment(
-            logDir: logDir,
-            stagingDir: tmpDir.appendingPathComponent("staging", isDirectory: true),
-        )
+        var environment = IsolatedQueueEnvironment.make(logDir: logDir)
         environment.recoverStagedRecordings = { _, levelBalance in handed.flags.append(levelBalance) }
         let pc = PipelineController(
             settings: settings,
             notifier: RecordingNotifier(),
-            terminalJobStore: TerminalJobStore(path: logDir.appendingPathComponent("terminal_jobs.json")),
             queueEnvironment: environment,
+            terminalJobStore: TerminalJobStore(path: logDir.appendingPathComponent("terminal_jobs.json")),
         )
         pc.activate { MockEngine() }
 

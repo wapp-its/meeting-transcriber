@@ -8,7 +8,7 @@ final class AppSettingsRecordWithoutAskingTests: XCTestCase {
     private func makeDefaults() throws -> UserDefaults {
         let suiteName = "AppSettingsRecordWithoutAskingTests.\(UUID().uuidString)"
         addTeardownBlock { DefaultsSuite.remove(suiteName) }
-        return try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        return try XCTUnwrap(DefaultsSuite.open(suiteName))
     }
 
     func testRecordWithoutAskingIsEmptyByDefaultAndPersists() throws {

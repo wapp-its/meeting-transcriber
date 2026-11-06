@@ -54,11 +54,14 @@ class WatchLoop {
     /// the recording ends anyway. Fixed at `meetingEndQuestionCountdown` in the
     /// app; injectable so tests need not wait it out.
     let meetingEndCountdown: TimeInterval
-    let noMic: Bool
-    /// Dynamic accessor — read at every recording start, like
-    /// `verboseDiagnostics` below, so a microphone chosen while watching is on
+    /// "No Microphone" and the mic picker (nil = system default), read at every
+    /// recording start: a loop lives as long as watching does, so snapshots
+    /// went stale (issue #706), and a microphone chosen while watching is on
     /// reaches the next recording without restarting watching.
+    let noMic: () -> Bool
     let micDeviceUID: () -> String?
+    /// The running recording's source, nil once it ended; see `activeRecordingSource`.
+    private(set) var recordingSource: RecordingSource?
     /// Dynamic accessor — read at recording-start time so toggling the setting
     /// at runtime takes effect on the next recording without an app restart.
     let verboseDiagnostics: () -> Bool
@@ -72,6 +75,10 @@ class WatchLoop {
     /// `recordings/` subfolder. Calling start-access on a child URL silently
     /// fails inside the App Store sandbox — see `RecordOnlyDestination`.
     let recordOnlyDestination: () -> RecordOnlyDestination
+    /// Puts a copy of a record-only file in the destination (see
+    /// `RecordOnlyWrite`). A seam so a test can see which thread it runs on
+    /// (see `writeRecordOnlyOffMain`).
+    let recordOnlyFileTransfer: RecordOnlyWrite.Transfer
     /// Surface user-facing failures (e.g. sidecar write errors) that don't
     /// transition state to `.error`. Defaults to a silent no-op for tests.
     let notifier: any AppNotifying
@@ -140,24 +147,13 @@ class WatchLoop {
     /// The task awaiting the parked answer. Held so `stop()` can let go of it.
     var consentTask: Task<Void, Never>?
 
-    /// Forget the open question. Not a decline: `WatchLoop+Consent` decides
-    /// what an answer (or the lack of one) means.
-    func clearConsentState() {
-        pendingConsentQuestion = nil
-        appsWaitingForPrompt = []
-        approvedConsentMeeting = nil
-        pendingConsentProtocolOptions = nil
-        approvedConsentProtocolOptions = nil
-        consentTask = nil
-    }
-
     private var watchTask: Task<Void, Never>?
 
     /// Hook called when state changes (for UI updates, notifications, etc.)
     var onStateChange: ((State, State) -> Void)?
     /// Told true as a detected meeting's capture begins and false once its recorder stopped, also after `stop()` left `.recording`.
     var onMeetingCapture: ((Bool) -> Void)?
-    /// Told once a manual recording has ended, after `stopManualRecording` went idle; `stop()` (the app quitting) never tells it.
+    /// Told once a manual recording has ended, after `stopManualRecording` went idle; a quit (`stop()`, `finishForQuit`) never tells it.
     var onManualRecordingEnded: (() -> Void)?
 
     init(
@@ -169,13 +165,14 @@ class WatchLoop {
         maxDuration: TimeInterval = 14400,
         capWarningLead: TimeInterval = RecordingCapWarningPolicy.defaultLead,
         meetingEndCountdown: TimeInterval = WatchLoop.meetingEndQuestionCountdown,
-        noMic: Bool = false,
+        noMic: @escaping () -> Bool = { false },
         micDeviceUID: @escaping () -> String? = { nil },
         verboseDiagnostics: @escaping () -> Bool = { false },
         recordOnly: @escaping () -> Bool = { false },
         recordOnlyDestination: @escaping () -> RecordOnlyDestination = {
             .unscoped(AppPaths.recordingsDir)
         },
+        recordOnlyFileTransfer: @escaping RecordOnlyWrite.Transfer = RecordOnlyWrite.linkOrCopy,
         recordWithoutAskingApps: @escaping () -> [String] = { [] },
         speechActivity: @escaping () -> SpeechActivity? = { nil },
         silencePromptAfter: @escaping () -> TimeInterval? = { nil },
@@ -202,6 +199,7 @@ class WatchLoop {
         self.verboseDiagnostics = verboseDiagnostics
         self.recordOnly = recordOnly
         self.recordOnlyDestination = recordOnlyDestination
+        self.recordOnlyFileTransfer = recordOnlyFileTransfer
         self.notifier = notifier
         self.diagnostics = diagnostics
         self.nowProvider = nowProvider
@@ -255,11 +253,37 @@ class WatchLoop {
         logger.info("Watch mode stopped")
     }
 
+    /// Whether a quit has to wait for this loop: it is watching (and so may be
+    /// recording, or about to), or a manual recording is running.
+    var hasWorkBeforeQuit: Bool {
+        watchTask != nil || activeRecorder != nil
+    }
+
+    /// Set by `finishForQuit`: the recording in flight is stopped with
+    /// `stopOffMain`, so the quit's budget (a main-actor timer) can fire while
+    /// the mix runs (see `TerminationFlush.recordingBudget` for what it does
+    /// not bound), and a manual start still waiting for its recorder gives up
+    /// instead of recording into the exit.
+    var finishingForQuit = false
+
+    /// Stop for a quit, returning once whatever was recording has been
+    /// enqueued (or written record-only). `stop()` is not enough: it drops a
+    /// manual recording unstopped, and the watch task finalizes an auto one
+    /// after `stop()` has returned. A mix the exit cuts off is re-mixed by the
+    /// next launch's crash recovery, without the title, app and participants.
+    func finishForQuit() async {
+        finishingForQuit = true
+        await stopManualRecordingForQuit()
+        let recording = watchTask
+        stop()
+        await recording?.value
+    }
+
     // MARK: - Manual Recording
 
     func startManualRecording(pid: pid_t, appName: String, title: String, protocolOptions: MeetingProtocolOptions? = nil) async throws {
         try await startManualRecording(
-            source: .forApp(pid: pid, noMic: noMic),
+            source: .forApp(pid: pid, noMic: noMic()),
             appName: appName,
             title: title,
             protocolOptions: protocolOptions,
@@ -293,6 +317,8 @@ class WatchLoop {
             logger.warning("Cannot start manual recording — already recording")
             return
         }
+        // Read before the awaits, like the `noMic` behind `source`.
+        let micDeviceUID = micDeviceUID()
 
         // Gate on what this path needs, not on overall health (see `blocksRecording`).
         let health = await permissionChecker()
@@ -308,8 +334,10 @@ class WatchLoop {
         declineParkedConsent()
 
         let recorder = await recorderFactory()
+        // The quit may have begun while the recorder was being built.
+        guard !finishingForQuit else { throw CancellationError() }
         try recorder.start(
-            source: source, micDeviceUID: micDeviceUID(),
+            source: source, micDeviceUID: micDeviceUID,
             debugLogging: verboseDiagnostics(),
         )
         let startedAt = nowProvider()
@@ -317,6 +345,7 @@ class WatchLoop {
         recordingPauses = RecordingPauseRecord(startedAt: startedAt)
 
         let pid = source.appPID
+        recordingSource = source
         activeRecorder = recorder
         update { next in
             next.phase = .recording
@@ -334,31 +363,57 @@ class WatchLoop {
     }
 
     func stopManualRecording(cutAt: Date? = nil) {
-        guard let recorder = activeRecorder, let info = manualRecordingInfo else { return }
-
-        manualRecordingTask?.cancel()
-        manualRecordingTask = nil
-
-        var failureMessage: String?
+        guard let (recorder, info) = takeManualRecording() else { return }
         do {
             let (recording, pauses) = try stopManualCapture(recorder, cutAt: cutAt)
             enqueueRecording(
                 title: info.title, appName: info.appName, recording: recording, trigger: .manual, pauses: pauses,
                 protocolOptions: info.protocolOptions,
             )
+            finishManualRecording(failure: nil)
         } catch {
-            logger.error("Failed to stop manual recording: \(error.localizedDescription, privacy: .public)")
-            failureMessage = error.localizedDescription
+            finishManualRecording(failure: error)
+        }
+    }
+
+    private func stopManualRecordingForQuit() async {
+        guard let (recorder, info) = takeManualRecording() else { return }
+        do {
+            try await stopAndEnqueueForQuit(
+                recorder, title: info.title, appName: info.appName, trigger: .manual,
+                protocolOptions: info.protocolOptions,
+            )
+            finishManualRecording(failure: nil)
+        } catch {
+            finishManualRecording(failure: error)
+        }
+    }
+
+    /// Clears the bookkeeping before the recorder stops, so the level poll
+    /// and a second stop find no recorder that is half stopped.
+    private func takeManualRecording() -> (any RecordingProvider, ManualRecordingInfo)? {
+        guard let recorder = activeRecorder, let info = manualRecordingInfo else { return nil }
+        manualRecordingTask?.cancel()
+        manualRecordingTask = nil
+        activeRecorder = nil
+        return (recorder, info)
+    }
+
+    /// `failure` is what the stop threw, nil when it produced a recording.
+    private func finishManualRecording(failure: (any Error)?) {
+        var failureMessage: String?
+        if let failure {
+            logger.error("Failed to stop manual recording: \(failure.localizedDescription, privacy: .public)")
+            if !isNothingRecordedAtQuit(failure) { failureMessage = failure.localizedDescription }
         }
 
-        activeRecorder = nil
         update { next in
             next.phase = .idle
             next.manualRecordingInfo = nil
             next.detail = ""
             if let failureMessage { next.lastError = failureMessage }
         }
-        onManualRecordingEnded?()
+        if !finishingForQuit { onManualRecordingEnded?() }
     }
 
     private func cleanupManualRecording() {
@@ -406,10 +461,11 @@ class WatchLoop {
     /// Record one meeting to completion and return to watching. True means the
     /// loop was cancelled mid-recording and must exit.
     private func runMeeting(_ meeting: DetectedMeeting, protocolOptions: MeetingProtocolOptions? = nil) async -> Bool {
+        var endReason = MeetingEndReason.ended
         do {
-            try await handleMeeting(meeting, protocolOptions: protocolOptions)
+            endReason = try await handleMeeting(meeting, protocolOptions: protocolOptions)
         } catch {
-            if error is CancellationError { return true }
+            if error is CancellationError || isNothingRecordedAtQuit(error) { return true }
             let msg = "Recording error: \(error.localizedDescription)"
             logger.error("\(msg, privacy: .public)")
             update { next in
@@ -420,26 +476,47 @@ class WatchLoop {
             try? await sleepProvider(10)
         }
 
-        detector.reset(appName: meeting.pattern.identityKey)
-
+        // Back to watching first, also after a split, so the next recording gets its own `.recording` transition.
         if !Task.isCancelled {
             update { next in
                 next.phase = .watching
+                next.currentMeeting = nil
                 next.detail = "Polling for meetings..."
             }
+        }
+
+        // After a split the next call is already live. Neither the cooldown
+        // nor a reset applies: the app's confirmation count still stands
+        // from the detection that started this recording, so this poll
+        // confirms the new call at once instead of `confirmationCount` polls
+        // later, which would cut its first seconds. It still passes the
+        // consent gate like any detection.
+        if endReason == .replacedByNewCall {
+            if !Task.isCancelled,
+               let next = detector.checkOnce(excluding: appsExcludedFromDetection.union(appsHeldFromDetection)) {
+                if !requestConsentIfNeeded(for: next) { return await runMeeting(next) }
+            } else {
+                detector.reset()
+            }
+        } else {
+            detector.reset(appName: meeting.pattern.identityKey)
         }
         return false
     }
 
     // MARK: - Meeting Handling
 
-    func handleMeeting(_ meeting: DetectedMeeting, protocolOptions: MeetingProtocolOptions? = nil) async throws {
+    @discardableResult
+    func handleMeeting(_ meeting: DetectedMeeting, protocolOptions: MeetingProtocolOptions? = nil) async throws -> MeetingEndReason {
         defer { stopByHandRequestedAt = nil }
         onMeetingCapture?(true)
         defer { onMeetingCapture?(false) }
         let title = Self.cleanTitle(meeting.windowTitle)
 
         // --- Recording ---
+        let source = RecordingSource.forApp(pid: meeting.windowPID, noMic: noMic())
+        let micDeviceUID = micDeviceUID()
+        recordingSource = source
         update { next in
             next.phase = .recording
             next.currentMeeting = meeting
@@ -447,11 +524,13 @@ class WatchLoop {
             next.lastError = nil
         }
 
-        let source = RecordingSource.forApp(pid: meeting.windowPID, noMic: noMic)
         let recorder = await recorderFactory()
+        // A quit or a stop that came while the recorder was being built: a
+        // recording started now would end at once, empty, as an error.
+        try Task.checkCancellation()
         try recorder.start(
             source: source,
-            micDeviceUID: micDeviceUID(),
+            micDeviceUID: micDeviceUID,
             debugLogging: verboseDiagnostics(),
         )
         activeRecorder = recorder
@@ -472,82 +551,16 @@ class WatchLoop {
         // Wait for the meeting to end. A cancelled watch task (Stop Watching,
         // which calls `stop()` → `watchTask.cancel()`) comes back here like a
         // natural end, so the recording is finalized rather than discarded
-        // (see `waitForMeetingEnd`). `recorder.stop()`, the cut and
-        // `enqueueRecording()` below are synchronous, so they run to completion
-        // on the cancelled task, and nothing else can start a recording while
-        // they do.
-        let cutAt = try await waitForMeetingEnd(meeting, storingCutsIn: (recorder, recordingStartedAt))
-
-        // Stop recording
-        if cutAt == nil { clearStoredCut(of: recorder) }
-        let stoppedAt = nowProvider()
-        let recording = try recorder.stop()
-        var stopped = (recording: recording, pauses: takeRecordingPauses(endingAt: stoppedAt, capturedOffsets: recording.pauseOffsets))
-        if let cutAt {
-            stopped = cutBack(stopped, to: cutAt, startedAt: recordingStartedAt, stoppedAt: stoppedAt, recorder: recorder)
-            clearStoredCut(of: recorder)
-        }
-
-        // --- Enqueue for background processing ---
-        enqueueRecording(
-            title: title,
-            appName: meeting.pattern.appName,
-            recording: stopped.recording,
-            trigger: .auto,
-            pauses: stopped.pauses,
-            participants: participants,
-            protocolOptions: protocolOptions,
+        // (see `waitForMeetingEnd` and `finishMeetingRecording`).
+        let end = try await waitForMeetingEnd(meeting, storingCutsIn: (recorder, recordingStartedAt))
+        try await finishMeetingRecording(
+            meeting, recorder: recorder, startedAt: recordingStartedAt, end: end,
+            participants: participants, protocolOptions: protocolOptions,
         )
+        return end.reason
     }
 
     // MARK: - Helpers
-
-    private func enqueueRecording(
-        title: String,
-        appName: String,
-        recording: RecordingResult,
-        trigger: RecordingSidecar.Trigger,
-        pauses: [RecordingPause],
-        participants: [String] = [],
-        protocolOptions: MeetingProtocolOptions? = nil,
-    ) {
-        if recordOnly() {
-            do {
-                try writeRecordOnlySidecar(
-                    title: title,
-                    appName: appName,
-                    recording: recording,
-                    trigger: trigger,
-                    pauses: pauses,
-                    participants: participants,
-                )
-            } catch {
-                // Error left redacted: a sidecar/WAV write error embeds the
-                // meeting-title-derived basename in its description.
-                logger.error("Record-only: \(error.localizedDescription)")
-                update { next in
-                    next.lastError = "Record-only output failed: \(error.localizedDescription)"
-                }
-                // Record-only performs no state transition, so this notification
-                // is the entire report that a recording was lost. It breaks
-                // through Focus on the same test as `captureAlert`: a failed
-                // write has no benign reading.
-                notifier.notify(
-                    title: "Record-only output failed",
-                    body: error.localizedDescription,
-                    urgency: .timeSensitive,
-                )
-            }
-            return
-        }
-
-        let job = Self.pipelineJob(
-            title: title, appName: appName, recording: recording, pauses: pauses, protocolOptions: protocolOptions,
-            participants: participants,
-        )
-        pipelineQueue?.enqueue(job)
-        logger.info("Enqueued pipeline job for: \(title, privacy: .private)")
-    }
 
     /// Single funnel through which every observable-field mutation flows.
     /// Build the next snapshot, hand it to `apply` to commit only the
@@ -555,7 +568,8 @@ class WatchLoop {
     /// on a phase transition. Co-located mutations stay coherent
     /// (a phase-change-plus-detail-update is one funnel call, not two
     /// separate property writes that consumers could observe mid-flight).
-    /// Every way out of `.recording` also ends a pause.
+    /// Every way out of `.recording` also ends a pause. Internal so the
+    /// extensions in `WatchLoop+*.swift` write through it too.
     func update(_ transform: (inout WatchLoopState) -> Void) {
         var next = snapshot
         transform(&next)
@@ -576,6 +590,7 @@ class WatchLoop {
             manualRecordingInfo = next.manualRecordingInfo
         }
         if pausedSince != next.pausedSince { pausedSince = next.pausedSince }
+        if oldPhase == .recording, next.phase != .recording { recordingSource = nil }
         if oldPhase != next.phase {
             onStateChange?(oldPhase, next.phase)
         }

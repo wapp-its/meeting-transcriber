@@ -68,6 +68,10 @@ extension AppAudioCapture {
                 // built rather than reaching into fields a newer attempt may
                 // already own.
                 built?.destroy()
+                // The no-first-buffer probes it armed go with it, or they
+                // would read the aggregate just destroyed and, with the
+                // watchdog on, open checks on a channel that was given up.
+                silentTrackDiagnostics.cancelNoBufferProbes()
                 return
             }
             DispatchQueue.main.async {
@@ -84,8 +88,10 @@ extension AppAudioCapture {
             else {
                 logger.info("App audio: discarding a restart that succeeded after the session was sealed")
                 // Same rule as the stale path above: destroy what this attempt
-                // built, not whatever happens to be installed.
+                // built, not whatever happens to be installed, and disarm the
+                // probes it armed for it.
                 built?.destroy()
+                silentTrackDiagnostics.cancelNoBufferProbes()
                 return
             }
             // Only start() and this adoption may declare capture running. Leaving
@@ -164,7 +170,7 @@ extension AppAudioCapture {
     }
 
     func installOutputDeviceChangeListener() {
-        guard !outputListenerInstalled else { return }
+        guard listensForOutputDeviceChanges, !outputListenerInstalled else { return }
         let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
             self?.handleOutputDeviceChanged()
         }
@@ -179,5 +185,18 @@ extension AppAudioCapture {
             outputListenerInstalled = true
             logger.info("App audio: listening for default output device changes")
         }
+    }
+
+    /// The counterpart of `installOutputDeviceChangeListener()`, called by `stop()`.
+    func removeOutputDeviceChangeListener() {
+        guard outputListenerInstalled, let listener = outputDeviceChangeListener else { return }
+        AudioObjectRemovePropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &defaultOutputAddress,
+            DispatchQueue.main,
+            listener,
+        )
+        outputDeviceChangeListener = nil
+        outputListenerInstalled = false
     }
 }

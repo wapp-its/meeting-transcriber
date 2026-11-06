@@ -2,7 +2,7 @@
 import ViewInspector
 import XCTest
 
-/// Settings → Output → Protocol Templates: what each model operation does to
+/// Settings → Output → Meeting Notes Templates: what each model operation does to
 /// the folder and the default setting, then one wiring test per control. Every
 /// test runs against a temp folder and a throwaway defaults suite, and records
 /// opened and trashed files instead of reaching the Finder or the real Trash.
@@ -15,7 +15,7 @@ final class ProtocolTemplatesSettingsTests: XCTestCase {
     private func makeSettings() throws -> AppSettings {
         let suite = "ProtocolTemplatesSettingsTests-\(getpid())-\(UUID().uuidString)"
         addTeardownBlock { DefaultsSuite.remove(suite) }
-        return try AppSettings(defaults: XCTUnwrap(UserDefaults(suiteName: suite)))
+        return try AppSettings(defaults: XCTUnwrap(DefaultsSuite.open(suite)))
     }
 
     private func makeModel(

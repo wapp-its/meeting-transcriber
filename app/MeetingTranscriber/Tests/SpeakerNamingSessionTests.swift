@@ -361,10 +361,10 @@ final class SpeakerNamingSessionTests: XCTestCase {
 
         func updateSpeakerDB(
             matcher _: SpeakerMatcher, mapping _: [String: String],
-            embeddings _: [String: [Float]], speakingTimes _: [String: TimeInterval],
+            embeddings _: [String: [Float]], speakingTimes _: [String: TimeInterval], jobID _: UUID,
         ) {}
 
-        func generateProtocol(jobID _: UUID, transcript _: String, title _: String, protocolsDir _: URL) async {
+        func generateProtocol(jobID _: UUID, transcript _: String, title _: String, protocolsDir _: URL, speakerNames _: [String]) async {
             recorder.generateProtocolEntered += 1
             await withCheckedContinuation { recorder.protocolGate = $0 }
         }
@@ -383,8 +383,6 @@ final class SpeakerNamingSessionTests: XCTestCase {
         ) -> String? {
             nil
         }
-
-        func startDiarizing(jobID _: UUID, mode _: DiarizerMode) {}
     }
 
     /// Pins the strong per-flow delegate capture: the delegate is weak *at

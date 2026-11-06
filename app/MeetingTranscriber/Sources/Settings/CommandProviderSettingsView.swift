@@ -54,10 +54,10 @@
             VStack(alignment: .leading, spacing: 2) {
                 Text("{prompt_file}: a file with the instructions and the transcript")
                 Text("{transcript_file}: a file with the transcript alone")
-                Text("{output_file}: the file the command writes the protocol to")
+                Text("{output_file}: the file the command writes the meeting notes to")
                 Text(
                     "Without {prompt_file} or {transcript_file}, the instructions and the transcript go to "
-                        + "standard input. Without {output_file}, the protocol is read from standard output.",
+                        + "standard input. Without {output_file}, the meeting notes are read from standard output.",
                 )
             }
             .font(.caption)

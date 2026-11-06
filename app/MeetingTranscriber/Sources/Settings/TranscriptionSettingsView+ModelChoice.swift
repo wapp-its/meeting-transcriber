@@ -33,11 +33,13 @@ extension TranscriptionSettingsView {
     }
 
     /// "Load Model". WhisperKit loads through the same helper as "Load now", which
-    /// applies the current selection before loading.
+    /// applies the current selection before loading. Applied here as well, so the
+    /// engine names the model as soon as the button is pressed, not a task later.
     func loadSelectedModel() {
         switch settings.transcriptionEngine {
         case .whisperKit:
             let selection = settings.whisperKitModelSelection
+            whisperKitEngine.applyModelVariant(selection.variant, origin: selection.origin)
             Task { await whisperKitEngine.loadModel(for: selection) }
 
         case .parakeet:

@@ -28,12 +28,14 @@ final class VocabularySourceSettingsTests: XCTestCase {
         tokenAccount = "VocabularySourceSettingsTests-token-\(getpid())-\(UUID().uuidString)"
         cacheDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("VocabularySourceSettingsTests-\(UUID().uuidString)", isDirectory: true)
-        defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults = try XCTUnwrap(DefaultsSuite.open(suiteName))
         settings = AppSettings(
             defaults: defaults,
             remoteVocabularyTokenAccount: tokenAccount,
             remoteVocabularyCacheDirectory: cacheDirectory,
         )
+        // The source controls sit under the vocabulary switch.
+        settings.customVocabularyEnabled = true
         fetcher = RemoteVocabularyFetcherFake()
     }
 

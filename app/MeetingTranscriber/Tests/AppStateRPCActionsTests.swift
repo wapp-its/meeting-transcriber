@@ -33,12 +33,12 @@
             dbPath = tmpDir.appendingPathComponent("speakers.json")
             let suite = "AppStateRPCActionsTests-\(getpid())-\(UUID().uuidString)"
             addTeardownBlock { DefaultsSuite.remove(suite) }
-            guard let defaults = UserDefaults(suiteName: suite) else {
+            guard let defaults = DefaultsSuite.open(suite) else {
                 XCTFail("Could not create test UserDefaults suite")
                 return
             }
             let settings = AppSettings(defaults: defaults)
-            state = AppState(settings: settings)
+            state = try AppState(pipelineEnvironment: makeIsolatedPipelineEnvironment(), settings: settings)
             actions = state.makeSpeakerDBActions { [dbPath] in
                 SpeakerMatcher(dbPath: dbPath)
             }
@@ -152,6 +152,67 @@
             XCTAssertEqual(entry.centroid?.count, AppState.seedEmbeddingDimension)
         }
 
+        // MARK: - unreadable DB
+
+        /// A DB that could not be read must not answer `ok` for a seed that
+        /// was never written, nor `notFound` for a speaker that may well be
+        /// in the unread file.
+        func test_actionsOnUnreadableDB_reportNotSaved() throws {
+            seedSpeaker(name: "Alice")
+            seedSpeaker(name: "Bob")
+            try makeUnreadable(dbPath)
+            let blocked = state.makeSpeakerDBActions { [dbPath] in
+                SpeakerMatcher(dbPath: dbPath) { _ in }
+            }
+
+            XCTAssertEqual(blocked.seed("Carol"), .notSaved)
+            XCTAssertEqual(blocked.rename("Alice", "Alicia"), .notSaved)
+            XCTAssertEqual(blocked.delete("Alice"), .notSaved)
+            XCTAssertEqual(blocked.merge("Alice", "Bob"), .notSaved)
+        }
+
+        /// An action that found the DB undecodable replaced it with an empty
+        /// one: not a 404 for a name that may be in the set-aside copy, and a
+        /// change the cached names must follow.
+        func test_renameOnUndecodableDB_reportsResetAndRefreshesCache() throws {
+            try Data("not json".utf8).write(to: dbPath)
+            let actions = state.makeSpeakerDBActions { [dbPath] in
+                SpeakerMatcher(dbPath: dbPath, onDBProblem: { _ in }, settleBeforeReread: {})
+            }
+
+            let outcome = actions.rename("Alice", "Alicia")
+
+            XCTAssertEqual(outcome, .dbReset)
+            XCTAssertTrue(outcome.changedDB, "the file was replaced, so cached names must refresh")
+        }
+
+        // MARK: - speaker database from the environment
+
+        /// A state reads and changes the speaker database its environment
+        /// names, as its queues do. With the matcher's default it read and
+        /// changed the installed app's `speakers.json` instead.
+        func test_snapshot_readsTheEnvironmentsSpeakerDatabase() throws {
+            let (isolated, _) = try makeStateOnSeededSpeakerDatabase()
+            XCTAssertEqual(isolated.rpcStateSnapshot().speakerDB.recentNames, ["Speaker A"])
+        }
+
+        func test_defaultSpeakerActionsChangeTheEnvironmentsSpeakerDatabase() throws {
+            let (isolated, database) = try makeStateOnSeededSpeakerDatabase()
+            XCTAssertEqual(isolated.makeSpeakerDBActions().rename("Speaker A", "Speaker B"), .ok)
+            XCTAssertEqual(SpeakerMatcher(dbPath: database).allSpeakerNames(), ["Speaker B"])
+        }
+
+        private func makeStateOnSeededSpeakerDatabase() throws -> (AppState, URL) {
+            var environment = try makeIsolatedPipelineEnvironment()
+            environment.speakersDB = makeTempFile(suffix: "-speakers.json")
+            SpeakerMatcher(dbPath: environment.speakersDB).mutateDB { speakers in
+                speakers = [StoredSpeaker(name: "Speaker A", embeddings: [[1, 0, 0]])]
+            }
+            let isolated = try AppState(pipelineEnvironment: environment, settings: makeIsolatedSettings())
+            addTeardownBlock { isolated.liveCaptions.clear() }
+            return (isolated, environment.speakersDB)
+        }
+
         // MARK: - pendingNamingJobs mapping in rpcStateSnapshot
 
         /// Drives the `pendingSpeakerNamingJobs.map` closure in
@@ -241,7 +302,7 @@
         /// the posted flag (false here: `setUp()` never ran in the test host).
         func test_snapshot_notifications_readsInjectedNotifier() throws {
             let manager = NotificationManager()
-            let notifierState = AppState(settings: state.settings, notifier: manager)
+            let notifierState = try AppState(pipelineEnvironment: makeIsolatedPipelineEnvironment(), settings: state.settings, notifier: manager)
             defer { notifierState.liveCaptions.clear() }
             manager.notify(title: "Silent Recording", body: "Both channels silent")
             manager.notify(title: "Meeting Detected", body: "Recording: Standup (Teams)")

@@ -13,7 +13,7 @@ final class CommandProviderSettingsTests: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
         suiteName = "CommandProviderSettingsTests-\(getpid())-\(UUID().uuidString)"
-        defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults = try XCTUnwrap(DefaultsSuite.open(suiteName))
     }
 
     override func tearDownWithError() throws {

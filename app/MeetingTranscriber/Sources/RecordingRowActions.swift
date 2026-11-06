@@ -10,6 +10,8 @@ enum RecordingRowActions {
         case nameSpeakers
         case openProtocol
         case openTranscript
+        /// A finished job whose notes went only to Notion.
+        case openInNotion
         case retry
         case remove
     }
@@ -18,9 +20,11 @@ enum RecordingRowActions {
     enum MenuItem: Equatable {
         case openProtocol
         case openTranscript
+        /// The completed export's Notion page.
+        case openInNotion
         /// Reveals the protocol, else the transcript.
         case showInFinder
-        /// "Regenerate Protocol…", disabled while the regenerator has no
+        /// "Regenerate Notes…", disabled while the regenerator has no
         /// transcript to send.
         case regenerate(enabled: Bool)
         case retry
@@ -29,10 +33,12 @@ enum RecordingRowActions {
     }
 
     /// The files the job recorded (`TranscriptionEntry.protocolURL` and
-    /// `transcriptURL`), whether or not they are still on disk.
+    /// `transcriptURL`), whether or not they are still on disk, and whether
+    /// its Notion export completed with a page (`notionPageURL`).
     struct RecordedFiles {
         let hasProtocol: Bool
         let hasTranscript: Bool
+        var hasNotionPage = false
     }
 
     /// What the regenerator would send as the transcript, by its own rule
@@ -56,8 +62,10 @@ enum RecordingRowActions {
 
     /// Follows the recorded files rather than the disk, as the window's Open
     /// did, so a file deleted since still gets its button and fails with "The
-    /// file was moved or deleted.". Nil for a finished job that recorded
-    /// neither file.
+    /// file was moved or deleted.". A finished job whose notes went only to
+    /// Notion opens its page; the local files win where there are any, since
+    /// the button names what it opens and the "…" menu offers the page. Nil
+    /// for a finished job that recorded neither file nor page.
     static func mainAction(state: JobState, files: RecordedFiles, canRetry: Bool) -> MainAction? {
         switch state {
         case .waiting, .transcribing, .diarizing, .generatingProtocol:
@@ -67,7 +75,13 @@ enum RecordingRowActions {
             .nameSpeakers
 
         case .done:
-            if files.hasProtocol { .openProtocol } else if files.hasTranscript { .openTranscript } else { nil }
+            if files.hasProtocol {
+                .openProtocol
+            } else if files.hasTranscript {
+                .openTranscript
+            } else {
+                files.hasNotionPage ? .openInNotion : nil
+            }
 
         case .error:
             canRetry ? .retry : .remove
@@ -78,8 +92,11 @@ enum RecordingRowActions {
     /// The main button's action is listed again where it is one of these, so
     /// the right-click menu stands on its own. A waiting or running job lists
     /// nothing: the transcript stage 1 may already have written is a draft
-    /// without speaker names that a later stage rewrites.
-    static func menuItems(state: JobState, onDisk: FilesOnDisk, canRetry: Bool) -> [MenuItem] {
+    /// without speaker names that a later stage rewrites. A finished job with
+    /// a Notion page lists "Open in Notion" after its files.
+    static func menuItems(
+        state: JobState, onDisk: FilesOnDisk, canRetry: Bool, hasNotionPage: Bool = false,
+    ) -> [MenuItem] {
         let hasSource = onDisk.transcriptSource != .none
         return switch state {
         case .waiting, .transcribing, .diarizing, .generatingProtocol:
@@ -89,7 +106,7 @@ enum RecordingRowActions {
             fileItems(onDisk) + [.dismiss]
 
         case .done:
-            fileItems(onDisk) + [.regenerate(enabled: hasSource)]
+            fileItems(onDisk) + (hasNotionPage ? [.openInNotion] : []) + [.regenerate(enabled: hasSource)]
 
         case .error:
             fileItems(onDisk) + (hasSource ? [.regenerate(enabled: true)] : [])
