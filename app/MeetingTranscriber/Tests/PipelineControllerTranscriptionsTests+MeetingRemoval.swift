@@ -9,6 +9,8 @@ import XCTest
 /// failed write or a crash in between must not bring a meeting back with no way to
 /// finish it, and nothing here may remove a file the mover did not check.
 extension PipelineControllerTranscriptionsTests {
+    private struct Refused: Error {}
+
     /// A done job the queue keeps for good, so a snapshot listing it brings it back.
     private func meetingWithAFailedExport(in harness: MeetingDeletionHarness) throws -> PipelineJob {
         var job = try harness.recordedMeeting()
@@ -173,5 +175,36 @@ extension PipelineControllerTranscriptionsTests {
 
         XCTAssertNil(harness.store.record(for: job.id))
         XCTAssertNil(TerminalJobStore(path: historyPath).lookup(jobID: job.id), "the row would come back")
+    }
+
+    // MARK: - A file's own mark
+
+    /// A write that fails once between two files. The pending mark must not go while
+    /// a file still reads as being deleted, as only that mark gets it looked at again.
+    func testAFileWhoseOwnMarkFailedToSaveEndsRightInTheRecord() throws {
+        let harness = try makeDeletionHarness()
+        let controller = harness.controller(queue: harness.makeQueue())
+        let job = try harness.recordedMeeting()
+        let moved = try XCTUnwrap(job.mixPath)
+        let refused = try XCTUnwrap(job.appPath)
+        // A folder at the staging path fails one write, which then clears it.
+        let staging = harness.logDir.appendingPathComponent("meeting_files.json.tmp", isDirectory: true)
+        harness.fakeTrash.beforeMove = { url in
+            guard [moved.lastPathComponent, refused.lastPathComponent].contains(url.lastPathComponent) else { return }
+            try? FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        }
+        harness.fakeTrash.refusal = { $0.lastPathComponent == refused.lastPathComponent ? Refused() : nil }
+
+        XCTAssertTrue(controller.moveAudioToTrash(jobID: job.id))
+
+        let onFile = try XCTUnwrap(MeetingFileStore(path: harness.recordPath).record(for: job.id))
+        XCTAssertNil(onFile.pending)
+        XCTAssertEqual(harness.names(onFile.incomplete?.paths ?? []), [refused.lastPathComponent])
+        func state(_ role: MeetingFile.Role) -> MeetingFile.State? {
+            onFile.files.first { $0.role == role }?.state
+        }
+        XCTAssertEqual(state(.mix), .gone, "it went, and only the pending mark would have had that looked at again")
+        XCTAssertEqual(state(.appTrack), .present, "the Trash refused it, so it is still there")
+        XCTAssertEqual(state(.micTrack), .gone)
     }
 }

@@ -307,6 +307,26 @@ extension MeetingFileStore {
         update(jobID: jobID) { $0.setState(state, ofFileAt: path) }
     }
 
+    /// End a deletion in one write: what became of each file, what `change` records,
+    /// and the pending mark. A file's own mark can have failed to save on the way,
+    /// and once the pending mark is gone nothing looks at that file again. False
+    /// leaves the pending mark, so the next launch settles it.
+    @discardableResult
+    func finishDeletion(
+        jobID: UUID, outcomes: [MeetingFileRemover.FileOutcome], _ change: (inout MeetingFileRecord) -> Void,
+    ) -> Bool {
+        update(jobID: jobID) { record in
+            for outcome in outcomes {
+                switch outcome.result {
+                case .removed, .alreadyGone: record.setState(.gone, ofFileAt: outcome.path)
+                case .failed: record.setState(.present, ofFileAt: outcome.path)
+                }
+            }
+            change(&record)
+            record.pending = nil
+        }
+    }
+
     /// Check every pending deletion whose process no longer runs against the disk.
     /// Another running build's deletion is not an abandoned one, so it stays.
     ///

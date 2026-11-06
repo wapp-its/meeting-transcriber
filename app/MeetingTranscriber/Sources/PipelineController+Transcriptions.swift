@@ -131,18 +131,16 @@ extension PipelineController {
                 if case .failed = outcome.result { return true }
                 return false
             }.map(\.path)
-            meetingFileStore.update(jobID: jobID) { record in
+            meetingFileStore.finishDeletion(jobID: jobID, outcomes: outcomes) { record in
                 record.incomplete = .init(reason: reason, paths: left, kind: kind)
-                record.pending = nil
             }
         } else if kind == .meetingToTrash {
             removeMovedMeeting(jobID: jobID)
         } else {
             let deletion = MeetingFileRecord.AudioDeletion(kind: .manual, at: now())
-            meetingFileStore.update(jobID: jobID) { record in
+            meetingFileStore.finishDeletion(jobID: jobID, outcomes: outcomes) { record in
                 record.audioDeletion = deletion
                 record.incomplete = nil
-                record.pending = nil
             }
         }
         return true
