@@ -547,7 +547,8 @@ final class WhisperKitEngineModelSourceTests: XCTestCase {
             XCTFail("A transcription without a model must throw")
         } catch {
             guard case .modelNotLoaded = error as? TranscriptionError else {
-                return XCTFail("Expected modelNotLoaded, got \(error)")
+                XCTFail("Expected modelNotLoaded, got \(error)")
+                return
             }
         }
         let refusals = [WhisperKitLoadFailure.tokenRejected.message, WhisperKitLoadFailure.tokenRequired.message]
