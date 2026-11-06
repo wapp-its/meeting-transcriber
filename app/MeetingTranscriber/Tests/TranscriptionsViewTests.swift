@@ -9,15 +9,18 @@ import XCTest
 /// and which buttons and items a row gets by `RecordingRowActionsTests`.
 @MainActor
 final class TranscriptionsViewTests: XCTestCase {
-    private typealias FilesOnDisk = RecordingRowActions.FilesOnDisk
+    // The helpers down to `button` are shared with
+    // TranscriptionsViewTests+MeetingFiles.swift, which a private one would not reach.
+    // swiftlint:disable test_case_accessibility
+    typealias FilesOnDisk = RecordingRowActions.FilesOnDisk
 
     /// What the search field's binding writes to, so a test reads the typed
     /// text without reaching into SwiftUI's state.
-    private final class QueryBox {
+    final class QueryBox {
         var text = ""
     }
 
-    private func makeView(
+    func makeView(
         _ entries: [TranscriptionEntry],
         query: String = "",
         queryBox: QueryBox? = nil,
@@ -37,7 +40,7 @@ final class TranscriptionsViewTests: XCTestCase {
     }
 
     /// Every action and its argument, in the order they were called.
-    private func recording(into calls: @escaping (String) -> Void, base: AllRecordingsActions = .noop) -> AllRecordingsActions {
+    func recording(into calls: @escaping (String) -> Void, base: AllRecordingsActions = .noop) -> AllRecordingsActions {
         var actions = base
         actions.openProtocol = { calls("openProtocol \($0.path)"); return true }
         actions.openTranscript = { calls("openTranscript \($0.path)"); return true }
@@ -50,11 +53,15 @@ final class TranscriptionsViewTests: XCTestCase {
         actions.cancel = { calls("cancel \($0)") }
         actions.nameSpeakers = { calls("nameSpeakers \($0)") }
         actions.openProtocolsFolder = { calls("openProtocolsFolder") }
+        actions.moveAudioToTrash = { calls("moveAudioToTrash \($0)") }
+        actions.moveMeetingToTrash = { calls("moveMeetingToTrash \($0)") }
+        actions.retryDeletion = { calls("retryDeletion \($0)") }
+        actions.setKeep = { calls("setKeep \($0) \($1)") }
         return actions
     }
 
     /// The files the entry recorded are all on disk, the transcript readable.
-    private static func recordedFilesOnDisk(_ entry: TranscriptionEntry) -> FilesOnDisk {
+    static func recordedFilesOnDisk(_ entry: TranscriptionEntry) -> FilesOnDisk {
         FilesOnDisk(
             protocolExists: entry.protocolURL != nil,
             transcriptExists: entry.transcriptURL != nil,
@@ -63,7 +70,7 @@ final class TranscriptionsViewTests: XCTestCase {
     }
 
     /// A job as the queue holds it.
-    private func entry(
+    func entry(
         _ title: String,
         state: JobState = .done,
         participants: [String] = [],
@@ -83,9 +90,11 @@ final class TranscriptionsViewTests: XCTestCase {
         return TranscriptionEntry(job: job, finishOrder: nil)
     }
 
-    private func button(_ identifier: String, in view: TranscriptionsView) throws -> InspectableView<ViewType.Button> {
+    func button(_ identifier: String, in view: TranscriptionsView) throws -> InspectableView<ViewType.Button> {
         try view.inspect().find(viewWithAccessibilityIdentifier: identifier).button()
     }
+
+    // swiftlint:enable test_case_accessibility
 
     // MARK: - Search
 
@@ -308,47 +317,68 @@ final class TranscriptionsViewTests: XCTestCase {
     }
 
     /// The "…" menu holds exactly `RecordingRowActions.menuItems` for its row,
-    /// in that order, Regenerate disabled without a transcript source; a
+    /// in that order, Regenerate disabled without a transcript source, Keep and the
+    /// Trash items after everything else and enabled as that decision says; a
     /// running job's menu is empty and its "…" disabled.
     func testTheMoreMenuListsExactlyTheRowsMenuItems() throws {
-        let rows: [(entry: TranscriptionEntry, onDisk: FilesOnDisk, canRetry: Bool)] = [
-            (
-                entry("Both", protocolPath: "/out/b.md", transcriptPath: "/out/b.txt"),
-                FilesOnDisk(protocolExists: true, transcriptExists: true, transcriptSource: .transcriptFile), false,
-            ),
+        let both = FilesOnDisk(protocolExists: true, transcriptExists: true, transcriptSource: .transcriptFile)
+        let transcriptOnly = FilesOnDisk(protocolExists: false, transcriptExists: true, transcriptSource: .transcriptFile)
+        let finished = entry("Finished", protocolPath: "/out/f.md", transcriptPath: "/out/f.txt")
+        let kept = entry("Kept", protocolPath: "/out/k.md", transcriptPath: "/out/k.txt")
+        let imported = entry("Imported", protocolPath: "/out/i.md", transcriptPath: "/out/i.txt")
+        let audioGone = entry("Audio gone", protocolPath: "/out/g.md", transcriptPath: "/out/g.txt")
+        let unplugged = entry("Unplugged", protocolPath: "/out/u.md", transcriptPath: "/out/u.txt")
+        let waiting = entry("Waiting for names", state: .speakerNamingPending, transcriptPath: "/out/w.txt")
+        let failed = entry("Failed", state: .error, error: "Failed", protocolPath: "/out/e.md")
+        var exportingJob = PipelineJob(
+            meetingTitle: "Exporting", appName: "Teams",
+            mixPath: URL(fileURLWithPath: "/rec/x_mix.wav"), appPath: nil, micPath: nil, micDelay: 0,
+        )
+        exportingJob.state = .done
+        exportingJob.beginNotionExport(speakerNames: [])
+        let exporting = TranscriptionEntry(job: exportingJob, finishOrder: nil)
+        let rows: [(entry: TranscriptionEntry, onDisk: FilesOnDisk, canRetry: Bool, meeting: Meeting?)] = [
+            (entry("Both", protocolPath: "/out/b.md", transcriptPath: "/out/b.txt"), both, false, nil),
             (
                 entry("No source", protocolPath: "/out/n.md", transcriptPath: "/out/n.txt"),
-                FilesOnDisk(protocolExists: true, transcriptExists: false, transcriptSource: .none), false,
+                FilesOnDisk(protocolExists: true, transcriptExists: false, transcriptSource: .none), false, nil,
             ),
             (
                 entry("Failed", state: .error, error: "Failed", protocolPath: "/out/e.md"),
-                FilesOnDisk(protocolExists: true, transcriptExists: false, transcriptSource: .protocolOnly), true,
+                FilesOnDisk(protocolExists: true, transcriptExists: false, transcriptSource: .protocolOnly), true, nil,
             ),
-            (
-                entry("Naming", state: .speakerNamingPending, transcriptPath: "/out/d.txt"),
-                FilesOnDisk(protocolExists: false, transcriptExists: true, transcriptSource: .transcriptFile), false,
-            ),
-            (
-                entry("Running", state: .diarizing, transcriptPath: "/out/r.txt"),
-                FilesOnDisk(protocolExists: false, transcriptExists: true, transcriptSource: .transcriptFile), false,
-            ),
+            (entry("Naming", state: .speakerNamingPending, transcriptPath: "/out/d.txt"), transcriptOnly, false, nil),
+            (entry("Running", state: .diarizing, transcriptPath: "/out/r.txt"), transcriptOnly, false, nil),
+            (finished, both, false, meeting(finished)),
+            (kept, both, false, meeting(kept) { $0.keep = true }),
+            (imported, both, false, meeting(imported, origin: .imported)),
+            (audioGone, both, false, meeting(audioGone, audio: Self.noAudioLeft)),
+            (unplugged, both, false, meeting(unplugged, audio: Self.unpluggedAudio)),
+            (exporting, both, false, meeting(exporting, exporting: true)),
+            (waiting, transcriptOnly, false, meeting(waiting)),
+            (failed, both, true, meeting(failed) { $0.outcome = .failed }),
         ]
         var actions = AllRecordingsActions.noop
         actions.canRetry = { id in rows.contains { $0.entry.id == id && $0.canRetry } }
         actions.filesOnDisk = { entry in rows.first { $0.entry.id == entry.id }?.onDisk ?? Self.recordedFilesOnDisk(entry) }
+        actions.meetingFiles = { id in rows.first { $0.entry.id == id }?.meeting?.record }
+        actions.audioOnDisk = { entry in rows.first { $0.entry.id == entry.id }?.meeting?.audio }
         let sut = makeView(rows.map(\.entry), actions: actions)
 
         for (index, row) in rows.enumerated() {
-            let expected = RecordingRowActions.menuItems(state: row.entry.state, onDisk: row.onDisk, canRetry: row.canRetry)
-            let menu = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.recordingMoreButton(index))
-            let items = menu.findAll(ViewType.Button.self)
+            let expected = RecordingRowActions.menuItems(
+                state: row.entry.state, onDisk: row.onDisk, canRetry: row.canRetry, meeting: row.meeting,
+            )
+            let moreButton = A11yID.recordingMoreButton(index)
+            let menu = try sut.inspect().find(viewWithAccessibilityIdentifier: moreButton)
+            let items = menu.findAll { try $0.accessibilityIdentifier() != moreButton }
 
             XCTAssertEqual(
                 try items.map { try $0.accessibilityIdentifier() },
                 expected.map { TranscriptionsView.identifier(of: $0, index: index) },
                 row.entry.title,
             )
-            XCTAssertEqual(items.map { $0.isDisabled() }, expected.map { $0 == .regenerate(enabled: false) }, row.entry.title)
+            XCTAssertEqual(items.map { $0.isDisabled() }, expected.map(Self.isDisabled), row.entry.title)
             XCTAssertEqual(menu.isDisabled(), expected.isEmpty, row.entry.title)
         }
     }

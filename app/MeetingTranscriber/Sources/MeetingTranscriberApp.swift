@@ -238,6 +238,17 @@ struct MeetingTranscriberApp: App {
             openProtocolsFolder: { AllRecordingsActions.openFolder(appState.settings.effectiveOutputDir) },
             canRetry: { appState.pipeline.canRetryJob(id: $0) },
             filesOnDisk: { AllRecordingsActions.readFilesOnDisk(of: $0, scopeRoot: appState.settings.effectiveOutputDir) },
+            meetingFiles: { appState.pipeline.meetingFileStore.record(for: $0) },
+            audioOnDisk: { entry in
+                appState.pipeline.meetingFileStore.record(for: entry.id).map { record in
+                    AllRecordingsActions.readAudioOnDisk(of: record, scopeRoot: appState.settings.effectiveOutputDir)
+                }
+            },
+            moveAudioToTrash: { appState.pipeline.moveAudioToTrash(jobID: $0) },
+            moveMeetingToTrash: { appState.pipeline.moveMeetingToTrash(jobID: $0) },
+            retryDeletion: { appState.pipeline.retryDeletion(jobID: $0) },
+            setKeep: { appState.pipeline.setKeep(jobID: $0, $1) },
+            retention: { appState.settings.recordingRetention },
             templateChoices: { appState.protocolTemplateChoices() },
             optionsUse: { appState.protocolOptionsUse() },
             chooseFile: { RegenerateProtocolView.chooseFile(startingIn: appState.settings.effectiveOutputDir) },

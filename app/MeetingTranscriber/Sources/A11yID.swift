@@ -158,6 +158,32 @@ enum A11yID {
         "recordingMenuDismiss.\(index)"
     }
 
+    static func recordingMenuKeep(_ index: Int) -> String {
+        "recordingMenuKeep.\(index)"
+    }
+
+    static func recordingMenuMoveAudioToTrash(_ index: Int) -> String {
+        "recordingMenuMoveAudioToTrash.\(index)"
+    }
+
+    static func recordingMenuMoveMeetingToTrash(_ index: Int) -> String {
+        "recordingMenuMoveMeetingToTrash.\(index)"
+    }
+
+    /// "Retry Deletion", the main button of a row whose deletion is incomplete.
+    static func recordingRetryDeletionButton(_ index: Int) -> String {
+        "recordingRetryDeletionButton.\(index)"
+    }
+
+    /// The "Keep" badge after a kept meeting's title.
+    static func recordingKeepBadge(_ index: Int) -> String {
+        "recordingKeepBadge.\(index)"
+    }
+
+    /// The buttons of a Trash confirmation, of which the window shows one at a time.
+    static let recordingTrashCancelButton = "recordingTrashCancelButton"
+    static let recordingTrashConfirmButton = "recordingTrashConfirmButton"
+
     /// The menu's answers to the open recording prompt. No app name, for the
     /// reason on `consentDeniedAppRemove`.
     static let consentPromptRecord = "consentPromptRecord"
