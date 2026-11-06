@@ -15,7 +15,7 @@
   "no_plan": true,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
-  "plan_reviewed_at": "2026-11-06T09:01:29.569108Z",
+  "plan_reviewed_at": "2026-11-06T15:51:20.920579Z",
   "ready": true,
   "review_attempts": [
     {
@@ -230,10 +230,99 @@
       "task": null,
       "timestamp": "2026-11-06T09:01:29.542660Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "749968718ea50f2dd6b7b73819facfb4eacd458901c5b4829e5e64e452f0580a",
+      "backend": "codex",
+      "base_sha": "c9951a5251e1f90877fca8866a49eb3b52650694",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-26fd0fc53de357e54b9810e95ad8c3fd",
+            "classification": "introduced",
+            "findingId": "finding-26fd0fc53de357e54b9810e95ad8c3fd",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "7e3e4b46febb1b4e27beb3512010475e85fd9830",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 390261,
+      "output_sha256": "1e17b5efde5832591ce5be8af1968590d90866140c6d853aa06efd8f19e9f4e3",
+      "reservation_id": "d01337315acc453ba34d3bd942971530",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-06T15:49:46.888264Z",
+      "tool_calls": 29,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "2edd997c029295636d7ada19d58fcb0ca0eef0a60c304517d2f27fb7d5773491",
+      "backend": "codex",
+      "base_sha": "c9951a5251e1f90877fca8866a49eb3b52650694",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-26fd0fc53de357e54b9810e95ad8c3fd",
+            "classification": "introduced",
+            "findingId": "finding-26fd0fc53de357e54b9810e95ad8c3fd",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "7e3e4b46febb1b4e27beb3512010475e85fd9830",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 697,
+      "output_sha256": "5f7b1ac7f282b71ce1f2281c9b12f22b2a300162c2784658a4bf552b08f11718",
+      "reservation_id": "bfcef78b01c74ee08d2d3ffb3adaac03",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-06T15:51:20.894168Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
-    "plan": 1,
+    "plan": 2,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
@@ -256,5 +345,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\n\"Regenerate Protocol\u2026\" (#2, #170) makes a meeting's protocol again with another template. The previous protocol then goes to the Trash, so a meeting has one protocol at a time. One meeting can need a report for each of several audiences, for example full minutes and a short summary (owner request, paraphrased).\n\n## NOTES\n\n- The regenerate dialog offers to save the new protocol as an additional report next to the existing one, named after its template. Replacing stays available. The template choice stays as it is.\n- The meeting's row in All Recordings lists its additional reports and opens them.\n- The main protocol keeps its role: Open Protocol, Open Last Protocol, the automation API and a retry use it.\n- Related: #170, #171.\n\n## TASKS\n\n- [ ] Draw the mockup (regenerate dialog, row menu) and get it accepted\n- [ ] Build the spec",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/190"
   },
-  "updated_at": "2026-11-06T09:01:44.942902Z"
+  "updated_at": "2026-11-06T15:51:20.921807Z"
 }
