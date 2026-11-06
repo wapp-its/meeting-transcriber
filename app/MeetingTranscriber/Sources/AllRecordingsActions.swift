@@ -121,6 +121,43 @@ struct AllRecordingsActions {
         )
     }
 
+    /// A meeting's audio as the disk answers for it, read inside the security scope
+    /// of `scopeRoot`. Touches each listed file, so the window asks it through
+    /// `RowAvailability`. A size is added only for a file that is there, and a file
+    /// out of reach is neither there nor gone.
+    ///
+    /// `totalCount` is what "2 of 3 files moved" counts. Every track the record lists
+    /// is in it, also one gone, as a file a deletion moved reads as gone. A 16 kHz copy
+    /// only while it is listed as still there: the pipeline removes those itself when
+    /// the speakers are named, and they never were among the meeting's files for the
+    /// reader of that line.
+    static func readAudioOnDisk(of record: MeetingFileRecord, scopeRoot: URL) -> RecordingAudioLine.AudioOnDisk {
+        let accessing = scopeRoot.startAccessingSecurityScopedResource()
+        defer { if accessing { scopeRoot.stopAccessingSecurityScopedResource() } }
+        // Move Meeting covers everything Move Audio does, so this is one probe per path.
+        let presence = Dictionary(uniqueKeysWithValues: record.filesCovered(by: .meetingToTrash).map { file in
+            (file.path, MeetingFilePresence.of(file.path))
+        })
+        let audio = record.filesCovered(by: .audioToTrash)
+        let present = audio.filter { presence[$0.path] == .present }
+        let notOwned = Set(record.files.filter { !$0.owned }.map(\.path))
+        let counted = record.files.filter { file in
+            file.owned && file.role.isAudio && !notOwned.contains(file.path) && (file.role.isSourceTrack || file.state != .gone)
+        }
+        return RecordingAudioLine.AudioOnDisk(
+            presentCount: present.count,
+            unreachableCount: audio.filter { presence[$0.path] == .unreachable }.count,
+            totalCount: Set(counted.map(\.path)).count,
+            bytes: present.reduce(0) { $0 + size(of: $1.path) },
+            gonePaths: Set(presence.filter { $0.value == .gone }.keys),
+        )
+    }
+
+    /// Zero for a file that went between the probe and this read.
+    private static func size(of path: String) -> Int64 {
+        (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int64) ?? 0
+    }
+
     private static func transcriptSource(_ transcript: RegenerationTranscript?) -> RecordingRowActions.TranscriptSource {
         guard let transcript else { return .none }
         return transcript.fromProtocol ? .protocolOnly : .transcriptFile
