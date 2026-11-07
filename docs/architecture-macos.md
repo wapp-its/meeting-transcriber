@@ -863,7 +863,8 @@ says what the retention setting deletes.
 automatically": Never (the default), Right after the notes, After 7 days, After
 30 days or After 90 days. `RecordingRetentionRule` selects, from the record
 alone, the audio of meetings this build recorded, whose outcome is finished (notes
-saved, or the transcript when notes generation was off; speakers named), that
+saved, or with notes generation off a transcript the record lists as present;
+speakers named), that
 are not marked Keep and whose recording date plus the chosen days has passed. `RecordingRetentionController` deletes that audio
 for good, not to the Trash; the transcript, the notes and all other files stay.
 It never touches imports, failed meetings, kept meetings, meetings without a

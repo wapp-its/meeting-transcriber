@@ -224,6 +224,28 @@ final class RecordingRetentionRuleTests: XCTestCase {
         }
     }
 
+    /// A1: with generation off, the transcript is what has to be saved, as the record
+    /// marks it. The check would keep the audio without one, so the rule must not
+    /// select the meeting, or the row and the preview promise what never happens.
+    func testWithNotesOffOnlyATranscriptMarkedPresentCountsAsSaved() {
+        let notesOff = MeetingFileRecord.Outcome.finished(protocolExpected: false)
+        let saved = Fixture.record(outcome: notesOff) { $0.setFiles(.protocol, to: nil) }
+        XCTAssertEqual(audio(saved), everyAudioFile, "test premise: a transcript marked present is saved")
+        let rows: [(String, MeetingFile.State?)] = [
+            ("no transcript listed", nil), ("the transcript is gone", .gone), ("the transcript is being deleted", .deleting),
+        ]
+        for (name, state) in rows {
+            let record = Fixture.record(outcome: notesOff) { record in
+                record.setFiles(.protocol, to: nil)
+                record.setFiles(.transcript, to: state)
+            }
+            XCTAssertFalse(RecordingRetentionRule.recordAllowsDeletion(record, bundleID: Fixture.thisBuild), name)
+            for retention in RecordingRetention.allCases {
+                XCTAssertEqual(audio(record, retention: retention), [], "\(name), \(retention)")
+            }
+        }
+    }
+
     /// The page that export created before it failed holds only part of the notes.
     func testAFailedExportWithoutItsMarkdownHasNoProtocolSaved() {
         let record = Fixture.record { $0.setFiles(.protocol, to: .gone) }

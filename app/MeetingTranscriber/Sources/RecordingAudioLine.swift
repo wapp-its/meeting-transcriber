@@ -142,7 +142,7 @@ struct RecordingAudioLine: Equatable, Sendable {
             case let .finished(protocolExpected):
                 guard retention != .never, RecordingRetentionRule.reaches(record, bundleID: bundleID) else { return nil }
                 if live?.notionExportRunning == true { return "kept until the Notion export ends" }
-                if protocolExpected, !RecordingRetentionRule.hasSavedProtocol(record) { return "kept, no notes were saved" }
+                if !RecordingRetentionRule.hasSavedNotes(record, protocolExpected: protocolExpected) { return "kept, no notes were saved" }
                 return RecordingRetentionRule.dueDate(record: record, retention: retention, calendar: calendar, bundleID: bundleID)
                     .map { due in "deleted automatically \(due <= now ? "at the next check" : "on \(day(due))")" }
             }

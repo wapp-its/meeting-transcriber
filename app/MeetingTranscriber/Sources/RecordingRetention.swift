@@ -90,21 +90,28 @@ enum RecordingRetentionRule {
         record.savedToNotion || record.files.contains { $0.role == .protocol && $0.state == .present }
     }
 
+    /// What a finished meeting has to have saved for its audio to go: its protocol
+    /// when generation was on, otherwise (A1) its transcript, as the record marks it.
+    /// The check asks the disk for the same file right before it deletes.
+    static func hasSavedNotes(_ record: MeetingFileRecord, protocolExpected: Bool) -> Bool {
+        protocolExpected ? hasSavedProtocol(record) : record.files.contains { $0.role == .transcript && $0.state == .present }
+    }
+
     /// What the record alone has to say for the audio to go, whatever the date: a
-    /// recording of this build that finished with its notes saved, or with notes off,
-    /// not kept and with no failed deletion on it. Also asked under the store's lock
-    /// before each file of an automatic deletion, as another build can change any of
-    /// it meanwhile.
+    /// recording of this build that finished with its notes saved, or with notes off
+    /// its transcript, not kept and with no failed deletion on it. Also asked under the
+    /// store's lock before each file of an automatic deletion, as another build can
+    /// change any of it meanwhile.
     static func recordAllowsDeletion(_ record: MeetingFileRecord, bundleID: String?) -> Bool {
         guard case let .finished(protocolExpected) = record.outcome else { return false }
         return reaches(record, bundleID: bundleID) && record.incomplete == nil
-            && (!protocolExpected || hasSavedProtocol(record))
+            && hasSavedNotes(record, protocolExpected: protocolExpected)
     }
 
     /// The audio to delete now: the owned files still marked present of a meeting of
-    /// this build that finished with its notes saved, or with notes off, whose queue
-    /// is through with it, with no deletion under way or left unfinished, and that is
-    /// due. Empty in every other case.
+    /// this build that finished with its notes saved, or with notes off its
+    /// transcript, whose queue is through with it, with no deletion under way or left
+    /// unfinished, and that is due. Empty in every other case.
     static func audioToDelete( // swiftlint:disable:this function_parameter_count
         record: MeetingFileRecord, live: LiveMeetingState?, retention: RecordingRetention, now: Date, calendar: Calendar,
         bundleID: String?,

@@ -89,6 +89,18 @@ final class RetentionPreviewTests: XCTestCase {
         }
     }
 
+    /// With notes off and no transcript saved the check keeps the audio, so the preview
+    /// neither counts the meeting nor asks.
+    func testNotesOffWithoutATranscriptIsNotCounted() {
+        let record = Fixture.record(outcome: .finished(protocolExpected: false)) { record in
+            record.setFiles(.protocol, to: nil)
+            record.setFiles(.transcript, to: nil)
+        }
+
+        XCTAssertTrue(preview([record]).isEmpty)
+        XCTAssertEqual(preview([record, Fixture.record()]).meetingCount, 1, "test premise: a saved meeting next to it counts")
+    }
+
     func testEverySkipReasonLeavesTheMeetingOutAndIsCounted() {
         typealias Skipped = RetentionPreview.Skipped
         let plain = Fixture.record()

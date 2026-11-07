@@ -132,6 +132,17 @@ final class RecordingAudioLineTests: XCTestCase {
         XCTAssertEqual(line(gone).text, "Audio · 286 MB · kept, no notes were saved", "a failed export without its Markdown")
     }
 
+    /// With notes off (A1) the transcript is what is saved, and without it the check
+    /// keeps the audio, so the line promises no date.
+    func testWithNotesOffAndNoTranscriptTheAudioIsKept() {
+        let record = Fixture.record(outcome: .finished(protocolExpected: false)) { record in
+            record.setFiles(.protocol, to: nil)
+            record.setFiles(.transcript, to: .gone)
+        }
+        XCTAssertEqual(line(record).text, "Audio · 286 MB · kept, no notes were saved")
+        XCTAssertEqual(line(record, retention: .never).text, "Audio · 286 MB", "Never promises nothing (A16)")
+    }
+
     func testARunningExportHoldsTheLineUnlessTheSettingIsNever() {
         XCTAssertEqual(line(Fixture.record(), live: live(.done, exporting: true)).text, "Audio · 286 MB · kept until the Notion export ends")
         XCTAssertEqual(line(Fixture.record(), live: live(.done, exporting: true), retention: .never).text, "Audio · 286 MB")
