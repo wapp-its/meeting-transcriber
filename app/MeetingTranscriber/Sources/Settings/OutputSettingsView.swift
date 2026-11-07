@@ -387,6 +387,9 @@ struct RecordingsSettingsSection: View {
             if choice.isChecking {
                 helpLine("Checking which meetings this would delete…")
             }
+            if let value = choice.notChecked {
+                helpLine("Could not read which meetings “\(value.title)” would delete, so the setting did not change. Try again later.")
+            }
             helpLine("Counts from the recording date. Only audio this app recorded is deleted; imported files never are.")
             helpLine(
                 "Audio stays until the meeting notes are saved and the speakers are named. "

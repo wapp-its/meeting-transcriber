@@ -151,8 +151,10 @@ final class MeetingFileStore {
         if current == nil { markGone(jobID: jobID, roles: [.protocol]) }
     }
 
-    /// Read the file again. Creates it when there is none yet.
-    func reload() {
+    /// Read the file again. Creates it when there is none yet. False when that failed,
+    /// which leaves `records` as they were and says nothing about the file.
+    @discardableResult
+    func reload() -> Bool {
         transact { _ in true }
     }
 

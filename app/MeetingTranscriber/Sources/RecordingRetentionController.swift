@@ -31,6 +31,7 @@ final class RecordingRetentionController {
     @ObservationIgnored private let store: MeetingFileStore
     @ObservationIgnored private let remover: MeetingFileRemover
     @ObservationIgnored private let liveState: @MainActor (UUID) -> LiveMeetingState?
+    @ObservationIgnored private let liveStateIsKnown: @MainActor (UUID) -> Bool
     @ObservationIgnored private let isListed: @MainActor (UUID) -> Bool
     @ObservationIgnored private let securityScope: SecurityScopeAccess
     @ObservationIgnored private let interval: Duration
@@ -49,6 +50,7 @@ final class RecordingRetentionController {
         store: MeetingFileStore,
         remover: MeetingFileRemover,
         liveState: @escaping @MainActor (UUID) -> LiveMeetingState?,
+        liveStateIsKnown: @escaping @MainActor (UUID) -> Bool = { _ in true },
         isListed: @escaping @MainActor (UUID) -> Bool,
         securityScope: SecurityScopeAccess = .live,
         interval: Duration = .seconds(24 * 60 * 60),
@@ -61,6 +63,7 @@ final class RecordingRetentionController {
         self.store = store
         self.remover = remover
         self.liveState = liveState
+        self.liveStateIsKnown = liveStateIsKnown
         self.isListed = isListed
         self.securityScope = securityScope
         self.interval = interval
@@ -77,6 +80,7 @@ final class RecordingRetentionController {
             store: pipeline.meetingFileStore,
             remover: pipeline.fileRemover,
             liveState: { pipeline.liveMeetingState(jobID: $0) },
+            liveStateIsKnown: { pipeline.knowsLiveState(jobID: $0) },
             isListed: { pipeline.listsMeeting(jobID: $0) },
             securityScope: pipeline.queueEnvironment.securityScope,
             now: pipeline.now,
@@ -132,25 +136,53 @@ final class RecordingRetentionController {
 
     // MARK: - The setting
 
-    /// What `retention` would delete now, by the check's own rule, changing nothing. The
-    /// disk is asked off the main actor, as this runs from Settings and a network volume
-    /// can block for as long as it likes. The answer is what the user agrees to; the check
-    /// that follows deletes what the rule selects at that moment.
-    func preview(for retention: RecordingRetention) async -> RetentionPreview {
-        store.reload()
+    /// What `retention` would delete now, by the check's own rule, changing nothing. Nil
+    /// when that cannot be told, as the records or the queue's saved jobs do not read: an
+    /// empty answer saves the value with nobody asked, and the next check deletes by it.
+    ///
+    /// The disk is asked off the main actor, as this runs from Settings and a network
+    /// volume can block for as long as it likes. A meeting can finish meanwhile, so the
+    /// rule is asked again until it selects nothing unread and the answer holds when it
+    /// returns. The check that follows a confirmation deletes what the rule selects then.
+    func preview(for retention: RecordingRetention) async -> RetentionPreview? {
+        var answers: [String: RetentionPreview.FileOnDisk] = [:]
+        var closeScope: (() -> Void)?
+        defer { closeScope?() }
+        while true {
+            guard let selection = currentSelection(for: retention) else { return nil }
+            let unread = Set(selection.meetings.joined().map(\.path)).subtracting(answers.keys)
+            if unread.isEmpty {
+                return logged(RetentionPreview(selection) { answers[$0.path] ?? .unreachable })
+            }
+            closeScope = closeScope ?? openOutputFolderScope()
+            let fresh = await Self.read(unread, with: readFile)
+            answers.merge(fresh) { _, new in new }
+        }
+    }
+
+    /// The rule's choice from a fresh read of the record file and the queue, or nil when
+    /// one of them does not read.
+    private func currentSelection(for retention: RecordingRetention) -> RetentionPreview.Selection? {
+        guard store.reload() else {
+            logger.error("Retention preview for \(retention.rawValue, privacy: .public): the meeting record does not read")
+            return nil
+        }
         let selection = RetentionPreview.Selection(
-            records: store.records, live: { liveState($0) }, retention: retention, now: now(), calendar: calendar,
+            records: store.records, live: { liveState($0) }, isKnown: { liveStateIsKnown($0) },
+            retention: retention, now: now(), calendar: calendar,
         )
-        let paths = Set(selection.meetings.joined().map(\.path))
-        guard !paths.isEmpty else { return RetentionPreview(selection) { _ in .gone } }
-        let closeScope = openOutputFolderScope()
-        defer { closeScope() }
-        let answers = await Self.read(paths, with: readFile)
-        let preview = RetentionPreview(selection) { answers[$0.path] ?? .unreachable }
+        guard selection.isComplete else {
+            logger.error("Retention preview for \(retention.rawValue, privacy: .public): the queue's saved jobs do not read")
+            return nil
+        }
+        return selection
+    }
+
+    private func logged(_ preview: RetentionPreview) -> RetentionPreview {
         let skipped = preview.skipped
         logger.notice(
             """
-            Retention preview for \(retention.rawValue, privacy: .public): \(preview.meetingCount, privacy: .public) meetings, \
+            Retention preview for \(preview.retention.rawValue, privacy: .public): \(preview.meetingCount, privacy: .public) meetings, \
             \(preview.unreachableFiles, privacy: .public) files out of reach; skipped \(skipped.kept, privacy: .public) kept, \
             \(skipped.failed, privacy: .public) failed, \(skipped.imported, privacy: .public) imported, \
             \(skipped.fromBeforeThisFeature, privacy: .public) from before this feature
@@ -368,6 +400,13 @@ extension PipelineController {
         return saved.first { $0.id == jobID }.map { job in
             LiveMeetingState(state: job.state, notionExportRunning: job.notionExportStatus == .inProgress)
         }
+    }
+
+    /// Whether `liveMeetingState` answers from what is known of the job. Not when the
+    /// queue does not hold it and the saved jobs do not read: that answer only holds the
+    /// audio back, and says nothing about what happens once they read again.
+    func knowsLiveState(jobID: UUID) -> Bool {
+        queue.jobs.contains { $0.id == jobID } || jobsTheQueueHasNotRead() != nil
     }
 
     /// Whether the All Recordings window still has a row for a meeting. Saved jobs that

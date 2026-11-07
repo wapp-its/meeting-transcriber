@@ -75,22 +75,31 @@ struct RetentionPreview: Equatable, Sendable {
         /// Per meeting, the audio files the rule would delete now.
         let meetings: [[MeetingFile]]
         let skipped: Skipped
+        /// False when the queue cannot answer for a meeting the record would let go, so
+        /// what goes cannot be told.
+        let isComplete: Bool
 
         /// The rule alone settles most, and the queue's answer can read a file, so the
         /// queue is asked only about a meeting that could go.
         @MainActor
         init(
-            records: [MeetingFileRecord], live: @MainActor (UUID) -> LiveMeetingState?, retention: RecordingRetention,
+            records: [MeetingFileRecord], live: @MainActor (UUID) -> LiveMeetingState?,
+            isKnown: @MainActor (UUID) -> Bool = { _ in true }, retention: RecordingRetention,
             now: Date, calendar: Calendar,
         ) {
             var meetings: [[MeetingFile]] = []
             var skipped = Skipped()
+            var isComplete = true
             for record in records {
                 let audioToDelete = { (state: LiveMeetingState?) in
                     RecordingRetentionRule.audioToDelete(record: record, live: state, retention: retention, now: now, calendar: calendar)
                 }
                 guard !audioToDelete(nil).isEmpty else {
                     skipped.count(record, queueSaysFailed: false)
+                    continue
+                }
+                guard isKnown(record.jobID) else {
+                    isComplete = false
                     continue
                 }
                 let state = live(record.jobID)
@@ -104,6 +113,7 @@ struct RetentionPreview: Equatable, Sendable {
             self.retention = retention
             self.meetings = meetings
             self.skipped = skipped
+            self.isComplete = isComplete
         }
     }
 
@@ -171,15 +181,17 @@ struct RetentionPreview: Equatable, Sendable {
 /// What the Recordings section asks of the app. Both come from
 /// `RecordingRetentionController`, which is what holds the records and the check.
 struct RetentionSettingsActions {
-    let preview: @MainActor (RecordingRetention) async -> RetentionPreview
+    /// Nil when what the value deletes cannot be told, which is no "nothing".
+    let preview: @MainActor (RecordingRetention) async -> RetentionPreview?
     /// Saves a confirmed value and asks for a check.
     let apply: @MainActor (RecordingRetention) -> Void
 }
 
 /// The picker's value on its way to the setting. A value that can delete something
-/// waits here until the disk has answered and the user has seen what it deletes.
-/// Everything else is saved at once, with no check of its own: only a confirmed value
-/// promises one. A reference type for the reason on `TranscriptionsFileNotice`.
+/// waits here until the disk has answered and the user has seen what it deletes, and is
+/// dropped when what it deletes cannot be told. Everything else is saved at once, with no
+/// check of its own: only a confirmed value promises one. A reference type for the reason
+/// on `TranscriptionsFileNotice`.
 @Observable
 @MainActor
 final class RetentionChoice {
@@ -187,6 +199,8 @@ final class RetentionChoice {
     private(set) var candidate: RecordingRetention?
     /// What `candidate` would delete, set while the alert is open.
     private(set) var preview: RetentionPreview?
+    /// The value dropped last as what it deletes could not be told, until the next choice.
+    private(set) var notChecked: RecordingRetention?
     /// Asking the disk for `candidate`, which can take as long as a slow volume does.
     @ObservationIgnored private(set) var checking: Task<Void, Never>?
 
@@ -219,6 +233,11 @@ final class RetentionChoice {
             let answer = await actions.preview(value)
             guard !Task.isCancelled, let self else { return }
             checking = nil
+            guard let answer else {
+                candidate = nil
+                notChecked = value
+                return
+            }
             if answer.isEmpty {
                 candidate = nil
                 settings.recordingRetention = value
@@ -240,5 +259,6 @@ final class RetentionChoice {
         checking = nil
         candidate = nil
         preview = nil
+        notChecked = nil
     }
 }

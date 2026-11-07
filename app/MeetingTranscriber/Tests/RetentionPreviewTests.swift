@@ -285,6 +285,12 @@ final class RetentionPreviewTests: XCTestCase {
         )
     }
 
+    /// The answer of a controller whose records and queue read, as they do here.
+    private func told(by sut: RecordingRetentionController) async throws -> RetentionPreview {
+        let answer = await sut.preview(for: .days30)
+        return try XCTUnwrap(answer)
+    }
+
     private func audioBytes(of records: [MeetingFileRecord], in bed: RetentionCheckBed) throws -> Int64 {
         try records.flatMap(bed.audioPaths).reduce(0) { total, path in
             let size = try FileManager.default.attributesOfItem(atPath: path)[.size] as? Int64
@@ -307,7 +313,7 @@ final class RetentionPreviewTests: XCTestCase {
         ]
         let sut = controller(bed, settingChangeDelay: .milliseconds(1))
 
-        let result = await sut.preview(for: .days30)
+        let result = try await told(by: sut)
 
         XCTAssertEqual(result.meetingCount, 2)
         XCTAssertEqual(result.bytes, try audioBytes(of: due, in: bed))
@@ -338,7 +344,7 @@ final class RetentionPreviewTests: XCTestCase {
         let record = try bed.meeting(audioFolder: drive)
         try FileManager.default.moveItem(at: drive, to: bed.harness.root.appendingPathComponent("unplugged", isDirectory: true))
 
-        let result = await controller(bed).preview(for: .days30)
+        let result = try await told(by: controller(bed))
 
         XCTAssertFalse(result.isEmpty)
         XCTAssertEqual(result.meetingCount, 1)
@@ -354,7 +360,7 @@ final class RetentionPreviewTests: XCTestCase {
             try bed.removeBehindTheApp(path)
         }
 
-        let result = await controller(bed).preview(for: .days30)
+        let result = try await told(by: controller(bed))
 
         XCTAssertTrue(result.isEmpty)
         XCTAssertEqual(try bed.current(record), record, "only an action writes down what it found")
@@ -368,7 +374,7 @@ final class RetentionPreviewTests: XCTestCase {
         let elsewhere = MeetingFileStore(path: bed.harness.root.appendingPathComponent("logs/meeting_files.json"))
         XCTAssertTrue(elsewhere.setKeep(true, jobID: record.jobID))
 
-        let result = await controller(bed).preview(for: .days30)
+        let result = try await told(by: controller(bed))
 
         XCTAssertTrue(result.isEmpty)
         XCTAssertEqual(result.skipped, RetentionPreview.Skipped(kept: 1))
@@ -392,7 +398,7 @@ final class RetentionPreviewTests: XCTestCase {
         XCTAssertFalse(probe.sawMainThread)
         probe.release()
         let result = await answer.value
-        XCTAssertEqual(result.bytes, 42)
+        XCTAssertEqual(result?.bytes, 42)
     }
 
     func testTheChosenFoldersScopeIsOpenWhileTheDiskIsReadAndClosedAfter() async throws {
@@ -407,7 +413,7 @@ final class RetentionPreviewTests: XCTestCase {
             return FileOnDisk.read(path)
         }
 
-        let result = await sut.preview(for: .days30)
+        let result = try await told(by: sut)
 
         XCTAssertEqual(result.meetingCount, 1)
         XCTAssertEqual(Set(openDuringReads.values), [1])
@@ -425,7 +431,7 @@ final class RetentionPreviewTests: XCTestCase {
             return .gone
         }
 
-        let result = await sut.preview(for: .days30)
+        let result = try await told(by: sut)
 
         XCTAssertTrue(result.isEmpty)
         XCTAssertEqual(reads.values, [])
