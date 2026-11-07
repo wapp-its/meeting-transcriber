@@ -879,8 +879,10 @@ the rule cannot see: a folder, a link or an unreadable file at the notes path,
 notes switched off with the transcript removed by hand, or saved jobs it cannot
 read (the meeting then counts as not through). A file out of reach or one that
 refuses to go stays listed and is tried again at the next check. The check runs
-at launch, once a day, when a meeting finishes, when a Notion export ends and 5
-seconds after a confirmed setting change, and never two at once.
+at launch, once a day, when a meeting finishes, when a Notion export ends, when
+the pipeline builds or rebuilds its queue (the first time it is needed and each
+time watching starts) and 5 seconds after a confirmed setting change, and never
+two at once.
 
 Choosing a value that would delete audio now first shows what it deletes
 (`RetentionPreview`). Cancel is that alert's default button, so Return cancels.
