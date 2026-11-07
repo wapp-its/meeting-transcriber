@@ -78,6 +78,16 @@ enum RecordingRetentionRule {
         record.savedToNotion || record.files.contains { $0.role == .protocol && $0.state == .present }
     }
 
+    /// What the record alone has to say for the audio to go, whatever the date: a
+    /// recording that finished with its notes saved, or with notes off, not kept and
+    /// with no failed deletion on it. Also asked under the store's lock before each
+    /// file of an automatic deletion, as another build can change any of it meanwhile.
+    static func recordAllowsDeletion(_ record: MeetingFileRecord) -> Bool {
+        guard case let .finished(protocolExpected) = record.outcome else { return false }
+        return record.origin == .recorded && !record.keep && !record.excludedFromAutomaticDeletion
+            && record.incomplete == nil && (!protocolExpected || hasSavedProtocol(record))
+    }
+
     /// The audio to delete now: the owned files still marked present of a meeting
     /// that finished with its notes saved, or with notes off, whose queue is through
     /// with it, with no deletion under way or left unfinished, and that is due. Empty
@@ -85,10 +95,7 @@ enum RecordingRetentionRule {
     static func audioToDelete(
         record: MeetingFileRecord, live: LiveMeetingState?, retention: RecordingRetention, now: Date, calendar: Calendar,
     ) -> [MeetingFile] {
-        guard case let .finished(protocolExpected) = record.outcome,
-              !protocolExpected || hasSavedProtocol(record),
-              live?.isSettled ?? true,
-              record.incomplete == nil, record.pending == nil,
+        guard recordAllowsDeletion(record), live?.isSettled ?? true, record.pending == nil,
               let due = dueDate(record: record, retention: retention, calendar: calendar), due <= now
         else { return [] }
         return record.filesCovered(by: .automatic).filter { $0.state == .present }

@@ -104,7 +104,8 @@ final class PipelineController {
     /// through a queue nothing else shows.
     @ObservationIgnored var onQueueReplaced: ((PipelineQueue) -> Void)?
 
-    /// Called when a meeting reaches `.done` and when a Notion export ends, which is
+    /// Called when a meeting reaches `.done`, when a Notion export ends and after a
+    /// rebuild, whose restore can finish a job before the queue has its callbacks. It is
     /// what the automatic deletion waits for. Read at each call, so it reaches every queue.
     @ObservationIgnored var onMeetingSettled: (() -> Void)?
 
@@ -223,6 +224,7 @@ final class PipelineController {
         builtQueue = built
         configureCallbacks()
         onQueueReplaced?(queue)
+        onMeetingSettled?()
     }
 
     /// Whether the installed queue is one this controller built, as opposed to

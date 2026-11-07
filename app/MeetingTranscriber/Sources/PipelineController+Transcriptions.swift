@@ -83,7 +83,7 @@ extension PipelineController {
     @discardableResult
     func setKeep(jobID: UUID, _ keep: Bool) -> Bool {
         guard let record = actionableMeetingRecord(jobID: jobID), record.origin == .recorded else { return false }
-        return meetingFileStore.update(jobID: jobID) { $0.keep = keep }
+        return meetingFileStore.setKeep(keep, jobID: jobID)
     }
 
     /// Finish, at launch, what a quit or a crash stopped. A meeting with nothing

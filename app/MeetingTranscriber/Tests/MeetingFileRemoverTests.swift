@@ -358,6 +358,7 @@ final class MeetingFileRemoverTests: XCTestCase {
             ([result(.listedByAnotherMeeting), result(.listedByAnotherMeeting)], "2 files are also listed by another meeting"),
             ([result(.refused("this volume has no Trash")), result(.refused("this volume has no Trash"))], "this volume has no Trash"),
             ([result(.recordNotSaved)], "the meeting's record could not be saved"),
+            ([result(.meetingChanged)], "the meeting changed while it was being deleted"),
             (
                 [result(.refused("no Trash")), result(.replaced), result(.unreachable)],
                 "1 file is on a drive or in a folder that is not available; 1 file was replaced; no Trash",

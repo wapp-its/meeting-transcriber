@@ -53,6 +53,7 @@ struct MeetingFileRemover {
         case unreachable
         case replaced
         case listedByAnotherMeeting
+        case meetingChanged
         case refused(String)
         case recordNotSaved
     }
@@ -101,6 +102,9 @@ struct MeetingFileRemover {
 
         case .listedByAnotherMeeting:
             return .failed(.listedByAnotherMeeting)
+
+        case .meetingChanged:
+            return .failed(.meetingChanged)
 
         case .notSaved:
             return .failed(.recordNotSaved)
@@ -167,6 +171,7 @@ struct MeetingFileRemover {
             parts.append(text)
         }
         if failures.contains(.recordNotSaved) { parts.append("the meeting's record could not be saved") }
+        if failures.contains(.meetingChanged) { parts.append("the meeting changed while it was being deleted") }
         return parts.joined(separator: "; ")
     }
 }

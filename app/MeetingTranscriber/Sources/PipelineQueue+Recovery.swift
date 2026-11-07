@@ -40,6 +40,7 @@ extension PipelineQueue {
         // state just adopted. Dropping it lost that state whenever the
         // adoption itself writes nothing (see below): a job that had just
         // failed stayed on disk as running and ran again on the next launch.
+        snapshotRestoreFailed = replaced.snapshotRestoreFailed
         var adopted = replaced.jobs
         // An export still running there is not interrupted: it is stopped and
         // started again below, so a slow Notion never keeps the old queue (and
@@ -111,7 +112,7 @@ extension PipelineQueue {
             }
             loaded = decoded
         } catch {
-            logger.error("Failed to load pipeline snapshot: \(error.localizedDescription, privacy: .public)")
+            noteSnapshotRestoreFailed(error)
             return
         }
 
@@ -197,6 +198,11 @@ extension PipelineQueue {
         if !pendingSpeakerNamingJobs.isEmpty {
             NotificationCenter.default.post(name: .showSpeakerNaming, object: nil)
         }
+    }
+
+    private func noteSnapshotRestoreFailed(_ error: any Error) {
+        logger.error("Failed to load pipeline snapshot: \(error.localizedDescription, privacy: .public)")
+        snapshotRestoreFailed = true
     }
 
     /// What to do with each job that was interrupted mid-run, decided before

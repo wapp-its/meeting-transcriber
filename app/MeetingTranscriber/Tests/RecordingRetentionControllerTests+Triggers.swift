@@ -437,6 +437,69 @@ extension RecordingRetentionControllerTests {
         XCTAssertNotNil(harness.store.record(for: empty), "may have a row in the unreadable file")
     }
 
+    /// Having an engine says the queue tried, not that it read anything: it stays
+    /// empty when the file does not read. So the job may still be in there, also once
+    /// another queue has taken over from that one.
+    func testASnapshotTheQueueCouldNotReadKeepsTheAudioAndTheRecord() async throws {
+        let (harness, pipeline, retention) = try bareRun()
+        let job = try harness.recordedMeeting()
+        let snapshot = harness.logDir.appendingPathComponent(PipelineSnapshot.snapshotFilename)
+        try Data("not json".utf8).write(to: snapshot)
+        let empty = makeEmptyRecord(in: harness)
+        pipeline.activate { MockEngine() }
+
+        for step in ["the first queue", "the queue after it"] {
+            pipeline.rebuild()
+            XCTAssertNotNil(pipeline.queue.engine, "test premise")
+            XCTAssertEqual(pipeline.queue.jobs.count, 0, "test premise")
+
+            await retention.checkNow()
+
+            XCTAssertEqual(pipeline.liveMeetingState(jobID: job.id), .init(state: .waiting, notionExportRunning: false), step)
+            XCTAssertTrue(pipeline.listsMeeting(jobID: empty), step)
+            XCTAssertEqual(harness.deletedForGood, [], step)
+            XCTAssertNil(try harness.record(of: job).audioDeletion, step)
+            XCTAssertNotNil(harness.store.record(for: empty), "\(step): may have a row in the unreadable file")
+        }
+    }
+
+    /// A queue that read its snapshot is what the answers go by, so a meeting it does
+    /// not hold has no live state and no row, whatever the file says from then on.
+    func testAQueueThatReadItsSnapshotAnswersForItsMeetings() async throws {
+        let (harness, pipeline, _) = try bareRun()
+        let job = try harness.recordedMeeting()
+        try PipelineSnapshot.save([], to: harness.logDir)
+        let empty = makeEmptyRecord(in: harness)
+        pipeline.activate { MockEngine() }
+
+        pipeline.rebuild()
+        await pipeline.queue.awaitSnapshotFlush()
+        try Data("not json".utf8).write(to: harness.logDir.appendingPathComponent(PipelineSnapshot.snapshotFilename))
+
+        XCTAssertNil(pipeline.liveMeetingState(jobID: job.id))
+        XCTAssertFalse(pipeline.listsMeeting(jobID: empty))
+    }
+
+    /// Its names are lost, so the restore finishes it, before the queue has any
+    /// callbacks. Nothing else would tell the check until the next day.
+    func testAJobTheRestoreFinishesSetsOffACheck() async throws {
+        let (harness, pipeline, retention) = try bareRun()
+        var job = try harness.recordedMeeting()
+        job.state = .speakerNamingPending
+        try PipelineSnapshot.save([job], to: harness.logDir)
+
+        await retention.checkNow()
+        XCTAssertEqual(harness.deletedForGood, [], "parked for its names")
+
+        pipeline.activate { MockEngine() }
+        pipeline.rebuild()
+        XCTAssertEqual(pipeline.queue.job(withID: job.id)?.state, .done, "test premise")
+
+        await waitFor { harness.store.record(for: job.id)?.audioDeletion != nil }
+
+        XCTAssertEqual(harness.deletedForGood.count, 3)
+    }
+
     func testAJobInAnUnreadSnapshotKeepsItsEmptyRecord() async throws {
         let (harness, _, retention) = try bareRun()
         let job = PipelineJob(

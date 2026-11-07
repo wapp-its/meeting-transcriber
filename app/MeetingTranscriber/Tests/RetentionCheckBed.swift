@@ -138,6 +138,24 @@ final class RetentionCheckBed {
 
     // MARK: - Looking at the result
 
+    /// Calls `look` at each change of the store's records. The store saves first and
+    /// tells afterwards, so the record file already holds that change.
+    func onEveryRecordWrite(_ look: @escaping @MainActor () -> Void) {
+        withObservationTracking {
+            _ = store.records
+        } onChange: { [weak self] in
+            MainActor.assumeIsolated {
+                look()
+                self?.onEveryRecordWrite(look)
+            }
+        }
+    }
+
+    /// What a crash at this moment would leave for the launch to settle.
+    var recordFileHoldsADeletionMark: Bool {
+        ((try? String(contentsOf: harness.recordPath, encoding: .utf8)) ?? "").contains("\"pending\"")
+    }
+
     func current(_ record: MeetingFileRecord) throws -> MeetingFileRecord {
         store.reload()
         return try XCTUnwrap(store.record(for: record.jobID))

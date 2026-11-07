@@ -64,6 +64,11 @@ class PipelineQueue {
     /// the state it was derived from, for no gain.
     var protocolResumeDispositions: [UUID: ProtocolResumeDisposition] = [:]
 
+    /// The snapshot file did not read when this queue restored from it, so `jobs`
+    /// says nothing about the jobs saved there. A queue that adopts this one's jobs
+    /// takes this over with them; the next launch reads whatever the file holds then.
+    var snapshotRestoreFailed = false
+
     /// Whether the protocol stage found a generator for a job, kept until the
     /// job's terminal state hands it to the meeting's outcome. The setting can
     /// change while the call runs, and a meeting is judged by the attempt it got.

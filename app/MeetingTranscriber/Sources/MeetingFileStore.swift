@@ -270,7 +270,21 @@ extension MeetingFileStore {
     enum RemovalStart: Equatable {
         case marked
         case listedByAnotherMeeting
+        case meetingChanged
         case notSaved
+    }
+
+    /// Set the Keep mark, unless a deletion of the meeting is under way. Under the
+    /// lock the deletion's mark is written under, so the first of the two wins: a Keep
+    /// that came first stops the deletion, and a deletion that came first refuses the
+    /// Keep, which never reads as saved beside audio that went.
+    func setKeep(_ keep: Bool, jobID: UUID) -> Bool {
+        transact { document in
+            guard let index = document.records.firstIndex(where: { $0.jobID == jobID }),
+                  document.records[index].pending == nil else { return false }
+            document.records[index].keep = keep
+            return true
+        }
     }
 
     /// Save a deletion before it touches its first file. False starts nothing: the
@@ -303,7 +317,9 @@ extension MeetingFileStore {
 
     /// Mark one file as being deleted, the last step before it is touched. A path
     /// another record lists is left alone: that meeting still needs the file. An
-    /// entry the other record knows is gone holds nothing back.
+    /// entry the other record knows is gone holds nothing back. An automatic deletion
+    /// also stops here when the record no longer allows it: not every write of another
+    /// build looks at the mark, and what has not gone yet can still stay.
     func startRemoving(path: String, jobID: UUID) -> RemovalStart {
         var answer = RemovalStart.notSaved
         let marked = transact { document in
@@ -312,6 +328,11 @@ extension MeetingFileStore {
             }
             if listedElsewhere { answer = .listedByAnotherMeeting }
             guard !listedElsewhere, let index = document.records.firstIndex(where: { $0.jobID == jobID }) else {
+                return false
+            }
+            if document.records[index].pending?.kind == .automatic,
+               !RecordingRetentionRule.recordAllowsDeletion(document.records[index]) {
+                answer = .meetingChanged
                 return false
             }
             document.records[index].setState(.deleting, ofFileAt: path)

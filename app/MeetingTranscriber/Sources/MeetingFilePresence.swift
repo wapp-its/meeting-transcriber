@@ -26,6 +26,14 @@ enum MeetingFilePresence: Equatable, Sendable {
         close(parent)
         return .gone
     }
+
+    /// Whether `path` leads to a regular file the app can read, through a link too.
+    /// `of` answers that something is there, which a folder or a dangling link also
+    /// is, so it cannot say that a file holds anything.
+    static func isReadableFile(_ path: String) -> Bool {
+        var info = stat()
+        return stat(path, &info) == 0 && info.st_mode & S_IFMT == S_IFREG && access(path, R_OK) == 0
+    }
 }
 
 /// A file's identity on disk: volume and file number from `lstat`. A rename

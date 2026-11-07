@@ -11,8 +11,9 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Recordi
 /// - **Nothing happens before `start()`.** `AppState` is built by many unit tests,
 ///   so `init` only stores its inputs, and the menu-bar `.task` calls `start()`.
 /// - **When it checks:** at `start()`, every `interval`, on `requestCheck`, which the
-///   pipeline calls when a meeting reaches `.done` and when a Notion export ends, and
-///   never two at once. `Task.sleep` counts through system sleep (see `LivenessMarker`).
+///   pipeline calls when a meeting reaches `.done`, when a Notion export ends and after
+///   a rebuild, and never two at once. `Task.sleep` counts through system sleep (see
+///   `LivenessMarker`).
 /// - **Paths come from the record.** It never resolves an output folder to find a
 ///   file, so the silent fallback folder cannot lead it to anything.
 /// - **Automatic deletions never read as incomplete.** A file that is out of reach or
@@ -156,14 +157,15 @@ final class RecordingRetentionController {
         RecordingRetentionRule.audioToDelete(record: record, live: live, retention: retention, now: time, calendar: calendar)
     }
 
-    /// The deletion never reaches a meeting whose notes are not on the disk, as the
-    /// audio would then be the last copy, whatever the record last marked. The disk
-    /// is asked off the main actor, because it can block on a network volume, and
-    /// everything is read again after that wait, down to the setting.
+    /// The deletion never reaches a meeting whose notes are not a file on the disk that
+    /// can be read, as the audio would then be the last copy, whatever the record last
+    /// marked. The disk is asked off the main actor, because it can block on a network
+    /// volume, and everything is read again after that wait, down to the setting.
     private func deleteAudio(of meeting: Selected, at time: Date) async {
         let record = meeting.record
         let notes = Self.notesToFind(in: record)
         let answers = await Self.presence(of: meeting.files.map(\.path) + notes.map(\.path))
+        let readableNotes = await Self.readableFiles(among: notes.map(\.path))
 
         store.reload()
         let unchanged = store.record(for: record.jobID) == record && audioToDelete(
@@ -173,14 +175,16 @@ final class RecordingRetentionController {
             logger.notice("Automatic deletion skipped meeting \(Self.shortID(record), privacy: .public): it changed")
             return
         }
-        if !record.savedToNotion, !notes.contains(where: { answers[$0.path] == .present }) {
+        if !record.savedToNotion, !notes.contains(where: { readableNotes.contains($0.path) }) {
             store.markGone(jobID: record.jobID, roles: Set(notes.filter { answers[$0.path] == .gone }.map(\.role)))
             logger.notice("Automatic deletion kept meeting \(Self.shortID(record), privacy: .public): no saved notes found")
             return
         }
-        let reachable = meeting.files.filter { answers[$0.path] != .unreachable }
-        guard !reachable.isEmpty else {
-            logger.notice("Automatic deletion retries meeting \(Self.shortID(record), privacy: .public): its audio is out of reach")
+        // Nothing here for this pass to delete, so no deletion begins: a crash after
+        // its mark would have the launch date one the app never did.
+        guard meeting.files.contains(where: { answers[$0.path] == .present }) else {
+            store.markGone(jobID: record.jobID, roles: Set(meeting.files.filter { answers[$0.path] == .gone }.map(\.role)))
+            logger.notice("Automatic deletion found nothing to delete of meeting \(Self.shortID(record), privacy: .public)")
             return
         }
         // Every file, also those out of reach: a crash now must not let the launch
@@ -190,6 +194,7 @@ final class RecordingRetentionController {
             logger.notice("Automatic deletion skipped meeting \(Self.shortID(record), privacy: .public): its mark was not saved")
             return
         }
+        let reachable = meeting.files.filter { answers[$0.path] != .unreachable }
         finish(record, outcomes: remover.remove(reachable, mode: .forGood, in: store, jobID: record.jobID), of: meeting.files, at: time)
     }
 
@@ -278,15 +283,21 @@ final class RecordingRetentionController {
             Dictionary(paths.map { ($0, MeetingFilePresence.of($0)) }) { first, _ in first }
         }.value
     }
+
+    nonisolated private static func readableFiles(among paths: [String]) async -> Set<String> {
+        await Task.detached(priority: .utility) {
+            Set(paths.filter { MeetingFilePresence.isReadableFile($0) })
+        }.value
+    }
 }
 
 extension PipelineController {
     /// What the queue knows of a meeting. A job the queue has not read yet counts,
     /// as the record says finished a moment before the snapshot does, and a crash in
     /// between comes back as a job still running. Building the queue to ask it would
-    /// resume those jobs, so its unread file is read instead (`loadSnapshot` reads the
-    /// same two places), and a file that cannot be read answers that the meeting is
-    /// not through, which keeps its audio.
+    /// resume those jobs, so its unread file is read instead, and when the saved jobs
+    /// cannot be known the answer is that the meeting is not through, which keeps its
+    /// audio.
     func liveMeetingState(jobID: UUID) -> LiveMeetingState? {
         if let job = queue.jobs.first(where: { $0.id == jobID }) {
             return LiveMeetingState(
@@ -296,8 +307,7 @@ extension PipelineController {
                 notionExportRunning: job.notionExportStatus == .inProgress || queue.notionExportTasks[jobID] != nil,
             )
         }
-        guard queue.engine == nil else { return nil }
-        guard let saved = try? jobsInUnreadSnapshot() else {
+        guard let saved = jobsTheQueueHasNotRead() else {
             return LiveMeetingState(state: .waiting, notionExportRunning: false)
         }
         return saved.first { $0.id == jobID }.map { job in
@@ -305,19 +315,26 @@ extension PipelineController {
         }
     }
 
-    /// Whether the All Recordings window still has a row for a meeting. An unreadable
-    /// snapshot may hold one.
+    /// Whether the All Recordings window still has a row for a meeting. Saved jobs that
+    /// cannot be known may hold one.
     func listsMeeting(jobID: UUID) -> Bool {
         if queue.jobs.contains(where: { $0.id == jobID }) || terminalJobStore.lookup(jobID: jobID) != nil { return true }
-        guard queue.engine == nil else { return false }
-        return (try? jobsInUnreadSnapshot())?.contains { $0.id == jobID } ?? true
+        return jobsTheQueueHasNotRead()?.contains { $0.id == jobID } ?? true
     }
 
-    /// The saved jobs, none when there is no file.
-    private func jobsInUnreadSnapshot() throws -> [PipelineJob] {
+    // swiftlint:disable discouraged_optional_collection
+    /// The saved jobs only the snapshot holds (`loadSnapshot` reads the same two
+    /// places), none once a queue has read it or when there is no file, and nil when
+    /// they cannot be known: the file does not read, or did not when the queue tried,
+    /// which leaves a queue with an engine and an empty list.
+    private func jobsTheQueueHasNotRead() -> [PipelineJob]? {
+        guard !queue.snapshotRestoreFailed else { return nil }
+        guard queue.engine == nil else { return [] }
         let logDir = queueEnvironment.logDir
-        return try PipelineSnapshotStore.existing(for: logDir)?.latestSaved ?? PipelineSnapshot.load(from: logDir) ?? []
+        return try? PipelineSnapshotStore.existing(for: logDir)?.latestSaved ?? PipelineSnapshot.load(from: logDir) ?? []
     }
+
+    // swiftlint:enable discouraged_optional_collection
 
     /// Call `onMeetingSettled` after the callbacks already on the queue. Last, because
     /// the local-model notices end a noticed job's callback early.
