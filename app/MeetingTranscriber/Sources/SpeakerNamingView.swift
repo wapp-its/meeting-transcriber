@@ -140,12 +140,6 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
         _keyboardGracePeriodActive = State(initialValue: gracePeriod > 0)
     }
 
-    /// Smallest width the dialog can be shown at. The window scene uses
-    /// `.windowResizability(.contentSize)`, so this is also the narrowest the
-    /// window opens at, and every control in the re-run area has to fit it
-    /// without truncation (`SpeakerNamingRerunLayoutTests`).
-    static let minimumWidth: CGFloat = 400
-
     /// Range of the re-run count. The count is read by the Standard method
     /// only (`DiarizerMode.countsSpeakersItself`), so the range is Standard's
     /// and does not change with the picked method.
@@ -208,6 +202,20 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
     @State private var rerunCount: Int = 2
     /// Number of "Known:" chips shown by default before "More…" appears.
     private static let knownChipsCollapsedLimit = 8
+
+    /// Width bounds of the dialog. The scene sizes the window to its content
+    /// (`.windowResizability(.contentSize)`), so the window is exactly as wide
+    /// as the content's ideal width allows. A chip row asked for its ideal
+    /// size gets no width to wrap at and answers with all chips on one line,
+    /// so without a maximum here a meeting with many participants, or an
+    /// expanded "More" list, opened the window several screens wide. Bounded,
+    /// the rows are offered a width and wrap. No fixed ideal width: the content
+    /// still sets it within these bounds, so the re-run controls keep the width
+    /// they need. `minWidth` is also the narrowest the window opens at, and
+    /// every control in the re-run area has to fit it without truncation
+    /// (`SpeakerNamingRerunLayoutTests`).
+    static let minWidth: CGFloat = 400
+    static let maxWidth: CGFloat = 900
 
     private var speakers: [(label: String, autoName: String?, speakingTime: Double)] {
         Self.computeSpeakers(from: data)
@@ -372,7 +380,7 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
             escapeDismissShortcut
         }
         .padding()
-        .frame(minWidth: Self.minimumWidth, maxHeight: 700)
+        .frame(minWidth: Self.minWidth, maxWidth: Self.maxWidth, maxHeight: 700)
         .id(data.meetingTitle)
         .onAppear { resetForCurrentPresentation() }
         // After Re-run, lateDiarization replaces the SpeakerNamingData for
