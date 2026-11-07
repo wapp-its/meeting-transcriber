@@ -10,7 +10,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-189-pick-the-protocol-template-from-the",
   "spec_path": ".flow/tasks/gh-189-pick-the-protocol-template-from-the.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement Pick the protocol template from the meeting title",
   "updated_at": "2026-11-07T16:28:11.998413Z"
 }
