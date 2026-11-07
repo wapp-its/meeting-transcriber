@@ -11,7 +11,8 @@ struct RecordingAudioLine: Equatable, Sendable {
         /// Out of reach, which is neither there nor gone.
         let unreachableCount: Int
         /// Every audio file the record lists as the app's, each path once, also those
-        /// gone: what "2 of 3 files" counts.
+        /// gone, except a 16 kHz copy it lists as gone: what "2 of 3 files" counts. The
+        /// pipeline removes those copies by itself once the speakers are named.
         let totalCount: Int
         /// Of the present files only.
         let bytes: Int64
