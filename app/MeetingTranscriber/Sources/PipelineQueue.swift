@@ -637,7 +637,9 @@ class PipelineQueue {
         var job = inputJob
         stampTranscriptOutputOptions(on: &job)
         jobs.append(job)
-        meetingFileStore?.create(MeetingFileRecord(job: job, origin: origin))
+        if let meetingFileStore {
+            meetingFileStore.create(MeetingFileRecord(job: job, origin: origin, createdBy: meetingFileStore.bundleID))
+        }
         eventLog.append(jobID: job.id, event: "enqueued", from: nil, to: job.state)
         saveSnapshot()
         logger.info("Enqueued job: \(job.meetingTitle, privacy: .private) (\(job.id))")

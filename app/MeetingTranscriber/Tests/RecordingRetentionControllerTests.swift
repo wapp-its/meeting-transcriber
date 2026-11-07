@@ -92,11 +92,13 @@ final class RecordingRetentionControllerTests: XCTestCase {
         }
     }
 
-    /// The two builds share the record file, and a meeting of the other one counts.
+    /// Another store of this build, such as the queue's, wrote the record after this
+    /// store last read the file: the check goes by the file. Another build's meeting
+    /// is a different matter (`testEachBuildsSettingReachesOnlyTheMeetingsThatBuildRecorded`).
     func testACheckGoesByWhatTheRecordFileSaysNow() async throws {
         let bed = try makeRetentionCheckBed()
-        let otherBuild = MeetingFileStore(path: bed.harness.recordPath)
-        let record = try bed.meeting(writtenBy: otherBuild)
+        let sameBuild = MeetingFileStore(path: bed.harness.recordPath, bundleID: bed.store.bundleID)
+        let record = try bed.meeting(writtenBy: sameBuild)
         XCTAssertNil(bed.store.record(for: record.jobID), "test premise")
 
         await bed.check()

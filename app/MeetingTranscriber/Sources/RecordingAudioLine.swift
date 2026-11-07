@@ -38,13 +38,17 @@ struct RecordingAudioLine: Equatable, Sendable {
     let incompleteText: String?
 
     /// `live` is nil when the queue no longer lists the job, and `audio` nil when the
-    /// row has no record.
+    /// row has no record. `bundleID` is the running build's: the line promises an
+    /// automatic deletion only where that build's check would make it.
     static func resolve( // swiftlint:disable:this function_parameter_count
         record: MeetingFileRecord?, live: LiveMeetingState?, audio: AudioOnDisk?, retention: RecordingRetention,
-        now: Date, calendar: Calendar, locale: Locale,
+        bundleID: String?, now: Date, calendar: Calendar, locale: Locale,
     ) -> Self {
         guard let record, let audio else { return Self(text: nil, showsKeepBadge: false, incompleteText: nil) }
-        let inputs = Inputs(record: record, live: live, audio: audio, retention: retention, now: now, calendar: calendar, locale: locale)
+        let inputs = Inputs(
+            record: record, live: live, audio: audio, retention: retention, bundleID: bundleID, now: now, calendar: calendar,
+            locale: locale,
+        )
         return Self(
             text: inputs.text,
             showsKeepBadge: record.keep,
@@ -66,6 +70,7 @@ struct RecordingAudioLine: Equatable, Sendable {
         let live: LiveMeetingState?
         let audio: AudioOnDisk
         let retention: RecordingRetention
+        let bundleID: String?
         let now: Date
         let calendar: Calendar
         let locale: Locale
@@ -120,7 +125,8 @@ struct RecordingAudioLine: Equatable, Sendable {
         }
 
         /// What happens to audio on disk, or nil when the line has nothing to promise.
-        /// Keep is true in every state, and the setting only reaches a finished meeting.
+        /// Keep is true in every state, and the setting only reaches a finished meeting
+        /// it can ever delete: none of another build or from before this feature.
         func next(_ standing: Standing) -> String? {
             if record.keep { return "kept, never deleted automatically" }
             switch standing {
@@ -134,12 +140,11 @@ struct RecordingAudioLine: Equatable, Sendable {
                 return nil
 
             case let .finished(protocolExpected):
-                guard retention != .never else { return nil }
+                guard retention != .never, RecordingRetentionRule.reaches(record, bundleID: bundleID) else { return nil }
                 if live?.notionExportRunning == true { return "kept until the Notion export ends" }
                 if protocolExpected, !RecordingRetentionRule.hasSavedProtocol(record) { return "kept, no notes were saved" }
-                return RecordingRetentionRule.dueDate(record: record, retention: retention, calendar: calendar).map { due in
-                    "deleted automatically \(due <= now ? "at the next check" : "on \(day(due))")"
-                }
+                return RecordingRetentionRule.dueDate(record: record, retention: retention, calendar: calendar, bundleID: bundleID)
+                    .map { due in "deleted automatically \(due <= now ? "at the next check" : "on \(day(due))")" }
             }
         }
 

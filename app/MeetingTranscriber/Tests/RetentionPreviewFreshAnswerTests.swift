@@ -72,7 +72,7 @@ final class RetentionPreviewFreshAnswerTests: XCTestCase {
             for _ in 0 ..< cached {
                 try bed.meeting()
             }
-            let cache = MeetingFileStore(path: bed.harness.recordPath)
+            let cache = MeetingFileStore(path: bed.harness.recordPath, bundleID: bed.store.bundleID)
             try bed.meeting()
             try setRecordFile(bed, readable: false)
 
@@ -87,7 +87,7 @@ final class RetentionPreviewFreshAnswerTests: XCTestCase {
     func testAValueNotCheckedStaysUnsavedAndIsAskedAgainOnceTheFileReads() async throws {
         let bed = try makeRetentionCheckBed()
         bed.settings.recordingRetention = .never
-        let cache = MeetingFileStore(path: bed.harness.recordPath)
+        let cache = MeetingFileStore(path: bed.harness.recordPath, bundleID: bed.store.bundleID)
         let record = try bed.meeting()
         try setRecordFile(bed, readable: false)
         let sut = controller(bed, store: cache)
@@ -119,7 +119,7 @@ final class RetentionPreviewFreshAnswerTests: XCTestCase {
         let line = "Could not read which meetings “After 30 days” would delete, so the setting did not change. Try again later."
         let goes = RetentionPreview(
             Selection(
-                records: [RetentionFixture.record()], live: { _ in nil }, retention: .days30,
+                records: [RetentionFixture.record()], live: { _ in nil }, retention: .days30, bundleID: RetentionFixture.thisBuild,
                 now: RetentionFixture.longAfter, calendar: RetentionFixture.calendar,
             ),
         ) { _ in .present(bytes: 100) }
@@ -167,7 +167,7 @@ final class RetentionPreviewFreshAnswerTests: XCTestCase {
                 asked.append(id)
                 return false
             },
-            retention: .days30, now: RetentionFixture.longAfter, calendar: RetentionFixture.calendar,
+            retention: .days30, bundleID: RetentionFixture.thisBuild, now: RetentionFixture.longAfter, calendar: RetentionFixture.calendar,
         )
 
         XCTAssertFalse(selection.isComplete)
@@ -179,7 +179,7 @@ final class RetentionPreviewFreshAnswerTests: XCTestCase {
     func testAJobKnownToBeBusyLeavesTheSelectionComplete() {
         let selection = Selection(
             records: [RetentionFixture.record()], live: { _ in self.busy }, isKnown: { _ in true },
-            retention: .days30, now: RetentionFixture.longAfter, calendar: RetentionFixture.calendar,
+            retention: .days30, bundleID: RetentionFixture.thisBuild, now: RetentionFixture.longAfter, calendar: RetentionFixture.calendar,
         )
 
         XCTAssertTrue(selection.isComplete)
@@ -304,10 +304,10 @@ final class RetentionPreviewFreshAnswerTests: XCTestCase {
         XCTAssertEqual(reads.count, Set(reads).count, "each file is read once")
     }
 
-    /// Other parts of the app, and other builds, write through a store of their own.
+    /// Other parts of the app write through a store of their own.
     func testAMeetingWrittenWhileTheDiskAnswersIsCounted() async throws {
         let bed = try bedWithAudioGone()
-        let elsewhere = MeetingFileStore(path: bed.harness.recordPath)
+        let elsewhere = MeetingFileStore(path: bed.harness.recordPath, bundleID: bed.store.bundleID)
         var written: MeetingFileRecord?
 
         let (answer, _) = try await preview(bed) { written = try bed.meeting(writtenBy: elsewhere) }

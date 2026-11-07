@@ -66,7 +66,7 @@ final class MeetingDeletionHarness {
     init(root: URL, settings: AppSettings) throws {
         self.root = root
         self.settings = settings
-        store = MeetingFileStore(path: root.appendingPathComponent("logs/meeting_files.json"))
+        store = MeetingFileStore(path: root.appendingPathComponent("logs/meeting_files.json"), bundleID: RetentionFixture.thisBuild)
         history = TerminalJobStore(path: root.appendingPathComponent("logs/terminal_jobs.json"))
         fakeTrash = try FakeTrash(folder: root.appendingPathComponent("fake-trash", isDirectory: true))
         try FileManager.default.createDirectory(
@@ -178,7 +178,7 @@ final class MeetingDeletionHarness {
         job.state = .done
         job.transcriptPath = try write("\(stem).txt")
         job.protocolPath = try write("\(stem).md")
-        var record = MeetingFileRecord(job: job, origin: origin)
+        var record = MeetingFileRecord(job: job, origin: origin, createdBy: store.bundleID)
         record.outcome = .finished(protocolExpected: true)
         for (role, url) in [(MeetingFile.Role.transcript, job.transcriptPath), (.protocol, job.protocolPath)] {
             try record.list(MeetingFile(role: role, url: XCTUnwrap(url), owned: origin.owns(role)))

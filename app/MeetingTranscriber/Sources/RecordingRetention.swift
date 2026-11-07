@@ -49,16 +49,28 @@ struct LiveMeetingState: Equatable, Sendable {
 }
 
 /// When a meeting's audio is due and which of its files the automatic check
-/// deletes now. Pure: the clock and the calendar come in, and "present" is what the
-/// record marks. The check is what asks the disk, right before it deletes.
+/// deletes now. Pure: the clock, the calendar and the running build's bundle
+/// identifier come in, and "present" is what the record marks. The check is what
+/// asks the disk, right before it deletes.
 enum RecordingRetentionRule {
+    /// Whether the automatic deletion reaches the meeting at all, whatever the date
+    /// and its state: audio the app recorded, of a meeting this build created the
+    /// record of, not kept and not from before this feature. The development and the
+    /// release build share the record file but not the setting, so a build's setting
+    /// never reaches the other build's meetings, nor a record from before the field.
+    static func reaches(_ record: MeetingFileRecord, bundleID: String?) -> Bool {
+        guard let bundleID, record.createdBy == bundleID else { return false }
+        return record.origin == .recorded && !record.keep && !record.excludedFromAutomaticDeletion
+    }
+
     /// Nil where the audio is never due: under Never, for an import, a kept meeting,
-    /// a recording from before this feature or one without a recording date. Right
-    /// after the notes is due from the start, so only `audioToDelete`'s other
-    /// conditions hold it back.
-    static func dueDate(record: MeetingFileRecord, retention: RecordingRetention, calendar: Calendar) -> Date? {
-        guard record.origin == .recorded, !record.keep, !record.excludedFromAutomaticDeletion,
-              let recorded = record.recordingDate else { return nil }
+    /// another build's meeting, a recording from before this feature or one without a
+    /// recording date. Right after the notes is due from the start, so only
+    /// `audioToDelete`'s other conditions hold it back.
+    static func dueDate(
+        record: MeetingFileRecord, retention: RecordingRetention, calendar: Calendar, bundleID: String?,
+    ) -> Date? {
+        guard reaches(record, bundleID: bundleID), let recorded = record.recordingDate else { return nil }
         switch retention {
         case .never:
             return nil
@@ -79,24 +91,26 @@ enum RecordingRetentionRule {
     }
 
     /// What the record alone has to say for the audio to go, whatever the date: a
-    /// recording that finished with its notes saved, or with notes off, not kept and
-    /// with no failed deletion on it. Also asked under the store's lock before each
-    /// file of an automatic deletion, as another build can change any of it meanwhile.
-    static func recordAllowsDeletion(_ record: MeetingFileRecord) -> Bool {
+    /// recording of this build that finished with its notes saved, or with notes off,
+    /// not kept and with no failed deletion on it. Also asked under the store's lock
+    /// before each file of an automatic deletion, as another build can change any of
+    /// it meanwhile.
+    static func recordAllowsDeletion(_ record: MeetingFileRecord, bundleID: String?) -> Bool {
         guard case let .finished(protocolExpected) = record.outcome else { return false }
-        return record.origin == .recorded && !record.keep && !record.excludedFromAutomaticDeletion
-            && record.incomplete == nil && (!protocolExpected || hasSavedProtocol(record))
+        return reaches(record, bundleID: bundleID) && record.incomplete == nil
+            && (!protocolExpected || hasSavedProtocol(record))
     }
 
-    /// The audio to delete now: the owned files still marked present of a meeting
-    /// that finished with its notes saved, or with notes off, whose queue is through
-    /// with it, with no deletion under way or left unfinished, and that is due. Empty
-    /// in every other case.
-    static func audioToDelete(
+    /// The audio to delete now: the owned files still marked present of a meeting of
+    /// this build that finished with its notes saved, or with notes off, whose queue
+    /// is through with it, with no deletion under way or left unfinished, and that is
+    /// due. Empty in every other case.
+    static func audioToDelete( // swiftlint:disable:this function_parameter_count
         record: MeetingFileRecord, live: LiveMeetingState?, retention: RecordingRetention, now: Date, calendar: Calendar,
+        bundleID: String?,
     ) -> [MeetingFile] {
-        guard recordAllowsDeletion(record), live?.isSettled ?? true, record.pending == nil,
-              let due = dueDate(record: record, retention: retention, calendar: calendar), due <= now
+        guard recordAllowsDeletion(record, bundleID: bundleID), live?.isSettled ?? true, record.pending == nil,
+              let due = dueDate(record: record, retention: retention, calendar: calendar, bundleID: bundleID), due <= now
         else { return [] }
         return record.filesCovered(by: .automatic).filter { $0.state == .present }
     }

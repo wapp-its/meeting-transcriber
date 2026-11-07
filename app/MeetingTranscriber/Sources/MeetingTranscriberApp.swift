@@ -249,6 +249,7 @@ struct MeetingTranscriberApp: App {
             retryDeletion: { appState.pipeline.retryDeletion(jobID: $0) },
             setKeep: { appState.pipeline.setKeep(jobID: $0, $1) },
             retention: { appState.settings.recordingRetention },
+            bundleID: appState.pipeline.meetingFileStore.bundleID,
             templateChoices: { appState.protocolTemplateChoices() },
             optionsUse: { appState.protocolOptionsUse() },
             chooseFile: { RegenerateProtocolView.chooseFile(startingIn: appState.settings.effectiveOutputDir) },

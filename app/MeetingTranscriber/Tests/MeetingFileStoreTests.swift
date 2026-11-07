@@ -48,6 +48,7 @@ final class MeetingFileStoreTests: XCTestCase {
         record.pending = .init(kind: .meetingToTrash, paths: ["/a", "/b"])
         record.excludedFromAutomaticDeletion = true
         record.savedToNotion = true
+        record.createdBy = "com.example.meetingtranscriber"
 
         let store = MeetingFileStore(path: path)
         XCTAssertTrue(store.create(record))
@@ -70,17 +71,21 @@ final class MeetingFileStoreTests: XCTestCase {
         XCTAssertEqual(MeetingFileStore(path: path).records, [])
     }
 
-    /// The first record stands: its recording date is written once, and nothing
-    /// that enters the same job twice may reset a Keep or a deletion state.
+    /// The first record stands: its recording date and the build that created it are
+    /// written once, and nothing that enters the same job twice may reset a Keep or a
+    /// deletion state.
     func testCreatingARecordTheStoreHasKeepsTheFirst() throws {
         let store = try MeetingFileStore(path: makePath())
-        let record = makeRecord()
+        var record = makeRecord()
+        record.createdBy = "com.example.first"
         store.create(record)
         store.update(jobID: record.jobID) { $0.keep = true }
 
+        record.createdBy = "com.example.second"
         XCTAssertTrue(store.create(record))
 
         XCTAssertEqual(store.record(for: record.jobID)?.keep, true)
+        XCTAssertEqual(store.record(for: record.jobID)?.createdBy, "com.example.first")
         XCTAssertEqual(store.records.count, 1)
     }
 
@@ -123,6 +128,7 @@ final class MeetingFileStoreTests: XCTestCase {
         XCTAssertFalse(record.keep)
         XCTAssertFalse(record.excludedFromAutomaticDeletion)
         XCTAssertFalse(record.savedToNotion)
+        XCTAssertNil(record.createdBy, "a record from before the field, never deleted automatically")
     }
 
     func testAudioRolesAreTheThreeTracksAndTheirCopies() {

@@ -22,7 +22,7 @@ final class ProtocolRegenerationMeetingFilesTests: XCTestCase {
         folder = try makeTempDirectory(prefix: "regeneration_files_test")
         trashBin = try makeTempDirectory(prefix: "regeneration_files_trash")
         store = MeetingFileStore(path: folder.appendingPathComponent("logs/meeting_files.json"))
-        store.create(MeetingFileRecord(job: job, origin: .recorded))
+        store.create(MeetingFileRecord(job: job, origin: .recorded, createdBy: store.bundleID))
     }
 
     private var txt: URL {
@@ -240,7 +240,8 @@ final class ProtocolRegenerationMeetingFilesTests: XCTestCase {
             pipelineEnvironment: IsolatedQueueEnvironment.make(logDir: folder.appendingPathComponent("app_logs")),
             settings: settings,
         )
-        state.pipeline.meetingFileStore.create(MeetingFileRecord(job: job, origin: .recorded))
+        let records = state.pipeline.meetingFileStore
+        records.create(MeetingFileRecord(job: job, origin: .recorded, createdBy: records.bundleID))
         try Data("# New notes".utf8).write(to: md)
 
         state.protocolRegenerator.environment.protocolReplaced(job.id, md, nil)

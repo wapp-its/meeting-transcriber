@@ -41,13 +41,17 @@ final class RetentionCheckBed {
         harness.settings.recordingRetention = .days30
     }
 
-    func controller(interval: Duration = .seconds(3600)) -> RecordingRetentionController {
+    /// `store` and `settings` stand for another build sharing the record file, which
+    /// has its own setting and identifier; by default this bed's.
+    func controller(
+        interval: Duration = .seconds(3600), store: MeetingFileStore? = nil, settings: AppSettings? = nil,
+    ) -> RecordingRetentionController {
         let readClock = { [self] in
             clockReads += 1
             return clock
         }
         return RecordingRetentionController(
-            settings: settings, store: store,
+            settings: settings ?? self.settings, store: store ?? self.store,
             remover: MeetingFileRemover(
                 trash: { url in
                     XCTFail("the automatic check moved \(url.lastPathComponent) to the Trash")
@@ -99,7 +103,8 @@ final class RetentionCheckBed {
 
     /// A finished meeting: three tracks and their 16 kHz copies, segments, a naming
     /// file, a transcript, a protocol and the protocol before it. A recording owns
-    /// its tracks. `audioFolder` puts the audio apart from everything else.
+    /// its tracks. `audioFolder` puts the audio apart from everything else. Created
+    /// by the build `writer` stands for, as `PipelineQueue` creates a record.
     @discardableResult
     func meeting(
         origin: MeetingFileRecord.Origin = .recorded,
@@ -123,7 +128,7 @@ final class RetentionCheckBed {
             files: audio.map { role, name in
                 try file(role, "\(stem)_\(name)", owned: origin.owns(role), in: audioFolder)
             } + other.map { role, name in try file(role, "\(stem)_\(name)") },
-            outcome: outcome,
+            outcome: outcome, createdBy: (writer ?? store).bundleID,
         )
         try change(&record)
         XCTAssertTrue((writer ?? store).create(record), "test premise")

@@ -52,6 +52,9 @@ struct AllRecordingsActions {
     var setKeep: (UUID, Bool) -> Void
     /// The setting the audio line says what happens next by.
     var retention: () -> RecordingRetention
+    /// The running build's bundle identifier, as the record store has it: the line
+    /// promises an automatic deletion only for a meeting this build recorded.
+    var bundleID: String?
 
     // MARK: Regenerate sheet
 
@@ -68,8 +71,8 @@ struct AllRecordingsActions {
     var generate: (ProtocolRegenerationTarget, MeetingProtocolOptions) -> Void
 
     /// Every action does nothing, no job can be retried or has a file record, no
-    /// file is on disk, recordings are kept and protocol generation is off, so a
-    /// test sets only what it asserts on.
+    /// file is on disk, recordings are kept, the build has no identifier and protocol
+    /// generation is off, so a test sets only what it asserts on.
     static let noop = Self(
         openProtocol: { _ in true },
         openTranscript: { _ in true },

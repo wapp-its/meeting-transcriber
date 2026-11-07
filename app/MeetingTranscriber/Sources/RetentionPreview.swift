@@ -80,19 +80,22 @@ struct RetentionPreview: Equatable, Sendable {
         let isComplete: Bool
 
         /// The rule alone settles most, and the queue's answer can read a file, so the
-        /// queue is asked only about a meeting that could go.
+        /// queue is asked only about a meeting that could go. `bundleID` is the running
+        /// build's, whose meetings alone its setting reaches.
         @MainActor
         init(
             records: [MeetingFileRecord], live: @MainActor (UUID) -> LiveMeetingState?,
             isKnown: @MainActor (UUID) -> Bool = { _ in true }, retention: RecordingRetention,
-            now: Date, calendar: Calendar,
+            bundleID: String?, now: Date, calendar: Calendar,
         ) {
             var meetings: [[MeetingFile]] = []
             var skipped = Skipped()
             var isComplete = true
             for record in records {
                 let audioToDelete = { (state: LiveMeetingState?) in
-                    RecordingRetentionRule.audioToDelete(record: record, live: state, retention: retention, now: now, calendar: calendar)
+                    RecordingRetentionRule.audioToDelete(
+                        record: record, live: state, retention: retention, now: now, calendar: calendar, bundleID: bundleID,
+                    )
                 }
                 guard !audioToDelete(nil).isEmpty else {
                     skipped.count(record, queueSaysFailed: false)

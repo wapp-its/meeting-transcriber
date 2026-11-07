@@ -21,8 +21,8 @@ final class RecordingAudioLineTests: XCTestCase {
         locale: Locale = RetentionFixture.locale,
     ) -> RecordingAudioLine {
         RecordingAudioLine.resolve(
-            record: record, live: live, audio: audio ?? mb286, retention: retention, now: now ?? beforeDue,
-            calendar: calendar, locale: locale,
+            record: record, live: live, audio: audio ?? mb286, retention: retention, bundleID: Fixture.thisBuild,
+            now: now ?? beforeDue, calendar: calendar, locale: locale,
         )
     }
 
@@ -157,6 +157,23 @@ final class RecordingAudioLineTests: XCTestCase {
         XCTAssertEqual(line(Fixture.record { $0.excludedFromAutomaticDeletion = true }).text, "Audio · 286 MB", "from before this feature")
         XCTAssertEqual(line(Fixture.record(recordingDate: nil)).text, "Audio · 286 MB", "no recording date")
         XCTAssertEqual(line(Fixture.record(outcome: .leftUnfinished)).text, "Audio · 286 MB", "left the queue unfinished")
+        XCTAssertEqual(line(Fixture.record { $0.createdBy = Fixture.otherBuild }).text, "Audio · 286 MB", "another build's meeting")
+        XCTAssertEqual(line(Fixture.record { $0.createdBy = nil }).text, "Audio · 286 MB", "a record from before the field")
+    }
+
+    /// Nor a reason to wait, which would say the audio goes afterwards.
+    func testAMeetingTheCheckNeverDeletesNamesNoWaitEither() {
+        let rows: [(String, MeetingFileRecord, LiveMeetingState?)] = [
+            ("another build's, notes not saved", Fixture.record { record in
+                record.createdBy = Fixture.otherBuild
+                record.setFiles(.protocol, to: nil)
+            }, nil),
+            ("another build's, export running", Fixture.record { $0.createdBy = Fixture.otherBuild }, live(.done, exporting: true)),
+            ("from before this feature, export running", Fixture.record { $0.excludedFromAutomaticDeletion = true }, live(.done, exporting: true)),
+        ]
+        for (name, record, live) in rows {
+            XCTAssertEqual(line(record, live: live).text, "Audio · 286 MB", name)
+        }
     }
 
     // MARK: - What the disk answered

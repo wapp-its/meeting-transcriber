@@ -7,6 +7,8 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Recordi
 /// Deletes finished meetings' audio for good as `AppSettings.recordingRetention`
 /// says. `RecordingRetentionRule` decides, from the record alone; this asks the disk
 /// and the queue right before it deletes. `AppState` owns it as `recordingRetention`.
+/// The setting is this build's own, so it reaches only the meetings this build
+/// recorded: the store's `bundleID` goes into every question to the rule.
 ///
 /// - **Nothing happens before `start()`.** `AppState` is built by many unit tests,
 ///   so `init` only stores its inputs, and the menu-bar `.task` calls `start()`.
@@ -169,7 +171,7 @@ final class RecordingRetentionController {
         }
         let selection = RetentionPreview.Selection(
             records: store.records, live: { liveState($0) }, isKnown: { liveStateIsKnown($0) },
-            retention: retention, now: now(), calendar: calendar,
+            retention: retention, bundleID: store.bundleID, now: now(), calendar: calendar,
         )
         guard selection.isComplete else {
             logger.error("Retention preview for \(retention.rawValue, privacy: .public): the queue's saved jobs do not read")
@@ -233,7 +235,9 @@ final class RecordingRetentionController {
     private func audioToDelete(
         _ record: MeetingFileRecord, live: LiveMeetingState?, retention: RecordingRetention, at time: Date,
     ) -> [MeetingFile] {
-        RecordingRetentionRule.audioToDelete(record: record, live: live, retention: retention, now: time, calendar: calendar)
+        RecordingRetentionRule.audioToDelete(
+            record: record, live: live, retention: retention, now: time, calendar: calendar, bundleID: store.bundleID,
+        )
     }
 
     /// The deletion never reaches a meeting whose notes are not a file on the disk that

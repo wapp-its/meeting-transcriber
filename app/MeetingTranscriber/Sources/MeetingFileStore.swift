@@ -37,6 +37,10 @@ final class MeetingFileStore {
     private static let lockRetryInterval: useconds_t = 10000
 
     @ObservationIgnored private let path: URL
+    /// The running build's bundle identifier: the build a record created here is
+    /// stamped with, and the only build whose records the automatic deletion acts on
+    /// (`RecordingRetentionRule`). Injected, so a test can run two builds over one file.
+    @ObservationIgnored let bundleID: String?
     private(set) var records: [MeetingFileRecord] = []
     /// When the file was first created: what a recovered recording's audio is
     /// compared with to tell one from before this feature. Written once, before
@@ -44,8 +48,9 @@ final class MeetingFileStore {
     /// version does not read as older than the file.
     @ObservationIgnored private(set) var since = Date()
 
-    init(path: URL) {
+    init(path: URL, bundleID: String? = Bundle.main.bundleIdentifier) {
         self.path = path
+        self.bundleID = bundleID
         reload()
     }
 
@@ -333,7 +338,7 @@ extension MeetingFileStore {
                 return false
             }
             if document.records[index].pending?.kind == .automatic,
-               !RecordingRetentionRule.recordAllowsDeletion(document.records[index]) {
+               !RecordingRetentionRule.recordAllowsDeletion(document.records[index], bundleID: bundleID) {
                 answer = .meetingChanged
                 return false
             }

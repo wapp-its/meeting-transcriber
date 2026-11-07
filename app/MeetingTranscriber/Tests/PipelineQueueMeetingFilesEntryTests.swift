@@ -142,6 +142,33 @@ final class PipelineQueueMeetingFilesEntryTests: XCTestCase {
         }
     }
 
+    // MARK: - The build that created it
+
+    /// Each way a record starts names the running build, the only one whose setting
+    /// deletes the meeting's audio automatically.
+    func testEveryRecordNamesTheBuildThatCreatedIt() async throws {
+        let build = "com.example.meetingtranscriber.dev"
+        store = MeetingFileStore(path: logDir.appendingPathComponent("meeting_files.json"), bundleID: build)
+        let queue = makeQueue()
+        let recorded = try PipelineJob(
+            meetingTitle: "Recorded", appName: "Teams", mixPath: createTestAudioFile(in: tmpDir), appPath: nil, micPath: nil, micDelay: 0,
+        )
+        let imported = try PipelineJob(
+            meetingTitle: "Imported", appName: "File", mixPath: createTestAudioFile(in: tmpDir), appPath: nil, micPath: nil, micDelay: 0,
+        )
+
+        queue.enqueue(recorded, origin: .recorded)
+        queue.enqueue(imported)
+        try stageRecording(in: stagingDir)
+        await queue.recoverOrphanedRecordings(recordingsDir: stagingDir)
+
+        XCTAssertEqual(queue.jobs.count, 3, "test premise: recorded, imported and recovered")
+        for job in queue.jobs {
+            XCTAssertEqual(store.record(for: job.id)?.createdBy, build, job.meetingTitle)
+        }
+        await queue.awaitProcessing()
+    }
+
     // MARK: - Recovered recordings
 
     /// Later than the true start, so its audio is kept longer, never shorter.

@@ -83,12 +83,19 @@ struct MeetingFileRecord: Codable, Equatable, Sendable {
     var pending: PendingDeletion?
     var excludedFromAutomaticDeletion = false
     var savedToNotion = false
+    /// The bundle identifier of the build that created the record, written once when
+    /// it is created and never changed. The development and the release build share
+    /// the record file but each has its own retention setting, so the automatic
+    /// deletion acts only on the records of its own build. Nil in a record from before
+    /// this field, or from a build without an identifier: never deleted automatically.
+    var createdBy: String?
 }
 
 extension MeetingFileRecord {
     /// A new record for a job entering processing, listing the source tracks it
-    /// carries.
-    init(job: PipelineJob, origin: Origin) {
+    /// carries. `createdBy` is the running build's bundle identifier
+    /// (`MeetingFileStore.bundleID`).
+    init(job: PipelineJob, origin: Origin, createdBy: String?) {
         let tracks: [(role: MeetingFile.Role, url: URL?)] = [
             (.mix, job.mixPath), (.appTrack, job.appPath), (.micTrack, job.micPath),
         ]
@@ -99,6 +106,7 @@ extension MeetingFileRecord {
             files: tracks.compactMap { track in
                 track.url.map { MeetingFile(role: track.role, url: $0, owned: origin.owns(track.role)) }
             },
+            createdBy: createdBy,
         )
     }
 
@@ -119,6 +127,7 @@ extension MeetingFileRecord {
             excludedFromAutomaticDeletion: container
                 .decodeIfPresent(Bool.self, forKey: .excludedFromAutomaticDeletion) ?? false,
             savedToNotion: container.decodeIfPresent(Bool.self, forKey: .savedToNotion) ?? false,
+            createdBy: container.decodeIfPresent(String.self, forKey: .createdBy),
         )
     }
 

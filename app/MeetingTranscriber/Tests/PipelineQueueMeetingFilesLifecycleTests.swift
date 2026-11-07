@@ -206,7 +206,7 @@ final class PipelineQueueMeetingFilesLifecycleTests: XCTestCase {
     /// The job never comes back, so it does not stay "in progress" for good.
     func testAJobTheRestoreDiscardsForItsMissingAudioLeftUnfinished() async throws {
         let job = try makeRecording()
-        store.create(MeetingFileRecord(job: job, origin: .recorded))
+        store.create(MeetingFileRecord(job: job, origin: .recorded, createdBy: store.bundleID))
         try FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
         try PipelineSnapshot.save([job], to: logDir)
         try FileManager.default.removeItem(at: XCTUnwrap(job.mixPath))

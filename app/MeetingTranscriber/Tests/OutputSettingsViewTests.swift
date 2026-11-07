@@ -160,7 +160,8 @@ final class OutputSettingsViewTests: XCTestCase {
     private func answer(meetings: Int, for retention: RecordingRetention = .days30) -> RetentionPreview {
         let records = (0 ..< meetings).map { _ in RetentionFixture.record() }
         let selection = RetentionPreview.Selection(
-            records: records, live: { _ in nil }, retention: retention, now: RetentionFixture.longAfter, calendar: RetentionFixture.calendar,
+            records: records, live: { _ in nil }, retention: retention, bundleID: RetentionFixture.thisBuild,
+            now: RetentionFixture.longAfter, calendar: RetentionFixture.calendar,
         )
         return RetentionPreview(selection) { _ in .present(bytes: 100) }
     }

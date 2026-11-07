@@ -12,6 +12,10 @@ enum RetentionFixture {
 
     /// Reads "15 Nov".
     static let locale = Locale(identifier: "en_GB")
+    /// The running build, which created every record here unless a test says otherwise.
+    static let thisBuild = "com.example.meetingtranscriber.this"
+    /// A second build sharing the record file, as the development and the release build do.
+    static let otherBuild = "com.example.meetingtranscriber.other"
     static let recorded = date(2026, 10, 16)
     /// Long past every due date.
     static let longAfter = date(2027, 6, 1)
@@ -37,7 +41,7 @@ enum RetentionFixture {
             : [file(.mix, "source.wav", owned: false)]
         var record = MeetingFileRecord(
             jobID: UUID(), origin: origin, recordingDate: recordingDate,
-            files: tracks + [file(.transcript, "b.txt"), file(.protocol, "b.md")], outcome: outcome,
+            files: tracks + [file(.transcript, "b.txt"), file(.protocol, "b.md")], outcome: outcome, createdBy: thisBuild,
         )
         change(&record)
         return record
@@ -71,15 +75,15 @@ final class RecordingRetentionRuleTests: XCTestCase {
 
     private func audio(
         _ record: MeetingFileRecord, live: LiveMeetingState? = nil, retention: RecordingRetention = .days30,
-        now: Date = RetentionFixture.longAfter,
+        now: Date = RetentionFixture.longAfter, bundleID: String? = RetentionFixture.thisBuild,
     ) -> [String] {
         RecordingRetentionRule.audioToDelete(
-            record: record, live: live, retention: retention, now: now, calendar: Fixture.calendar,
+            record: record, live: live, retention: retention, now: now, calendar: Fixture.calendar, bundleID: bundleID,
         ).map { URL(filePath: $0.path).lastPathComponent }
     }
 
-    private func due(_ record: MeetingFileRecord, _ retention: RecordingRetention) -> Date? {
-        RecordingRetentionRule.dueDate(record: record, retention: retention, calendar: Fixture.calendar)
+    private func due(_ record: MeetingFileRecord, _ retention: RecordingRetention, bundleID: String? = RetentionFixture.thisBuild) -> Date? {
+        RecordingRetentionRule.dueDate(record: record, retention: retention, calendar: Fixture.calendar, bundleID: bundleID)
     }
 
     // MARK: - The setting's values
@@ -176,6 +180,30 @@ final class RecordingRetentionRuleTests: XCTestCase {
                 XCTAssertEqual(audio(record, retention: retention), [], "\(name), \(retention)")
             }
         }
+    }
+
+    // MARK: - The build that recorded it
+
+    /// The development and the release build share the record file, each with a
+    /// setting of its own: one build's setting never reaches the other's meetings,
+    /// nor a record from before the field, nor anything when the build has no
+    /// identifier. Due under this build's identifier, so only that one differs.
+    func testOnlyTheBuildThatCreatedTheRecordDeletesItsAudio() {
+        XCTAssertEqual(audio(Fixture.record()), everyAudioFile, "test premise: this build's own meeting goes")
+        let rows: [(String, MeetingFileRecord, String?)] = [
+            ("another build's meeting", Fixture.record { $0.createdBy = Fixture.otherBuild }, Fixture.thisBuild),
+            ("a record from before the field", Fixture.record { $0.createdBy = nil }, Fixture.thisBuild),
+            ("a build without an identifier", Fixture.record { $0.createdBy = nil }, nil),
+        ]
+        for (name, record, bundleID) in rows {
+            XCTAssertFalse(RecordingRetentionRule.recordAllowsDeletion(record, bundleID: bundleID), name)
+            for retention in RecordingRetention.allCases {
+                XCTAssertNil(due(record, retention, bundleID: bundleID), "\(name), \(retention)")
+                XCTAssertEqual(audio(record, retention: retention, bundleID: bundleID), [], "\(name), \(retention)")
+            }
+        }
+        let theOthers = Fixture.record { $0.createdBy = Fixture.otherBuild }
+        XCTAssertEqual(audio(theOthers, bundleID: Fixture.otherBuild), everyAudioFile, "the other build deletes its own")
     }
 
     // MARK: - Saved protocol

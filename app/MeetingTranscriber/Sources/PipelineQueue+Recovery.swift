@@ -490,7 +490,7 @@ extension PipelineQueue {
     /// automatically. A date that cannot be read counts as that, the safe side.
     private func createRecord(ofRecovered job: PipelineJob, mix: URL) {
         guard let meetingFileStore else { return }
-        var record = MeetingFileRecord(job: job, origin: .recorded)
+        var record = MeetingFileRecord(job: job, origin: .recorded, createdBy: meetingFileStore.bundleID)
         let created = (try? FileManager.default.attributesOfItem(atPath: mix.path))?[.creationDate] as? Date
         record.excludedFromAutomaticDeletion = created.map { $0 < meetingFileStore.since } ?? true
         meetingFileStore.create(record)

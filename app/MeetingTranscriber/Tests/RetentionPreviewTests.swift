@@ -15,7 +15,9 @@ final class RetentionPreviewTests: XCTestCase {
         _ records: [MeetingFileRecord], live: [UUID: LiveMeetingState] = [:], retention: RecordingRetention = .days30,
         now: Date = Fixture.longAfter,
     ) -> RetentionPreview.Selection {
-        RetentionPreview.Selection(records: records, live: { live[$0] }, retention: retention, now: now, calendar: Fixture.calendar)
+        RetentionPreview.Selection(
+            records: records, live: { live[$0] }, retention: retention, bundleID: Fixture.thisBuild, now: now, calendar: Fixture.calendar,
+        )
     }
 
     private func preview(
@@ -43,6 +45,8 @@ final class RetentionPreviewTests: XCTestCase {
             Fixture.record { $0.excludedFromAutomaticDeletion = true },
             Fixture.record { $0.setAudio(to: .gone) },
             Fixture.record(recordingDate: nil),
+            Fixture.record { $0.createdBy = Fixture.otherBuild },
+            Fixture.record { $0.createdBy = nil },
         ]
     }
 
@@ -75,6 +79,7 @@ final class RetentionPreviewTests: XCTestCase {
                     let expected = records.map { record in
                         RecordingRetentionRule.audioToDelete(
                             record: record, live: queue[record.jobID], retention: retention, now: now, calendar: Fixture.calendar,
+                            bundleID: Fixture.thisBuild,
                         )
                     }.filter { !$0.isEmpty }
 
@@ -156,7 +161,7 @@ final class RetentionPreviewTests: XCTestCase {
                 asked.append(id)
                 return nil
             },
-            retention: .days30, now: Fixture.longAfter, calendar: Fixture.calendar,
+            retention: .days30, bundleID: Fixture.thisBuild, now: Fixture.longAfter, calendar: Fixture.calendar,
         )
 
         XCTAssertEqual(asked, [plain.jobID])

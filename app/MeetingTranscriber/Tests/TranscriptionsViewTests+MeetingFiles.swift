@@ -45,6 +45,7 @@ extension TranscriptionsViewTests {
             files: listed.map { file in
                 MeetingFile(role: file.role, path: "/rec/\(entry.id)_\(file.name)", identity: nil, owned: origin.owns(file.role), state: .present)
             },
+            createdBy: RetentionFixture.thisBuild,
         )
         record.outcome = .finished(protocolExpected: true)
         change(&record)
@@ -60,6 +61,7 @@ extension TranscriptionsViewTests {
         actions.meetingFiles = { id in meetings.first { $0.entry.id == id }?.meeting.record }
         actions.audioOnDisk = { entry in meetings.first { $0.entry.id == entry.id }?.meeting.audio }
         actions.retention = { retention }
+        actions.bundleID = RetentionFixture.thisBuild
         return actions
     }
 

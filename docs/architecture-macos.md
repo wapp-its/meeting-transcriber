@@ -402,7 +402,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `NamingStatusDTO.swift` | Wire shape for `GET /v1/jobs/<id>/naming` — per-speaker auto-name suggestion + speaking time + participants |
 | `IdempotencyStore.swift` | Bounded FIFO map of `Idempotency-Key` → created job IDs for the `/v1` enqueue routes |
 | `TerminalJobStore.swift` | File-backed store of recent finished-job statuses (survives queue reaping + app restart) |
-| `MeetingFileRecord.swift` | One meeting's files and what has happened to them: paths, ownership, recording date, Keep mark, pending and incomplete deletions (see [Meeting Files and Deletion](#meeting-files-and-deletion)) |
+| `MeetingFileRecord.swift` | One meeting's files and what has happened to them: paths, ownership, recording date, Keep mark, the build that created it, pending and incomplete deletions (see [Meeting Files and Deletion](#meeting-files-and-deletion)) |
 | `MeetingFileStore.swift` | `meeting_files.json`: every meeting's record, lock-guarded writes shared with a second running build |
 | `MeetingFilePresence.swift` | The one probe of a meeting's file: present, gone, or out of reach |
 | `MeetingFileRemover.swift` | Moves a meeting's files to the Trash or deletes them for good, after the pending mark is on disk |
@@ -815,8 +815,8 @@ always use the default handler.
 Each meeting that enters processing gets a `MeetingFileRecord`, kept by
 `MeetingFileStore` in `meeting_files.json` beside `terminal_jobs.json` and keyed
 by the job id. The record lists every file of the meeting with its current path
-and whether the app owns it, plus the recording date, the Keep mark and the
-state of any deletion. It follows each file as the pipeline writes, moves,
+and whether the app owns it, plus the recording date, the Keep mark, the state
+of any deletion and the bundle identifier of the build that created it. It follows each file as the pipeline writes, moves,
 replaces or removes it, and it outlives the 1000-entry finished-job list. A
 deletion only touches a path the record lists, never one derived from a file
 name or a folder. An imported source file is never owned, also inside the
@@ -862,12 +862,13 @@ says what the retention setting deletes.
 **Automatically.** Settings → Output → Recordings, "Delete recordings
 automatically": Never (the default), Right after the notes, After 7 days, After
 30 days or After 90 days. `RecordingRetentionRule` selects, from the record
-alone, the audio of meetings the app recorded, whose outcome is finished (notes
+alone, the audio of meetings this build recorded, whose outcome is finished (notes
 saved, or the transcript when notes generation was off; speakers named), that
 are not marked Keep and whose recording date plus the chosen days has passed. `RecordingRetentionController` deletes that audio
 for good, not to the Trash; the transcript, the notes and all other files stay.
 It never touches imports, failed meetings, kept meetings, meetings without a
-record or recordings from before this feature. It skips a meeting whose state
+record, recordings from before this feature or meetings another build recorded.
+A row the setting never reaches shows only its audio size. It skips a meeting whose state
 changed since the check began or whose Notion export is running. Right before it
 deletes, it asks the disk and the queue again, and it keeps the audio in cases
 the rule cannot see: a folder, a link or an unreadable file at the notes path,
@@ -888,7 +889,13 @@ records or the queue's saved jobs do not read, the value is not saved.
 The development and the release build share the data folder. Every write to
 `meeting_files.json` takes a lock and changes only its one record, and a
 deletion found pending is left alone while the process that started it still
-runs.
+runs. Each build keeps its own retention setting, so a build's setting reaches
+only the records it created: the record names that build's bundle identifier
+(`createdBy`, written once), and the rule, the row's audio line, the preview and
+the store's last look before each file all take the running build's identifier
+(`MeetingFileStore.bundleID`). A record without the field, written before it
+existed, is never deleted automatically. The manual actions act on any meeting
+the window lists.
 
 ---
 

@@ -265,7 +265,8 @@ struct TranscriptionsView: View {
             audioLine: RecordingAudioLine.resolve(
                 record: record,
                 live: entry.isLive ? LiveMeetingState(state: entry.state, notionExportRunning: exportRunning) : nil,
-                audio: audio, retention: actions.retention(), now: Date(), calendar: .current, locale: .current,
+                audio: audio, retention: actions.retention(), bundleID: actions.bundleID, now: Date(), calendar: .current,
+                locale: .current,
             ),
             items: RecordingRowActions.menuItems(
                 state: entry.state, onDisk: onDisk, canRetry: canRetry, meeting: meeting,

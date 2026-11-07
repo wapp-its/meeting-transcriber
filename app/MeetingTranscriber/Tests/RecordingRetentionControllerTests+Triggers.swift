@@ -552,7 +552,7 @@ extension RecordingRetentionControllerTests {
         let record = MeetingFileRecord(
             jobID: UUID(), origin: .recorded, recordingDate: RetentionFixture.recorded,
             files: [MeetingFile(role: .mix, url: urls[0], owned: true), MeetingFile(role: .protocol, url: urls[1], owned: true)],
-            outcome: .finished(protocolExpected: true),
+            outcome: .finished(protocolExpected: true), createdBy: store.bundleID,
         )
         XCTAssertTrue(store.create(record), "test premise")
 
