@@ -44,12 +44,24 @@ enum StartRecordingSource: Hashable {
 /// What the start dialog holds while it is open. A reference type so a view
 /// test can preset a selection, which `List(selection:)` does not let it make,
 /// and read back what Start hands over.
+///
+/// After `reset(choices:)`, every change of the source or the title moves the
+/// template to what the rules pick for the title the recording would get,
+/// until the user changes the template picker.
 @Observable
 @MainActor
 final class StartRecordingDraft {
-    var source: StartRecordingSource?
-    var title: String
+    var source: StartRecordingSource? {
+        didSet { followRules() }
+    }
+
+    var title: String {
+        didSet { followRules() }
+    }
+
     let protocolOptions: ProtocolOptionsDraft
+    /// The templates and rules as read when the dialog opened; nil before.
+    private var choices: ProtocolTemplateChoices?
 
     init(
         source: StartRecordingSource? = nil,
@@ -72,12 +84,31 @@ final class StartRecordingDraft {
         }
     }
 
+    /// The title the recording would get, nil without a source: the job's
+    /// title, which the queue would match the rules against.
+    var meetingTitle: String? {
+        switch request {
+        case .none: nil
+        case .microphone: ManualRecordingInfo.microphoneTitle
+        case let .app(_, _, title): title
+        }
+    }
+
     /// How every opening of the dialog starts: nothing selected, no title, the
-    /// default template and no background.
-    func reset(defaultTemplate: ProtocolTemplateID) {
+    /// default template, no background, and with rules the line saying the
+    /// default applies until a source is chosen.
+    func reset(choices: ProtocolTemplateChoices) {
+        self.choices = nil
         source = nil
         title = ""
-        protocolOptions.reset(to: defaultTemplate)
+        protocolOptions.reset(to: choices.defaultTemplate)
+        self.choices = choices
+        followRules()
+    }
+
+    private func followRules() {
+        guard let choices else { return }
+        protocolOptions.follow(choices, title: meetingTitle)
     }
 }
 
@@ -106,6 +137,8 @@ struct AppPickerView: View {
     @State private var apps: [RunningApp] = []
     /// The templates as read when the window opened, nil before that.
     @State private var openedChoices: ProtocolTemplateChoices?
+    /// What the line under the template picker adds to the window's height.
+    @State private var templateLineHeight: CGFloat = 0
     /// SwiftUI keeps the first object it is handed for the view's lifetime, so
     /// a test holds the object every control of the dialog writes to.
     @State private var draft: StartRecordingDraft
@@ -158,17 +191,18 @@ struct AppPickerView: View {
                 Text(appRecordingCaption)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                ProtocolOptionsForm(context: context, draft: draft.protocolOptions)
+                ProtocolOptionsForm(context: context, draft: draft.protocolOptions) { templateLineHeight = $0 }
                 actions
             }
             .padding()
         }
-        .frame(width: 440, height: 620)
+        // Grows by the line under the template picker, so nothing is clipped.
+        .frame(width: 440, height: 620 + templateLineHeight)
         .onAppear {
             apps = appsProvider.runningApps()
             let opened = templateChoices()
             openedChoices = opened
-            draft.reset(defaultTemplate: opened.defaultTemplate)
+            draft.reset(choices: opened)
         }
     }
 

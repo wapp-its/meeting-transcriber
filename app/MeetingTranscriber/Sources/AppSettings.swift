@@ -753,6 +753,19 @@ final class AppSettings { // swiftlint:disable:this type_body_length
     /// `ProtocolTemplateMigration`, which sets it when it is absent.
     static let defaultProtocolTemplateKey = "defaultProtocolTemplate"
 
+    /// The template rules, in the order they are tried: a new meeting gets the
+    /// template of the first rule whose pattern matches its title, else the
+    /// default (`ProtocolTemplateRules.resolve`). Kept per build, like the
+    /// default template. Settings writes only patterns that compile; one
+    /// that does not (from another build) is skipped when a title is matched.
+    var protocolTemplateRules: [ProtocolTemplateRule] {
+        didSet {
+            defaults.set(ProtocolTemplateRule.storedList(protocolTemplateRules), forKey: Self.protocolTemplateRulesKey)
+        }
+    }
+
+    static let protocolTemplateRulesKey = "protocolTemplateRules"
+
     /// Append the verbatim transcript to generated Markdown meeting minutes.
     /// Defaults to `true` to preserve the output format used before this option
     /// was introduced.
@@ -1112,6 +1125,7 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         #endif
         protocolLanguage = defaults.string(forKey: "protocolLanguage") ?? "German"
         defaultProtocolTemplate = ProtocolTemplateID(storedValue: defaults.string(forKey: Self.defaultProtocolTemplateKey) ?? "")
+        protocolTemplateRules = ProtocolTemplateRule.list(fromStored: defaults.array(forKey: Self.protocolTemplateRulesKey) ?? [])
         includeFullTranscriptInProtocol = defaults.bool(forKey: "includeFullTranscriptInProtocol", default: true)
         saveRawTranscriptSeparately = defaults.bool(forKey: "saveRawTranscriptSeparately", default: true)
         useAITitleForFilenames = defaults.bool(forKey: "useAITitleForFilenames", default: false)

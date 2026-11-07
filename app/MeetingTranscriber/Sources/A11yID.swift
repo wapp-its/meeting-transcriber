@@ -241,11 +241,39 @@ enum A11yID {
         "protocolTemplateDelete.\(index)"
     }
 
+    /// Settings → Output → Template Rules. A rule row's controls are addressed
+    /// by ROW POSITION, never by pattern or template name: both are user input,
+    /// for the reason on `consentDeniedAppRemove`.
+    static let templateRulesAddButton = "templateRulesAddButton"
+    static let templateRulesTryTitleField = "templateRulesTryTitleField"
+    static let templateRulesTryResult = "templateRulesTryResult"
+
+    static func templateRulePatternField(_ index: Int) -> String {
+        "templateRulePatternField.\(index)"
+    }
+
+    static func templateRuleTemplatePicker(_ index: Int) -> String {
+        "templateRuleTemplatePicker.\(index)"
+    }
+
+    static func templateRuleMoveUp(_ index: Int) -> String {
+        "templateRuleMoveUp.\(index)"
+    }
+
+    static func templateRuleMoveDown(_ index: Int) -> String {
+        "templateRuleMoveDown.\(index)"
+    }
+
+    static func templateRuleDelete(_ index: Int) -> String {
+        "templateRuleDelete.\(index)"
+    }
+
     /// The per-recording options form (`ProtocolOptionsForm`). Constants only:
     /// its windows show background text and stay off every RPC allowlist.
     static let protocolOptionsTemplatePicker = "protocolOptionsTemplatePicker"
     static let protocolOptionsBackgroundEditor = "protocolOptionsBackgroundEditor"
     static let protocolOptionsDestinationNotice = "protocolOptionsDestinationNotice"
+    static let protocolOptionsTemplateLine = "protocolOptionsTemplateLine"
 
     /// The regenerate sheet's controls (All Recordings window). The sheet shows
     /// background text and stays off every RPC allowlist.

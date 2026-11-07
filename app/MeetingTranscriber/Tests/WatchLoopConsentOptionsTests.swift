@@ -27,12 +27,14 @@ final class WatchLoopConsentOptionsTests: XCTestCase {
         let queue: PipelineQueue
     }
 
-    private func makeHarness(recordWithoutAsking: [String] = [], pollInterval: TimeInterval = 0.05) throws -> Harness {
+    private func makeHarness(
+        recordWithoutAsking: [String] = [], pollInterval: TimeInterval = 0.05, meeting: DetectedMeeting? = nil,
+    ) throws -> Harness {
         let output = try makeTempDirectory(prefix: "consent-options")
         let defaultTemplate: () -> ProtocolTemplateID = { Self.defaultTemplate }
         let queue = PipelineQueue(logDir: output, stagingDir: output, defaultProtocolTemplateProvider: defaultTemplate)
         let recorders = Recorders()
-        let detector = ScriptedDetector([zoom])
+        let detector = ScriptedDetector([meeting ?? zoom])
         let notifier = ParkingNotifier()
         let loop = WatchLoop(
             detector: detector,
@@ -91,6 +93,22 @@ final class WatchLoopConsentOptionsTests: XCTestCase {
         XCTAssertEqual(harness.recorders.starts, 1)
         XCTAssertEqual(job.protocolTemplate, .file(name: "Board"))
         XCTAssertEqual(job.protocolBackground, "Agenda: budget")
+        harness.loop.stop()
+    }
+
+    /// The Record Meeting window matches the rules against the question's
+    /// meeting title, so it must be the title the job then gets: the window
+    /// title without the app's suffix.
+    func testTheQuestionCarriesTheTitleTheJobGets() async throws {
+        let meeting = DetectedMeeting(pattern: .zoom, windowTitle: "Team Daily - Zoom", ownerName: "zoom.us", windowPID: 4321)
+        let harness = try makeHarness(meeting: meeting)
+        let question = try await openZoomPrompt(harness)
+
+        XCTAssertEqual(question.meetingTitle, "Team Daily")
+        harness.notifier.answer(.granted)
+        let job = try await finishRecording(harness, app: "Zoom")
+
+        XCTAssertEqual(job.meetingTitle, question.meetingTitle)
         harness.loop.stop()
     }
 

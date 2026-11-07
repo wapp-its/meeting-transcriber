@@ -18,6 +18,10 @@ final class AppPickerViewTests: XCTestCase {
     ]
 
     private static let choices = ProtocolTemplateChoices(templates: [.builtIn, .file(name: "Board")], defaultTemplate: .builtIn)
+    private static let withRules = ProtocolTemplateChoices(
+        templates: [.builtIn, .file(name: "Board")], defaultTemplate: .builtIn,
+        rules: [ProtocolTemplateRule(pattern: "board", template: .file(name: "Board"))],
+    )
     private static let use = ProtocolOptionsUse(destination: .remote(name: "Anthropic (Claude)"), recordOnly: false)
 
     private func makeView(
@@ -26,6 +30,7 @@ final class AppPickerViewTests: XCTestCase {
         noMic: Bool = false,
         optionsUse: @escaping () -> ProtocolOptionsUse = { use },
         draft: StartRecordingDraft = StartRecordingDraft(),
+        choices: ProtocolTemplateChoices = choices,
         onStartRecording: @escaping (ManualRecordingRequest, MeetingProtocolOptions) -> Void = { _, _ in },
         onCancel: @escaping () -> Void = {},
     ) -> AppPickerView {
@@ -33,7 +38,7 @@ final class AppPickerViewTests: XCTestCase {
             appsProvider: MockAppsProvider(apps: apps),
             startWouldBeRefused: startWouldBeRefused,
             noMic: noMic,
-            templateChoices: { Self.choices },
+            templateChoices: { choices },
             optionsUse: optionsUse,
             draft: draft,
             onStartRecording: onStartRecording,
@@ -156,6 +161,53 @@ final class AppPickerViewTests: XCTestCase {
 
         XCTAssertEqual(try notice(sut), ProtocolDestination.remote(name: "api.example.com").notice)
         XCTAssertNoThrow(try sut.inspect().find(text: ProtocolOptionsForm.recordOnlyNote))
+    }
+
+    // MARK: - Template rules
+
+    private func templateLine(_ sut: AppPickerView) throws -> String {
+        try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.protocolOptionsTemplateLine).text().string()
+    }
+
+    /// Opening reads the rules; the typed title moves the template and the
+    /// line; Start hands over what the line names.
+    func testTheTemplateFollowsTheTypedTitleAndStartHandsItOver() throws {
+        let draft = StartRecordingDraft()
+        var started: [MeetingProtocolOptions] = []
+        let onStart: (ManualRecordingRequest, MeetingProtocolOptions) -> Void = { started.append($1) }
+        let sut = makeView(draft: draft, choices: Self.withRules, onStartRecording: onStart)
+        try sut.inspect().vStack().callOnAppear()
+        XCTAssertEqual(try templateLine(sut), "Default template until you choose what to record.")
+
+        draft.source = .app(Self.testApps[0])
+        try sut.inspect().find(ViewType.TextField.self).setInput("Board Review")
+
+        XCTAssertEqual(try templateLine(sut), "From rule 1 (board), matching the title “Board Review”.")
+        try sut.inspect().find(button: "Start Recording").tap()
+        XCTAssertEqual(started.map(\.template), [.file(name: "Board")])
+    }
+
+    func testATemplatePickedInTheDialogStaysWhenTheTitleChanges() throws {
+        let draft = StartRecordingDraft()
+        let sut = makeView(draft: draft, choices: Self.withRules)
+        try sut.inspect().vStack().callOnAppear()
+        draft.source = .app(Self.testApps[0])
+
+        try sut.inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.protocolOptionsTemplatePicker)
+            .find(ViewType.Picker.self)
+            .select(value: ProtocolTemplateID.file(name: "Board"))
+        draft.title = "Weekly"
+
+        XCTAssertEqual(draft.protocolOptions.template, .file(name: "Board"))
+        XCTAssertEqual(try templateLine(sut), "Chosen by you. This recording uses it, whatever the rules say.")
+    }
+
+    func testWithNoRulesTheDialogShowsNoLine() throws {
+        let sut = makeView()
+        try sut.inspect().vStack().callOnAppear()
+
+        XCTAssertThrowsError(try templateLine(sut))
     }
 
     // MARK: - Cancel

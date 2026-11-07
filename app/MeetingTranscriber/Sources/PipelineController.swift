@@ -348,6 +348,7 @@ final class PipelineController {
             defaultProtocolTemplateProvider: { [settings] in
                 ProtocolTemplateStore.production.effectiveDefault(settings.defaultProtocolTemplate)
             },
+            protocolTemplateRulesProvider: { [settings] in settings.protocolTemplateRules },
             protocolTemplateStore: .production,
             speakerMatcherFactory: SpeakerMatcher.factory(dbPath: speakersDB, notifier: notifier),
             vadConfig: settings.vadEnabled ? VADConfig(threshold: settings.vadThreshold) : nil,

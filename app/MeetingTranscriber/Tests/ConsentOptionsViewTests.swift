@@ -8,6 +8,10 @@ import XCTest
 @MainActor
 final class ConsentOptionsViewTests: XCTestCase {
     private static let choices = ProtocolTemplateChoices(templates: [.builtIn, .file(name: "Board")], defaultTemplate: .builtIn)
+    private static let withRules = ProtocolTemplateChoices(
+        templates: [.builtIn, .file(name: "Board")], defaultTemplate: .builtIn,
+        rules: [ProtocolTemplateRule(pattern: "board", template: .file(name: "Board"))],
+    )
     private static let use = ProtocolOptionsUse(destination: .remote(name: "Anthropic (Claude)"), recordOnly: false)
 
     private let question = ConsentQuestion(
@@ -26,6 +30,7 @@ final class ConsentOptionsViewTests: XCTestCase {
         question: ConsentQuestion?,
         optionsUse: @escaping () -> ProtocolOptionsUse = { use },
         draft: ConsentOptionsDraft = ConsentOptionsDraft(),
+        choices: ProtocolTemplateChoices = choices,
         answerResult: Bool = true,
         calls: Calls = Calls(),
     ) -> ConsentOptionsView {
@@ -38,7 +43,7 @@ final class ConsentOptionsViewTests: XCTestCase {
         let onClose: () -> Void = { calls.closes += 1 }
         return ConsentOptionsView(
             question: question,
-            templateChoices: { Self.choices },
+            templateChoices: { choices },
             optionsUse: optionsUse,
             draft: draft,
             onRecord: onRecord,
@@ -99,6 +104,40 @@ final class ConsentOptionsViewTests: XCTestCase {
         XCTAssertEqual(calls.closes, 0, "the window stays open")
         XCTAssertTrue(draft.questionClosed)
         XCTAssertNoThrow(try sut.inspect().find(text: ConsentOptionsView.noLongerOpen))
+    }
+
+    // MARK: - Template rules
+
+    private func templateLine(_ sut: ConsentOptionsView) throws -> String {
+        try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.protocolOptionsTemplateLine).text().string()
+    }
+
+    /// The window opens on what the rules pick for the meeting's title, says
+    /// so, and Record answers with that template.
+    func testTheWindowOpensOnTheTemplateTheRulesPickForTheMeetingTitle() throws {
+        let calls = Calls()
+        let meeting = ConsentQuestion(app: "Zoom", title: question.title, body: question.body, meetingTitle: "Board Review")
+        let sut = makeView(question: meeting, choices: Self.withRules, calls: calls)
+        try sut.inspect().vStack().callOnAppear()
+
+        XCTAssertEqual(try templateLine(sut), "From rule 1 (board), matching the title “Board Review”.")
+        try button(A11yID.consentOptionsRecordButton, in: sut).tap()
+        XCTAssertEqual(calls.answers.map(\.options.template), [.file(name: "Board")])
+    }
+
+    func testNoMatchSaysTheDefaultAppliesAndAPickSaysItWasChosen() throws {
+        let draft = ConsentOptionsDraft()
+        let meeting = ConsentQuestion(app: "Teams", title: question.title, body: question.body, meetingTitle: "Microsoft Teams Call")
+        let sut = makeView(question: meeting, draft: draft, choices: Self.withRules)
+        try sut.inspect().vStack().callOnAppear()
+        XCTAssertEqual(try templateLine(sut), "Default template: no rule matches the title “Microsoft Teams Call”.")
+
+        try sut.inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.protocolOptionsTemplatePicker)
+            .find(ViewType.Picker.self)
+            .select(value: ProtocolTemplateID.file(name: "Board"))
+
+        XCTAssertEqual(try templateLine(sut), "Chosen by you. This recording uses it, whatever the rules say.")
     }
 
     func testCancelClosesWithoutAnswering() throws {

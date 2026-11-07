@@ -3,8 +3,8 @@ import Observation
 
 /// The template and background info one recording's protocol is made with, as
 /// chosen in an options window. Nil wherever a recording starts without that
-/// window: its job then gets the default template, stamped when it is queued,
-/// and no background.
+/// window: its job then gets the template the rules pick for its title (the
+/// default when none matches), stamped when it is queued, and no background.
 struct MeetingProtocolOptions: Equatable {
     let template: ProtocolTemplateID
     /// Trimmed; nil when blank, so "no background" has one representation.
@@ -23,9 +23,16 @@ struct MeetingProtocolOptions: Equatable {
 @Observable
 @MainActor
 final class ProtocolOptionsDraft {
+    /// Written by the picker only through `chooseByHand`.
     var template: ProtocolTemplateID
     /// As typed; `options` normalises it.
     var background: String
+    /// The line under the template picker; nil shows none, as with no rules
+    /// and in the regenerate sheet, which never follows the rules (spec A6).
+    private(set) var line: TemplateChoiceLine?
+    /// The user changed the template picker since the window opened. From then
+    /// on the rules no longer move the selection.
+    private(set) var chosenByHand = false
 
     init(template: ProtocolTemplateID = .builtIn, background: String = "") {
         self.template = template
@@ -36,10 +43,73 @@ final class ProtocolOptionsDraft {
         MeetingProtocolOptions(template: template, rawBackground: background)
     }
 
-    /// How every opening of a window starts: the default template, no background.
+    /// How every opening of a window starts: the default template, no
+    /// background, no line, nothing chosen by hand.
     func reset(to template: ProtocolTemplateID) {
         self.template = template
         background = ""
+        line = nil
+        chosenByHand = false
+    }
+
+    /// The template picker's write. A pick that changes nothing is not a choice.
+    func chooseByHand(_ template: ProtocolTemplateID) {
+        guard template != self.template else { return }
+        self.template = template
+        chosenByHand = true
+        if line != nil { line = .chosenByHand }
+    }
+
+    /// Selects what the rules pick for `title`, the title the recording would
+    /// get (nil while the start dialog has nothing selected), and says why in
+    /// the line. A template chosen by hand stays. With no rules, no line.
+    func follow(_ choices: ProtocolTemplateChoices, title: String?) {
+        guard !choices.rules.isEmpty else {
+            line = nil
+            return
+        }
+        guard !chosenByHand else {
+            line = .chosenByHand
+            return
+        }
+        guard let title else {
+            template = choices.defaultTemplate
+            line = .defaultUntilSourceChosen
+            return
+        }
+        let choice = choices.choice(forTitle: title)
+        template = choice.template
+        line = switch choice.source {
+        case let .rule(index, pattern): .rule(number: index + 1, pattern: pattern, title: title)
+        case .defaultTemplate: .noRuleMatches(title: title)
+        }
+    }
+}
+
+/// The small line under the template picker of the start dialog and the
+/// Record Meeting window, in the accepted mockup's wording. Carries the
+/// meeting title, so it is shown only in windows off every RPC allowlist.
+enum TemplateChoiceLine: Equatable {
+    case rule(number: Int, pattern: String, title: String)
+    case noRuleMatches(title: String)
+    /// The start dialog before a source is selected.
+    case defaultUntilSourceChosen
+    case chosenByHand
+
+    var text: String {
+        switch self {
+        case let .rule(number, pattern, title):
+            "From rule \(number) (\(pattern)), matching the title “\(title)”."
+
+        case let .noRuleMatches(title):
+            "Default template: no rule matches the title “\(title)”."
+
+        case .defaultUntilSourceChosen:
+            "Default template until you choose what to record."
+
+        case .chosenByHand:
+            "Chosen by you. This recording uses it, whatever the rules say."
+        }
     }
 }
 
@@ -124,13 +194,26 @@ extension ProtocolOptionsContext {
     }
 }
 
-/// What a window reads once, when it opens: the templates its form lists and
-/// the default its draft starts from. Every opening starts from the effective
-/// default, and the folder is not listed again on every redraw.
+/// What a window reads once, when it opens: the templates its form lists, the
+/// default its draft starts from and the template rules. Every opening starts
+/// from the effective default, and the folder is not listed again on every
+/// redraw.
 struct ProtocolTemplateChoices: Equatable {
     let templates: [ProtocolTemplateID]
     /// The effective default, spelt as the folder lists it.
     let defaultTemplate: ProtocolTemplateID
+    var rules: [ProtocolTemplateRule] = []
+
+    /// What the rules pick for `title` among the templates listed here.
+    func choice(forTitle title: String) -> ProtocolTemplateRules.Choice {
+        let names = templates.compactMap { id -> String? in
+            if case let .file(name) = id { return name }
+            return nil
+        }
+        return ProtocolTemplateRules.resolve(
+            title: title, rules: rules, templateNames: names, defaultTemplate: defaultTemplate,
+        )
+    }
 }
 
 /// The part of the context a window reads on every redraw, so one left open
@@ -154,6 +237,7 @@ extension ProtocolTemplateChoices {
         let names = store.names()
         templates = [.builtIn] + names.map { .file(name: $0) }
         defaultTemplate = Self.listed(store.effectiveDefault(settings.defaultProtocolTemplate), in: names)
+        rules = settings.protocolTemplateRules
     }
 
     /// `id` spelt as the folder lists it. After a Finder rename that changed

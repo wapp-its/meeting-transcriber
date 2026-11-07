@@ -41,6 +41,10 @@ struct OutputSettingsView: View {
     /// The Recordings section's state. Nil leaves the section out, as without the
     /// check nothing can tell what a value would delete.
     @State private var retentionChoice: RetentionChoice?
+    /// The templates section's state, which the rules section lists templates
+    /// and reads the default through.
+    @State private var templatesModel: ProtocolTemplatesModel
+    @State private var templateRulesModel: TemplateRulesModel
 
     #if !APPSTORE
         @State private var claudeBinaries: [String] = ["claude"]
@@ -54,6 +58,9 @@ struct OutputSettingsView: View {
         self.settings = settings
         self.templateStore = templateStore
         _retentionChoice = State(initialValue: retentionChoice)
+        let templatesModel = ProtocolTemplatesModel(store: templateStore, settings: settings)
+        _templatesModel = State(initialValue: templatesModel)
+        _templateRulesModel = State(initialValue: TemplateRulesModel(templates: templatesModel, settings: settings))
     }
 
     var body: some View {
@@ -122,7 +129,9 @@ struct OutputSettingsView: View {
             .accessibilityIdentifier(A11yID.protocolSection)
             .recordOnlyDisabled(settings.recordOnly)
 
-            ProtocolTemplatesSettingsView(model: ProtocolTemplatesModel(store: templateStore, settings: settings))
+            ProtocolTemplatesSettingsView(model: templatesModel)
+                .recordOnlyDisabled(settings.recordOnly)
+            TemplateRulesSettingsView(model: templateRulesModel)
                 .recordOnlyDisabled(settings.recordOnly)
         }
         .formStyle(.grouped)
