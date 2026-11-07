@@ -146,6 +146,15 @@ extension MeetingFileRecord {
         }
     }
 
+    /// List a file the app kept beside the meeting's own under a name of its own,
+    /// replacing an entry of the same path. Never `list`: each run the Trash refuses
+    /// leaves one more copy of the same role, and deleting the meeting has to find
+    /// them all.
+    mutating func appendKept(_ file: MeetingFile) {
+        files.removeAll { $0.path == file.path }
+        files.append(file)
+    }
+
     /// The files a deletion of `kind` covers: what the app owns of the meeting and
     /// has not seen go, each path once. A path this record also lists as not owned
     /// stays out: one file can sit under two roles, and it is the user's under either.

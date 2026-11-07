@@ -175,6 +175,7 @@ final class AppState {
             notifier: notifier,
             regenerated: { [pipeline] in pipeline.queue.recordRegeneratedTemplate(jobID: $0, template: $1) },
             protocolReplaced: pipeline.meetingFileStore.noteProtocolReplaced,
+            reportKept: pipeline.meetingFileStore.noteKeptFile,
         ))
     }
 

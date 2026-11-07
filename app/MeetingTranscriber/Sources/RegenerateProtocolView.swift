@@ -13,6 +13,8 @@ final class RegenerateProtocolDraft {
     /// Why the last chosen file could not be used.
     var fileProblem: String?
     let protocolOptions: ProtocolOptionsDraft
+    /// "Save as:". Offered, and read, only for a meeting that has notes.
+    var saveAs: ProtocolRegenerationOutput = .additionalReport
 
     init(target: ProtocolRegenerationTarget? = nil, protocolOptions: ProtocolOptionsDraft = ProtocolOptionsDraft()) {
         self.target = target
@@ -20,11 +22,30 @@ final class RegenerateProtocolDraft {
     }
 
     /// How every opening starts: the meeting it was opened for, if any, the
-    /// default template and no background.
+    /// default template, no background, and an additional report (spec A1).
     func reset(target opened: ProtocolRegenerationTarget?, defaultTemplate: ProtocolTemplateID) {
         target = opened
         fileProblem = nil
+        saveAs = .additionalReport
         protocolOptions.reset(to: defaultTemplate)
+    }
+
+    /// What Generate writes: a meeting without notes gets them as its main
+    /// protocol, with no choice shown.
+    var output: ProtocolRegenerationOutput {
+        target?.hasProtocol == true ? saveAs : .mainProtocol
+    }
+
+    /// Where the chosen template's report would go, for a meeting with notes.
+    var reportSlot: MeetingReportFolder.Slot? {
+        guard let target, target.hasProtocol else { return nil }
+        return target.reportSlot(for: protocolOptions.template)
+    }
+
+    /// The report's file name belongs to another meeting, and the report is chosen.
+    var reportNameTaken: Bool {
+        guard output == .additionalReport, case .otherMeeting = reportSlot else { return false }
+        return true
     }
 }
 
@@ -35,7 +56,10 @@ final class RegenerateProtocolDraft {
 /// `/ui/press` allowlists, as the window it is shown over does.
 @MainActor
 struct RegenerateProtocolView: View {
-    static let trashNote = "The current meeting notes are moved to the Trash and replaced."
+    static let trashNote = "The current notes are moved to the Trash and replaced."
+    static let saveAsLabel = "Save as:"
+    static let reportOption = "An additional report"
+    static let replaceOption = "Replace the current notes"
     static let unknownDateNote = "This meeting's date is not known, so the meeting notes show it as Unknown."
     static let noMeeting = "No recent meeting found"
 
@@ -52,7 +76,7 @@ struct RegenerateProtocolView: View {
     /// Runs the open panel; a test hands in a URL instead.
     let chooseFile: () -> URL?
     let resolveFile: (URL) throws -> ProtocolRegenerationTarget
-    let onGenerate: (ProtocolRegenerationTarget, MeetingProtocolOptions) -> Void
+    let onGenerate: (ProtocolRegenerationTarget, MeetingProtocolOptions, ProtocolRegenerationOutput) -> Void
     let onClose: () -> Void
 
     @State private var openedChoices: ProtocolTemplateChoices?
@@ -67,7 +91,7 @@ struct RegenerateProtocolView: View {
         chooseFile: @escaping () -> URL?,
         resolveFile: @escaping (URL) throws -> ProtocolRegenerationTarget,
         draft: RegenerateProtocolDraft = RegenerateProtocolDraft(),
-        onGenerate: @escaping (ProtocolRegenerationTarget, MeetingProtocolOptions) -> Void,
+        onGenerate: @escaping (ProtocolRegenerationTarget, MeetingProtocolOptions, ProtocolRegenerationOutput) -> Void,
         onClose: @escaping () -> Void,
     ) {
         self.phase = phase
@@ -89,7 +113,7 @@ struct RegenerateProtocolView: View {
     /// The form's notice and record-only note say why when the settings are the reason.
     private var generateDisabled: Bool {
         let use = optionsUse()
-        return draft.target == nil || phase == .running || use.destination == .off || use.recordOnly
+        return draft.target == nil || phase == .running || use.destination == .off || use.recordOnly || draft.reportNameTaken
     }
 
     var body: some View {
@@ -99,6 +123,7 @@ struct RegenerateProtocolView: View {
             meetingSection
             Divider()
             ProtocolOptionsForm(context: context, draft: draft.protocolOptions)
+            saveAsGroup
             targetNotes
             status
             actions
@@ -119,7 +144,7 @@ struct RegenerateProtocolView: View {
                     .bold()
                 Text(Self.dateLine(target.meetingStartTime))
                     .foregroundStyle(.secondary)
-                Text(target.protocolURL.lastPathComponent)
+                Text(Self.fileLine(target))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -148,12 +173,47 @@ struct RegenerateProtocolView: View {
         }
     }
 
+    /// The accepted mockup's radio group, for a meeting that has notes.
+    @ViewBuilder private var saveAsGroup: some View {
+        if let target = draft.target, target.hasProtocol {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(Self.saveAsLabel)
+                saveAsOption(
+                    .additionalReport, title: Self.reportOption, note: Self.reportNote(draft.reportSlot),
+                    id: A11yID.regenerateSaveAsReportOption,
+                )
+                saveAsOption(.mainProtocol, title: Self.replaceOption, note: (Self.trashNote, false), id: A11yID.regenerateSaveAsReplaceOption)
+            }
+        }
+    }
+
+    private func saveAsOption(
+        _ output: ProtocolRegenerationOutput, title: String, note: (text: String, warns: Bool), id: String,
+    ) -> some View {
+        let selected = draft.saveAs == output
+        return Button {
+            draft.saveAs = output
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .foregroundStyle(selected ? Color.accentColor : .secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                    Text(note.text)
+                        .font(.caption)
+                        .foregroundStyle(note.warns ? Color.orange : .secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier(id)
+    }
+
     @ViewBuilder private var targetNotes: some View {
         if let target = draft.target {
-            if target.hasProtocol {
-                Text(Self.trashNote)
-                    .font(.caption)
-            }
             if target.meetingStartTime == nil {
                 Text(Self.unknownDateNote)
                     .font(.caption)
@@ -201,11 +261,38 @@ struct RegenerateProtocolView: View {
 
             Button("Generate") {
                 guard let target = draft.target else { return }
-                onGenerate(target, draft.protocolOptions.options)
+                onGenerate(target, draft.protocolOptions.options, draft.output)
             }
             .keyboardShortcut(.defaultAction)
             .disabled(generateDisabled)
             .accessibilityIdentifier(A11yID.regenerateGenerateButton)
+        }
+    }
+
+    /// The notes' file name, and how many additional reports the meeting has.
+    static func fileLine(_ target: ProtocolRegenerationTarget) -> String {
+        let name = target.protocolURL.lastPathComponent
+        switch target.reports.count {
+        case 0: return name
+        case 1: return "\(name) · 1 additional report"
+        case let count: return "\(name) · \(count) additional reports"
+        }
+    }
+
+    /// The small line under "An additional report", and whether it is the orange one.
+    static func reportNote(_ slot: MeetingReportFolder.Slot?) -> (text: String, warns: Bool) {
+        switch slot {
+        case let .free(fileName)?:
+            ("Saved as “\(fileName)”. The current notes stay as they are.", false)
+
+        case let .existing(fileName)?:
+            ("Replaces the existing “\(fileName)”, which is moved to the Trash. The current notes stay as they are.", true)
+
+        case let .otherMeeting(fileName)?:
+            ("“\(fileName)” belongs to another meeting, so this template cannot be saved as an additional report here.", true)
+
+        case nil:
+            ("", false)
         }
     }
 

@@ -1,3 +1,5 @@
+import Foundation
+
 /// What one row of the All Recordings window offers: the one main button its
 /// state calls for, and the items of its "…" menu, which the row's
 /// right-click menu shows as well. Pure: the row's owner resolves which files
@@ -24,6 +26,13 @@ enum RecordingRowActions {
         case openInNotion
         /// Reveals the protocol, else the transcript.
         case showInFinder
+        /// Sets the Additional Reports group apart.
+        case separator
+        /// "Additional Reports", which does nothing.
+        case reportsHeading
+        /// Opens one of the meeting's additional reports; `position` is its place
+        /// among them, which its identifier carries instead of its name.
+        case report(Report, position: Int)
         /// "Regenerate Notes…", disabled while the regenerator has no
         /// transcript to send.
         case regenerate(enabled: Bool)
@@ -92,12 +101,22 @@ enum RecordingRowActions {
         case none // swiftlint:disable:this discouraged_none_name
     }
 
+    /// One of the meeting's additional reports, as its folder was read.
+    struct Report: Equatable {
+        let name: String
+        let url: URL
+    }
+
     /// The row's files as last found on disk.
     struct FilesOnDisk {
         let protocolExists: Bool
         /// True for a `.txt` that is blank or not UTF-8 too: it still opens.
         let transcriptExists: Bool
         let transcriptSource: TranscriptSource
+        /// The meeting's additional reports in alphabetical order (`AdditionalReport`).
+        /// None by default: a selection's plan never reads them, and a report never
+        /// decides which items a selection offers.
+        var reports: [Report] = []
     }
 
     /// Follows the recorded files rather than the disk, as the window's Open
@@ -133,7 +152,9 @@ enum RecordingRowActions {
     /// the right-click menu stands on its own. A waiting or running job lists
     /// nothing: the transcript stage 1 may already have written is a draft
     /// without speaker names that a later stage rewrites. A finished job with
-    /// a Notion page lists "Open in Notion" after its files.
+    /// a Notion page lists "Open in Notion" after its files. The meeting's
+    /// additional reports follow under their heading, set apart by a separator
+    /// on each side, before "Regenerate Notes…" (spec D3).
     static func menuItems(
         state: JobState, onDisk: FilesOnDisk, canRetry: Bool, hasNotionPage: Bool = false,
     ) -> [MenuItem] {
@@ -146,12 +167,21 @@ enum RecordingRowActions {
             fileItems(onDisk) + [.dismiss]
 
         case .done:
-            fileItems(onDisk) + (hasNotionPage ? [.openInNotion] : []) + [.regenerate(enabled: hasSource)]
+            reportGroup(after: fileItems(onDisk) + (hasNotionPage ? [.openInNotion] : []), onDisk) + [.regenerate(enabled: hasSource)]
 
         case .error:
-            fileItems(onDisk) + (hasSource ? [.regenerate(enabled: true)] : [])
+            reportGroup(after: fileItems(onDisk), onDisk) + (hasSource ? [.regenerate(enabled: true)] : [])
                 + (canRetry ? [.retry] : []) + [.remove]
         }
+    }
+
+    /// `items`, then the reports under their heading, with a separator before them
+    /// only when items precede it; an item always follows the group. Nothing for a
+    /// meeting without reports.
+    private static func reportGroup(after items: [MenuItem], _ onDisk: FilesOnDisk) -> [MenuItem] {
+        guard !onDisk.reports.isEmpty else { return items }
+        let reports = onDisk.reports.enumerated().map { MenuItem.report($0.element, position: $0.offset) }
+        return items + (items.isEmpty ? [] : [.separator]) + [.reportsHeading] + reports + [.separator]
     }
 
     /// Retry Deletion wins over every other button while a deletion is incomplete and

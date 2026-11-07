@@ -76,119 +76,6 @@ enum ProtocolRegenerationError: LocalizedError, Equatable {
     }
 }
 
-// MARK: - Files
-
-/// The transcript a regeneration sends.
-struct RegenerationTranscript: Equatable {
-    let text: String
-    /// Taken from the protocol's Full Transcript section, the only copy left
-    /// when "Save raw transcript separately" was off.
-    let fromProtocol: Bool
-}
-
-/// A meeting's `<basename>.txt` and `<basename>.md`, as read at one moment.
-/// Compared byte for byte before a new protocol replaces anything, so a run
-/// that rewrote either file meanwhile (a pipeline Retry) is never overwritten.
-struct ProtocolRegenerationFiles: Equatable {
-    /// Nil when there is no readable file.
-    let transcriptFile: Data?
-    let protocolFile: Data?
-
-    /// The transcript file when it is UTF-8 and not blank, else the
-    /// protocol's Full Transcript section, else nil.
-    var transcript: RegenerationTranscript? {
-        if let data = transcriptFile, let text = String(data: data, encoding: .utf8),
-           !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return RegenerationTranscript(text: text, fromProtocol: false)
-        }
-        guard let data = protocolFile, let document = String(data: data, encoding: .utf8),
-              let text = ProtocolGenerator.fullTranscript(in: document)
-        else { return nil }
-        return RegenerationTranscript(text: text, fromProtocol: true)
-    }
-}
-
-// MARK: - Target
-
-/// The meeting a regeneration is for, resolved from a chosen protocol (`.md`)
-/// or transcript (`.txt`) and the finished-job history.
-struct ProtocolRegenerationTarget: Equatable {
-    let folder: URL
-    let basename: String
-    let title: String
-    /// Nil when no finished-job record knows the meeting: the protocol then
-    /// shows its date as Unknown.
-    let meetingStartTime: Date?
-    let jobID: String?
-    let files: ProtocolRegenerationFiles
-
-    var transcriptURL: URL {
-        folder.appendingPathComponent("\(basename).txt")
-    }
-
-    /// Where the new protocol goes, whether or not one is there now.
-    var protocolURL: URL {
-        folder.appendingPathComponent("\(basename).md")
-    }
-
-    var hasProtocol: Bool {
-        files.protocolFile != nil
-    }
-
-    /// `<basename>.txt` and `<basename>.md` in `folder`, read now.
-    static func readFiles(folder: URL, basename: String, read: (URL) -> Data?) -> ProtocolRegenerationFiles {
-        ProtocolRegenerationFiles(
-            transcriptFile: read(folder.appendingPathComponent("\(basename).txt")),
-            protocolFile: read(folder.appendingPathComponent("\(basename).md")),
-        )
-    }
-
-    /// The meeting `file` belongs to. Its title, start and job come from the
-    /// newest finished-job record naming either of its two files; without one
-    /// the title is the file name without its timestamp prefix.
-    static func resolve(file: URL, records: [TerminalJobRecord], read: (URL) -> Data?) throws -> Self {
-        let folder = file.deletingLastPathComponent()
-        let basename = file.deletingPathExtension().lastPathComponent
-        let files = readFiles(folder: folder, basename: basename, read: read)
-        guard files.transcript != nil else { throw ProtocolRegenerationError.noTranscript }
-        let candidates: Set = [
-            normalizedPath(folder.appendingPathComponent("\(basename).txt")),
-            normalizedPath(folder.appendingPathComponent("\(basename).md")),
-        ]
-        let record = records.last { record in
-            [record.status.transcriptPath, record.status.protocolPath].contains { path in
-                path.map { candidates.contains(normalizedPath(URL(fileURLWithPath: $0))) } ?? false
-            }
-        }
-        return Self(
-            folder: folder,
-            basename: basename,
-            title: record?.status.meetingTitle ?? ProtocolGenerator.stripExistingTimestampPrefix(basename),
-            meetingStartTime: record?.meetingStartTime,
-            jobID: record?.status.jobID,
-            files: files,
-        )
-    }
-
-    /// Whether `job` writes this meeting's files: the same job, basename or path.
-    func isOwned(by job: PipelineJob) -> Bool {
-        if job.id.uuidString == jobID || job.namingSlug == basename { return true }
-        let own: Set = [Self.normalizedPath(transcriptURL), Self.normalizedPath(protocolURL)]
-        return [job.transcriptPath, job.protocolPath].contains { url in
-            url.map { own.contains(Self.normalizedPath($0)) } ?? false
-        }
-    }
-
-    /// A path compared through symlinks (`/var` is `/private/var`). The folder
-    /// is resolved on its own as well: `resolvingSymlinksInPath` leaves a path
-    /// to a missing file as it is, and a record may name a deleted transcript.
-    static func normalizedPath(_ url: URL) -> String {
-        let resolved = url.standardizedFileURL.resolvingSymlinksInPath()
-        return resolved.deletingLastPathComponent().resolvingSymlinksInPath()
-            .appendingPathComponent(resolved.lastPathComponent).path
-    }
-}
-
 // MARK: - File operations
 
 /// Every file access a regeneration makes, so a test can make any single step
@@ -197,6 +84,8 @@ struct ProtocolRegenerationFileOperations {
     /// Nil when nothing readable is there.
     var read: (URL) -> Data?
     var fileExists: (URL) -> Bool
+    /// A folder's file names; nil when it cannot be listed.
+    var list: (URL) -> [String]? // swiftlint:disable:this discouraged_optional_collection
     /// Creates an empty owner-only file, replacing one left by a crashed run.
     var createEmpty: (URL) throws -> Void
     var restrictToOwner: (URL) throws -> Void
@@ -209,6 +98,7 @@ struct ProtocolRegenerationFileOperations {
         Self(
             read: { try? Data(contentsOf: $0) },
             fileExists: { FileManager.default.fileExists(atPath: $0.path) },
+            list: { try? FileManager.default.contentsOfDirectory(atPath: $0.path) },
             createEmpty: { url in
                 let created = FileManager.default.createFile(
                     atPath: url.path, contents: nil, attributes: [.posixPermissions: FileManager.ownerOnlyPermissions],
@@ -229,6 +119,15 @@ struct ProtocolRegenerationFileOperations {
 }
 
 // MARK: - Regenerator
+
+/// What "Save as:" chose in the regenerate sheet.
+enum ProtocolRegenerationOutput: Equatable {
+    /// The meeting's main protocol, replaced as before.
+    case mainProtocol
+    /// The chosen template's additional report beside it, which the main protocol
+    /// and every other report outlive (`AdditionalReport`).
+    case additionalReport
+}
 
 /// Makes a new protocol for a finished meeting from a chosen template and
 /// background, one run at a time and outside the pipeline queue, and swaps it
@@ -267,6 +166,12 @@ final class ProtocolRegenerator {
         /// into place gives the path a new file, which the record has to name, or
         /// a later deletion refuses the app's own file as replaced.
         var protocolReplaced: @MainActor (_ jobID: UUID, _ current: URL?, _ keptPrevious: URL?) -> Void = { _, _, _ in }
+        /// Called with an old additional report a run kept on disk under a name of
+        /// its own (the Trash refused it, or it could not be put back), for the
+        /// meeting's file record (`MeetingFileStore.noteKeptFile`): Move Meeting to
+        /// Trash finds it there, as no report rule names it any more. A report run
+        /// calls neither hook above: its file is no protocol of the meeting.
+        var reportKept: @MainActor (_ jobID: UUID, _ kept: URL) -> Void = { _, _ in }
     }
 
     static let succeededTitle = "Meeting Notes Regenerated"
@@ -297,6 +202,7 @@ final class ProtocolRegenerator {
         try withOutputScope {
             try ProtocolRegenerationTarget.resolve(
                 file: file, records: environment.records(), read: environment.fileOperations.read,
+                list: environment.fileOperations.list,
             )
         }
     }
@@ -311,36 +217,48 @@ final class ProtocolRegenerator {
         guard let file = entry.fileToOpen else { throw ProtocolRegenerationError.noTranscript }
         let folder = file.deletingLastPathComponent()
         let basename = file.deletingPathExtension().lastPathComponent
-        let files = withOutputScope {
-            ProtocolRegenerationTarget.readFiles(folder: folder, basename: basename, read: environment.fileOperations.read)
+        let ops = environment.fileOperations
+        let (files, reportFolder) = withOutputScope {
+            (
+                ProtocolRegenerationTarget.readFiles(folder: folder, basename: basename, read: ops.read),
+                MeetingReportFolder.read(folder: folder, basename: basename, list: ops.list, read: ops.read),
+            )
         }
         guard files.transcript != nil else { throw ProtocolRegenerationError.noTranscript }
         return ProtocolRegenerationTarget(
             folder: folder, basename: basename, title: entry.title,
-            meetingStartTime: entry.meetingStartTime, jobID: entry.id.uuidString, files: files,
+            meetingStartTime: entry.meetingStartTime, jobID: entry.id.uuidString, files: files, reportFolder: reportFolder,
         )
     }
 
-    /// Generates, then replaces the meeting's protocol; the outcome lands in
-    /// `phase` and a notification. Ignored while a run is going. `notes` join
-    /// a success's warnings.
-    func regenerate(_ target: ProtocolRegenerationTarget, options: MeetingProtocolOptions, notes: [String] = []) async {
+    /// Generates, then replaces the meeting's protocol, or writes the template's
+    /// additional report beside it; the outcome lands in `phase` and a
+    /// notification. Ignored while a run is going. `notes` join a success's
+    /// warnings. Only a run that wrote the main protocol tells the job its
+    /// template: a retried Notion export titles the page by it and sends the
+    /// main protocol (spec A7).
+    func regenerate(
+        _ target: ProtocolRegenerationTarget, options: MeetingProtocolOptions,
+        saveAs: ProtocolRegenerationOutput = .mainProtocol, notes: [String] = [],
+    ) async {
         guard !isRunning else { return }
         phase = .running
         let scope = environment.outputDir()
         let accessing = scope.startAccessingSecurityScopedResource()
         defer { if accessing { scope.stopAccessingSecurityScopedResource() } }
         let backgroundPresence = options.background == nil ? "absent" : "present"
+        let output = saveAs == .additionalReport ? "report" : "notes"
         logger.info(
-            "protocol_regeneration_started job=\(target.jobID ?? "none", privacy: .public) background=\(backgroundPresence, privacy: .public)",
+            "protocol_regeneration_started job=\(target.jobID ?? "none", privacy: .public) background=\(backgroundPresence, privacy: .public) output=\(output, privacy: .public)",
         )
         do {
-            let warnings = try await run(target, options: options) + notes
+            let (written, runWarnings) = try await run(target, options: options, saveAs: saveAs)
+            let warnings = runWarnings + notes
             logger.info("protocol_regenerated job=\(target.jobID ?? "none", privacy: .public)")
-            if let jobID = target.jobID.flatMap(UUID.init(uuidString:)) {
+            if written == target.protocolURL, let jobID = target.jobID.flatMap(UUID.init(uuidString:)) {
                 environment.regenerated(jobID, options.template)
             }
-            phase = .succeeded(target.protocolURL, warnings: warnings)
+            phase = .succeeded(written, warnings: warnings)
             environment.notifier.notify(title: Self.succeededTitle, body: ([target.title] + warnings).joined(separator: "\n"))
         } catch {
             let reason = error.localizedDescription
@@ -350,14 +268,21 @@ final class ProtocolRegenerator {
         }
     }
 
-    private func run(_ target: ProtocolRegenerationTarget, options: MeetingProtocolOptions) async throws -> [String] {
+    /// The file written, and the run's warnings.
+    private func run(
+        _ target: ProtocolRegenerationTarget, options: MeetingProtocolOptions, saveAs: ProtocolRegenerationOutput,
+    ) async throws -> (written: URL, warnings: [String]) {
         guard let generator = environment.generatorFactory() else { throw ProtocolRegenerationError.providerOff }
         guard !environment.recordOnly() else { throw ProtocolRegenerationError.recordOnly }
         guard !isBusy(target) else { throw ProtocolRegenerationError.meetingBusy }
-        let files = ProtocolRegenerationTarget.readFiles(
-            folder: target.folder, basename: target.basename, read: environment.fileOperations.read,
-        )
+        let read = environment.fileOperations.read
+        let files = ProtocolRegenerationTarget.readFiles(folder: target.folder, basename: target.basename, read: read)
         guard let transcript = files.transcript else { throw ProtocolRegenerationError.noTranscript }
+        // A meeting without notes gets them as its main protocol, whatever was chosen.
+        let reportName = saveAs == .additionalReport && files.protocolFile != nil ? AdditionalReport.name(of: options.template) : nil
+        let report = reportName.map { target.folder.appendingPathComponent(AdditionalReport.fileName(basename: target.basename, name: $0)) }
+        // The report the run would write counts among the meeting's files.
+        let reportBefore = report.flatMap(read)
         // The only copy of the transcript is never left in the Trash alone.
         let includeFullTranscript = environment.includeFullTranscript() || transcript.fromProtocol
         let (instructions, _, templateWarning) = environment.templateStore.instructions(
@@ -370,15 +295,32 @@ final class ProtocolRegenerator {
         // A Retry may have started, or even finished and rewritten both
         // files, while the provider was working.
         guard !isBusy(target) else { throw ProtocolRegenerationError.meetingBusy }
-        let current = ProtocolRegenerationTarget.readFiles(
-            folder: target.folder, basename: target.basename, read: environment.fileOperations.read,
-        )
+        let current = ProtocolRegenerationTarget.readFiles(folder: target.folder, basename: target.basename, read: read)
         guard current == files else { throw ProtocolRegenerationError.filesChanged }
-        let document = ProtocolGenerator.composeDocument(
+        if let report, let reportName {
+            guard read(report) == reportBefore else { throw ProtocolRegenerationError.filesChanged }
+            try checkReportIsTheMeetings(reportName, of: target)
+        }
+        let document = Data(ProtocolGenerator.composeDocument(
             protocolMarkdown: protocolMarkdown, transcript: transcript.text, includeFullTranscript: includeFullTranscript,
-        )
-        let trashWarning = try replaceProtocol(of: target, with: Data(document.utf8), replacing: files.protocolFile != nil)
-        return [templateWarning, incompleteWarning, trashWarning].compactMap(\.self)
+        ).utf8)
+        let trashWarning = if let report {
+            try replaceReport(report, of: target, with: document, replacing: reportBefore != nil)
+        } else {
+            try replaceProtocol(of: target, with: document, replacing: files.protocolFile != nil)
+        }
+        return (report ?? target.protocolURL, [templateWarning, incompleteWarning, trashWarning].compactMap(\.self))
+    }
+
+    /// The last look before a report is written: a meeting that took its name
+    /// during the run (its own transcript, or a longer meeting name claiming the
+    /// file) stops it, as any other change of the meeting's files does.
+    private func checkReportIsTheMeetings(_ name: String, of target: ProtocolRegenerationTarget) throws {
+        let ops = environment.fileOperations
+        guard let folder = MeetingReportFolder.read(folder: target.folder, basename: target.basename, list: ops.list, read: ops.read) else {
+            throw ProtocolRegenerationError.writeFailed("the folder of the meeting notes could not be read")
+        }
+        if case .otherMeeting = folder.slot(forReportNamed: name) { throw ProtocolRegenerationError.filesChanged }
     }
 
     /// The provider's protocol, and a warning when the local model stopped at
@@ -445,14 +387,40 @@ final class ProtocolRegenerator {
         environment.queuedJobs().contains { !$0.state.isTerminal && target.isOwned(by: $0) }
     }
 
-    /// Writes an owner-only staging file, renames the old protocol aside,
-    /// renames the staging file into place (renaming the old one back if that
-    /// fails), and only then trashes the old one. Until the last rename the
-    /// original stays at its path. Renames, not `replaceItemAt`, whose failure
-    /// states are undocumented. Returns a warning when the Trash refused.
+    /// Puts new notes at the meeting's protocol path. Returns a warning when the
+    /// Trash refused the old ones.
     private func replaceProtocol(of target: ProtocolRegenerationTarget, with data: Data, replacing: Bool) throws -> String? {
+        let kept = try replaceFile(at: target.protocolURL, with: data, replacing: replacing) { current, kept in
+            reportProtocolFiles(of: target, current: current, keptPrevious: kept)
+        }
+        return kept.map { "The previous meeting notes could not be moved to the Trash and were kept as \($0.lastPathComponent)." }
+    }
+
+    /// Puts an additional report in place, replacing the template's earlier one
+    /// the way new notes replace the old ones; the main protocol is never touched.
+    /// An old report kept under its `.previous-<stamp>` name is no report by the
+    /// ownership rule, so the record learns of it instead.
+    private func replaceReport(_ report: URL, of target: ProtocolRegenerationTarget, with data: Data, replacing: Bool) throws -> String? {
+        let kept = try replaceFile(at: report, with: data, replacing: replacing) { _, kept in
+            guard let kept, let jobID = target.jobID.flatMap(UUID.init(uuidString:)) else { return }
+            environment.reportKept(jobID, kept)
+        }
+        return kept.map { "The previous report could not be moved to the Trash and was kept as \($0.lastPathComponent)." }
+    }
+
+    /// Writes an owner-only staging file, renames the old file aside, renames the
+    /// staging file into place (renaming the old one back if that fails), and only
+    /// then trashes the old one. Until the last rename the original stays at its
+    /// path. Renames, not `replaceItemAt`, whose failure states are undocumented.
+    /// `noteFiles` hears what a write left on disk: the file at `destination` (nil
+    /// when neither the new nor the old one is there), and an old one kept beside
+    /// it. Returns that old one when the Trash refused it.
+    private func replaceFile(
+        at destination: URL, with data: Data, replacing: Bool, noteFiles: (_ current: URL?, _ keptPrevious: URL?) -> Void,
+    ) throws -> URL? {
         let ops = environment.fileOperations
-        let staging = target.folder.appendingPathComponent("\(target.basename).md.regenerating")
+        let folder = destination.deletingLastPathComponent()
+        let staging = folder.appendingPathComponent("\(destination.lastPathComponent).regenerating")
         do {
             try ops.createEmpty(staging)
         } catch {
@@ -468,9 +436,9 @@ final class ProtocolRegenerator {
         var previous: URL?
         if replacing {
             let stamp = Self.previousStamp.string(from: environment.now())
-            let aside = target.folder.appendingPathComponent("\(target.basename).previous-\(stamp).md")
+            let aside = folder.appendingPathComponent("\(destination.deletingPathExtension().lastPathComponent).previous-\(stamp).md")
             do {
-                try ops.move(target.protocolURL, aside)
+                try ops.move(destination, aside)
             } catch {
                 try? ops.remove(staging)
                 throw ProtocolRegenerationError.writeFailed(error.localizedDescription)
@@ -478,30 +446,30 @@ final class ProtocolRegenerator {
             previous = aside
         }
         do {
-            try ops.move(staging, target.protocolURL)
+            try ops.move(staging, destination)
         } catch {
             try? ops.remove(staging)
             if let previous {
                 do {
-                    try ops.move(previous, target.protocolURL)
+                    try ops.move(previous, destination)
                 } catch {
-                    reportProtocolFiles(of: target, current: nil, keptPrevious: previous)
+                    noteFiles(nil, previous)
                     throw ProtocolRegenerationError.restoreFailed(keptAs: previous.lastPathComponent)
                 }
             }
             throw ProtocolRegenerationError.writeFailed(error.localizedDescription)
         }
         guard let previous else {
-            reportProtocolFiles(of: target, current: target.protocolURL, keptPrevious: nil)
+            noteFiles(destination, nil)
             return nil
         }
         do {
             try ops.trash(previous)
-            reportProtocolFiles(of: target, current: target.protocolURL, keptPrevious: nil)
+            noteFiles(destination, nil)
             return nil
         } catch {
-            reportProtocolFiles(of: target, current: target.protocolURL, keptPrevious: previous)
-            return "The previous meeting notes could not be moved to the Trash and were kept as \(previous.lastPathComponent)."
+            noteFiles(destination, previous)
+            return previous
         }
     }
 

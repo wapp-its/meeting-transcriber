@@ -103,9 +103,11 @@ struct TranscriptionsView: View {
         } message: { request in
             Text(request.text.lines.joined(separator: "\n\n"))
         }
-        // The moments the rows' files are read again (see `RowAvailability`).
+        // The moments the rows' files are read again (see `RowAvailability`); a
+        // regeneration that ended may have written a report.
         .onAppear { availability.refresh() }
         .onChange(of: entries) { availability.refresh() }
+        .onChange(of: regenerationPhase) { availability.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
             if (note.object as? NSWindow)?.identifier?.rawValue == Self.windowID { availability.refresh() }
         }
@@ -160,15 +162,6 @@ struct TranscriptionsView: View {
         if let stopped = notice.trashStopped { windowMessage(stopped) }
     }
 
-    private func windowMessage(_ text: String) -> some View {
-        Text(text)
-            .font(.callout)
-            .foregroundStyle(.red)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-    }
-
     private var shown: [TranscriptionEntry] {
         TranscriptionList.matching(entries, query: query.wrappedValue)
     }
@@ -209,12 +202,6 @@ struct TranscriptionsView: View {
             .padding(.horizontal)
             .padding(.vertical, 6)
             .accessibilityIdentifier(A11yID.transcriptionsFooter)
-    }
-
-    private func placeholder(_ text: String) -> some View {
-        Text(text)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Row
@@ -296,16 +283,6 @@ struct TranscriptionsView: View {
         }
     }
 
-    private func keepBadge(index: Int) -> some View {
-        Text("Keep")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 1)
-            .overlay(Capsule().stroke(.secondary.opacity(0.5), lineWidth: 1))
-            .accessibilityIdentifier(A11yID.recordingKeepBadge(index))
-    }
-
     /// While a deletion is incomplete, why it stopped takes the status's place: that
     /// is what the row needs from the user, and a finished job has nothing to add.
     @ViewBuilder
@@ -317,28 +294,6 @@ struct TranscriptionsView: View {
         } else {
             Label(statusText(entry), systemImage: statusSymbol(entry))
                 .font(.caption)
-        }
-    }
-
-    private func statusText(_ entry: TranscriptionEntry) -> String {
-        JobMenuSummary.status(state: entry.state, hasWarnings: !entry.warnings.isEmpty, progress: entry.state.label)
-    }
-
-    private func statusSymbol(_ entry: TranscriptionEntry) -> String {
-        JobMenuSummary.symbol(state: entry.state, hasWarnings: !entry.warnings.isEmpty)
-    }
-
-    /// Why a failed job failed, or what a finished one warned about.
-    @ViewBuilder
-    private func outcome(_ entry: TranscriptionEntry) -> some View {
-        if entry.state == .error, let error = entry.error {
-            Text(error)
-                .font(.caption)
-                .foregroundStyle(.red)
-        } else if entry.state == .done, !entry.warnings.isEmpty {
-            Text(entry.warnings.joined(separator: "; "))
-                .font(.caption)
-                .foregroundStyle(.orange)
         }
     }
 
@@ -375,10 +330,18 @@ struct TranscriptionsView: View {
         }
     }
 
-    /// Keep is a toggle, which is what a menu shows with a check mark.
+    /// Keep is a toggle, which is what a menu shows with a check mark; the reports'
+    /// heading is text, which a menu shows as an item that does nothing.
     @ViewBuilder
     private func menuEntry(_ item: RowMenuItem, entry: TranscriptionEntry, facts: RowFacts, index: Int) -> some View {
         switch item {
+        case .item(.separator):
+            Divider()
+
+        case .item(.reportsHeading):
+            Text(Self.title(of: item))
+                .accessibilityIdentifier(Self.identifier(of: item, index: index))
+
         case let .item(plain):
             menuButton(item, index: index) { perform(plain, on: entry, onDisk: facts.onDisk) }
 
@@ -449,6 +412,8 @@ struct TranscriptionsView: View {
         case .openTranscript: open(entry.transcriptURL, with: actions.openTranscript)
         case .openInNotion: openInNotion(entry)
         case .showInFinder: open(onDisk.protocolExists ? entry.protocolURL : entry.transcriptURL, with: actions.reveal)
+        case .separator, .reportsHeading: break
+        case let .report(report, _): open(report.url, with: actions.openProtocol)
         case .regenerate: notice.fileMissing = !actions.regenerate(entry)
         case .retry: actions.retry(entry.id)
         case .remove: actions.remove(entry.id)
@@ -513,6 +478,7 @@ extension TranscriptionsView {
     /// last read for it, and nothing moves until it is confirmed.
     private func askToMove(_ action: TrashConfirmationPrompt.Action, _ entry: TranscriptionEntry, facts: RowFacts) {
         guard let meeting = facts.meeting else { return }
+        let reports = action == .moveMeeting ? actions.meetingReports(meeting.record) : []
         let text = switch action {
         case .moveAudio:
             TrashConfirmationText.moveAudio(
@@ -523,16 +489,20 @@ extension TranscriptionsView {
         case .moveMeeting:
             TrashConfirmationText.moveMeeting(
                 meetingTitle: entry.title, record: meeting.record, audio: meeting.audio,
-                hasNotionPage: entry.hasNotionPage, hasFailedExport: entry.liveNotionExport == .failed,
+                hasNotionPage: entry.hasNotionPage, hasFailedExport: entry.liveNotionExport == .failed, reports: reports,
             )
         }
-        let named = TrashConfirmationText.files(of: action.kind, record: meeting.record, audio: meeting.audio)
+        let named = TrashConfirmationText.files(of: action.kind, record: meeting.record, audio: meeting.audio).map(\.path) + reports
         notice.trashStopped = nil
-        trashPrompt.request = .init(action: action, entries: [entry], text: text, named: [entry.id: Set(named.map(\.path))])
+        trashPrompt.request = .init(action: action, entries: [entry], text: text, named: [entry.id: Set(named)])
     }
 
     /// The same for a selection: one dialog for every meeting the plan applies to.
-    private func askToMove(_ plan: TrashSelectionPlan) {
+    private func askToMove(_ selected: TrashSelectionPlan) {
+        var plan = selected
+        if plan.action == .moveMeeting {
+            plan.reports = Dictionary(plan.meetings.map { ($0.entry.id, actions.meetingReports($0.meeting.record)) }) { first, _ in first }
+        }
         notice.trashStopped = nil
         trashPrompt.request = .init(
             action: plan.action, entries: plan.meetings.map(\.entry), text: .forSelection(plan), named: plan.named,
@@ -589,9 +559,11 @@ extension TranscriptionsView {
         }
     }
 
-    /// Without a record the action refuses by itself.
+    /// Without a record the action refuses by itself. Move Meeting also has to have
+    /// named each additional report there now.
     private func namesEveryFileToMove(of entry: TranscriptionEntry, named: Set<String>, kind: MeetingFileRecord.DeletionKind) -> Bool {
         guard let record = actions.meetingFiles(entry.id), let audio = actions.audioOnDisk(entry) else { return true }
-        return named.isSuperset(of: TrashConfirmationText.files(of: kind, record: record, audio: audio).map(\.path))
+        let reports = kind == .meetingToTrash ? actions.meetingReports(record) : []
+        return named.isSuperset(of: TrashConfirmationText.files(of: kind, record: record, audio: audio).map(\.path) + reports)
     }
 }

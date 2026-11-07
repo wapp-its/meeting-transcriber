@@ -74,6 +74,9 @@ struct TrashSelectionPlan {
     let meetings: [Planned]
     /// Selected rows the action does not apply to.
     let leftOut: Int
+    /// Per meeting, the paths of its additional reports as Move Meeting to Trash just
+    /// found them, which the confirmation counts and answers for. Set by the window.
+    var reports: [UUID: [String]] = [:]
 
     init(action: TrashConfirmationPrompt.Action, selected: [Selected], isRegenerating: Bool = false) {
         let planned = selected.compactMap { row -> Planned? in
@@ -123,11 +126,11 @@ struct TrashSelectionPlan {
     }
 
     /// Per meeting, the paths the confirmation answers for, by the rule of the single
-    /// dialogs: what the action covers, less what the disk answered gone.
+    /// dialogs: what the action covers, less what the disk answered gone, and its reports.
     var named: [UUID: Set<String>] {
         Dictionary(meetings.map { planned in
             let files = TrashConfirmationText.files(of: action.kind, record: planned.meeting.record, audio: planned.meeting.audio)
-            return (planned.entry.id, Set(files.map(\.path)))
+            return (planned.entry.id, Set(files.map(\.path) + (reports[planned.entry.id] ?? [])))
         }) { first, _ in first }
     }
 }

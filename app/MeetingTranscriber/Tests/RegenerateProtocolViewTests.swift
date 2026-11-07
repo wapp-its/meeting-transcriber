@@ -31,7 +31,7 @@ final class RegenerateProtocolViewTests: XCTestCase {
         allowsChooseFile: Bool = true,
         chooseFile: @escaping () -> URL? = { nil },
         resolveFile: @escaping (URL) throws -> ProtocolRegenerationTarget = { _ in target() },
-        onGenerate: @escaping (ProtocolRegenerationTarget, MeetingProtocolOptions) -> Void = { _, _ in },
+        onGenerate: @escaping (ProtocolRegenerationTarget, MeetingProtocolOptions, ProtocolRegenerationOutput) -> Void = { _, _, _ in },
         onClose: @escaping () -> Void = {},
     ) -> RegenerateProtocolView {
         RegenerateProtocolView(
@@ -146,15 +146,18 @@ final class RegenerateProtocolViewTests: XCTestCase {
     func testGenerateHandsTheTargetAndTheDraftsOptionsToTheRegenerator() throws {
         let options = ProtocolOptionsDraft(template: .file(name: "Board"), background: " Agenda ")
         let draft = RegenerateProtocolDraft(target: Self.target(), protocolOptions: options)
-        var generated: [(ProtocolRegenerationTarget, MeetingProtocolOptions)] = []
+        var generated: [(ProtocolRegenerationTarget, MeetingProtocolOptions, ProtocolRegenerationOutput)] = []
         // swiftlint:disable:next trailing_closure
-        let sut = makeView(draft: draft, onGenerate: { generated.append(($0, $1)) })
+        let sut = makeView(draft: draft, onGenerate: { generated.append(($0, $1, $2)) })
 
         try generateButton(sut).tap()
+        try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.regenerateSaveAsReplaceOption).button().tap()
+        try generateButton(sut).tap()
 
-        XCTAssertEqual(generated.count, 1)
+        XCTAssertEqual(generated.count, 2)
         XCTAssertEqual(generated.first?.0, Self.target())
         XCTAssertEqual(generated.first?.1, MeetingProtocolOptions(template: .file(name: "Board"), rawBackground: "Agenda"))
+        XCTAssertEqual(generated.map(\.2), [.additionalReport, .mainProtocol])
     }
 
     /// A failed run says why in the sheet, in the regenerator's own words.

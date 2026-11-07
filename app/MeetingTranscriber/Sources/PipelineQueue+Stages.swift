@@ -1294,6 +1294,10 @@ extension PipelineQueue {
     /// Job paths are repointed only for files that actually moved, and
     /// `meetingTitle` is left alone: it is the caller's title, read back through
     /// `/state` and `/v1/jobs`, and it is the input to later protocol runs.
+    ///
+    /// The meeting's additional reports move in the same run, found by the ownership
+    /// rule in the protocols folder, which is read first: a folder that cannot be read
+    /// renames nothing, as its reports would stay under the old name.
     @discardableResult
     func renameJobArtifacts(
         jobID: UUID,
@@ -1302,23 +1306,14 @@ extension PipelineQueue {
         protocolsDir: URL,
         moveItem: (_ source: URL, _ destination: URL) throws -> Void = { try FileManager.default.moveItem(at: $0, to: $1) },
     ) -> String {
-        let fm = FileManager.default
         let shortID = PipelineJob.shortID(for: jobID)
         let dirs = ArtifactRenamePlan.Directories(
             protocols: protocolsDir,
             recordings: protocolsDir.deletingLastPathComponent().appendingPathComponent("recordings"),
         )
-        let exists: (URL) -> Bool = { fm.fileExists(atPath: $0.path) }
-
-        guard let newStem = ArtifactRenamePlan.availableStem(
-            titleSlug: titleSlug, shortID: shortID, currentStem: oldStem, in: dirs, exists: exists,
-        ) else {
-            logger.warning("[\(shortID, privacy: .public)] ai_title_rename_skipped reason=no_free_name")
+        guard let (newStem, moves, reportMoves) = planRename(jobID: jobID, from: oldStem, titleSlug: titleSlug, dirs: dirs) else {
             return oldStem
         }
-        guard newStem != oldStem else { return oldStem }
-
-        let moves = ArtifactRenamePlan.moves(from: oldStem, to: newStem, in: dirs, exists: exists)
         var done: [ArtifactRenamePlan.Move] = []
         // Each source's listed spelling, read while the file is still there.
         var sources: [URL: String] = [:]
@@ -1338,6 +1333,11 @@ extension PipelineQueue {
             let stayed = undoRenames(done, shortID: shortID, moveItem: moveItem)
             logger.warning("[\(shortID, privacy: .public)] ai_title_rename_failed error=\(error.localizedDescription, privacy: .private)")
             report(stayed)
+            // No record lists a report, and under the new name no rule finds it for
+            // this meeting: the record lists it where it is, for Move Meeting to Trash.
+            for move in stayed where reportMoves.contains(move.to) {
+                meetingFileStore?.noteKeptFile(jobID: jobID, url: move.to)
+            }
             addWarning(
                 id: jobID,
                 !stayed.isEmpty
@@ -1363,6 +1363,37 @@ extension PipelineQueue {
             saveSnapshot()
         }
         return newStem
+    }
+
+    /// What renaming `oldStem` to `titleSlug` moves: the new stem, every artifact
+    /// and additional report of the meeting (the reports last), and the reports'
+    /// destinations. Nil when nothing moves, with the reason logged, and warned for
+    /// a protocols folder that cannot be read.
+    private func planRename(
+        jobID: UUID, from oldStem: String, titleSlug: String, dirs: ArtifactRenamePlan.Directories,
+    ) -> (stem: String, moves: [ArtifactRenamePlan.Move], reportMoves: Set<URL>)? {
+        let fm = FileManager.default
+        let shortID = PipelineJob.shortID(for: jobID)
+        let exists: (URL) -> Bool = { fm.fileExists(atPath: $0.path) }
+        let folder = dirs.protocols
+        // A folder not made yet holds no report.
+        guard let names = fm.fileExists(atPath: folder.path) ? try? fm.contentsOfDirectory(atPath: folder.path) : [] else {
+            logger.warning("[\(shortID, privacy: .public)] ai_title_rename_skipped reason=folder_unreadable")
+            addWarning(id: jobID, "Could not rename the output files to the AI meeting title; the original names were kept")
+            return nil
+        }
+        guard let newStem = ArtifactRenamePlan.availableStem(
+            titleSlug: titleSlug, shortID: shortID, currentStem: oldStem, in: dirs, protocolNames: Set(names), exists: exists,
+        ) else {
+            logger.warning("[\(shortID, privacy: .public)] ai_title_rename_skipped reason=no_free_name")
+            return nil
+        }
+        guard newStem != oldStem else { return nil }
+        let reports = MeetingReportFolder.read(
+            folder: folder, basename: oldStem, list: { _ in names }, read: { try? Data(contentsOf: $0) },
+        )?.reports.map(\.name) ?? []
+        let moves = ArtifactRenamePlan.moves(from: oldStem, to: newStem, in: dirs, reports: reports, exists: exists)
+        return (newStem, moves, Set(moves.suffix(reports.count).map(\.to)))
     }
 
     // MARK: - VAD Preprocessing

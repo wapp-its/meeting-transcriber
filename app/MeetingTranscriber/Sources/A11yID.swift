@@ -145,6 +145,15 @@ enum A11yID {
         "recordingMenuShowInFinder.\(index)"
     }
 
+    static func recordingMenuReportsHeading(_ index: Int) -> String {
+        "recordingMenuReportsHeading.\(index)"
+    }
+
+    /// The row's `position`th additional report, counted from 0 in the menu's order.
+    static func recordingMenuReport(_ index: Int, _ position: Int) -> String {
+        "recordingMenuReport.\(index).\(position)"
+    }
+
     static func recordingMenuRegenerate(_ index: Int) -> String {
         "recordingMenuRegenerate.\(index)"
     }
@@ -280,6 +289,8 @@ enum A11yID {
     static let regenerateChooseFileButton = "regenerateChooseFileButton"
     static let regenerateCancelButton = "regenerateCancelButton"
     static let regenerateGenerateButton = "regenerateGenerateButton"
+    static let regenerateSaveAsReportOption = "regenerateSaveAsReportOption"
+    static let regenerateSaveAsReplaceOption = "regenerateSaveAsReplaceOption"
 
     static let includeFullTranscriptToggle = "includeFullTranscriptToggle"
     static let saveRawTranscriptToggle = "saveRawTranscriptToggle"

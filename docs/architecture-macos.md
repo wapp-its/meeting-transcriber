@@ -704,12 +704,41 @@ timestamped names stay. The rename moves every artifact of the job in both
 prefix scan, because a bare-title stem is a prefix of other jobs' stems. A title
 is taken only if none of its artifacts exist, otherwise `_<shortID>` is
 appended, and nothing is overwritten. If any move fails, the ones already done
-are undone and the job keeps its old stem and paths.
+are undone and the job keeps its old stem and paths. The meeting's additional
+reports (see [Additional Reports](#additional-reports)) are the one exception
+to the suffix lists: the ownership rule finds them by their whole name before
+` (`, they move in the same all-or-nothing run, and a title with a report is
+taken. A `protocols/` folder that cannot be listed renames nothing.
 The title comes from the first top-level `# ` heading in what the model
 wrote, and only for a job that ran the built-in template (after a fallback
 too): a custom template's first heading is whatever it writes, a section such
 as "Action items" as often as a title, so its files keep the timestamped
 names (`ProtocolGenerator.fileTitleSlug`, over `ProtocolGenerator.aiTitle`).
+
+### Additional Reports
+
+Regenerate Notes… on a meeting that already has notes offers "Save as:" with
+"An additional report" preselected: the new notes go to
+`<basename> (<template name>).md` beside the meeting and the current notes stay
+(the built-in template's report is `(Standard)`). "Replace the current notes"
+works as before. A second report from the same template replaces the first,
+whose file goes to the Trash; when the Trash refuses, the new report stays and
+the old one stays beside it as `<name>.previous-<stamp>.md` with a warning.
+
+One rule decides whose report a file is (`AdditionalReport`,
+`MeetingReportFolder`), and the sheet's count, its orange lines, the row menu,
+"Regenerate from File…", Move Meeting to Trash and the AI-title rename all use
+it: a file with a `.txt` of its own name is a meeting, otherwise the longest
+name before a ` (` that has a transcript (its `.txt`, or the transcript inside
+its notes) owns it. A report name the rule gives to another meeting disables
+Generate. The run checks the name again right before the write, and a report
+that appeared, changed or vanished meanwhile stops it like any changed file.
+
+Nothing lists a report while its meeting lives, so a report renamed or deleted
+in Finder drops out of the row menu. A report run never tells the job its
+template and never lists its file as the meeting's notes, so Open Notes, the
+automation API, a retried Notion export and the "right after the notes"
+retention keep using the main notes (`ProtocolRegenerator.regenerate`).
 
 `AppSettings.protocolLanguage` (default `"German"`) is substituted into the prompt as `{LANGUAGE}`. Every template can also use `{MEETING_DATE}` (`YYYY-MM-DD`) and `{MEETING_TIME}` (`HH:mm`), derived from the captured recording start time. Imports and recovery jobs resolve those time placeholders to `Unknown` rather than their enqueue or processing time. Only recordings with a captured start receive the authoritative meeting-metadata block, so templates receive reliable temporal context without needing to add the placeholders.
 
@@ -851,6 +880,19 @@ takes the row off the list at once. The record holds the pending mark, so it
 goes last, after the queue and the finished-job list no longer hold the
 meeting; after a failed write or a crash it stays until the next launch
 finishes the removal. From then on `GET /v1/jobs/<id>` answers `404`.
+
+**Additional reports in a deletion.** Move Meeting to Trash also moves the
+meeting's additional reports, found by the ownership rule in each folder of
+its transcript and notes (`MeetingReportScan`), and the confirmation counts and
+names them. The dialog, the window's check, the action and each Retry Deletion
+read them again, and a report the dialog did not name stops the action like
+any unnamed file. They enter the record in the same save as the pending mark,
+under the existing role `previous_protocol` (the release and the development
+build share the record file, and a build that cannot decode a role moves the
+file aside as corrupt), so a crash or a retry carries them. A folder that
+cannot be read, or that now resolves elsewhere, moves nothing and leaves
+"Deletion incomplete" with Retry Deletion; a meeting another record shares
+keeps its reports; Move Audio and the automatic deletion leave them.
 
 **By hand, several meetings.** Rows can be selected with Shift and Command.
 The right-click menu over a selection offers only the two Trash items.

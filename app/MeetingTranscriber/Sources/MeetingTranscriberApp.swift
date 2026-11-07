@@ -247,6 +247,7 @@ struct MeetingTranscriberApp: App {
             reloadMeetingFiles: { appState.pipeline.meetingFileStore.reload() },
             moveAudioToTrash: { appState.pipeline.moveAudioToTrash(jobID: $0, named: $1) },
             moveMeetingToTrash: { appState.pipeline.moveMeetingToTrash(jobID: $0, named: $1) },
+            meetingReports: { appState.pipeline.meetingReportPaths(of: $0) },
             retryDeletion: { appState.pipeline.retryDeletion(jobID: $0) },
             setKeep: { appState.pipeline.setKeep(jobID: $0, $1) },
             retention: { appState.settings.recordingRetention },
@@ -255,8 +256,8 @@ struct MeetingTranscriberApp: App {
             optionsUse: { appState.protocolOptionsUse() },
             chooseFile: { RegenerateProtocolView.chooseFile(startingIn: appState.settings.effectiveOutputDir) },
             resolveFile: { try appState.protocolRegenerator.target(for: $0) },
-            generate: { target, options in
-                Task { await appState.protocolRegenerator.regenerate(target, options: options) }
+            generate: { target, options, output in
+                Task { await appState.protocolRegenerator.regenerate(target, options: options, saveAs: output) }
             },
         )
     }

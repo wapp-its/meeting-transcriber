@@ -51,6 +51,18 @@ final class RegenerateSheetStateTests: XCTestCase {
         XCTAssertEqual(target.files, ProtocolRegenerationFiles(transcriptFile: Self.transcript, protocolFile: Self.oldProtocol))
     }
 
+    /// The sheet's meeting lines count the meeting's additional reports.
+    func testARowsMeetingKnowsItsReports() throws {
+        let entry = try XCTUnwrap(TranscriptionEntry(record: TerminalJobRecord(job: job()), finishOrder: 0))
+        var files = bothFiles
+        files["/out/protocols/\(Self.basename) (Short).md"] = Data("# Short".utf8)
+        let sut = RegenerateSheetState()
+
+        XCTAssertTrue(sut.present(entry: entry, using: ProtocolRegenerator.reading(files)))
+
+        XCTAssertEqual(sut.initialTarget?.reports.map(\.name), ["Short"])
+    }
+
     /// A failed job stays listed after the history dropped its record. Its
     /// title, start and job still come from the row, never from the file
     /// name, which would read "board_ab12cd34" with no date or job.
@@ -137,6 +149,10 @@ extension ProtocolRegenerator {
         var operations = ProtocolRegenerationFileOperations.live
         operations.read = { files[$0.path] }
         operations.fileExists = { files[$0.path] != nil }
+        operations.list = { folder in
+            files.keys.map(URL.init(fileURLWithPath:)).filter { $0.deletingLastPathComponent().path == folder.path }
+                .map(\.lastPathComponent)
+        }
         return ProtocolRegenerator(environment: .init(
             generatorFactory: { nil },
             templateStore: ProtocolTemplateStore(directory: URL(fileURLWithPath: "/nonexistent/templates")),

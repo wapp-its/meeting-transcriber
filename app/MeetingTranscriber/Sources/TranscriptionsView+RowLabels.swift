@@ -41,6 +41,9 @@ extension TranscriptionsView {
         case .openTranscript: "Open Transcript"
         case .openInNotion: "Open in Notion"
         case .showInFinder: "Show in Finder"
+        case .separator: ""
+        case .reportsHeading: "Additional Reports"
+        case let .report(report, _): report.name
         case .regenerate: "Regenerate Notes…"
         case .retry: "Retry"
         case .remove: "Remove"
@@ -63,6 +66,9 @@ extension TranscriptionsView {
         case .openTranscript: A11yID.recordingMenuOpenTranscript(index)
         case .openInNotion: A11yID.recordingMenuOpenInNotion(index)
         case .showInFinder: A11yID.recordingMenuShowInFinder(index)
+        case .separator: ""
+        case .reportsHeading: A11yID.recordingMenuReportsHeading(index)
+        case let .report(_, position): A11yID.recordingMenuReport(index, position)
         case .regenerate: A11yID.recordingMenuRegenerate(index)
         case .retry: A11yID.recordingMenuRetry(index)
         case .remove: A11yID.recordingMenuRemove(index)

@@ -73,6 +73,7 @@ final class ProtocolRegenerationMeetingFilesTests: XCTestCase {
             fileOperations: ops,
             now: now,
             protocolReplaced: store.noteProtocolReplaced,
+            reportKept: store.noteKeptFile,
         ))
     }
 
@@ -199,6 +200,32 @@ final class ProtocolRegenerationMeetingFilesTests: XCTestCase {
         XCTAssertEqual(store.record(for: job.id)?.savedToNotion, true)
     }
 
+    // MARK: - Additional reports
+
+    /// The report is no protocol of the meeting: the record's notes stay as they
+    /// are, and only an old report kept under its own name is listed.
+    func testAReportRunLeavesTheRecordsNotesAndListsAnOldReportTheTrashRefused() async throws {
+        try writeMeeting()
+        let report = folder.appendingPathComponent("\(basename) (Standard).md")
+        try Data("# Old standard".utf8).write(to: report)
+        let notesBefore = try files(.protocol)
+        let regenerator = makeRegenerator(fileOperations(trashRefuses: true)) { Date(timeIntervalSince1970: 1_760_000_000) }
+
+        try await regenerator.regenerate(targetWithJob(), options: Self.options, saveAs: .additionalReport)
+
+        assertSucceeded(regenerator)
+        XCTAssertEqual(try files(.protocol), notesBefore)
+        let kept = try XCTUnwrap(files(.previousProtocol).first)
+        XCTAssertTrue(kept.path.hasSuffix("/\(basename) (Standard).previous-\(Self.keptStamp).md"), kept.path)
+        XCTAssertTrue(kept.owned)
+        XCTAssertEqual(kept.identity, FileIdentity.of(kept.path))
+        XCTAssertNotNil(kept.identity)
+    }
+
+    private static var keptStamp: String {
+        DateFormatter.filenameStamp("yyyyMMdd_HHmmss").string(from: Date(timeIntervalSince1970: 1_760_000_000))
+    }
+
     // MARK: - No record to follow
 
     func testAHandPickedFileChangesNoRecord() async throws {
@@ -245,9 +272,14 @@ final class ProtocolRegenerationMeetingFilesTests: XCTestCase {
         try Data("# New notes".utf8).write(to: md)
 
         state.protocolRegenerator.environment.protocolReplaced(job.id, md, nil)
+        let keptReport = folder.appendingPathComponent("\(basename) (Standard).previous-1.md")
+        try Data("# Old report".utf8).write(to: keptReport)
+        state.protocolRegenerator.environment.reportKept(job.id, keptReport)
 
-        let listed = state.pipeline.meetingFileStore.record(for: job.id)?.files.first { $0.role == .protocol }
+        let files = state.pipeline.meetingFileStore.record(for: job.id)?.files ?? []
+        let listed = files.first { $0.role == .protocol }
         XCTAssertEqual(listed?.identity, FileIdentity.of(md.path))
         XCTAssertNotNil(listed?.identity)
+        XCTAssertEqual(files.first { $0.role == .previousProtocol }?.path, MeetingFile.resolvedPath(keptReport))
     }
 }

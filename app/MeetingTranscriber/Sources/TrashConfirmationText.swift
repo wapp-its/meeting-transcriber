@@ -27,7 +27,7 @@ struct TrashConfirmationText: Equatable, Sendable {
         return Self(title: "Move the audio of “\(meetingTitle)” to the Trash?", lines: [
             ([going] + whatStays(of: record, audio: audio, transcriptSource: transcriptSource)).joined(separator: " "),
             "Without the audio you cannot transcribe this meeting again or identify its speakers again. Voice profiles learned from it stay.",
-            names(of: files),
+            names(of: files.map(\.path)),
         ])
     }
 
@@ -52,38 +52,58 @@ struct TrashConfirmationText: Equatable, Sendable {
         record.files.contains { $0.role == role && $0.state != .gone && !audio.gonePaths.contains($0.path) }
     }
 
+    /// `reports` are the paths of the meeting's additional reports as they were just
+    /// found (`MeetingReportScan`): counted after the notes and named with the other
+    /// files (spec A10).
     static func moveMeeting(
         meetingTitle: String, record: MeetingFileRecord, audio: RecordingAudioLine.AudioOnDisk,
-        hasNotionPage: Bool, hasFailedExport: Bool,
+        hasNotionPage: Bool, hasFailedExport: Bool, reports: [String] = [],
     ) -> Self {
         let files = Self.files(of: .meetingToTrash, record: record, audio: audio)
-        var lines = [whatGoes(of: files, origin: record.origin, audio: audio)]
+        let listed = Set(files.map(\.path))
+        let paths = files.map(\.path) + reports.filter { !listed.contains($0) }
+        var lines = [whatGoes(of: files, origin: record.origin, audio: audio, reports: reports.count)]
         if record.origin == .imported { lines.append("The imported file stays where it is.") }
         if hasNotionPage { lines.append("The page in Notion stays.") }
         if hasFailedExport { lines.append("The failed Notion export can no longer be retried.") }
         lines.append("Voice profiles learned from it stay.")
-        if !files.isEmpty { lines.append(names(of: files)) }
+        if !paths.isEmpty { lines.append(names(of: paths)) }
         return Self(title: "Move “\(meetingTitle)” to the Trash?", lines: lines)
     }
 
     /// Names what is still on disk. An import's audio is the user's: a copy the
     /// pipeline made goes too, as one of the remaining files, not as its audio.
-    private static func whatGoes(of files: [MeetingFile], origin: MeetingFileRecord.Origin, audio: RecordingAudioLine.AudioOnDisk) -> String {
-        guard !files.isEmpty else { return "No file of this meeting is left to move, so it only leaves this list." }
+    private static func whatGoes(
+        of files: [MeetingFile], origin: MeetingFileRecord.Origin, audio: RecordingAudioLine.AudioOnDisk, reports: Int,
+    ) -> String {
+        guard !files.isEmpty || reports > 0 else { return "No file of this meeting is left to move, so it only leaves this list." }
         var named: [String] = []
         if origin == .recorded, files.contains(where: \.role.isAudio) {
             named.append(audio.bytes > 0 ? "audio (\(audio.size))" : "audio")
         }
         if files.contains(where: { $0.role == .transcript }) { named.append("transcript") }
         if files.contains(where: { $0.role == .protocol }) { named.append("meeting notes") }
+        if let counted = reportCount(reports) { named.append(counted) }
         guard let last = named.last else { return "Its remaining files go to the Trash, and the meeting leaves this list." }
         let list = named.count == 1 ? last : named.dropLast().joined(separator: ", ") + " and " + last
-        let verb = named.count == 1 && last != "meeting notes" ? "goes" : "go"
+        let verb = named.count == 1 && !isPlural(last) ? "goes" : "go"
         return "Its \(list) \(verb) to the Trash, and the meeting leaves this list."
     }
 
-    private static func names(of files: [MeetingFile]) -> String {
-        files.map { URL(filePath: $0.path, directoryHint: .notDirectory).lastPathComponent }.joined(separator: "\n")
+    private static func reportCount(_ count: Int) -> String? {
+        switch count {
+        case 0: nil
+        case 1: "1 additional report"
+        default: "\(count) additional reports"
+        }
+    }
+
+    private static func isPlural(_ named: String) -> Bool {
+        named == "meeting notes" || named == "transcripts" || named.hasSuffix("reports")
+    }
+
+    private static func names(of paths: [String]) -> String {
+        paths.map { URL(filePath: $0, directoryHint: .notDirectory).lastPathComponent }.joined(separator: "\n")
     }
 
     // MARK: - Several meetings
@@ -123,20 +143,22 @@ struct TrashConfirmationText: Equatable, Sendable {
     /// file is named when any meeting has one left.
     private static func whatGoes(_ plan: TrashSelectionPlan) -> String {
         let covered = plan.meetings.map { ($0.meeting, files(of: .meetingToTrash, record: $0.meeting.record, audio: $0.meeting.audio)) }
+        let reports = plan.meetings.reduce(0) { $0 + (plan.reports[$1.entry.id]?.count ?? 0) }
         if covered.count == 1, let (meeting, files) = covered.first {
-            return whatGoes(of: files, origin: meeting.record.origin, audio: meeting.audio)
+            return whatGoes(of: files, origin: meeting.record.origin, audio: meeting.audio, reports: reports)
         }
         let all = covered.flatMap(\.1)
-        guard !all.isEmpty else { return "No file of these meetings is left to move, so they only leave this list." }
+        guard !all.isEmpty || reports > 0 else { return "No file of these meetings is left to move, so they only leave this list." }
         var named: [String] = []
         if covered.contains(where: { $0.0.record.origin == .recorded && $0.1.contains(where: \.role.isAudio) }) {
             named.append(plan.audioBytes > 0 ? "audio (\(plan.audioSize))" : "audio")
         }
         if all.contains(where: { $0.role == .transcript }) { named.append("transcripts") }
         if all.contains(where: { $0.role == .protocol }) { named.append("meeting notes") }
+        if let counted = reportCount(reports) { named.append(counted) }
         guard let last = named.last else { return "Their remaining files go to the Trash, and the meetings leave this list." }
         let list = named.count == 1 ? last : named.dropLast().joined(separator: ", ") + " and " + last
-        let verb = named.count == 1 && last.hasPrefix("audio") ? "goes" : "go"
+        let verb = named.count == 1 && !isPlural(last) ? "goes" : "go"
         return "Their \(list) \(verb) to the Trash, and the meetings leave this list."
     }
 
