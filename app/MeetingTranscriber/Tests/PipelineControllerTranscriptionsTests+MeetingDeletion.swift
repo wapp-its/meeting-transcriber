@@ -285,6 +285,64 @@ extension PipelineControllerTranscriptionsTests {
         }
     }
 
+    /// A9: a re-export chained behind another counts as running, also between the
+    /// two, where the job's status already reads completed. The actions ask the queue
+    /// as the automatic check does, so they wait for the whole chain.
+    func testEveryActionRefusesAMeetingBetweenTwoChainedNotionExports() async throws {
+        let harness = try makeDeletionHarness()
+        let queue = harness.makeQueue()
+        let controller = harness.controller(queue: queue)
+        let older = GatedNotionExporter(pageCreation: .beforeRelease, pageID: "page-a")
+        let newer = GatedNotionExporter(pageCreation: .beforeRelease, pageID: "page-b")
+        let job = try harness.recordedMeeting()
+        queue.seedFinishedJobWithRunningExport(exporter: older, job: job, databaseID: "database-a")
+        await waitFor { await older.startedExports == 1 }
+        queue.queueReExport(exporter: newer, databaseID: "database-b", jobID: job.id)
+        var inTheGap: [String: Bool] = [:]
+        let announce = queue.onNotionExportFinished
+        queue.onNotionExportFinished = { finished, reason in
+            announce?(finished, reason)
+            guard inTheGap.isEmpty else { return }
+            XCTAssertEqual(finished.notionExportStatus, .completed, "test premise: the first export's end")
+            inTheGap = [
+                "Keep": controller.setKeep(jobID: job.id, true),
+                "Move Audio": controller.moveAudioToTrash(jobID: job.id),
+                "Move Meeting": controller.moveMeetingToTrash(jobID: job.id),
+            ]
+        }
+        let files = try harness.paths(of: job)
+
+        await older.release()
+        await waitFor { await newer.startedExports == 1 }
+
+        XCTAssertEqual(inTheGap, ["Keep": false, "Move Audio": false, "Move Meeting": false])
+        let record = try harness.record(of: job)
+        XCTAssertFalse(record.keep)
+        XCTAssertNil(record.pending)
+        XCTAssertNil(record.audioDeletion)
+        XCTAssertEqual(files.filter(harness.isOnDisk), files)
+        XCTAssertEqual(harness.fakeTrash.moved, [])
+
+        await newer.release()
+        await queue.awaitNotionExports()
+        XCTAssertTrue(controller.setKeep(jobID: job.id, true), "the chain's end lets the actions through")
+    }
+
+    /// The saved jobs did not read, so the meeting may still be one of them, waiting for
+    /// its speakers: the actions keep its files, as the automatic check does.
+    func testEveryActionRefusesAMeetingWhileTheSavedJobsCannotBeKnown() throws {
+        let harness = try makeDeletionHarness()
+        let queue = harness.makeQueue()
+        queue.snapshotRestoreFailed = true
+        let controller = harness.controller(queue: queue)
+        let job = try harness.recordedMeeting()
+
+        XCTAssertFalse(controller.setKeep(jobID: job.id, true))
+        XCTAssertFalse(controller.moveAudioToTrash(jobID: job.id))
+        XCTAssertFalse(controller.moveMeetingToTrash(jobID: job.id))
+        XCTAssertEqual(harness.fakeTrash.moved, [])
+    }
+
     /// A2: a row finished before this version has no record to go by, and its
     /// files are never inferred from anywhere else.
     func testEveryActionRefusesAMeetingWithoutARecord() throws {

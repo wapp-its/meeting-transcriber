@@ -830,8 +830,11 @@ row menu offers Keep (Never Delete Automatically), Move Audio to Trash… and
 Move Meeting to Trash… (`RecordingRowActions`). They are absent for a failed
 meeting and for a row without a record. They are disabled while the meeting
 waits, runs, waits for speaker names, has a Notion export running or a deletion
-pending. Move Meeting is also disabled while Regenerate Notes runs: the
-regenerator writes notes that a removed record would no longer list. Keep
+pending. When it runs, each action asks the queue again with the check's own
+question (`liveMeetingState`), so a re-export chained behind another holds it
+also between the two exports, and so do saved jobs that did not read. Move
+Meeting is also disabled while Regenerate Notes runs: the regenerator writes
+notes that a removed record would no longer list. Keep
 switches at once. Each Trash action asks first, and the dialog names what goes:
 what the record lists, less what the disk answered gone
 (`TrashConfirmationText`). If a file came back while the dialog was open, so

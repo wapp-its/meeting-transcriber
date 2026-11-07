@@ -106,14 +106,15 @@ extension PipelineController {
     /// qualifies: a run of another build reads as `inProgress` here, a meeting that
     /// left the queue unfinished keeps its audio. A finished record says nothing
     /// about a late re-diarization or an export, so the queue is asked as well, and
-    /// it has to be built first to know about a job still only in the snapshot.
+    /// it has to be built first to know about a job still only in the snapshot. Its
+    /// answer is the automatic check's (`liveMeetingState`), which counts a re-export
+    /// chained behind another as running also between the two.
     private func actionableMeetingRecord(jobID: UUID) -> MeetingFileRecord? {
         ensureQueue()
         meetingFileStore.reload()
         guard let record = meetingFileStore.record(for: jobID), record.pending == nil,
               case .finished = record.outcome else { return nil }
-        if let live = queue.jobs.first(where: { $0.id == jobID }),
-           live.state != .done || live.notionExportStatus == .inProgress {
+        if let live = liveMeetingState(jobID: jobID), !live.isSettled {
             return nil
         }
         return record
