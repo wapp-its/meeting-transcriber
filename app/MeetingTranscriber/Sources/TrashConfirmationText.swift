@@ -175,6 +175,13 @@ struct TrashConfirmationText: Equatable, Sendable {
         return "Nothing was moved: \(whose) changed while the dialog was open. Choose the action again to see what it moves now."
     }
 
+    /// What the window says when a selection stopped part-way, because a file of the next
+    /// meeting came back while the earlier ones moved.
+    static func stopped(after done: Int, of total: Int) -> String {
+        "Stopped after \(done) of \(total) meetings: the files of the next one changed meanwhile. "
+            + "Choose the action again to see what it moves now."
+    }
+
     private static func leftOutLine(_ count: Int) -> String? {
         switch count {
         case 0: nil

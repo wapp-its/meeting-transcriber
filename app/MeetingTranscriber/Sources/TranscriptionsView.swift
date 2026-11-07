@@ -549,17 +549,29 @@ extension TranscriptionsView {
     /// The action works out its files anew, and the disk can have moved on since the
     /// dialog opened: a file back from where it was would go without having been named.
     /// That stops here, for every meeting of the dialog, with the rows as they were, and
-    /// choosing the item again names it. Fewer files than named is no harm. A meeting
-    /// acted on leaves the selection; one that failed stays as "Deletion incomplete".
+    /// choosing the item again names it. Fewer files than named is no harm. An earlier
+    /// meeting's move takes time, during which a file of a later one can come back, so
+    /// each after the first is asked again right before its own action, and the batch
+    /// stops there. A meeting acted on leaves the selection, also one left as "Deletion
+    /// incomplete".
     private func confirm(_ request: TrashConfirmationPrompt.Request) {
-        if request.entries.allSatisfy({ namesEveryFileToMove(of: $0, named: request.named[$0.id] ?? [], kind: request.action.kind) }) {
+        let stillNamed = { (entry: TranscriptionEntry) in
+            namesEveryFileToMove(of: entry, named: request.named[entry.id] ?? [], kind: request.action.kind)
+        }
+        if request.entries.allSatisfy(stillNamed) {
+            var actedOn: [UUID] = []
             for entry in request.entries {
+                guard actedOn.isEmpty || stillNamed(entry) else {
+                    notice.trashStopped = TrashConfirmationText.stopped(after: actedOn.count, of: request.entries.count)
+                    break
+                }
                 switch request.action {
                 case .moveAudio: actions.moveAudioToTrash(entry.id)
                 case .moveMeeting: actions.moveMeetingToTrash(entry.id)
                 }
+                actedOn.append(entry.id)
             }
-            selection.ids.subtract(request.entries.map(\.id))
+            selection.ids.subtract(actedOn)
         } else {
             notice.trashStopped = TrashConfirmationText.nothingMoved(meetings: request.entries.count)
         }

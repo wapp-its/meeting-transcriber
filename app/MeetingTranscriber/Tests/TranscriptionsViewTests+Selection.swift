@@ -304,6 +304,41 @@ extension TranscriptionsViewTests {
         }
     }
 
+    /// A file of a later meeting that comes back while an earlier one moves does not go
+    /// either: each meeting is asked again right before its own action, and the batch
+    /// stops there, says how far it got and keeps the rest selected.
+    func testAFileThatComesBackDuringTheBatchStopsItBeforeThatMeeting() throws {
+        for item in [A11yID.recordingsSelectionMoveAudioToTrash, A11yID.recordingsSelectionMoveMeetingToTrash] {
+            let harness = try makeSelectionHarness()
+            let controller = harness.controller(queue: harness.makeQueue())
+            let meetings = try [harness.recordedMeeting(), harness.recordedMeeting()]
+            let laterID = try XCTUnwrap(controller.transcriptionEntries.last?.id, "the batch acts in the list's order")
+            let track = try XCTUnwrap(meetings.first { $0.id == laterID }?.micPath)
+            let aside = harness.root.appendingPathComponent("aside.wav")
+            try FileManager.default.moveItem(at: track, to: aside)
+            let selection = TranscriptionsSelection()
+            selection.ids = Set(meetings.map(\.id))
+            let sut = window(over: controller, scopeRoot: harness.outputDir, selection: selection)
+
+            try menuItem(item, of: sut, for: selection.ids).tap()
+            var restored = false
+            harness.fakeTrash.beforeMove = { _ in
+                guard !restored else { return }
+                restored = true
+                do { try FileManager.default.moveItem(at: aside, to: track) } catch { XCTFail("could not put the file back: \(error)") }
+            }
+            try tapInTrashAlert(A11yID.recordingTrashConfirmButton, in: sut)
+
+            XCTAssertTrue(restored, "test premise: the file comes back during the first meeting's move")
+            XCTAssertFalse(harness.fakeTrash.moved.contains(track.lastPathComponent), "\(item) moved a file the dialog did not count")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: track.path))
+            XCTAssertNil(controller.meetingFileStore.record(for: laterID)?.pending)
+            XCTAssertNoThrow(try sut.inspect().find(text: Self.severalStoppedAfterOne))
+            XCTAssertEqual(selection.ids, [laterID], "the meeting not acted on stays selected, to ask again")
+            XCTAssertEqual(harness.deletedForGood, [])
+        }
+    }
+
     /// A file the Trash refuses stops its own meeting only: that row stays as "Deletion
     /// incomplete" with Retry Deletion, and the others go through (R5, R6).
     func testAMeetingThatFailsInTheBatchStaysAsDeletionIncomplete() throws {
@@ -368,4 +403,6 @@ extension TranscriptionsViewTests {
 
     static let severalNothingMoved =
         "Nothing was moved: the files of a selected meeting changed while the dialog was open. Choose the action again to see what it moves now."
+    static let severalStoppedAfterOne =
+        "Stopped after 1 of 2 meetings: the files of the next one changed meanwhile. Choose the action again to see what it moves now."
 }
