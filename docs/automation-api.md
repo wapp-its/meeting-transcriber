@@ -170,8 +170,10 @@ Responses:
 - `200 OK` with a [JobStatusDTO](#jobstatusdto).
 - `404 Not Found` if the id is unknown (never enqueued, or aged out of the
   terminal store), for a job cancelled before it finished, which leaves no
-  terminal record, and for a failed job the user removed, which takes its
-  terminal record with it.
+  terminal record, for a failed job the user removed, which takes its
+  terminal record with it, and for a meeting moved to the Trash with Move
+  Meeting to Trash in the All Recordings window, which removes its terminal
+  record and its meeting file record.
 
 A job in `error` is not necessarily final: the user can retry it from the menu
 bar or the All Recordings window, which moves it back to `waiting` under the

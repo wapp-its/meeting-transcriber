@@ -40,7 +40,7 @@ extension WatchLoop {
             title: title, appName: appName, recording: recording, pauses: pauses, protocolOptions: protocolOptions,
             participants: participants,
         )
-        pipelineQueue?.enqueue(job)
+        pipelineQueue?.enqueue(job, origin: .recorded)
         logger.info("Enqueued pipeline job for: \(title, privacy: .private)")
     }
 

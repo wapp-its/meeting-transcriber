@@ -24,11 +24,11 @@ enum RecordingFileSuffix {
     /// #633) opens no tap and writes no temp, so a crash left nothing to find
     /// and the audio was lost. This marker is source-independent.
     ///
-    /// It must stay the ONLY new crash signal. "A mic track with no mix" looks
-    /// like an interrupted recording and is in fact the normal end state of
-    /// every processed one, since `AudioPersistencePolicy` moves the mix into
-    /// the output folder and leaves the mic track in staging. Inferring a crash
-    /// from that once re-processed 40 recordings on a live archive.
+    /// It must stay the ONLY new crash signal. Inferring a crash from which
+    /// tracks sit in staging ("a mic track with no mix") once re-processed 40
+    /// recordings on a live archive. A finished job now moves all three tracks
+    /// into the output folder, but a move that fails or is cut short still
+    /// leaves tracks behind, so what staging holds proves nothing.
     static let inProgress = "_recording.marker"
 
     /// The stored meeting-end cut of a recording (`PendingRecordingCut`),

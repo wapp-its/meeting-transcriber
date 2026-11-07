@@ -34,6 +34,32 @@ struct AllRecordingsActions {
     /// window asks it through `RowAvailability`, never on each redraw.
     var filesOnDisk: (TranscriptionEntry) -> FilesOnDisk
 
+    // MARK: A meeting's files
+
+    /// The meeting's file record; nil for a job from before records existed. Read
+    /// on every redraw, so a row follows the store while the window is open.
+    var meetingFiles: (UUID) -> MeetingFileRecord?
+    /// The audio of the row's meeting as it is on disk now; nil without a record. It
+    /// reads every listed file, so the window asks it through `RowAvailability`.
+    var audioOnDisk: (TranscriptionEntry) -> RecordingAudioLine.AudioOnDisk?
+    /// Reads the record file again, which the other running build also writes, so a
+    /// confirmation checks the files as they are listed now.
+    var reloadMeetingFiles: () -> Void
+    /// "Move Audio to Trash…", once confirmed, with the paths the dialog named. False
+    /// when it moved nothing, as when another file would have gone.
+    var moveAudioToTrash: (UUID, Set<String>) -> Bool
+    /// "Move Meeting to Trash…", the same way.
+    var moveMeetingToTrash: (UUID, Set<String>) -> Bool
+    /// "Retry Deletion" on a row whose deletion is incomplete.
+    var retryDeletion: (UUID) -> Void
+    /// "Keep (Never Delete Automatically)", with the mark's new value.
+    var setKeep: (UUID, Bool) -> Void
+    /// The setting the audio line says what happens next by.
+    var retention: () -> RecordingRetention
+    /// The running build's bundle identifier, as the record store has it: the line
+    /// promises an automatic deletion only for a meeting this build recorded.
+    var bundleID: String?
+
     // MARK: Regenerate sheet
 
     /// Read when the sheet opens, so templates added in Finder since are listed.
@@ -48,8 +74,9 @@ struct AllRecordingsActions {
     /// as a notification.
     var generate: (ProtocolRegenerationTarget, MeetingProtocolOptions) -> Void
 
-    /// Every action does nothing, no job can be retried, no file is on disk
-    /// and protocol generation is off, so a test sets only what it asserts on.
+    /// Every action does nothing, no job can be retried or has a file record, no
+    /// file is on disk, recordings are kept, the build has no identifier and protocol
+    /// generation is off, so a test sets only what it asserts on.
     static let noop = Self(
         openProtocol: { _ in true },
         openTranscript: { _ in true },
@@ -64,6 +91,14 @@ struct AllRecordingsActions {
         openProtocolsFolder: {},
         canRetry: { _ in false },
         filesOnDisk: { _ in FilesOnDisk(protocolExists: false, transcriptExists: false, transcriptSource: .none) },
+        meetingFiles: { _ in nil },
+        audioOnDisk: { _ in nil },
+        reloadMeetingFiles: {},
+        moveAudioToTrash: { _, _ in true },
+        moveMeetingToTrash: { _, _ in true },
+        retryDeletion: { _ in },
+        setKeep: { _, _ in },
+        retention: { .never },
         templateChoices: { ProtocolTemplateChoices(templates: [.builtIn], defaultTemplate: .builtIn) },
         optionsUse: { ProtocolOptionsUse(destination: .off, recordOnly: false) },
         chooseFile: { nil },
@@ -119,6 +154,42 @@ struct AllRecordingsActions {
             transcriptExists: entry.transcriptURL.map(disk.fileExists) ?? false,
             transcriptSource: transcriptSource(transcript),
         )
+    }
+
+    /// A meeting's audio as the disk answers for it, read inside the security scope
+    /// of `scopeRoot`. Touches each listed file, so the window asks it through
+    /// `RowAvailability`. A size is added only for a file that is there, and a file
+    /// out of reach is neither there nor gone.
+    ///
+    /// `totalCount` is what "2 of 3 files moved" counts: every track the record lists,
+    /// also one gone, as a file a deletion moved reads as gone, and a 16 kHz copy only
+    /// while it is listed as there. The pipeline removes those copies itself once the
+    /// speakers are named, which would otherwise read "5 of 6" for three tracks.
+    static func readAudioOnDisk(of record: MeetingFileRecord, scopeRoot: URL) -> RecordingAudioLine.AudioOnDisk {
+        let accessing = scopeRoot.startAccessingSecurityScopedResource()
+        defer { if accessing { scopeRoot.stopAccessingSecurityScopedResource() } }
+        // Move Meeting covers everything Move Audio does, so this is one probe per path.
+        let presence = Dictionary(uniqueKeysWithValues: record.filesCovered(by: .meetingToTrash).map { file in
+            (file.path, MeetingFilePresence.of(file.path))
+        })
+        let audio = record.filesCovered(by: .audioToTrash)
+        let present = audio.filter { presence[$0.path] == .present }
+        let notOwned = Set(record.files.filter { !$0.owned }.map(\.path))
+        let counted = record.files.filter { file in
+            file.owned && file.role.isAudio && !notOwned.contains(file.path) && (file.role.isSourceTrack || file.state != .gone)
+        }
+        return RecordingAudioLine.AudioOnDisk(
+            presentCount: present.count,
+            unreachableCount: audio.filter { presence[$0.path] == .unreachable }.count,
+            totalCount: Set(counted.map(\.path)).count,
+            bytes: present.reduce(0) { $0 + size(of: $1.path) },
+            gonePaths: Set(presence.filter { $0.value == .gone }.keys),
+        )
+    }
+
+    /// Zero for a file that went between the probe and this read.
+    private static func size(of path: String) -> Int64 {
+        (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int64) ?? 0
     }
 
     private static func transcriptSource(_ transcript: RegenerationTranscript?) -> RecordingRowActions.TranscriptSource {

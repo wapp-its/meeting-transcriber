@@ -262,6 +262,11 @@ final class ProtocolRegenerator {
         /// reads those notes and titles its page by that template's rule
         /// (`ProtocolGenerator.aiTitle`).
         var regenerated: @MainActor (_ jobID: UUID, _ template: ProtocolTemplateID) -> Void = { _, _ in }
+        /// Called with what a run left on disk for a meeting that has a job, for
+        /// its file record (`MeetingFileStore.noteProtocolReplaced`). The rename
+        /// into place gives the path a new file, which the record has to name, or
+        /// a later deletion refuses the app's own file as replaced.
+        var protocolReplaced: @MainActor (_ jobID: UUID, _ current: URL?, _ keptPrevious: URL?) -> Void = { _, _, _ in }
     }
 
     static let succeededTitle = "Meeting Notes Regenerated"
@@ -270,7 +275,7 @@ final class ProtocolRegenerator {
     private static let previousStamp = DateFormatter.filenameStamp("yyyyMMdd_HHmmss")
 
     private(set) var phase: Phase = .idle
-    @ObservationIgnored private let environment: Environment
+    @ObservationIgnored let environment: Environment
 
     init(environment: Environment) {
         self.environment = environment
@@ -480,18 +485,30 @@ final class ProtocolRegenerator {
                 do {
                     try ops.move(previous, target.protocolURL)
                 } catch {
+                    reportProtocolFiles(of: target, current: nil, keptPrevious: previous)
                     throw ProtocolRegenerationError.restoreFailed(keptAs: previous.lastPathComponent)
                 }
             }
             throw ProtocolRegenerationError.writeFailed(error.localizedDescription)
         }
-        guard let previous else { return nil }
+        guard let previous else {
+            reportProtocolFiles(of: target, current: target.protocolURL, keptPrevious: nil)
+            return nil
+        }
         do {
             try ops.trash(previous)
+            reportProtocolFiles(of: target, current: target.protocolURL, keptPrevious: nil)
             return nil
         } catch {
+            reportProtocolFiles(of: target, current: target.protocolURL, keptPrevious: previous)
             return "The previous meeting notes could not be moved to the Trash and were kept as \(previous.lastPathComponent)."
         }
+    }
+
+    /// A hand-picked file has no job, and so no record to tell.
+    private func reportProtocolFiles(of target: ProtocolRegenerationTarget, current: URL?, keptPrevious: URL?) {
+        guard let jobID = target.jobID.flatMap(UUID.init(uuidString:)) else { return }
+        environment.protocolReplaced(jobID, current, keptPrevious)
     }
 
     private func withOutputScope<T>(_ body: () throws -> T) rethrows -> T {

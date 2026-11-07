@@ -9,7 +9,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-97-delete-recordings-by-hand-and-after-a",
   "spec_path": ".flow/tasks/gh-97-delete-recordings-by-hand-and-after-a.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Meeting file record: the store and a recorded meeting's files",
   "updated_at": "2026-10-21T15:31:31.100162Z"
 }

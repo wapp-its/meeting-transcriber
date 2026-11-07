@@ -154,6 +154,8 @@ extension SpeakerNamingSession {
                     }
                 }
                 try transcript.write(to: transcriptPath, atomically: true, encoding: .utf8)
+                // Before the chmod, which can fail with the file already replaced.
+                onFilesChanged?(jobID, .transcriptRewritten(transcriptPath))
                 // Re-applying speaker names rewrites the transcript — keep it
                 // owner-only (the original save in saveTranscript already is).
                 try FileManager.default.restrictToOwner(transcriptPath)
@@ -556,6 +558,7 @@ extension SpeakerNamingSession {
         ) else { return }
         do {
             try rebuilt.write(to: transcriptPath, atomically: true, encoding: .utf8)
+            onFilesChanged?(jobID, .transcriptRewritten(transcriptPath))
             // Keep the rewritten transcript owner-only, matching the original save.
             try FileManager.default.restrictToOwner(transcriptPath)
         } catch {

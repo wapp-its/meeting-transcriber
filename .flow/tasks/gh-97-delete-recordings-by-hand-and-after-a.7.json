@@ -11,7 +11,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-97-delete-recordings-by-hand-and-after-a",
   "spec_path": ".flow/tasks/gh-97-delete-recordings-by-hand-and-after-a.7.md",
-  "status": "todo",
+  "status": "done",
   "title": "Settings \u2192 Output: the Recordings section and the preview",
   "updated_at": "2026-10-21T15:27:49.434574Z"
 }

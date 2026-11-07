@@ -112,6 +112,9 @@ enum A11yID {
     // path.
     static let transcriptionsSearchField = "transcriptionsSearchField"
 
+    /// The line under the list: how many rows, their audio and what the setting does.
+    static let transcriptionsFooter = "transcriptionsFooter"
+
     /// The toolbar's "Open Notes Folder" and "Regenerate from File…".
     static let recordingsOpenFolderButton = "recordingsOpenFolderButton"
     static let recordingsRegenerateFromFileButton = "recordingsRegenerateFromFileButton"
@@ -157,6 +160,36 @@ enum A11yID {
     static func recordingMenuDismiss(_ index: Int) -> String {
         "recordingMenuDismiss.\(index)"
     }
+
+    static func recordingMenuKeep(_ index: Int) -> String {
+        "recordingMenuKeep.\(index)"
+    }
+
+    static func recordingMenuMoveAudioToTrash(_ index: Int) -> String {
+        "recordingMenuMoveAudioToTrash.\(index)"
+    }
+
+    static func recordingMenuMoveMeetingToTrash(_ index: Int) -> String {
+        "recordingMenuMoveMeetingToTrash.\(index)"
+    }
+
+    /// "Retry Deletion", the main button of a row whose deletion is incomplete.
+    static func recordingRetryDeletionButton(_ index: Int) -> String {
+        "recordingRetryDeletionButton.\(index)"
+    }
+
+    /// The "Keep" badge after a kept meeting's title.
+    static func recordingKeepBadge(_ index: Int) -> String {
+        "recordingKeepBadge.\(index)"
+    }
+
+    /// The two Trash items of the right-click menu over several selected rows.
+    static let recordingsSelectionMoveAudioToTrash = "recordingsSelectionMoveAudioToTrash"
+    static let recordingsSelectionMoveMeetingToTrash = "recordingsSelectionMoveMeetingToTrash"
+
+    /// The buttons of a Trash confirmation, of which the window shows one at a time.
+    static let recordingTrashCancelButton = "recordingTrashCancelButton"
+    static let recordingTrashConfirmButton = "recordingTrashConfirmButton"
 
     /// The menu's answers to the open recording prompt. No app name, for the
     /// reason on `consentDeniedAppRemove`.
@@ -246,6 +279,10 @@ enum A11yID {
     static let notionUpgradeSchemaButton = "notionUpgradeSchemaButton"
     static let notionRefreshButton = "notionRefreshButton"
     static let outputFolderSection = "outputFolderSection"
+    static let recordingRetentionPicker = "recordingRetentionPicker"
+    /// The buttons of the alert before a shorter retention takes effect.
+    static let retentionPreviewCancelButton = "retentionPreviewCancelButton"
+    static let retentionPreviewConfirmButton = "retentionPreviewConfirmButton"
     static let vadSection = "vadSection"
     static let echoCancellationToggle = "echoCancellationToggle"
     static let echoDedupToggle = "echoDedupToggle"

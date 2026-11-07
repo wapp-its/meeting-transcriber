@@ -12,7 +12,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-97-delete-recordings-by-hand-and-after-a",
   "spec_path": ".flow/tasks/gh-97-delete-recordings-by-hand-and-after-a.5.md",
-  "status": "todo",
+  "status": "done",
   "title": "All Recordings rows: audio line, Keep, the two Trash actions and Retry Deletion",
   "updated_at": "2026-10-21T15:27:48.952440Z"
 }

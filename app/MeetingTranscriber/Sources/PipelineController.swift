@@ -29,7 +29,7 @@ final class PipelineController {
     /// by `installQueueForTesting`.
     private(set) var queue: PipelineQueue
 
-    private let settings: AppSettings
+    let settings: AppSettings
     private let notifier: any AppNotifying
 
     /// Decides the folder a new queue writes into, and tells the user when it is
@@ -43,6 +43,15 @@ final class PipelineController {
     /// Durable finished-job record store, shared across queue rebuilds and read
     /// by `jobStatus(forID:)` for the automation API. Test-injectable.
     let terminalJobStore: TerminalJobStore
+
+    /// Durable record of each meeting's files, shared across queue rebuilds like
+    /// the finished-job records beside it. Test-injectable.
+    let meetingFileStore: MeetingFileStore
+
+    /// What moves a meeting's files, and the clock its deletions are dated by.
+    /// Test-injectable, so no test touches the real Trash.
+    let fileRemover: MeetingFileRemover
+    let now: () -> Date
 
     /// Where the queues this controller builds keep their data and how they
     /// reach the output folder, beyond the settings: the logs and snapshot, the
@@ -95,6 +104,11 @@ final class PipelineController {
     /// through a queue nothing else shows.
     @ObservationIgnored var onQueueReplaced: ((PipelineQueue) -> Void)?
 
+    /// Called when a meeting reaches `.done`, when a Notion export ends and after a
+    /// rebuild, whose restore can finish a job before the queue has its callbacks. It is
+    /// what the automatic deletion waits for. Read at each call, so it reaches every queue.
+    @ObservationIgnored var onMeetingSettled: (() -> Void)?
+
     /// The output-folder bookmark the current queue was built from, so a change
     /// of folder can be noticed without resolving the bookmark again.
     @ObservationIgnored private var queueBuiltFromBookmark: Data?
@@ -115,6 +129,9 @@ final class PipelineController {
         notifier: any AppNotifying,
         queueEnvironment: QueueEnvironment,
         terminalJobStore: TerminalJobStore? = nil,
+        meetingFileStore: MeetingFileStore? = nil,
+        fileRemover: MeetingFileRemover = MeetingFileRemover(),
+        now: @escaping () -> Date = { Date() },
     ) {
         self.settings = settings
         self.notifier = notifier
@@ -124,6 +141,12 @@ final class PipelineController {
             ?? TerminalJobStore(
                 path: queueEnvironment.logDir.appendingPathComponent("terminal_jobs.json"),
             )
+        self.meetingFileStore = meetingFileStore
+            ?? MeetingFileStore(
+                path: queueEnvironment.logDir.appendingPathComponent("meeting_files.json"),
+            )
+        self.fileRemover = fileRemover
+        self.now = now
         self.queue = queueEnvironment.initialQueue
             ?? PipelineQueue(
                 logDir: queueEnvironment.logDir, stagingDir: queueEnvironment.stagingDir,
@@ -134,6 +157,7 @@ final class PipelineController {
     /// stored-property init.
     func activate(engineProvider: @escaping () -> (any TranscribingEngine)?) {
         self.engineProvider = engineProvider
+        reconcileInterruptedDeletions()
         observeOutputFolder()
     }
 
@@ -200,6 +224,7 @@ final class PipelineController {
         builtQueue = built
         configureCallbacks()
         onQueueReplaced?(queue)
+        onMeetingSettled?()
     }
 
     /// Whether the installed queue is one this controller built, as opposed to
@@ -333,6 +358,7 @@ final class PipelineController {
             stageTimingLog: StageTimingLog(path: queueEnvironment.stageTimingLog),
             notionExportConfigurationProvider: { [settings] in NotionExportConfiguration.resolve(settings: settings) },
             terminalJobStore: terminalJobStore,
+            meetingFileStore: meetingFileStore,
             securityScope: queueEnvironment.securityScope,
         )
     }
@@ -422,6 +448,7 @@ final class PipelineController {
         #if !APPSTORE
             LocalModelJobNotices(notifier: notifier, settings: settings).install(on: queue)
         #endif
+        chainRetentionTriggers() // Last: the notices above can end a job's callback early.
     }
 
     // MARK: - File enqueue

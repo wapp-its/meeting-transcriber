@@ -49,9 +49,47 @@ The early proof point: the meeting file record (spec "Architecture & Data Models
 - [ ] The presence probe calls a file gone only when the file system confirms it is absent from a readable folder; a missing folder or a permission or access error is unreachable (R1, spec "Reachable versus gone").
 - [ ] `MeetingFileStoreTests`, `MeetingFilePresenceTests` and `PipelineQueueMeetingFilesTests` were written before the implementation and pass; the spec's quick command stays green.
 ## Done summary
-TBD
+Every meeting now gets a durable record in `meeting_files.json` that lists its files with their identity and follows them through relocation, the AI-title rename, an undone rename and a failed undo. The record ends with the meeting's outcome. The spec's early proof point holds: the record matches the disk in every one of those paths.
 
+Tier: implementer - opus (explicit invocation) at xhigh effort (requested) (model: claude-opus-5-5)
+
+
+baseline: green via handoff (green (verified at 71b2e14e by the conductor))
+gate classify: FULL (code changed), so the focused Quick commands ran: 43 new tests, 367 neighbouring pipeline, controller and workflow tests, the spec's quick command (101 tests), all exit 0; lint 0 violations.
+
+Tests written first and seen red: the three new test classes ran red against stubs, each for its stated reason. The path-spelling test also went red when its guard was removed by hand, and the skipped-naming test was red against the task's flag design before that design changed.
+
+### Deviations from the task text
+
+DECIDED: `enqueue(_:)` stays as a one-line forwarder to a new `enqueue(_:origin:)` with `.imported`, instead of an `origin:` parameter with a default (rule 6). Two test queue subclasses outside this task's Touches override `enqueue(_ job:)`, so a defaulted parameter does not compile. Import call sites stay `queue.enqueue(job)` rather than naming `.imported`; the behaviour is the same, and a caller that names no origin is an import.
+
+DECIDED: whether protocol generation is on is read from the generator factory at the terminal transition, not recorded in `generateProtocol` as the task text says, so the record has no such field (rule 6). A naming skipped with no generator goes straight to done without running that stage, as does naming data lost at a restore. The flag would keep its default, and such a meeting would read as expecting a protocol and never be deleted automatically. Test: `testASkippedNamingWithNoGeneratorFinishesWithoutExpectingAProtocol`. One narrow consequence: a generator switched off while a generation is running, which then fails, records finished without a protocol expected.
+
+### Other choices
+
+DECIDED: `create` on a job the file already has keeps the first record (rule 1: spec "Recording date", written once).
+DECIDED: the file and `since` are written when the store first opens, before any record (rule 1: spec "Recordings from before this feature").
+DECIDED: only source tracks take their ownership from the origin; every file the pipeline wrote is owned, also for an import (rule 1: task Creation and A4).
+DECIDED: a file that cannot be read is left in place and the write fails; only one that does not decode is moved aside (rule 1: spec "Reachable versus gone"). A newer corrupt copy replaces an older one (rule 6).
+DECIDED: a listing always writes state present; later hooks ask the probe for gone (rule 1: task .2 "Gone versus unreachable").
+DECIDED: the queue hooks sit in an extension at the bottom of `PipelineQueue.swift`, whose file length rule is already disabled, instead of a new file outside Touches (rule 6).
+DECIDED: `renameJobArtifacts` takes a `moveItem` closure as a test seam, because folder permissions can fail a forward move but not the undo after it; the undo loop moved to `undoRenames` to stay inside the function length limit (rule 6).
+
+### For later tasks
+
+Declarations only later tasks use in production, for `unused_declaration`: `Role.isAudio`, `audioDeletion`, `incomplete`, `pending` and their types, `keep`, `remove(jobID:)` (.3); `excludedFromAutomaticDeletion`, `savedToNotion` (.2, .4); `.leftUnfinished`, `.naming`, `.previousProtocol`, `since` (.2); `.deleting`, `.gone` (.2, .3); `MeetingFilePresence` (.2, .3, .5, .6).
+
+Known limit until task .2 lands: after a job's removal or the raw transcript cleanup the record still lists those files, and a transcript rewritten by a late naming keeps its old identity. Both are in task .2's scope, through `noteWritten` and the probe.
+
+Both build variants: this task uses nothing the App Store variant lacks, but only the default variant was built here; the conductor builds both at the end.
+
+stage: impl-review - ran (model: gpt-6-astra xhigh (codex:gpt-6-astra:xhigh)); verdict SHIP after 2 round(s)
+DECIDED: the one finding (P1, all three reviewers reproduced it, validator kept it, status now fixed) reverses the worker's deviation "read from the generator factory at the terminal transition": `generateProtocol` now keeps what it found when it chose its generator, and the factory is asked at the terminal transition only for a job that never ran the stage (rule 1: spec "Meeting outcome", generation on "for it"; task text "Outcome"). The worker's "one narrow consequence" no longer applies; its summary line is out of date on this point.
+DECIDED: the value lives in memory on the queue (`PipelineQueue.protocolGenerationOn`), not as a new field of the persisted record: it matters only between the stage and the terminal transition, and a quit restarts the stage (rule 6).
+DECIDED: not derived from the job having been in `.generatingProtocol`, because a confirmed naming hops through that state with no generator; `testAConfirmedNamingWithNoGeneratorFinishesWithoutExpectingAProtocol` guards this and was seen failing under a mutant of the early return (rule 6).
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 3cf0f259c37bc2bb0e49dbce788af509f928d377, 06ae58755cf3e610ec16d76895ee3f34da9a2fcf, 68b385546d603524cda27690122b884f26c79aaa
+- Tests: CFFIXED_USER_HOME=<scratch> swift test --parallel --filter 'MeetingFileStoreTests|MeetingFilePresenceTests|PipelineQueueMeetingFilesTests', CFFIXED_USER_HOME=<scratch> swift test --parallel --filter 'PipelineQueueTests|PipelineQueueHistoryRecordTests|PipelineControllerTests|PipelineControllerNotionExportTests|ArtifactRenamePlanTests|LateRerunCancelTests|WorkflowIntegrationTests|WatchLoopTests', CFFIXED_USER_HOME=<scratch> swift test --parallel --filter 'TranscriptionsViewTests|TranscriptionListTests|RecordingRowActionsTests|RowAvailabilityTests|PipelineControllerTranscriptionsTests|TranscriptionsWindowPrivacyTests|TerminalJobStoreTests|TerminalJobRecordTests|AudioPersistencePolicyTests|OutputSettingsViewTests|SpeakerNamingStoreTests|ProcessedRecordingsLedgerTests', ./scripts/lint.sh
 - PRs:

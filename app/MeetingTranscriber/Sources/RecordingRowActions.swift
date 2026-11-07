@@ -32,6 +32,46 @@ enum RecordingRowActions {
         case dismiss
     }
 
+    /// A row's main button, once its meeting's record is known.
+    enum RowMainAction: Equatable {
+        case action(MainAction)
+        /// Runs the deletion that stopped again, over the files still there.
+        case retryDeletion
+    }
+
+    /// One item of a row's menu, once its meeting's record is known: what any job
+    /// lists, then the items acting on the meeting's files, declared in that order.
+    enum RowMenuItem: Equatable {
+        case item(MenuItem)
+        /// "Keep (Never Delete Automatically)".
+        case keep(checked: Bool, enabled: Bool)
+        /// "Move Audio to Trash…".
+        case moveAudioToTrash(enabled: Bool)
+        /// "Move Meeting to Trash…".
+        case moveMeetingToTrash(enabled: Bool)
+    }
+
+    /// What the row's record says, for the items acting on the meeting's files.
+    struct Meeting {
+        let record: MeetingFileRecord
+        let notionExportRunning: Bool
+        let audio: RecordingAudioLine.AudioOnDisk
+
+        /// Whether the window's actions would take this meeting now, by the rule
+        /// `PipelineController.actionableMeetingRecord` applies again when one runs,
+        /// as a menu can go stale. A record not `.finished` covers another build's
+        /// run; one with a pending mark can still be there after its row has left.
+        func isActionable(in state: JobState) -> Bool {
+            guard record.pending == nil, case .finished = record.outcome else { return false }
+            return LiveMeetingState(state: state, notionExportRunning: notionExportRunning).isSettled
+        }
+
+        /// Any audio present or out of reach, of the files a deletion would cover.
+        var hasAudioLeft: Bool {
+            audio.isAnyLeft && !record.filesCovered(by: .audioToTrash).isEmpty
+        }
+    }
+
     /// The files the job recorded (`TranscriptionEntry.protocolURL` and
     /// `transcriptURL`), whether or not they are still on disk, and whether
     /// its Notion export completed with a page (`notionPageURL`).
@@ -112,6 +152,46 @@ enum RecordingRowActions {
             fileItems(onDisk) + (hasSource ? [.regenerate(enabled: true)] : [])
                 + (canRetry ? [.retry] : []) + [.remove]
         }
+    }
+
+    /// Retry Deletion wins over every other button while a deletion is incomplete and
+    /// the retry would run. Otherwise the row keeps its usual one, as a button that
+    /// does nothing would hide "Name Speakers" or "Retry" from a meeting that moved on.
+    static func mainAction(state: JobState, files: RecordedFiles, canRetry: Bool, meeting: Meeting?) -> RowMainAction? {
+        if let meeting, let kind = meeting.record.incomplete?.kind, kind != .automatic, meeting.isActionable(in: state) {
+            return .retryDeletion
+        }
+        return mainAction(state: state, files: files, canRetry: canRetry).map(RowMainAction.action)
+    }
+
+    /// What the row lists for any job, then Keep and the two Trash items.
+    static func menuItems(
+        state: JobState, onDisk: FilesOnDisk, canRetry: Bool, meeting: Meeting?, hasNotionPage: Bool = false,
+    ) -> [RowMenuItem] {
+        menuItems(state: state, onDisk: onDisk, canRetry: canRetry, hasNotionPage: hasNotionPage).map(RowMenuItem.item)
+            + meetingFileItems(state: state, meeting: meeting)
+    }
+
+    /// None without a record, or for a meeting that failed or left the queue unfinished:
+    /// it keeps today's Retry and Remove and its audio. Listed but disabled while the
+    /// meeting's state stops the actions, so the menu says the items exist. Keep and
+    /// Move Audio have nothing to act on for an import or with no audio left.
+    private static func meetingFileItems(state: JobState, meeting: Meeting?) -> [RowMenuItem] {
+        guard let meeting, state != .error else { return [] }
+        switch meeting.record.outcome {
+        case .failed, .leftUnfinished: return []
+        case .inProgress, .finished: break
+        }
+        let enabled = meeting.isActionable(in: state)
+        var items: [RowMenuItem] = []
+        if meeting.record.origin == .recorded, meeting.hasAudioLeft {
+            items.append(.keep(checked: meeting.record.keep, enabled: enabled))
+            // A half-moved meeting goes on with Retry: its action refuses here, as
+            // finishing the audio would replace the record of what is left of it.
+            items.append(.moveAudioToTrash(enabled: enabled && meeting.record.incomplete?.kind != .meetingToTrash))
+        }
+        items.append(.moveMeetingToTrash(enabled: enabled))
+        return items
     }
 
     /// An item per file found on disk, and Show in Finder while either is.
