@@ -1,14 +1,16 @@
 {
   "branch_name": "gh-189-pick-the-protocol-template-from-the",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "not_required",
+  "completion_reviewed_at": "2026-11-07T17:46:29.290949Z",
   "created_at": "2026-10-21T08:27:22.435108Z",
   "default_impl": null,
   "default_review": null,
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-189-pick-the-protocol-template-from-the",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-189-pick-the-protocol-template-from-the.1": 0
+  },
   "next_task": 1,
   "no_plan": true,
   "plan_review_rounds": 0,
@@ -152,15 +154,53 @@
       "task": null,
       "timestamp": "2026-11-06T08:49:18.072675Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "8241599d1db9a1eaad54d59daddfe46c2fa3114e985bc4405553f936e5d2f952",
+      "backend": "codex",
+      "base_sha": "ab1fddae1dc68e2b7a94825f0dbd68885d71c234",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "88a4485a12ae176d5b9a316515f0fedd02d57245",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "711c8a25c9d44f5fab9c7f4a16961910",
+      "round_consumed": true,
+      "scope": "impl:gh-189-pick-the-protocol-template-from-the.1",
+      "superseded_by": null,
+      "task": "gh-189-pick-the-protocol-template-from-the.1",
+      "timestamp": "2026-11-07T17:45:47.413843Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-189-pick-the-protocol-template-from-the.1": 1,
     "plan": 1,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-189-pick-the-protocol-template-from-the.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-189-pick-the-protocol-template-from-the.md",
@@ -178,5 +218,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nProtocol templates and a default template exist since #2. A recording that starts without an options window gets the default, and the options windows open on the default. A meeting that recurs, such as a daily stand-up, needs the same non-default template every time, so today it has to be picked by hand at each start or the meeting gets the default format (owner request, paraphrased).\n\n## NOTES\n\n- Rules in Settings: a pattern on the meeting title (a regular expression, not case-sensitive) and the template it selects. The first matching rule wins. With no match, the default applies as today.\n- Applies to every new recording. Starts without a window get the matched template. The start dialog and the Record Meeting window open with it selected. A template picked by hand still wins.\n- A detected meeting has its real window title only with the Screen Recording permission. Without it, the title is \"<App> Call\".\n- Related: #6 (profiles; a rule may pick a profile later), #155 (shared code of the options windows), #69 (templates from a central URL).\n\n## TASKS\n\n- [ ] Draw the mockup (Settings rules, the two windows) and get it accepted\n- [ ] Build the spec",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/189"
   },
-  "updated_at": "2026-11-06T09:01:44.620189Z"
+  "updated_at": "2026-11-07T17:46:29.291094Z"
 }
