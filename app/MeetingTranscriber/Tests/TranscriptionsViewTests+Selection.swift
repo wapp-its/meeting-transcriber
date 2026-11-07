@@ -260,8 +260,9 @@ extension TranscriptionsViewTests {
         actions.audioOnDisk = { entry in
             controller.meetingFileStore.record(for: entry.id).map { AllRecordingsActions.readAudioOnDisk(of: $0, scopeRoot: scopeRoot) }
         }
-        actions.moveAudioToTrash = { controller.moveAudioToTrash(jobID: $0) }
-        actions.moveMeetingToTrash = { controller.moveMeetingToTrash(jobID: $0) }
+        actions.reloadMeetingFiles = { controller.meetingFileStore.reload() }
+        actions.moveAudioToTrash = { controller.moveAudioToTrash(jobID: $0, named: $1) }
+        actions.moveMeetingToTrash = { controller.moveMeetingToTrash(jobID: $0, named: $1) }
         actions.retryDeletion = { controller.retryDeletion(jobID: $0) }
         return makeView(controller.transcriptionEntries, actions: actions, regenerationPhase: phase, selection: selection)
     }
@@ -302,6 +303,31 @@ extension TranscriptionsViewTests {
 
             XCTAssertEqual(harness.fakeTrash.moved.count, testCase.moved)
         }
+    }
+
+    /// A29 across builds: the other running build lists a file of the later meeting
+    /// while the dialog is open. Nothing of either meeting moves, as for a file that
+    /// came back on disk, and both stay selected.
+    func testAFileAnotherBuildListedWhileTheDialogWasOpenStopsTheWholeSelection() throws {
+        let harness = try makeSelectionHarness()
+        let controller = harness.controller(queue: harness.makeQueue())
+        let meetings = try [harness.recordedMeeting(), harness.recordedMeeting()]
+        let later = try XCTUnwrap(meetings.first { $0.id == controller.transcriptionEntries.last?.id })
+        let previous = harness.recordings.appendingPathComponent("notes.previous.md")
+        try Data("previous notes".utf8).write(to: previous)
+        let selection = TranscriptionsSelection()
+        selection.ids = Set(meetings.map(\.id))
+        let sut = window(over: controller, scopeRoot: harness.outputDir, selection: selection)
+
+        try menuItem(A11yID.recordingsSelectionMoveMeetingToTrash, of: sut, for: selection.ids).tap()
+        MeetingFileStore(path: harness.recordPath, bundleID: "other-build")
+            .noteProtocolReplaced(jobID: later.id, current: later.protocolPath, keptPrevious: previous)
+        try tapInTrashAlert(A11yID.recordingTrashConfirmButton, in: sut)
+
+        XCTAssertEqual(harness.fakeTrash.moved, [])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: previous.path))
+        XCTAssertNoThrow(try sut.inspect().find(text: Self.severalNothingMoved))
+        XCTAssertEqual(selection.ids, Set(meetings.map(\.id)))
     }
 
     /// A file of a later meeting that comes back while an earlier one moves does not go

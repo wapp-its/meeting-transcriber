@@ -25,8 +25,9 @@ extension TranscriptionsViewTests {
         actions.audioOnDisk = { entry in
             controller.meetingFileStore.record(for: entry.id).map { AllRecordingsActions.readAudioOnDisk(of: $0, scopeRoot: scopeRoot) }
         }
-        actions.moveAudioToTrash = { controller.moveAudioToTrash(jobID: $0) }
-        actions.moveMeetingToTrash = { controller.moveMeetingToTrash(jobID: $0) }
+        actions.reloadMeetingFiles = { controller.meetingFileStore.reload() }
+        actions.moveAudioToTrash = { controller.moveAudioToTrash(jobID: $0, named: $1) }
+        actions.moveMeetingToTrash = { controller.moveMeetingToTrash(jobID: $0, named: $1) }
         actions.retryDeletion = { controller.retryDeletion(jobID: $0) }
         actions.setKeep = { controller.setKeep(jobID: $0, $1) }
         return makeView(controller.transcriptionEntries, actions: actions)
@@ -104,6 +105,31 @@ extension TranscriptionsViewTests {
             XCTAssertTrue(harness.fakeTrash.moved.contains(track.lastPathComponent))
             XCTAssertEqual(harness.fakeTrash.moved.count, testCase.moved)
         }
+    }
+
+    /// A22 across builds: while the dialog is open, a regeneration in the other running
+    /// build finishes and lists the old notes it could not trash. The click moves
+    /// nothing and says so; asked again, the dialog names that file.
+    func testAFileAnotherBuildListedWhileTheDialogWasOpenIsNotMovedUnnamed() throws {
+        let harness = try makeHarness()
+        let controller = harness.controller(queue: harness.makeQueue())
+        let job = try harness.recordedMeeting()
+        let previous = harness.recordings.appendingPathComponent("notes.previous.md")
+        try Data("previous notes".utf8).write(to: previous)
+        let sut = window(over: controller, scopeRoot: harness.outputDir)
+
+        try button(A11yID.recordingMenuMoveMeetingToTrash(0), in: sut).tap()
+        MeetingFileStore(path: harness.recordPath, bundleID: "other-build")
+            .noteProtocolReplaced(jobID: job.id, current: job.protocolPath, keptPrevious: previous)
+        try tapInTrashAlert(A11yID.recordingTrashConfirmButton, in: sut)
+
+        XCTAssertEqual(harness.fakeTrash.moved, [])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: previous.path))
+        XCTAssertNoThrow(try sut.inspect().find(text: Self.nothingMoved))
+        XCTAssertNil(controller.meetingFileStore.record(for: job.id)?.pending)
+
+        try button(A11yID.recordingMenuMoveMeetingToTrash(0), in: sut).tap()
+        XCTAssertTrue(try trashAlert(in: sut).message().text().string().contains(previous.lastPathComponent))
     }
 
     /// A file the Trash refuses: for each Trash item the row says so, counts what went

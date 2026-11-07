@@ -52,23 +52,27 @@ extension PipelineController {
 
     /// Move the meeting's own audio to the Trash; the transcript and the protocol
     /// stay. Returns false when it refuses and changes nothing; a file it could not
-    /// move is not a refusal, and shows in the record as `incomplete`.
+    /// move is not a refusal, and shows in the record as `incomplete`. With `named`,
+    /// the paths a confirmation named (none is not the same as no confirmation), it
+    /// also refuses when it would move a file outside them, judged by the record it
+    /// reads itself (A22).
     @discardableResult
-    func moveAudioToTrash(jobID: UUID) -> Bool {
+    func moveAudioToTrash(jobID: UUID, named: Set<String>? = nil) -> Bool { // swiftlint:disable:this discouraged_optional_collection
         // A half-deleted meeting goes on with Retry: finishing the audio here would
         // replace the record of the meeting's own unfinished deletion.
         guard let record = actionableMeetingRecord(jobID: jobID), record.origin == .recorded,
               record.incomplete?.kind != .meetingToTrash,
               !record.filesCovered(by: .audioToTrash).isEmpty else { return false }
-        return runManualDeletion(.audioToTrash, of: record)
+        return named.map { runConfirmedDeletion(.audioToTrash, of: record, named: $0) } ?? runManualDeletion(.audioToTrash, of: record)
     }
 
     /// Move every file the app owns of the meeting to the Trash, then take the
     /// meeting off every list. Nothing here talks to Notion: a page stays where it is.
+    /// `named` as for Move Audio.
     @discardableResult
-    func moveMeetingToTrash(jobID: UUID) -> Bool {
+    func moveMeetingToTrash(jobID: UUID, named: Set<String>? = nil) -> Bool { // swiftlint:disable:this discouraged_optional_collection
         guard let record = actionableMeetingRecord(jobID: jobID) else { return false }
-        return runManualDeletion(.meetingToTrash, of: record)
+        return named.map { runConfirmedDeletion(.meetingToTrash, of: record, named: $0) } ?? runManualDeletion(.meetingToTrash, of: record)
     }
 
     /// Run an incomplete deletion again, over what the record still lists rather
@@ -120,10 +124,22 @@ extension PipelineController {
         return record
     }
 
-    private func runManualDeletion(_ kind: MeetingFileRecord.DeletionKind, of record: MeetingFileRecord) -> Bool {
+    /// From a confirmation: a file it did not name stops the action unless the disk
+    /// answers it gone, as the dialog leaves out only those. The record must then still
+    /// be the one checked when the pending mark is saved, under the lock the other
+    /// build also takes.
+    private func runConfirmedDeletion(_ kind: MeetingFileRecord.DeletionKind, of record: MeetingFileRecord, named: Set<String>) -> Bool {
+        let unnamed = record.filesCovered(by: kind).filter { !named.contains($0.path) }
+        guard withOutputFolderScope({ unnamed.allSatisfy { MeetingFilePresence.of($0.path) == .gone } }) else { return false }
+        return runManualDeletion(kind, of: record, unchangedFrom: record)
+    }
+
+    private func runManualDeletion(
+        _ kind: MeetingFileRecord.DeletionKind, of record: MeetingFileRecord, unchangedFrom read: MeetingFileRecord? = nil,
+    ) -> Bool {
         let jobID = record.jobID
         let files = record.filesCovered(by: kind)
-        guard meetingFileStore.beginDeletion(jobID: jobID, kind: kind, paths: files.map(\.path)) else { return false }
+        guard meetingFileStore.beginDeletion(jobID: jobID, kind: kind, paths: files.map(\.path), unchangedFrom: read) else { return false }
         let outcomes = withOutputFolderScope {
             fileRemover.remove(files, mode: .trash, in: meetingFileStore, jobID: jobID)
         }

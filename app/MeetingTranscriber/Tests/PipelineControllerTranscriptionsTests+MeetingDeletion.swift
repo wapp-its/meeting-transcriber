@@ -157,6 +157,42 @@ extension PipelineControllerTranscriptionsTests {
         XCTAssertTrue(controller.queue.jobs.contains { $0.id == job.id })
     }
 
+    /// A22: the other running build lists a file of the meeting after the dialog named
+    /// its files. The action reads the shared record itself, so it refuses and nothing
+    /// moves; handed the names again, it moves that file too.
+    func testAFileAnotherBuildListedSinceTheDialogStopsTheAction() throws {
+        let cases: [(kind: MeetingFileRecord.DeletionKind, listed: (MeetingFileStore, PipelineJob, URL) -> Void)] = [
+            (.audioToTrash, { other, job, url in other.list([MeetingFile(role: .mix16k, url: url, owned: true)], jobID: job.id) }),
+            (.meetingToTrash, { other, job, url in
+                other.noteProtocolReplaced(jobID: job.id, current: job.protocolPath, keptPrevious: url)
+            }),
+        ]
+        for testCase in cases {
+            let harness = try makeDeletionHarness()
+            let controller = harness.controller(queue: harness.makeQueue())
+            let job = try harness.recordedMeeting()
+            let act = { (named: Set<String>) in
+                testCase.kind == .audioToTrash
+                    ? controller.moveAudioToTrash(jobID: job.id, named: named)
+                    : controller.moveMeetingToTrash(jobID: job.id, named: named)
+            }
+            let named = try Set(harness.record(of: job).filesCovered(by: testCase.kind).map(\.path))
+            let added = harness.recordings.appendingPathComponent("added-\(UUID().uuidString.prefix(8))")
+            try Data("added".utf8).write(to: added)
+            testCase.listed(MeetingFileStore(path: harness.recordPath, bundleID: "other-build"), job, added)
+            XCTAssertFalse(named.contains(MeetingFile.resolvedPath(added)), "test premise")
+
+            XCTAssertFalse(act(named), "\(testCase.kind)")
+
+            XCTAssertEqual(harness.fakeTrash.moved, [], "\(testCase.kind)")
+            XCTAssertTrue(harness.isOnDisk(added.path), "\(testCase.kind)")
+            XCTAssertNil(try harness.record(of: job).pending, "\(testCase.kind)")
+
+            XCTAssertTrue(try act(Set(harness.record(of: job).filesCovered(by: testCase.kind).map(\.path))), "\(testCase.kind)")
+            XCTAssertTrue(harness.fakeTrash.moved.contains(added.lastPathComponent), "\(testCase.kind)")
+        }
+    }
+
     // MARK: - Retry
 
     func testRetryMovesOnlyTheFileStillThereAndCompletesTheAction() throws {

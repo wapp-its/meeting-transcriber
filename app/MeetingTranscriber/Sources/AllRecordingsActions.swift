@@ -42,10 +42,14 @@ struct AllRecordingsActions {
     /// The audio of the row's meeting as it is on disk now; nil without a record. It
     /// reads every listed file, so the window asks it through `RowAvailability`.
     var audioOnDisk: (TranscriptionEntry) -> RecordingAudioLine.AudioOnDisk?
-    /// "Move Audio to Trash…", once confirmed.
-    var moveAudioToTrash: (UUID) -> Void
-    /// "Move Meeting to Trash…", once confirmed.
-    var moveMeetingToTrash: (UUID) -> Void
+    /// Reads the record file again, which the other running build also writes, so a
+    /// confirmation checks the files as they are listed now.
+    var reloadMeetingFiles: () -> Void
+    /// "Move Audio to Trash…", once confirmed, with the paths the dialog named. False
+    /// when it moved nothing, as when another file would have gone.
+    var moveAudioToTrash: (UUID, Set<String>) -> Bool
+    /// "Move Meeting to Trash…", the same way.
+    var moveMeetingToTrash: (UUID, Set<String>) -> Bool
     /// "Retry Deletion" on a row whose deletion is incomplete.
     var retryDeletion: (UUID) -> Void
     /// "Keep (Never Delete Automatically)", with the mark's new value.
@@ -89,8 +93,9 @@ struct AllRecordingsActions {
         filesOnDisk: { _ in FilesOnDisk(protocolExists: false, transcriptExists: false, transcriptSource: .none) },
         meetingFiles: { _ in nil },
         audioOnDisk: { _ in nil },
-        moveAudioToTrash: { _ in },
-        moveMeetingToTrash: { _ in },
+        reloadMeetingFiles: {},
+        moveAudioToTrash: { _, _ in true },
+        moveMeetingToTrash: { _, _ in true },
         retryDeletion: { _ in },
         setKeep: { _, _ in },
         retention: { .never },

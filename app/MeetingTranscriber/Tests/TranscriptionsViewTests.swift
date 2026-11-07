@@ -55,8 +55,8 @@ final class TranscriptionsViewTests: XCTestCase {
         actions.cancel = { calls("cancel \($0)") }
         actions.nameSpeakers = { calls("nameSpeakers \($0)") }
         actions.openProtocolsFolder = { calls("openProtocolsFolder") }
-        actions.moveAudioToTrash = { calls("moveAudioToTrash \($0)") }
-        actions.moveMeetingToTrash = { calls("moveMeetingToTrash \($0)") }
+        actions.moveAudioToTrash = { id, _ in calls("moveAudioToTrash \(id)"); return true }
+        actions.moveMeetingToTrash = { id, _ in calls("moveMeetingToTrash \(id)"); return true }
         actions.retryDeletion = { calls("retryDeletion \($0)") }
         actions.setKeep = { calls("setKeep \($0) \($1)") }
         return actions

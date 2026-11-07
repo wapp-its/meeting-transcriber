@@ -547,28 +547,28 @@ extension TranscriptionsView {
             .accessibilityIdentifier(A11yID.recordingTrashConfirmButton)
     }
 
-    /// The action works out its files anew, and the disk can have moved on since the
-    /// dialog opened: a file back from where it was would go without having been named.
-    /// That stops here, for every meeting of the dialog, with the rows as they were, and
-    /// choosing the item again names it. Fewer files than named is no harm. An earlier
-    /// meeting's move takes time, during which a file of a later one can come back, so
-    /// each after the first is asked again right before its own action, and the batch
-    /// stops there. A meeting acted on leaves the selection, also one left as "Deletion
-    /// incomplete".
+    /// The action works out its files anew, and the disk or the other running build's
+    /// record can have moved on since the dialog opened: a file back from where it was,
+    /// or newly listed, would go without having been named. That stops here, for every
+    /// meeting of the dialog, with the rows as they were, and choosing the item again
+    /// names it. Fewer files than named is no harm. An earlier meeting's move takes time,
+    /// during which a file of a later one can come back, so each after the first is asked
+    /// again right before its own action, and the batch stops there; the action itself
+    /// refuses a file it was not named, which stops it the same way. A meeting acted on
+    /// leaves the selection, also one left as "Deletion incomplete".
     private func confirm(_ request: TrashConfirmationPrompt.Request) {
+        actions.reloadMeetingFiles()
         let stillNamed = { (entry: TranscriptionEntry) in
             namesEveryFileToMove(of: entry, named: request.named[entry.id] ?? [], kind: request.action.kind)
         }
         if request.entries.allSatisfy(stillNamed) {
             var actedOn: [UUID] = []
             for entry in request.entries {
-                guard actedOn.isEmpty || stillNamed(entry) else {
-                    notice.trashStopped = TrashConfirmationText.stopped(after: actedOn.count, of: request.entries.count)
+                guard actedOn.isEmpty || stillNamed(entry), move(entry, as: request) || stillNamed(entry) else {
+                    notice.trashStopped = actedOn.isEmpty
+                        ? TrashConfirmationText.nothingMoved(meetings: request.entries.count)
+                        : TrashConfirmationText.stopped(after: actedOn.count, of: request.entries.count)
                     break
-                }
-                switch request.action {
-                case .moveAudio: actions.moveAudioToTrash(entry.id)
-                case .moveMeeting: actions.moveMeetingToTrash(entry.id)
                 }
                 actedOn.append(entry.id)
             }
@@ -578,6 +578,15 @@ extension TranscriptionsView {
         }
         availability.refresh()
         trashPrompt.request = nil
+    }
+
+    /// False when the action moved nothing. The record it read is then in the store.
+    private func move(_ entry: TranscriptionEntry, as request: TrashConfirmationPrompt.Request) -> Bool {
+        let named = request.named[entry.id] ?? []
+        return switch request.action {
+        case .moveAudio: actions.moveAudioToTrash(entry.id, named)
+        case .moveMeeting: actions.moveMeetingToTrash(entry.id, named)
+        }
     }
 
     /// Without a record the action refuses by itself.

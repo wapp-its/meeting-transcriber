@@ -837,9 +837,12 @@ Meeting is also disabled while Regenerate Notes runs: the regenerator writes
 notes that a removed record would no longer list. Keep
 switches at once. Each Trash action asks first, and the dialog names what goes:
 what the record lists, less what the disk answered gone
-(`TrashConfirmationText`). If a file came back while the dialog was open, so
-the action would move a file the dialog did not name, nothing moves and the
-window says so. A file the Trash refuses leaves the
+(`TrashConfirmationText`). If a file came back while the dialog was open, or
+the other running build listed one in the shared record meanwhile, so the action
+would move a file the dialog did not name, nothing moves and the window says so.
+The window reads the record file again before it checks, and the action itself,
+handed the named paths, checks once more against the record it reads and refuses
+an unnamed file that is not gone. A file the Trash refuses leaves the
 meeting as "Deletion incomplete" with Retry Deletion. Move Meeting to Trash
 takes the row off the list at once. The record holds the pending mark, so it
 goes last, after the queue and the finished-job list no longer hold the
@@ -853,8 +856,9 @@ so a selection never offers what the action would refuse, and an item is
 disabled when it applies to none. One confirmation names the kept meetings and
 says how many selected meetings are left out and that imported files stay. If
 any of the meetings would move a file the dialog did not count, because it came
-back while the dialog was open, nothing moves; a file that went missing is no
-reason to stop. Each meeting is checked again right before its own move, so a
+back or another build listed it while the dialog was open, nothing moves; a
+file that went missing is no reason to stop. Each meeting is checked again
+right before its own move, so a
 file that comes back while the earlier meetings move stops the batch before that
 meeting, and the window says after how many it stopped. A meeting that fails
 stays as "Deletion incomplete", and the meetings acted on leave the selection.
