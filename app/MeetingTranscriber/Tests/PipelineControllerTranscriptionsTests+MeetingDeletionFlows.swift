@@ -8,8 +8,6 @@ import XCTest
 /// own file afterwards), a Notion export running, a path two meetings list, and a
 /// deletion a crash interrupted.
 extension PipelineControllerTranscriptionsTests {
-    private struct Refused: Error {}
-
     // MARK: - After a real run
 
     /// A recorded meeting run through the queue and parked for its speaker names.
