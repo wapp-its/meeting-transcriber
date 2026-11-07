@@ -831,11 +831,12 @@ Move Meeting to Trash… (`RecordingRowActions`). They are absent for a failed
 meeting and for a row without a record. They are disabled while the meeting
 waits, runs, waits for speaker names, has a Notion export running or a deletion
 pending. Move Meeting is also disabled while Regenerate Notes runs: the
-regenerator writes notes that a removed record would no longer list. Each
-action asks first, and the dialog names what goes: what the record lists, less
-what the disk answered gone (`TrashConfirmationText`). If a file came back
-while the dialog was open, so the action would move a file the dialog did not
-name, nothing moves and the window says so. A file the Trash refuses leaves the
+regenerator writes notes that a removed record would no longer list. Keep
+switches at once. Each Trash action asks first, and the dialog names what goes:
+what the record lists, less what the disk answered gone
+(`TrashConfirmationText`). If a file came back while the dialog was open, so
+the action would move a file the dialog did not name, nothing moves and the
+window says so. A file the Trash refuses leaves the
 meeting as "Deletion incomplete" with Retry Deletion. Move Meeting to Trash
 takes the row off the list at once. The record holds the pending mark, so it
 goes last, after the queue and the finished-job list no longer hold the
@@ -848,18 +849,22 @@ The right-click menu over a selection offers only the two Trash items.
 so a selection never offers what the action would refuse, and an item is
 disabled when it applies to none. One confirmation names the kept meetings and
 says how many selected meetings are left out and that imported files stay. If
-the files of any of the meetings changed while the dialog was open, nothing
-moves. A meeting that fails stays as "Deletion incomplete", and the meetings
-acted on leave the selection. Only rows the search shows count as selected. The
-footer counts those rows (or says "N of M selected"), adds the audio on disk of
-the ones with a record, and says what the retention setting deletes.
+any of the meetings would move a file the dialog did not count, because it came
+back while the dialog was open, nothing moves; a file that went missing is no
+reason to stop. Each meeting is checked again right before its own move, so a
+file that comes back while the earlier meetings move stops the batch before that
+meeting, and the window says after how many it stopped. A meeting that fails
+stays as "Deletion incomplete", and the meetings acted on leave the selection.
+Only rows the search shows count as selected. The footer counts those rows (or
+says "N of M selected"), adds the audio on disk of the ones with a record, and
+says what the retention setting deletes.
 
 **Automatically.** Settings → Output → Recordings, "Delete recordings
 automatically": Never (the default), Right after the notes, After 7 days, After
 30 days or After 90 days. `RecordingRetentionRule` selects, from the record
 alone, the audio of meetings the app recorded, whose outcome is finished (notes
-saved, speakers named), that are not marked Keep and whose recording date plus
-the chosen days has passed. `RecordingRetentionController` deletes that audio
+saved, or the transcript when notes generation was off; speakers named), that
+are not marked Keep and whose recording date plus the chosen days has passed. `RecordingRetentionController` deletes that audio
 for good, not to the Trash; the transcript, the notes and all other files stay.
 It never touches imports, failed meetings, kept meetings, meetings without a
 record or recordings from before this feature. It skips a meeting whose state
