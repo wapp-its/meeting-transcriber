@@ -27,6 +27,7 @@ final class TranscriptionsViewTests: XCTestCase {
         actions: AllRecordingsActions = .noop,
         regenerateSheet: RegenerateSheetState = RegenerateSheetState(),
         regenerationPhase: ProtocolRegenerator.Phase = .idle,
+        selection: TranscriptionsSelection = TranscriptionsSelection(),
     ) -> TranscriptionsView {
         let box = queryBox ?? QueryBox()
         box.text = query
@@ -36,6 +37,7 @@ final class TranscriptionsViewTests: XCTestCase {
             actions: actions,
             regenerateSheet: regenerateSheet,
             regenerationPhase: regenerationPhase,
+            selection: selection,
         )
     }
 
@@ -473,6 +475,7 @@ final class TranscriptionsViewTests: XCTestCase {
             A11yID.transcriptionsSearchField,
             A11yID.recordingsOpenFolderButton,
             A11yID.recordingsRegenerateFromFileButton,
+            A11yID.transcriptionsFooter,
             A11yID.recordingMainButton(0),
             A11yID.recordingMoreButton(0),
             A11yID.recordingMenuOpenProtocol(0),

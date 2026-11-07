@@ -10,45 +10,19 @@ import SwiftUI
 @MainActor
 final class TranscriptionsFileNotice {
     var fileMissing = false
-    /// A Trash confirmation stopped because it no longer named every file to move.
-    var trashStopped = false
-}
-
-/// The Trash confirmation the window is showing, if any: which action, on which
-/// meeting, in what words. A reference type for the reason on
-/// `TranscriptionsFileNotice`.
-@Observable
-@MainActor
-final class TrashConfirmationPrompt {
-    enum Action {
-        case moveAudio
-        case moveMeeting
-
-        var kind: MeetingFileRecord.DeletionKind {
-            switch self {
-            case .moveAudio: .audioToTrash
-            case .moveMeeting: .meetingToTrash
-            }
-        }
-    }
-
-    struct Request {
-        let action: Action
-        let entry: TranscriptionEntry
-        let text: TrashConfirmationText
-        /// The paths the dialog names, which are all its confirmation answers for.
-        let named: Set<String>
-    }
-
-    var request: Request?
+    /// What the window says when a Trash confirmation stopped because it no longer
+    /// named every file to move.
+    var trashStopped: String?
 }
 
 /// The All Recordings window: every job the app knows, newest first, searched
 /// by title and participant. Each row has the one main button its state calls
 /// for and a "…" menu, which its right-click menu repeats, both decided by
 /// `RecordingRowActions`, and says what happens to its audio, decided by
-/// `RecordingAudioLine`. Regenerating a protocol happens in a sheet over the
-/// window, which `regenerateSheet` presents.
+/// `RecordingAudioLine`. Several rows can be selected, and the right-click menu
+/// over them moves their audio or the meetings to the Trash after one confirmation,
+/// as `TrashSelectionPlan` decides. The footer counts the rows shown. Regenerating
+/// a protocol happens in a sheet over the window, which `regenerateSheet` presents.
 ///
 /// Data and actions arrive as stored properties, the way `SettingsView` takes
 /// them, so the view reads no app state of its own. The query is a binding for
@@ -87,6 +61,7 @@ struct TranscriptionsView: View {
     @State private var notice: TranscriptionsFileNotice
     @State private var availability: RowAvailability
     @State private var trashPrompt: TrashConfirmationPrompt
+    @State private var selection: TranscriptionsSelection
 
     init(
         entries: [TranscriptionEntry],
@@ -94,6 +69,7 @@ struct TranscriptionsView: View {
         actions: AllRecordingsActions,
         regenerateSheet: RegenerateSheetState,
         regenerationPhase: ProtocolRegenerator.Phase,
+        selection: TranscriptionsSelection = TranscriptionsSelection(),
     ) {
         self.entries = entries
         self.query = query
@@ -106,6 +82,7 @@ struct TranscriptionsView: View {
         _notice = State(initialValue: TranscriptionsFileNotice())
         _availability = State(initialValue: RowAvailability())
         _trashPrompt = State(initialValue: TrashConfirmationPrompt())
+        _selection = State(initialValue: selection)
     }
 
     // Sections hoisted out of `body`, each type-checked on its own budget (see
@@ -114,6 +91,7 @@ struct TranscriptionsView: View {
         VStack(spacing: 0) {
             fileMissingMessage
             listOrPlaceholder
+            footer
         }
         .frame(minWidth: 560, minHeight: 320)
         .toolbar { toolbarItems }
@@ -179,9 +157,7 @@ struct TranscriptionsView: View {
 
     @ViewBuilder private var fileMissingMessage: some View {
         if notice.fileMissing { windowMessage("The file was moved or deleted.") }
-        if notice.trashStopped {
-            windowMessage("Nothing was moved: the meeting's files changed while the dialog was open. Choose the action again to see what it moves now.")
-        }
+        if let stopped = notice.trashStopped { windowMessage(stopped) }
     }
 
     private func windowMessage(_ text: String) -> some View {
@@ -193,19 +169,46 @@ struct TranscriptionsView: View {
             .padding(.vertical, 8)
     }
 
+    private var shown: [TranscriptionEntry] {
+        TranscriptionList.matching(entries, query: query.wrappedValue)
+    }
+
+    /// A `Set` selection makes the list multi-select, with Shift and Command built in.
     @ViewBuilder private var listOrPlaceholder: some View {
-        let shown = TranscriptionList.matching(entries, query: query.wrappedValue)
+        let shown = shown
         if entries.isEmpty {
             placeholder("No transcriptions yet")
         } else if shown.isEmpty {
             placeholder("No transcriptions match")
         } else {
-            List {
+            List(selection: Bindable(selection).ids) {
                 ForEach(Array(shown.enumerated()), id: \.element.id) { index, entry in
                     row(entry, index: index)
+                        .tag(entry.id)
                 }
             }
+            .contextMenu(forSelectionType: UUID.self) { ids in selectionMenu(for: ids) }
         }
+    }
+
+    /// The rows shown and their audio on disk, read through `availability` as the rows
+    /// read it, so a redraw reads nothing again. A row without a record adds nothing.
+    private var footer: some View {
+        let shown = shown
+        let bytes = shown.reduce(Int64(0)) { total, entry in
+            let audio = availability.audioOnDisk(for: entry, record: actions.meetingFiles(entry.id), resolve: actions.audioOnDisk)
+            return total + (audio?.bytes ?? 0)
+        }
+        let text = TranscriptionsFooter.text(
+            shown: shown.count, selected: selection.entries(in: shown).count, audioBytes: bytes, retention: actions.retention(),
+        )
+        return Text(text)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal)
+            .padding(.vertical, 6)
+            .accessibilityIdentifier(A11yID.transcriptionsFooter)
     }
 
     private func placeholder(_ text: String) -> some View {
@@ -216,8 +219,8 @@ struct TranscriptionsView: View {
 
     // MARK: - Row
 
-    /// The "…" menu and the right-click menu are one list by construction:
-    /// both are built from the same `items`.
+    /// The "…" menu and the right-click menu of one row are one list by
+    /// construction: both are built from the same `items`.
     private func row(_ entry: TranscriptionEntry, index: Int) -> some View {
         let facts = facts(for: entry)
         return HStack(alignment: .top, spacing: 12) {
@@ -237,7 +240,6 @@ struct TranscriptionsView: View {
             .accessibilityIdentifier(A11yID.recordingMoreButton(index))
         }
         .padding(.vertical, 4)
-        .contextMenu { rowMenu(entry, facts: facts, index: index) }
     }
 
     /// The record comes from the store on every draw, so the row follows it while the
@@ -423,70 +425,6 @@ struct TranscriptionsView: View {
         }
     }
 
-    // MARK: - Trash confirmations
-
-    private var trashPromptShown: Binding<Bool> {
-        Binding(
-            get: { trashPrompt.request != nil },
-            set: { shown in
-                if !shown { trashPrompt.request = nil }
-            },
-        )
-    }
-
-    /// Only asks: what the dialog says comes from the row's record and what was
-    /// last read for it, and nothing moves until it is confirmed.
-    private func askToMove(_ action: TrashConfirmationPrompt.Action, _ entry: TranscriptionEntry, facts: RowFacts) {
-        guard let meeting = facts.meeting else { return }
-        let text = switch action {
-        case .moveAudio:
-            TrashConfirmationText.moveAudio(
-                meetingTitle: entry.title, record: meeting.record, audio: meeting.audio,
-                transcriptSource: facts.onDisk.transcriptSource,
-            )
-
-        case .moveMeeting:
-            TrashConfirmationText.moveMeeting(
-                meetingTitle: entry.title, record: meeting.record, audio: meeting.audio,
-                hasNotionPage: entry.hasNotionPage, hasFailedExport: entry.liveNotionExport == .failed,
-            )
-        }
-        let named = TrashConfirmationText.files(of: action.kind, record: meeting.record, audio: meeting.audio)
-        notice.trashStopped = false
-        trashPrompt.request = .init(action: action, entry: entry, text: text, named: Set(named.map(\.path)))
-    }
-
-    @ViewBuilder
-    private func trashButtons(_ request: TrashConfirmationPrompt.Request) -> some View {
-        Button("Cancel", role: .cancel) { trashPrompt.request = nil }
-            .accessibilityIdentifier(A11yID.recordingTrashCancelButton)
-        Button(request.text.confirmButton, role: .destructive) { confirm(request) }
-            .accessibilityIdentifier(A11yID.recordingTrashConfirmButton)
-    }
-
-    /// The action works out its files anew, and the disk can have moved on since the
-    /// dialog opened: a file back from where it was would go without having been named.
-    /// That stops here, with the row as it was, and choosing the item again names it.
-    /// Fewer files than named is no harm.
-    private func confirm(_ request: TrashConfirmationPrompt.Request) {
-        if namesEveryFileToMove(request) {
-            switch request.action {
-            case .moveAudio: actions.moveAudioToTrash(request.entry.id)
-            case .moveMeeting: actions.moveMeetingToTrash(request.entry.id)
-            }
-        } else {
-            notice.trashStopped = true
-        }
-        availability.refresh()
-        trashPrompt.request = nil
-    }
-
-    /// Without a record the action refuses by itself.
-    private func namesEveryFileToMove(_ request: TrashConfirmationPrompt.Request) -> Bool {
-        guard let record = actions.meetingFiles(request.entry.id), let audio = actions.audioOnDisk(request.entry) else { return true }
-        return request.named.isSuperset(of: TrashConfirmationText.files(of: request.action.kind, record: record, audio: audio).map(\.path))
-    }
-
     // MARK: - Performing
 
     private func perform(_ action: MainAction, on entry: TranscriptionEntry) {
@@ -529,5 +467,109 @@ struct TranscriptionsView: View {
     private func open(_ url: URL?, with action: (URL) -> Bool) {
         guard let url else { return }
         notice.fileMissing = !action(url)
+    }
+}
+
+// MARK: - Selection and Trash confirmations
+
+extension TranscriptionsView {
+    /// The right-click menu over `ids`, which SwiftUI hands in: the clicked row, or the
+    /// selection when the click was on a selected row. Of one row shown, that row's own
+    /// menu; of several, only the two Trash items, applied to all of them.
+    @ViewBuilder
+    func selectionMenu(for ids: Set<UUID>) -> some View {
+        let rows = shown.enumerated().filter { ids.contains($0.element.id) }
+        if rows.count == 1, let row = rows.first {
+            rowMenu(row.element, facts: facts(for: row.element), index: row.offset)
+        } else if rows.count > 1 {
+            let selected = rows.map { TrashSelectionPlan.Selected(entry: $0.element, meeting: facts(for: $0.element).meeting) }
+            selectionItem(.moveAudio, selected, title: Self.title(of: .moveAudioToTrash(enabled: true)), id: A11yID.recordingsSelectionMoveAudioToTrash)
+            selectionItem(
+                .moveMeeting, selected, title: Self.title(of: .moveMeetingToTrash(enabled: true)), id: A11yID.recordingsSelectionMoveMeetingToTrash,
+            )
+        }
+    }
+
+    private func selectionItem(
+        _ action: TrashConfirmationPrompt.Action, _ selected: [TrashSelectionPlan.Selected], title: String, id: String,
+    ) -> some View {
+        let plan = TrashSelectionPlan(action: action, selected: selected, isRegenerating: isRegenerating)
+        return Button(title) { askToMove(plan) }
+            .disabled(!plan.isEnabled)
+            .accessibilityIdentifier(id)
+    }
+
+    private var trashPromptShown: Binding<Bool> {
+        Binding(
+            get: { trashPrompt.request != nil },
+            set: { shown in
+                if !shown { trashPrompt.request = nil }
+            },
+        )
+    }
+
+    /// Only asks: what the dialog says comes from the row's record and what was
+    /// last read for it, and nothing moves until it is confirmed.
+    private func askToMove(_ action: TrashConfirmationPrompt.Action, _ entry: TranscriptionEntry, facts: RowFacts) {
+        guard let meeting = facts.meeting else { return }
+        let text = switch action {
+        case .moveAudio:
+            TrashConfirmationText.moveAudio(
+                meetingTitle: entry.title, record: meeting.record, audio: meeting.audio,
+                transcriptSource: facts.onDisk.transcriptSource,
+            )
+
+        case .moveMeeting:
+            TrashConfirmationText.moveMeeting(
+                meetingTitle: entry.title, record: meeting.record, audio: meeting.audio,
+                hasNotionPage: entry.hasNotionPage, hasFailedExport: entry.liveNotionExport == .failed,
+            )
+        }
+        let named = TrashConfirmationText.files(of: action.kind, record: meeting.record, audio: meeting.audio)
+        notice.trashStopped = nil
+        trashPrompt.request = .init(action: action, entries: [entry], text: text, named: [entry.id: Set(named.map(\.path))])
+    }
+
+    /// The same for a selection: one dialog for every meeting the plan applies to.
+    private func askToMove(_ plan: TrashSelectionPlan) {
+        notice.trashStopped = nil
+        trashPrompt.request = .init(
+            action: plan.action, entries: plan.meetings.map(\.entry), text: .forSelection(plan), named: plan.named,
+        )
+    }
+
+    @ViewBuilder
+    private func trashButtons(_ request: TrashConfirmationPrompt.Request) -> some View {
+        Button("Cancel", role: .cancel) { trashPrompt.request = nil }
+            .accessibilityIdentifier(A11yID.recordingTrashCancelButton)
+        Button(request.text.confirmButton, role: .destructive) { confirm(request) }
+            .accessibilityIdentifier(A11yID.recordingTrashConfirmButton)
+    }
+
+    /// The action works out its files anew, and the disk can have moved on since the
+    /// dialog opened: a file back from where it was would go without having been named.
+    /// That stops here, for every meeting of the dialog, with the rows as they were, and
+    /// choosing the item again names it. Fewer files than named is no harm. A meeting
+    /// acted on leaves the selection; one that failed stays as "Deletion incomplete".
+    private func confirm(_ request: TrashConfirmationPrompt.Request) {
+        if request.entries.allSatisfy({ namesEveryFileToMove(of: $0, named: request.named[$0.id] ?? [], kind: request.action.kind) }) {
+            for entry in request.entries {
+                switch request.action {
+                case .moveAudio: actions.moveAudioToTrash(entry.id)
+                case .moveMeeting: actions.moveMeetingToTrash(entry.id)
+                }
+            }
+            selection.ids.subtract(request.entries.map(\.id))
+        } else {
+            notice.trashStopped = TrashConfirmationText.nothingMoved(meetings: request.entries.count)
+        }
+        availability.refresh()
+        trashPrompt.request = nil
+    }
+
+    /// Without a record the action refuses by itself.
+    private func namesEveryFileToMove(of entry: TranscriptionEntry, named: Set<String>, kind: MeetingFileRecord.DeletionKind) -> Bool {
+        guard let record = actions.meetingFiles(entry.id), let audio = actions.audioOnDisk(entry) else { return true }
+        return named.isSuperset(of: TrashConfirmationText.files(of: kind, record: record, audio: audio).map(\.path))
     }
 }

@@ -283,3 +283,266 @@ final class TrashConfirmationTextTests: XCTestCase {
         }
     }
 }
+
+// MARK: - Several meetings (R7)
+
+/// What the one confirmation for several selected meetings says, also when one meeting
+/// is left for the action.
+extension TrashConfirmationTextTests {
+    private typealias Selected = TrashSelectionPlan.Selected
+
+    private enum Several {
+        static let everyFileGoes = "Their audio (700 MB), transcripts and meeting notes go to the Trash, and the meetings leave this list."
+        static let theirAudioGoes = "Their audio (700 MB) goes to the Trash. Their transcripts and meeting notes stay."
+        static let voiceProfilesStay = "Voice profiles learned from these meetings stay."
+        static let audioLost = "Without the audio you cannot transcribe these meetings again or identify their speakers again. "
+            + "Voice profiles learned from these meetings stay."
+        static let oneLeftOut = "1 selected meeting is left out, as this action does not apply to it."
+    }
+
+    /// Where a meeting's Notion export stands.
+    private enum Notion {
+        case notExported
+        case completed
+        case failed
+        case failedAfterMakingItsPage
+    }
+
+    /// A finished recorded meeting of three tracks, a transcript and notes, each
+    /// meeting 350 MB unless told otherwise.
+    private func selected(
+        _ title: String = "Meeting", bytes: Int64 = 350_000_000, gone: [String] = [], origin: MeetingFileRecord.Origin = .recorded,
+        notion: Notion = .notExported, record: (inout MeetingFileRecord) -> Void = { _ in },
+    ) -> Selected {
+        var job = PipelineJob(
+            meetingTitle: title, appName: "Teams",
+            mixPath: URL(fileURLWithPath: "/rec/\(title)_mix.wav"), appPath: nil, micPath: nil, micDelay: 0,
+        )
+        job.state = .done
+        if notion == .completed || notion == .failedAfterMakingItsPage {
+            job.recordNotionPage(NotionPageResult(pageID: "page-1", url: "https://www.notion.so/page-1"), databaseID: "db")
+        }
+        if notion != .notExported {
+            job.beginNotionExport(speakerNames: [])
+            job.finishNotionExport(succeeded: notion == .completed)
+        }
+        let audio = AudioOnDisk(
+            presentCount: bytes > 0 ? 3 : 0, unreachableCount: bytes > 0 ? 0 : 3, totalCount: 3, bytes: bytes,
+            gonePaths: Set(gone.map { Fixture.file(.mix, $0).path }),
+        )
+        return Selected(
+            entry: TranscriptionEntry(job: job, finishOrder: nil),
+            meeting: .init(record: Fixture.record(origin: origin, record), notionExportRunning: false, audio: audio),
+        )
+    }
+
+    private func text(_ action: TrashConfirmationPrompt.Action, _ selected: [Selected]) -> TrashConfirmationText {
+        .forSelection(TrashSelectionPlan(action: action, selected: selected))
+    }
+
+    private var leftOut: Selected {
+        Selected(entry: selected("No record").entry, meeting: nil)
+    }
+
+    private func kept(_ title: String, bytes: Int64 = 350_000_000) -> Selected {
+        selected(title, bytes: bytes) { $0.keep = true }
+    }
+
+    // MARK: - The two variants
+
+    /// The accepted mockup, word for word but for the numbers.
+    func testSeveralMeetingsReadAsInTheMockup() {
+        let text = text(.moveMeeting, [
+            kept("Strategy offsite", bytes: 300_000_000),
+            selected("Retro", bytes: 200_000_000),
+            selected("Standup", bytes: 200_000_000),
+        ])
+        XCTAssertEqual(text.title, "Move 3 meetings to the Trash?")
+        XCTAssertEqual(text.lines, [
+            Several.everyFileGoes,
+            "“Strategy offsite” is marked Keep. Keep only stops automatic deletion, so it goes too.",
+            Several.voiceProfilesStay,
+        ])
+        XCTAssertEqual(text.confirmButton, "Move to Trash")
+    }
+
+    /// The audio variant says that the text stays and what is lost with the audio.
+    func testTheAudioOfSeveralSaysWhatStaysAndWhatIsLost() {
+        let text = text(.moveAudio, [selected("One"), selected("Two")])
+        XCTAssertEqual(text.title, "Move the audio of 2 meetings to the Trash?")
+        XCTAssertEqual(text.lines, [Several.theirAudioGoes, Several.audioLost])
+        XCTAssertEqual(text.confirmButton, "Move to Trash")
+    }
+
+    // MARK: - R7's lines
+
+    /// Every kept meeting by name, in each variant, with the verb following the number.
+    func testEveryKeptMeetingIsNamed() {
+        let rows: [(selected: [Selected], names: String, meeting: String, audio: String)] = [
+            ([kept("A"), selected("Plain")], "“A” is marked Keep.", "it goes too", "its audio goes too"),
+            ([kept("A"), kept("B")], "“A” and “B” are marked Keep.", "they go too", "their audio goes too"),
+            (
+                [kept("A", bytes: 200_000_000), kept("B", bytes: 250_000_000), kept("C", bytes: 250_000_000)],
+                "“A”, “B” and “C” are marked Keep.", "they go too", "their audio goes too",
+            ),
+        ]
+        for row in rows {
+            let keep = "\(row.names) Keep only stops automatic deletion, so"
+            XCTAssertEqual(text(.moveMeeting, row.selected).lines, [Several.everyFileGoes, "\(keep) \(row.meeting).", Several.voiceProfilesStay])
+            XCTAssertEqual(text(.moveAudio, row.selected).lines, [Several.theirAudioGoes, "\(keep) \(row.audio).", Several.audioLost])
+        }
+    }
+
+    /// How many were left out, in each variant, after what goes and the Keep line.
+    func testItSaysHowManyWereLeftOut() {
+        let two = [selected("One"), kept("Two")]
+        let keep = "“Two” is marked Keep. Keep only stops automatic deletion, so"
+        XCTAssertEqual(
+            text(.moveMeeting, two + [leftOut]).lines, [Several.everyFileGoes, "\(keep) it goes too.", Several.oneLeftOut, Several.voiceProfilesStay],
+        )
+        XCTAssertEqual(text(.moveMeeting, two + [leftOut, leftOut]).lines, [
+            Several.everyFileGoes, "\(keep) it goes too.", "2 selected meetings are left out, as this action does not apply to them.",
+            Several.voiceProfilesStay,
+        ])
+        XCTAssertEqual(text(.moveAudio, two + [leftOut]).lines, [Several.theirAudioGoes, "\(keep) its audio goes too.", Several.oneLeftOut, Several.audioLost])
+    }
+
+    /// An import's own file stays, and it is no reason to speak of its audio (A4).
+    func testSeveralMeetingsSayImportedFilesStay() {
+        let withImport = text(.moveMeeting, [selected("One", bytes: 700_000_000), selected("Talk", origin: .imported)])
+        XCTAssertEqual(withImport.lines, [Several.everyFileGoes, "Imported files stay where they are.", Several.voiceProfilesStay])
+        let onlyImports = text(.moveMeeting, [selected("Talk", origin: .imported), selected("Other", origin: .imported)])
+        XCTAssertEqual(onlyImports.lines.first, "Their transcripts and meeting notes go to the Trash, and the meetings leave this list.")
+    }
+
+    /// A page stays and a failed export's retry ends, as in the single dialog (A10).
+    func testSeveralMeetingsSayWhatHappensInNotion() {
+        let exported = selected("Exported", notion: .completed)
+        let failed = selected("Failed", notion: .failed)
+        XCTAssertEqual(text(.moveMeeting, [exported, failed]).lines, [
+            Several.everyFileGoes, "Pages in Notion stay.", "Failed Notion exports can no longer be retried.", Several.voiceProfilesStay,
+        ])
+        XCTAssertEqual(text(.moveAudio, [exported, failed]).lines, [Several.theirAudioGoes, Several.audioLost])
+    }
+
+    // MARK: - As far as the files are still there
+
+    /// Over all of the meetings: a kind of file goes unnamed only when no meeting has
+    /// one left, and the verb follows what is named.
+    func testSeveralMeetingsNameOnlyWhatIsStillThere() {
+        let noText: (inout MeetingFileRecord) -> Void = { record in
+            record.setFiles(.transcript, to: nil)
+            record.setFiles(.protocol, to: nil)
+        }
+        let noAudio: (inout MeetingFileRecord) -> Void = { $0.setAudio(to: .gone) }
+        let onlyNotes: (inout MeetingFileRecord) -> Void = { record in
+            record.setAudio(to: .gone)
+            record.setFiles(.transcript, to: nil)
+        }
+        let rows: [(String, [Selected], String)] = [
+            ("one has no notes", [selected("A") { $0.setFiles(.protocol, to: .gone) }, selected("B")], Several.everyFileGoes),
+            (
+                "no notes at all",
+                [selected("A") { $0.setFiles(.protocol, to: .gone) }, selected("B") { $0.setFiles(.protocol, to: nil) }],
+                "Their audio (700 MB) and transcripts go to the Trash, and the meetings leave this list.",
+            ),
+            (
+                "only audio", [selected("A", record: noText), selected("B", record: noText)],
+                "Their audio (700 MB) goes to the Trash, and the meetings leave this list.",
+            ),
+            (
+                "no audio", [selected("A", bytes: 0, record: noAudio), selected("B", bytes: 0, record: noAudio)],
+                "Their transcripts and meeting notes go to the Trash, and the meetings leave this list.",
+            ),
+            (
+                "the disk answered every track gone",
+                [selected("A", bytes: 0, gone: everyTrack), selected("B", bytes: 0, gone: everyTrack)],
+                "Their transcripts and meeting notes go to the Trash, and the meetings leave this list.",
+            ),
+            (
+                "audio out of reach", [selected("A", bytes: 0), selected("B", bytes: 0)],
+                "Their audio, transcripts and meeting notes go to the Trash, and the meetings leave this list.",
+            ),
+            (
+                "only notes",
+                [selected("A", bytes: 0, record: onlyNotes), selected("B", bytes: 0, record: onlyNotes)],
+                "Their meeting notes go to the Trash, and the meetings leave this list.",
+            ),
+            (
+                "only naming files",
+                [
+                    selected("A", bytes: 0) { $0.files = [Fixture.file(.naming, "a.naming.json")] },
+                    selected("B", bytes: 0) { $0.files = [Fixture.file(.naming, "b.naming.json")] },
+                ],
+                "Their remaining files go to the Trash, and the meetings leave this list.",
+            ),
+            (
+                "nothing left",
+                [selected("A", bytes: 0) { $0.files = [] }, selected("B", bytes: 0, gone: everyTrack + ["b.txt", "b.md"])],
+                "No file of these meetings is left to move, so they only leave this list.",
+            ),
+        ]
+        for (name, selected, expected) in rows {
+            XCTAssertEqual(text(.moveMeeting, selected).lines.first, expected, name)
+        }
+    }
+
+    /// The same for what stays when only their audio goes.
+    func testTheAudioOfSeveralNamesOnlyTheTextStillThere() {
+        let noText: (inout MeetingFileRecord) -> Void = { record in
+            record.setFiles(.transcript, to: nil)
+            record.setFiles(.protocol, to: .gone)
+        }
+        let rows: [(String, (inout MeetingFileRecord) -> Void, String)] = [
+            ("no transcripts", { $0.setFiles(.transcript, to: .gone) }, "Their audio (700 MB) goes to the Trash. Their meeting notes stay."),
+            ("no notes", { $0.setFiles(.protocol, to: nil) }, "Their audio (700 MB) goes to the Trash. Their transcripts stay."),
+            ("no text", noText, "Their audio (700 MB) goes to the Trash."),
+        ]
+        for (name, change, expected) in rows {
+            XCTAssertEqual(text(.moveAudio, [selected("A", record: change), selected("B", record: change)]).lines.first, expected, name)
+        }
+        XCTAssertEqual(
+            text(.moveAudio, [selected("A", gone: ["b.txt"]), selected("B", gone: ["b.txt"])]).lines.first,
+            "Their audio (700 MB) goes to the Trash. Their meeting notes stay.",
+        )
+        XCTAssertEqual(
+            text(.moveAudio, [selected("A", bytes: 0), selected("B", bytes: 0)]).lines.first,
+            "Their audio goes to the Trash. Their transcripts and meeting notes stay.",
+        )
+    }
+
+    // MARK: - One meeting left
+
+    /// Several rows selected and one left for the action: the same dialog, in the singular.
+    func testASelectionLeavingOneMeetingReadsInTheSingular() {
+        let one = kept("Kept", bytes: 286_000_000)
+
+        let meeting = text(.moveMeeting, [one, leftOut])
+        XCTAssertEqual(meeting.title, "Move 1 meeting to the Trash?")
+        XCTAssertEqual(meeting.lines, [
+            "Its audio (286 MB), transcript and meeting notes go to the Trash, and the meeting leaves this list.",
+            "“Kept” is marked Keep. Keep only stops automatic deletion, so it goes too.",
+            Several.oneLeftOut,
+            "Voice profiles learned from it stay.",
+        ])
+
+        let audio = text(.moveAudio, [one, leftOut])
+        XCTAssertEqual(audio.title, "Move the audio of 1 meeting to the Trash?")
+        XCTAssertEqual(audio.lines, [
+            "Its audio (286 MB) goes to the Trash. Its transcript and meeting notes stay.",
+            "“Kept” is marked Keep. Keep only stops automatic deletion, so its audio goes too.",
+            Several.oneLeftOut,
+            "Without the audio you cannot transcribe this meeting again or identify its speakers again. Voice profiles learned from it stay.",
+        ])
+
+        let exportedImport = selected("Talk", origin: .imported, notion: .failedAfterMakingItsPage)
+        XCTAssertEqual(text(.moveMeeting, [exportedImport, leftOut]).lines, [
+            "Its transcript and meeting notes go to the Trash, and the meeting leaves this list.",
+            Several.oneLeftOut,
+            "The imported file stays where it is.",
+            "The page in Notion stays.",
+            "The failed Notion export can no longer be retried.",
+            "Voice profiles learned from it stay.",
+        ])
+    }
+}

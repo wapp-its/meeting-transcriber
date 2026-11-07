@@ -456,6 +456,7 @@ extension TranscriptionsViewTests {
             A11yID.transcriptionsSearchField,
             A11yID.recordingsOpenFolderButton,
             A11yID.recordingsRegenerateFromFileButton,
+            A11yID.transcriptionsFooter,
             A11yID.recordingKeepBadge(0),
             A11yID.recordingMainButton(0),
             A11yID.recordingMoreButton(0),

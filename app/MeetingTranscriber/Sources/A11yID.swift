@@ -112,6 +112,9 @@ enum A11yID {
     // path.
     static let transcriptionsSearchField = "transcriptionsSearchField"
 
+    /// The line under the list: how many rows, their audio and what the setting does.
+    static let transcriptionsFooter = "transcriptionsFooter"
+
     /// The toolbar's "Open Notes Folder" and "Regenerate from File…".
     static let recordingsOpenFolderButton = "recordingsOpenFolderButton"
     static let recordingsRegenerateFromFileButton = "recordingsRegenerateFromFileButton"
@@ -179,6 +182,10 @@ enum A11yID {
     static func recordingKeepBadge(_ index: Int) -> String {
         "recordingKeepBadge.\(index)"
     }
+
+    /// The two Trash items of the right-click menu over several selected rows.
+    static let recordingsSelectionMoveAudioToTrash = "recordingsSelectionMoveAudioToTrash"
+    static let recordingsSelectionMoveMeetingToTrash = "recordingsSelectionMoveMeetingToTrash"
 
     /// The buttons of a Trash confirmation, of which the window shows one at a time.
     static let recordingTrashCancelButton = "recordingTrashCancelButton"
