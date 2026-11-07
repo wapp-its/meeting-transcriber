@@ -104,3 +104,5 @@ Mockup gate: accepted by the owner on 2026-10-28. The boards are on a private de
 Related: #2 (templates, shipped), #190 (sibling spec), gh-6 (profiles), #155 (shared options-window code), #69 (templates from a URL). Upstream check 2026-10-21: the original has no open issue or pull request about protocol templates or template rules; templates exist only in this fork.
 
 FIT: GO · 2026-11-06 · base c9951a52 · engine flow-next 9.6.0 · the merged Notion export reads the same per-job template field a rule writes, nothing upstream chooses a template by title, and only screen names moved
+
+FIT: GO · 2026-11-07 · base 1c5088f2 · engine flow-next 9.6.0 · gh-97 added a Recordings group to Settings → Output and file records at queue admission without touching the per-job template field, and today's upstream merge touched only the naming window
