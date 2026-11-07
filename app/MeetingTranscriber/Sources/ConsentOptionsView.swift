@@ -15,9 +15,14 @@ final class ConsentOptionsDraft {
         self.protocolOptions = protocolOptions
     }
 
-    /// How every question starts: the default template, no background.
-    func reset(to template: ProtocolTemplateID) {
-        protocolOptions.reset(to: template)
+    /// How every question starts: the template the rules pick for the
+    /// question's meeting title (the default without a question or without
+    /// rules), no background.
+    func reset(choices: ProtocolTemplateChoices, question: ConsentQuestion?) {
+        protocolOptions.reset(to: choices.defaultTemplate)
+        if let question {
+            protocolOptions.follow(choices, title: question.meetingTitle)
+        }
         questionClosed = false
     }
 }
@@ -130,6 +135,6 @@ struct ConsentOptionsView: View {
     private func startOver() {
         let opened = templateChoices()
         openedChoices = opened
-        draft.reset(to: opened.defaultTemplate)
+        draft.reset(choices: opened, question: question)
     }
 }

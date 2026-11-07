@@ -28,6 +28,25 @@ final class ProtocolOptionsFormTests: XCTestCase {
             .select(value: ProtocolTemplateID.file(name: "Retro"))
 
         XCTAssertEqual(draft.template, .file(name: "Retro"))
+        XCTAssertTrue(draft.chosenByHand, "a pick in the picker is a choice by hand")
+    }
+
+    /// The line under Template shows the draft's line, and none without one.
+    func testTheTemplateLineShowsTheDraftsLine() throws {
+        let draft = ProtocolOptionsDraft()
+        let form = ProtocolOptionsForm(context: makeContext(), draft: draft)
+        XCTAssertThrowsError(try form.inspect().find(viewWithAccessibilityIdentifier: A11yID.protocolOptionsTemplateLine))
+
+        draft.follow(
+            ProtocolTemplateChoices(
+                templates: [.builtIn, .file(name: "Board")], defaultTemplate: .builtIn,
+                rules: [ProtocolTemplateRule(pattern: "board", template: .file(name: "Board"))],
+            ),
+            title: "Board Review",
+        )
+
+        let line = try form.inspect().find(viewWithAccessibilityIdentifier: A11yID.protocolOptionsTemplateLine).text().string()
+        XCTAssertEqual(line, "From rule 1 (board), matching the title “Board Review”.")
     }
 
     func testBackgroundEditorWritesTheDraft() throws {

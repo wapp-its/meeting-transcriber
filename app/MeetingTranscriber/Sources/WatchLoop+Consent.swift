@@ -71,6 +71,8 @@ extension WatchLoop {
             title: "Record \(appLabel) meeting?",
             body: "A meeting is active in \(appLabel). Everyone must agree to being recorded.",
             identityKey: key,
+            // What `handleMeeting` names the job after this meeting is approved.
+            meetingTitle: Self.cleanTitle(meeting.windowTitle),
         )
         pendingConsentQuestion = question
         logger.info("Meeting in \(app, privacy: .public) detected, asking for consent")

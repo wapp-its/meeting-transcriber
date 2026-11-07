@@ -149,6 +149,9 @@ class PipelineQueue {
     /// used for a job without one (an older snapshot, or a job no longer queued).
     /// Internal for the same reason as `protocolTemplateStore`.
     let defaultProtocolTemplateProvider: () -> ProtocolTemplateID
+    /// The current template rules, read when a job is admitted: a job without
+    /// a template of its own gets the template they pick for its title.
+    let protocolTemplateRulesProvider: () -> [ProtocolTemplateRule]
     let speakerMatcherFactory: () -> SpeakerMatcher
     let vadConfig: VADConfig?
     /// nil disables JSONL logging. AppState injects a real instance for production;
@@ -400,6 +403,7 @@ class PipelineQueue {
         echoCancellationEnabled: @escaping () -> Bool = { false },
         echoCancellerFactory: (() -> (any EchoCancelling)?)? = nil,
         defaultProtocolTemplateProvider: @escaping () -> ProtocolTemplateID = { .builtIn },
+        protocolTemplateRulesProvider: @escaping () -> [ProtocolTemplateRule] = { [] },
         protocolTemplateStore: ProtocolTemplateStore = .production,
     ) {
         self.logDir = logDir
@@ -428,6 +432,7 @@ class PipelineQueue {
         transcriptOutputOptionsProvider = { outputOptions }
         self.protocolTemplateStore = protocolTemplateStore
         self.defaultProtocolTemplateProvider = defaultProtocolTemplateProvider
+        self.protocolTemplateRulesProvider = protocolTemplateRulesProvider
         self.speakerMatcherFactory = speakerMatcherFactory
         self.snapshotWriter = snapshotWriter
         self.vadConfig = nil
@@ -530,6 +535,7 @@ class PipelineQueue {
         useAITitleForFilenames: Bool = false,
         transcriptOutputOptionsProvider: (() -> TranscriptOutputOptions)? = nil,
         defaultProtocolTemplateProvider: @escaping () -> ProtocolTemplateID = { .builtIn },
+        protocolTemplateRulesProvider: @escaping () -> [ProtocolTemplateRule] = { [] },
         protocolTemplateStore: ProtocolTemplateStore = .production,
         speakerMatcherFactory: @escaping () -> SpeakerMatcher = PipelineQueue.throwawayMatcherFactory(),
         snapshotWriter: @escaping @Sendable ([PipelineJob], URL) throws -> Void = PipelineSnapshot.save,
@@ -578,6 +584,7 @@ class PipelineQueue {
         self.transcriptOutputOptionsProvider = transcriptOutputOptionsProvider ?? { outputOptions }
         self.protocolTemplateStore = protocolTemplateStore
         self.defaultProtocolTemplateProvider = defaultProtocolTemplateProvider
+        self.protocolTemplateRulesProvider = protocolTemplateRulesProvider
         self.speakerMatcherFactory = speakerMatcherFactory
         self.snapshotWriter = snapshotWriter
         self.vadConfig = vadConfig
@@ -664,10 +671,11 @@ class PipelineQueue {
     }
 
     /// Copy the current settings onto a newly admitted job: the transcript
-    /// output options and, unless the job brought its own, the default protocol
-    /// template. Recovery uses the same admission rule as regular enqueueing so
-    /// a later settings change cannot change output handling for an already
-    /// recovered recording.
+    /// output options and, unless the job brought its own, the protocol
+    /// template the rules pick for its title (the default when none matches).
+    /// Recovery uses the same admission rule as regular enqueueing so a later
+    /// settings change cannot change output handling for an already recovered
+    /// recording.
     func stampTranscriptOutputOptions(on job: inout PipelineJob) {
         let outputOptions = transcriptOutputOptionsProvider()
         if job.includeFullTranscriptInProtocol == nil {
@@ -677,11 +685,30 @@ class PipelineQueue {
             job.saveRawTranscriptSeparately = outputOptions.saveRawTranscriptSeparately
         }
         if job.protocolTemplate == nil {
-            job.protocolTemplate = defaultProtocolTemplateProvider()
+            job.protocolTemplate = admissionTemplate(forTitle: job.meetingTitle)
         }
         if job.useAITitleForFilenames == nil {
             job.useAITitleForFilenames = outputOptions.useAITitleForFilenames
         }
+    }
+
+    /// The default with no rules, without listing the folder; otherwise what
+    /// the rules pick. Titles and patterns are user text, so they are logged
+    /// only as private values.
+    private func admissionTemplate(forTitle title: String) -> ProtocolTemplateID {
+        let rules = protocolTemplateRulesProvider()
+        guard !rules.isEmpty else { return defaultProtocolTemplateProvider() }
+        let choice = ProtocolTemplateRules.resolve(
+            title: title, rules: rules, templateNames: protocolTemplateStore.names(),
+            defaultTemplate: defaultProtocolTemplateProvider(),
+        )
+        for index in choice.timedOutRules {
+            logger.warning("Template rule \(index + 1) took too long on \(title, privacy: .private) and was skipped")
+        }
+        if case let .rule(index, _) = choice.source {
+            logger.info("Template rule \(index + 1) picked the template for \(title, privacy: .private)")
+        }
+        return choice.template
     }
 
     /// Test-only: insert a fully-formed job at any state, bypassing

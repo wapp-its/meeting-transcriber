@@ -20,12 +20,20 @@ struct ConsentQuestion: Equatable, Sendable {
     let identityKey: String
     let title: String
     let body: String
+    /// The title the meeting's job would get, which the Record Meeting window
+    /// matches the template rules against. The question's own text names the
+    /// app only.
+    let meetingTitle: String
 
-    init(app: String, title: String, body: String, identityKey: String? = nil, id: UUID = UUID()) {
+    init(
+        app: String, title: String, body: String, identityKey: String? = nil, meetingTitle: String = "",
+        id: UUID = UUID(),
+    ) {
         self.id = id
         self.app = app
         self.identityKey = identityKey ?? app
         self.title = title
         self.body = body
+        self.meetingTitle = meetingTitle
     }
 }

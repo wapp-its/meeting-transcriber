@@ -12,11 +12,18 @@ struct ProtocolOptionsForm: View {
 
     let context: ProtocolOptionsContext
     @Bindable var draft: ProtocolOptionsDraft
+    /// Told the height the line under the template picker adds, spacing
+    /// included, and 0 without it, so a window of fixed height can grow by it.
+    var onLineHeightChange: ((CGFloat) -> Void)?
+
+    /// The space a `VStack` of this form puts above the line.
+    private static let spacing: CGFloat = 8
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Self.spacing) {
+            VStack(alignment: .leading, spacing: Self.spacing) {
                 templatePicker
+                templateLine
                 backgroundEditor
                 Text(context.destination.notice)
                     .font(.caption)
@@ -42,13 +49,31 @@ struct ProtocolOptionsForm: View {
         }
     }
 
+    /// Writes through `chooseByHand`, so a pick is told apart from the rules
+    /// moving the selection.
     private var templatePicker: some View {
-        Picker("Template", selection: $draft.template) {
+        Picker("Template", selection: Binding(get: { draft.template }, set: { draft.chooseByHand($0) })) {
             ForEach(context.templates, id: \.self) { id in
                 Text(Self.label(for: id)).tag(id)
             }
         }
         .accessibilityIdentifier(A11yID.protocolOptionsTemplatePicker)
+    }
+
+    /// Which rule picked the template, or why none did. Wraps rather than
+    /// clips: it carries the meeting title and the rule's pattern.
+    @ViewBuilder private var templateLine: some View {
+        if let line = draft.line {
+            Text(line.text)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier(A11yID.protocolOptionsTemplateLine)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                    onLineHeightChange?(height + Self.spacing)
+                }
+                .onDisappear { onLineHeightChange?(0) }
+        }
     }
 
     /// A `TextEditor` has no placeholder on macOS, so the hint is an overlay

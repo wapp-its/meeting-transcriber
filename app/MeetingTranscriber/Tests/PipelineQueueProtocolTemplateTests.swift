@@ -13,8 +13,11 @@ final class PipelineQueueProtocolTemplateTests: XCTestCase {
     private var store: ProtocolTemplateStore!
     /// What the settings name as the default template right now.
     private var currentDefault: ProtocolTemplateID = .builtIn
+    /// The settings' template rules right now.
+    private var currentRules: [ProtocolTemplateRule] = []
 
     private let boardText = "Board template in {LANGUAGE}."
+    private let dailyText = "Daily template in {LANGUAGE}."
     private let background = "Alice chairs, Bob reports on the budget"
 
     override func setUp() async throws {
@@ -23,6 +26,7 @@ final class PipelineQueueProtocolTemplateTests: XCTestCase {
         store = ProtocolTemplateStore(directory: tmpDir.appendingPathComponent("templates", isDirectory: true))
         try store.create(name: "Board")
         try boardText.write(to: store.fileURL(named: "Board"), atomically: true, encoding: .utf8)
+        try dailyText.write(to: store.fileURL(named: "Daily"), atomically: true, encoding: .utf8)
     }
 
     private func makeEngine() -> MockEngine {
@@ -40,14 +44,17 @@ final class PipelineQueueProtocolTemplateTests: XCTestCase {
             logDir: tmpDir,
             stagingDir: tmpDir.appendingPathComponent("staging"),
             defaultProtocolTemplateProvider: { self.currentDefault },
+            protocolTemplateRulesProvider: { self.currentRules },
             protocolTemplateStore: store,
             inFlightRuns: InFlightRunRegistry(),
         )
     }
 
-    private func makeJob(template: ProtocolTemplateID?, background: String?) throws -> PipelineJob {
+    private func makeJob(
+        template: ProtocolTemplateID?, background: String?, title: String = "Board meeting",
+    ) throws -> PipelineJob {
         try PipelineJob(
-            meetingTitle: "Board meeting", appName: "Teams",
+            meetingTitle: title, appName: "Teams",
             mixPath: createTestAudioFile(in: tmpDir), appPath: nil, micPath: nil, micDelay: 0,
             protocolTemplate: template, protocolBackground: background,
         )
@@ -82,6 +89,86 @@ final class PipelineQueueProtocolTemplateTests: XCTestCase {
 
         XCTAssertEqual(queue.jobs.first?.protocolTemplate, .file(name: "Board"))
         XCTAssertEqual(protocolGen.capturedInstructions?.template, boardText)
+    }
+
+    // MARK: - Template rules
+
+    func testAJobWithoutATemplateGetsTheTemplateTheRulesPickForItsTitle() async throws {
+        let protocolGen = MockProtocolGen()
+        let queue = makeQueue(engine: makeEngine(), protocolGen: protocolGen)
+        currentRules = [ProtocolTemplateRule(pattern: "daily|stand-?up", template: .file(name: "Daily"))]
+
+        try queue.enqueue(makeJob(template: nil, background: nil, title: "Team Daily"))
+        await queue.awaitProcessing()
+
+        XCTAssertEqual(queue.jobs.first?.protocolTemplate, .file(name: "Daily"))
+        XCTAssertEqual(protocolGen.capturedInstructions?.template, dailyText)
+    }
+
+    func testAJobWithItsOwnTemplateKeepsItWhateverTheRulesSay() async throws {
+        let queue = makeQueue(engine: makeEngine(), protocolGen: MockProtocolGen())
+        currentRules = [ProtocolTemplateRule(pattern: "daily", template: .file(name: "Daily"))]
+
+        try queue.enqueue(makeJob(template: .file(name: "Board"), background: nil, title: "Team Daily"))
+
+        XCTAssertEqual(queue.jobs.first?.protocolTemplate, .file(name: "Board"))
+        await queue.awaitProcessing()
+    }
+
+    func testATitleNoRuleMatchesAndARuleWhoseTemplateIsMissingGetTheDefault() async throws {
+        let queue = makeQueue(engine: makeEngine(), protocolGen: MockProtocolGen())
+        currentDefault = .file(name: "Board")
+        currentRules = [
+            ProtocolTemplateRule(pattern: "retro", template: .file(name: "Gone")),
+            ProtocolTemplateRule(pattern: "daily", template: .file(name: "Daily")),
+        ]
+
+        try queue.enqueue(makeJob(template: nil, background: nil, title: "Microsoft Teams Call"))
+        try queue.enqueue(makeJob(template: nil, background: nil, title: "Sprint Retro"))
+
+        XCTAssertEqual(queue.jobs.map(\.protocolTemplate), [.file(name: "Board"), .file(name: "Board")])
+        await queue.awaitProcessing()
+    }
+
+    func testWithNoRulesEveryJobGetsTheDefaultAsBefore() async throws {
+        let queue = makeQueue(engine: makeEngine(), protocolGen: MockProtocolGen())
+        currentDefault = .file(name: "Board")
+
+        try queue.enqueue(makeJob(template: nil, background: nil, title: "Team Daily"))
+
+        XCTAssertEqual(queue.jobs.first?.protocolTemplate, .file(name: "Board"))
+        await queue.awaitProcessing()
+    }
+
+    /// The template is decided when the job enters the queue (spec A5): a rule
+    /// changed afterwards does not move a job already admitted.
+    func testTheRulesAreReadWhenTheJobIsQueued() async throws {
+        let protocolGen = MockProtocolGen()
+        let queue = makeQueue(engine: makeEngine(), protocolGen: protocolGen)
+        currentRules = [ProtocolTemplateRule(pattern: "daily", template: .file(name: "Daily"))]
+
+        try queue.enqueue(makeJob(template: nil, background: nil, title: "Team Daily"))
+        currentRules = []
+        await queue.awaitProcessing()
+
+        XCTAssertEqual(protocolGen.capturedInstructions?.template, dailyText)
+    }
+
+    func testARecoveredOrphanGetsTheTemplateTheRulesPickForItsTitle() async throws {
+        let recordings = tmpDir.appendingPathComponent("recordings")
+        try FileManager.default.createDirectory(at: recordings, withIntermediateDirectories: true)
+        try Data(repeating: 0xFF, count: 100).write(to: recordings.appendingPathComponent("20260311_100000_mix.wav"))
+        let queue = PipelineQueue(
+            logDir: tmpDir,
+            inFlightRuns: InFlightRunRegistry(),
+            defaultProtocolTemplateProvider: { .file(name: "Board") },
+            protocolTemplateRulesProvider: { [ProtocolTemplateRule(pattern: "^recovered", template: .file(name: "Daily"))] },
+            protocolTemplateStore: store,
+        )
+
+        await queue.recoverOrphanedRecordings(recordingsDir: recordings)
+
+        XCTAssertEqual(queue.jobs.map(\.protocolTemplate), [.file(name: "Daily")])
     }
 
     func testARetriedJobKeepsItsTemplateAndBackground() async throws {
