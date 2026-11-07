@@ -101,6 +101,15 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `MenuBarView.swift` | Menu bar dropdown (state, actions, meeting info, the Microphone entry: a submenu whose inline picker checks the chosen microphone and stores a choice in `AppSettings.micDeviceUID`; at the top, the open recording prompt with Record / Record with Options… / Ignore; "Open Last Notes", which opens the newest finished job's notes file or, while Notion export is on, its Notion page, as `JobOpenTarget` resolves it) |
 | `MenuBarView+Jobs.swift` | The dropdown's job lines under "In progress" and "Needs you", one line per job with its actions in a submenu; a finished job whose Notion export runs or failed keeps a line there with "Retry Notion Export" and "Discard Notion Retry" |
 | `JobMenuSummary.swift` | Status text and symbol of a job's single line in the menu bar dropdown |
+| `TranscriptionsView.swift` | The All Recordings window: every job the app knows, searched by title and participant; each row's main button, "…" menu (repeated by its right-click menu) and audio line; several rows selected at once with one right-click menu for them; the footer; the Trash confirmations |
+| `TranscriptionsView+RowLabels.swift` | A row's detail line and the titles and accessibility identifiers of its buttons and menu items |
+| `TranscriptionsSelection.swift` | The window's selection and Trash-confirmation models, `TrashSelectionPlan` (which selected meetings a Trash action applies to, by each row's own rules) and the footer text |
+| `TrashConfirmationText.swift` | Pure wording of the Trash confirmations for one meeting and for a selection, from the record less what the disk answered gone |
+| `RecordingRowActions.swift` | Pure decision of a row's main button and menu items, Keep and the two Trash items included, and when they are disabled |
+| `RecordingAudioLine.swift` | Pure wording of a row's audio line, its Keep badge and why a deletion stopped |
+| `RowAvailability.swift` | The rows' files and audio on disk, read once per row and refresh, so a redraw never reads the disk |
+| `AllRecordingsActions.swift` | What the window's controls do, handed to `TranscriptionsView` as one value |
+| `RetentionPreview.swift` | What a retention value would delete now, shown before it is saved, and `RetentionChoice`, the picker's value on its way to the setting |
 | `MicrophoneMenuState.swift` | Pure decision for the menu bar's Microphone entry: its title (the device a recording reports, otherwise the chosen device or `System Default (<name>)`, a chosen device that is not connected, no microphone available, the "No Microphone" off line), the items (`System Default (<name>)` then the Settings list) and the checked choice, and every string the entry shows |
 | `ProtocolOpener.swift` | Opens local protocols with the default handler and prefers an already-running Notion desktop app for Notion pages, falling back to the default handler |
 | `MenuBarIcon.swift` | Renders the animated waveform icon + badge overlays (watching dot, question mark while a recording prompt is open, pulse while a meeting-end countdown runs, permission, record-only, channel-silent) |
@@ -393,6 +402,12 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `NamingStatusDTO.swift` | Wire shape for `GET /v1/jobs/<id>/naming` — per-speaker auto-name suggestion + speaking time + participants |
 | `IdempotencyStore.swift` | Bounded FIFO map of `Idempotency-Key` → created job IDs for the `/v1` enqueue routes |
 | `TerminalJobStore.swift` | File-backed store of recent finished-job statuses (survives queue reaping + app restart) |
+| `MeetingFileRecord.swift` | One meeting's files and what has happened to them: paths, ownership, recording date, Keep mark, pending and incomplete deletions (see [Meeting Files and Deletion](#meeting-files-and-deletion)) |
+| `MeetingFileStore.swift` | `meeting_files.json`: every meeting's record, lock-guarded writes shared with a second running build |
+| `MeetingFilePresence.swift` | The one probe of a meeting's file: present, gone, or out of reach |
+| `MeetingFileRemover.swift` | Moves a meeting's files to the Trash or deletes them for good, after the pending mark is on disk |
+| `RecordingRetention.swift` | The retention setting's values and `RecordingRetentionRule`, which decides from the record alone whether a meeting's audio is due |
+| `RecordingRetentionController.swift` | The automatic deletion check: when it runs, and what it asks the disk and the queue right before it deletes |
 | `AppSettings+RPC.swift` | Builds the read-only settings projection for the debug RPC `/state` endpoint |
 | `AppState+RPC.swift` | Builds `RPCStateSnapshot` from live `AppState` for the `/state` endpoint (`#if !APPSTORE`) |
 | `RPCStateSnapshot.swift` | JSON-serializable RPC state snapshot type (`#if !APPSTORE`) |
@@ -669,8 +684,9 @@ legacy output. Their values are captured when a job enters the queue, so a
 later settings change affects only subsequent recordings. The raw `.txt` and
 verbatim segment sidecar are deleted only after a job completes successfully
 with a saved protocol. If protocol generation is disabled, fails, or the job
-ends in an error, the raw transcript is retained with a warning; recordings are
-governed by their separate retention policy.
+ends in an error, the raw transcript is retained with a warning. Neither setting
+deletes a recording's audio; only the rules in
+[Meeting Files and Deletion](#meeting-files-and-deletion) do.
 
 The prompt is the job's protocol template: the built-in one ("Standard (built-in)") or a Markdown file in `~/Library/Application Support/MeetingTranscriber/Protocol Templates/`, named after the file and managed in Settings → Output. A job captures the template's name when it enters the queue (`AppSettings.defaultProtocolTemplate` unless the job names one), and the file is read when the protocol is made; a template that is missing or blank by then falls back to the built-in with a warning on the job. A custom prompt from an earlier version (`protocol_prompt.md`) is copied in once as the template "Custom Prompt" and made the default; the old file is left in place.
 
@@ -794,6 +810,81 @@ always use the default handler.
 [appended when enabled]
 ```
 
+### Meeting Files and Deletion
+
+Each meeting that enters processing gets a `MeetingFileRecord`, kept by
+`MeetingFileStore` in `meeting_files.json` beside `terminal_jobs.json` and keyed
+by the job id. The record lists every file of the meeting with its current path
+and whether the app owns it, plus the recording date, the Keep mark and the
+state of any deletion. It follows each file as the pipeline writes, moves,
+replaces or removes it, and it outlives the 1000-entry finished-job list. A
+deletion only touches a path the record lists, never one derived from a file
+name or a folder. An imported source file is never owned, also inside the
+recordings folder, and a meeting finished before this feature has no record and
+gets none. A file counts as gone only when its folder reads and the file system
+says the file does not exist (`MeetingFilePresence`). A missing volume or an
+access error makes it unreachable, and an unreachable file stays listed.
+
+**By hand, one meeting.** In the All Recordings window, a finished meeting's
+row menu offers Keep (Never Delete Automatically), Move Audio to Trash… and
+Move Meeting to Trash… (`RecordingRowActions`). They are absent for a failed
+meeting and for a row without a record. They are disabled while the meeting
+waits, runs, waits for speaker names, has a Notion export running or a deletion
+pending. Move Meeting is also disabled while Regenerate Notes runs: the
+regenerator writes notes that a removed record would no longer list. Each
+action asks first, and the dialog names what goes: what the record lists, less
+what the disk answered gone (`TrashConfirmationText`). If a file came back
+while the dialog was open, so the action would move a file the dialog did not
+name, nothing moves and the window says so. A file the Trash refuses leaves the
+meeting as "Deletion incomplete" with Retry Deletion. Move Meeting to Trash
+takes the row off the list at once. The record holds the pending mark, so it
+goes last, after the queue and the finished-job list no longer hold the
+meeting; after a failed write or a crash it stays until the next launch
+finishes the removal. From then on `GET /v1/jobs/<id>` answers `404`.
+
+**By hand, several meetings.** Rows can be selected with Shift and Command.
+The right-click menu over a selection offers only the two Trash items.
+`TrashSelectionPlan` takes each selected meeting by its own row's rules above,
+so a selection never offers what the action would refuse, and an item is
+disabled when it applies to none. One confirmation names the kept meetings and
+says how many selected meetings are left out and that imported files stay. If
+the files of any of the meetings changed while the dialog was open, nothing
+moves. A meeting that fails stays as "Deletion incomplete", and the meetings
+acted on leave the selection. Only rows the search shows count as selected. The
+footer counts those rows (or says "N of M selected"), adds the audio on disk of
+the ones with a record, and says what the retention setting deletes.
+
+**Automatically.** Settings → Output → Recordings, "Delete recordings
+automatically": Never (the default), Right after the notes, After 7 days, After
+30 days or After 90 days. `RecordingRetentionRule` selects, from the record
+alone, the audio of meetings the app recorded, whose outcome is finished (notes
+saved, speakers named), that are not marked Keep and whose recording date plus
+the chosen days has passed. `RecordingRetentionController` deletes that audio
+for good, not to the Trash; the transcript, the notes and all other files stay.
+It never touches imports, failed meetings, kept meetings, meetings without a
+record or recordings from before this feature. It skips a meeting whose state
+changed since the check began or whose Notion export is running. Right before it
+deletes, it asks the disk and the queue again, and it keeps the audio in cases
+the rule cannot see: a folder, a link or an unreadable file at the notes path,
+notes switched off with the transcript removed by hand, or saved jobs it cannot
+read (the meeting then counts as not through). A file out of reach or one that
+refuses to go stays listed and is tried again at the next check. The check runs
+at launch, once a day, when a meeting finishes, when a Notion export ends and 5
+seconds after a confirmed setting change, and never two at once.
+
+Choosing a value that would delete audio now first shows what it deletes
+(`RetentionPreview`). Cancel is that alert's default button, so Return cancels.
+A confirmed value is saved and starts a check 5 seconds later; the check reads
+the setting when it runs, so going back to Never in between keeps the audio.
+When nothing would be deleted, and for Never or a longer time, the value is
+saved without asking. When what the value deletes cannot be told, because the
+records or the queue's saved jobs do not read, the value is not saved.
+
+The development and the release build share the data folder. Every write to
+`meeting_files.json` takes a lock and changes only its one record, and a
+deletion found pending is left alone while the process that started it still
+runs.
+
 ---
 
 ## Data Flow
@@ -821,6 +912,7 @@ AppSettings (UserDefaults)
 | Speaker DB | `~/Library/Application Support/MeetingTranscriber/speakers.json` |
 | WhisperKit models | `~/Library/Application Support/MeetingTranscriber/huggingface/` |
 | Pipeline logs | `~/.meeting-transcriber/pipeline_queue.json`, `pipeline_log.jsonl` |
+| Meeting file records | `~/Library/Application Support/MeetingTranscriber/ipc/meeting_files.json`, beside `terminal_jobs.json` |
 | AudioTapLib | Linked as SPM library (no separate binary) |
 
 ---
@@ -883,7 +975,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 | **Audio** | Microphone · VAD | `settings` | `audioDevices` |
 | **Transcription** | Engine + per-engine options + vocabulary source + status | `settings`, three engines, `remoteVocabulary?` | — |
 | **Speakers** | Diarization · Speaker Identity · Known Voices · Recognition Stats · Experimental Diarization Tuning | `settings`, `recognitionStatsLog`, `enrollmentDiarizerFactory` | `knownVoicesSheet` |
-| **Output** | LLM Provider (with the local model's folder and Check Model) · Notes Language · Output Folder · Notion Export · Meeting Notes Templates | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel` |
+| **Output** | LLM Provider (with the local model's folder and Check Model) · Notes Language · Output Folder · Recordings (automatic deletion, with its preview) · Notion Export · Meeting Notes Templates | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel` |
 | **Advanced** | Permissions · Diagnostics | — | `micPermission`, `screenRecordingOK`, `accessibilityOK` |
 | **About** | Build identity · Dependencies · Updates | `settings`, `updateChecker?` | — |
 
