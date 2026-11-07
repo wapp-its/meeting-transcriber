@@ -899,9 +899,13 @@ runs. Each build keeps its own retention setting, so a build's setting reaches
 only the records it created: the record names that build's bundle identifier
 (`createdBy`, written once), and the rule, the row's audio line, the preview and
 the store's last look before each file all take the running build's identifier
-(`MeetingFileStore.bundleID`). A record without the field, written before it
-existed, is never deleted automatically. The manual actions act on any meeting
-the window lists.
+(`MeetingFileStore.bundleID`). A record without the field is never deleted
+automatically. A build that does not know a field of the record drops it from
+every record when it saves the file, so a field the automatic deletion depends
+on has to keep the audio when it is missing, as `createdBy` does. The record
+file and `createdBy` arrive in the same change, so no build that writes the file
+deletes automatically without asking the field. The manual actions act on any
+meeting the window lists.
 
 ---
 
