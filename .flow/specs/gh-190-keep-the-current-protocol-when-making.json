@@ -15,7 +15,7 @@
   "no_plan": true,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
-  "plan_reviewed_at": "2026-11-06T15:51:20.920579Z",
+  "plan_reviewed_at": "2026-11-07T15:32:49.284984Z",
   "ready": true,
   "review_attempts": [
     {
@@ -319,10 +319,147 @@
       "task": null,
       "timestamp": "2026-11-06T15:51:20.894168Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "2fd18372a1efe768cd19d420d88363287cb586bdf44da4becf162788e1a71362",
+      "backend": "codex",
+      "base_sha": "6b7fea70dcca344c557b14a24c93eaa145022c74",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-39cb8561f4d7c778739d2812329483f7",
+            "classification": "introduced",
+            "findingId": "finding-39cb8561f4d7c778739d2812329483f7",
+            "firstSeenThisRound": true,
+            "severity": "P0",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-c01add64a88a79836eb82ead2fb741ad",
+            "classification": "introduced",
+            "findingId": "finding-c01add64a88a79836eb82ead2fb741ad",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-634f0200e3351f18807ab73c2a8270da",
+            "classification": "introduced",
+            "findingId": "finding-634f0200e3351f18807ab73c2a8270da",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-bcd4192c62798fb65501f03d40f9d2c4",
+            "classification": "introduced",
+            "findingId": "finding-bcd4192c62798fb65501f03d40f9d2c4",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 2,
+      "head_sha": "6b7fea70dcca344c557b14a24c93eaa145022c74",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 402825,
+      "output_sha256": "fa43b62f6931044e8f4ef91e234fb77d7ca1b26e342472ddfb1480845edefc83",
+      "reservation_id": "783a5ee2df8d4989a4e6cf2374b1c4f9",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-07T15:30:02.544883Z",
+      "tool_calls": 20,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "1c1474f226e500f7b504b75a631591b39994f08aa51bff58b8b6439199de2ac3",
+      "backend": "codex",
+      "base_sha": "6b7fea70dcca344c557b14a24c93eaa145022c74",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-39cb8561f4d7c778739d2812329483f7",
+            "classification": "introduced",
+            "findingId": "finding-39cb8561f4d7c778739d2812329483f7",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-c01add64a88a79836eb82ead2fb741ad",
+            "classification": "introduced",
+            "findingId": "finding-c01add64a88a79836eb82ead2fb741ad",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-634f0200e3351f18807ab73c2a8270da",
+            "classification": "introduced",
+            "findingId": "finding-634f0200e3351f18807ab73c2a8270da",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-bcd4192c62798fb65501f03d40f9d2c4",
+            "classification": "introduced",
+            "findingId": "finding-bcd4192c62798fb65501f03d40f9d2c4",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 2,
+      "head_sha": "6b7fea70dcca344c557b14a24c93eaa145022c74",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 756,
+      "output_sha256": "29487e5514b4882915e4d753cc66f154ec32efe736d8b3237dda7bbd7a3dc13e",
+      "reservation_id": "cc575eb7b1084bae90954fc2a3a58157",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-07T15:32:49.257744Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
-    "plan": 2,
+    "plan": 3,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
@@ -345,5 +482,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\n\"Regenerate Protocol\u2026\" (#2, #170) makes a meeting's protocol again with another template. The previous protocol then goes to the Trash, so a meeting has one protocol at a time. One meeting can need a report for each of several audiences, for example full minutes and a short summary (owner request, paraphrased).\n\n## NOTES\n\n- The regenerate dialog offers to save the new protocol as an additional report next to the existing one, named after its template. Replacing stays available. The template choice stays as it is.\n- The meeting's row in All Recordings lists its additional reports and opens them.\n- The main protocol keeps its role: Open Protocol, Open Last Protocol, the automation API and a retry use it.\n- Related: #170, #171.\n\n## TASKS\n\n- [ ] Draw the mockup (regenerate dialog, row menu) and get it accepted\n- [ ] Build the spec",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/190"
   },
-  "updated_at": "2026-11-06T15:51:20.921807Z"
+  "updated_at": "2026-11-07T15:32:49.286216Z"
 }
