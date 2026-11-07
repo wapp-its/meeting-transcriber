@@ -43,9 +43,62 @@ The pure decisions the single-row UI (task .5) and the automatic check (task .6)
 - [ ] The confirmation texts carry every element of R5 and R6, singular and plural (R5, R6).
 - [ ] All new tests were written before the implementation and pass; none of the new types imports SwiftUI or touches the file system (R14).
 ## Done summary
-TBD
+Added the pure decisions the later tasks render and run: the recording retention setting and rule, the audio line of a row, the row actions with Keep, the two Trash items and Retry Deletion, and the texts of the two confirmations. Nothing shows in the app yet.
 
+Tier: implementer - opus (explicit invocation) at xhigh effort (requested) (model: claude-opus-5-5)
+baseline: green via handoff (green (verified at a67e0f84 by the conductor; only .flow/ paths moved since))
+
+Gates, on the committed tree:
+- `gate classify`: FULL (exit 1), code changed.
+- Focused tests (the five classes this task touches): exit 0, 125 tests.
+- The spec's Quick command: exit 0, 147 tests over all 12 classes.
+- `./scripts/lint.sh` with the pinned tools: exit 0, 0 violations.
+
+Tests first:
+- All tests were written before any implementation. A red run against compile-only stubs gave exit 1: 44 of the 54 new tests failed.
+- The other 10 passed against the stubs because a stub that says nothing already satisfies them (the rule returning nothing, no line for a meeting in progress, the usual main button, the raw values declared in the stub, Never as the stub's default). 7 of them were shown to fail when their guard was broken, below. The other 3 assert literal raw values or a row without a record, and had no guard broken.
+- `testMoveMeetingOfAnImportWithNothingOfTheAppsLeft` came with the implementation, not before it; breaking its guard fails it.
+- 42 guards were broken one at a time, each with a rebuild. All 42 now fail a test. Two survived at first and showed real gaps: the fixture gave an import no recording date, which hid the origin guard of the due date, and no row covered an import with a copy of the app's own, which hid the origin guard of Keep and Move Audio. Both were closed with test changes after the implementation, then re-run and caught.
+- `testWhatARowOffersIsWhatItsActionAccepts` runs each item against the real controller, for both origins and 10 record states.
+
+None of the new types imports SwiftUI or touches the file system: the three new files import Foundation only, and `RecordingRowActions.swift` has no import. `URL(filePath:directoryHint: .notDirectory)` is used for file names only.
+
+Not run: the App Store build, `swiftlint analyze`, the full suite, sanitizers.
+
+DECIDED: `audioToDelete` takes a required `calendar:` beyond the task's signature, so task .6's call needs it (rule 1: Key context, the clock, calendar and locale come in as inputs; no default, so a caller cannot silently miss it).
+DECIDED: `dueDate` is also nil for a record excluded from automatic deletion (rule 1: D9).
+DECIDED: sizes go through `ByteCountFormatter` as the task says, so the decimal separator is the machine's; the 1.1 GB test interpolates its expected size, MB samples are literal (rule 1).
+DECIDED: Retry Deletion is the main button only where `retryDeletion` would accept the meeting, otherwise the row keeps its usual button (rule 1: the dispatch note on what the actions refuse).
+DECIDED: Move Audio is disabled while a Move Meeting is incomplete (rule 1: the dispatch note, `moveAudioToTrash`).
+DECIDED: the Move Meeting confirmation also lists the file names (rule 1: D1, it "names the files").
+DECIDED: the Keep line precedes the naming and failed lines; the import line wins over everything but "still being processed", also when its file is gone (rule 6).
+DECIDED: the count and names in Move Audio come from the record and the size from the disk, so a file removed by hand still counts until the action finds it gone (rule 6).
+ASSUMED: wrapper enums `RowMenuItem` and `RowMainAction` embed the old `MenuItem` and `MainAction`, with new overloads taking `meeting:` · alternatives: B — flat new cases in the old enums, as the task text says, which needs lines in `TranscriptionsView.swift` outside this task's Touches, as five exhaustive switches there would stop compiling; C — two separate lists, which leave order and precedence to the view · flip at: `RecordingRowActions.RowMenuItem`, `RecordingRowActions.RowMainAction` · test: `testTheItemsFollowRegenerateInTheMockupsOrder`
+ASSUMED: a recording from before this feature, or one without a recording date, shows plain "Audio · 286 MB" · alternatives: B — "kept, never deleted automatically", which would sit beside an unchecked Keep · flip at: `RecordingAudioLine.Inputs.next` · test: `testAMeetingTheCheckNeverDeletesShowsItsSizeOnly`
+ASSUMED: under Never a finished meeting without notes shows the plain size, by the same reasoning R2 gives for a running export; the row's warning still reports the failed notes · alternatives: B — "kept, no notes were saved" also under Never · flip at: `RecordingAudioLine.Inputs.next` · test: `testUnderNeverAFinishedMeetingShowsItsSizeOnly`
+ASSUMED: a meeting that left the queue unfinished shows its plain size and no file items; the spec says it has no row, but a history row can exist after Retry then Cancel · alternatives: B — treat it as failed, "kept while the meeting has failed" · flip at: `RecordingAudioLine.Inputs.next`, `RecordingRowActions.meetingFileItems` · test: `testEveryStateCrossedWithWhatTheRecordSays`
+
+FOLLOW-UP: this task's Touches omit `TranscriptionsView.swift`, so task .5 switches the row to `RowMenuItem` and `RowMainAction`, within its own Touches. The overloads without `meeting:` stay, as the new ones call them.
+FOLLOW-UP: task .5 fills `AudioOnDisk` as follows: `totalCount` is every audio file the record lists as the app's, each path once, also those gone; `presentCount` and `unreachableCount` come from the probe over the files not gone; `bytes` counts present files only.
+FOLLOW-UP: declarations that a later task first uses, for `swiftlint analyze`: `RecordingRetention.title` (.7), `RowMenuItem`, `RowMainAction`, the `meeting:` overloads, `RecordingAudioLine.resolve` and `TrashConfirmationText` (.5), `audioToDelete` (.6, .7), `AppSettings.recordingRetention` (.5, .6, .7).
+
+Similar code search: reused `MeetingFileRecord.filesCovered(by:)`; followed the `DiarizerMode` setting pattern and the existing `ByteCountFormatter` use; extended `RecordingRowActions`; no retention code existed.
+
+
+stage: impl-review - ran (model: gpt-6-astra xhigh (codex:gpt-6-astra:xhigh)); verdict SHIP after 2 round(s)
+DECIDED: panel of three in round 1, because the task adds a stored setting and the rule that decides which audio is deleted. All three reviewers traced `audioToDelete` and ran its tests, and none found a wrong answer. The fix commit leaves `RecordingRetention.swift` unchanged (rule 1: the skill's panel rule).
+DECIDED: findings 1 and 2 (both P2, each reproduced by a reviewer, validator kept both) are fixed; the receipt marks both `fixed`. None declined (rule 1: R5 "the number and size of the audio files" and "Regenerate Notes keeps working", task acceptance "carry every element of R5 and R6").
+DECIDED: finding 1 reverses the worker's decision "the count and names in Move Audio come from the record and the size from the disk". Both confirmations now leave out what the disk answered gone, in the number, the names and the words for what stays or goes, for transcript and notes as well as audio. The worker's summary line is out of date on this point (rule 1: R5; R6 "as far as they are still on disk").
+DECIDED: `RecordingAudioLine.AudioOnDisk.gonePaths` defaults to empty, so the tests that build an `AudioOnDisk` for the audio line and the row actions stay as they are. A caller that leaves it empty gets an overcount in the text only, with no effect on what is moved (rule 6).
+DECIDED: `moveMeeting` no longer drops all audio on `isAnyLeft`; `gonePaths` is the one mechanism, and it covers part of the audio being gone (rule 6).
+DECIDED: `TrashConfirmationText.moveAudio` takes a required `transcriptSource:`, the regenerator's own answer. This also stops the old text promising Regenerate Notes for a blank transcript file with nothing in the notes. With no transcript and no notes listed, nothing is promised whatever the source says (rule 6).
+DECIDED: test changes in this task's own `TrashConfirmationTextTests`: `testMoveAudioNamesOnlyTheTextThatIsStillThere` gained a source column, its expected texts unchanged for source `.none` and `.transcriptFile`, with new rows, as the reviewer showed the test asserted the omission; one input row of `testMoveMeetingNamesOnlyWhatIsStillThere` now states the gone paths, its expected text unchanged. New: `testMoveAudioLeavesOutWhatTheDiskAnsweredGone`, `testMoveMeetingLeavesOutWhatTheDiskAnsweredGone` (rule 1: the brief's rule on a test whose behaviour is deliberately changed).
+DECIDED: evidence. Tests first: against compile-only stubs `TrashConfirmationTextTests` exited 1 with 3 of 14 tests failing, each on the stated text. After the fix: that class exit 0, 14 tests; the five classes this task touches exit 0, 127 tests; the spec's Quick set plus the task's other classes exit 0, 256 tests. `lint.sh` with the pinned tools: exit 0, 0 violations. The last test run was on the tree that was committed. Not run: App Store build, `swiftlint analyze`, full suite, sanitizers (the step runs them).
+DECIDED: lesson captured as an uncommitted `.flow/memory/bug/ui/` entry, for the step to commit. `.flow/specs/gh-97-delete-recordings-by-hand-and-after-a.json` holds flowctl's review bookkeeping, also uncommitted (rule 1: the review brief).
+FOLLOW-UP: task .5 (spec gh-97), in addition to the worker's note on `AudioOnDisk`: fill `gonePaths` from the presence probe over every file `record.filesCovered(by: .meetingToTrash)` lists, audio or not, and pass `FilesOnDisk.transcriptSource` as `transcriptSource:` to `TrashConfirmationText.moveAudio`. Matters at once: an empty `gonePaths` brings back the overcount in the dialog for a file removed by hand.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 7e2ab7b6c58fd26d239b2c2fe2c6bebedf4f21d4, f9da75f07b0dc39e2b90b509ca21fbd9d9f330f8, 13f47c3cafc384965fb6e98a426d68483521895b, 9f1636195042741b4298132705766483e8d51412, 16e341b8d9f403d58e3bc4084036aadc0edd78d4
+- Tests: CFFIXED_USER_HOME=<scratch> swift test --parallel --filter 'RecordingRetentionRuleTests|RecordingAudioLineTests|TrashConfirmationTextTests|RecordingRowActionsTests|AppSettingsTests', CFFIXED_USER_HOME=<scratch> swift test --parallel --filter 'TranscriptionsViewTests|TranscriptionListTests|RecordingRowActionsTests|RowAvailabilityTests|PipelineControllerTranscriptionsTests|TranscriptionsWindowPrivacyTests|TerminalJobStoreTests|TerminalJobRecordTests|AudioPersistencePolicyTests|OutputSettingsViewTests|SpeakerNamingStoreTests|ProcessedRecordingsLedgerTests', ./scripts/lint.sh
 - PRs:

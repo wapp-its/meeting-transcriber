@@ -238,6 +238,19 @@ struct MeetingTranscriberApp: App {
             openProtocolsFolder: { AllRecordingsActions.openFolder(appState.settings.effectiveOutputDir) },
             canRetry: { appState.pipeline.canRetryJob(id: $0) },
             filesOnDisk: { AllRecordingsActions.readFilesOnDisk(of: $0, scopeRoot: appState.settings.effectiveOutputDir) },
+            meetingFiles: { appState.pipeline.meetingFileStore.record(for: $0) },
+            audioOnDisk: { entry in
+                appState.pipeline.meetingFileStore.record(for: entry.id).map { record in
+                    AllRecordingsActions.readAudioOnDisk(of: record, scopeRoot: appState.settings.effectiveOutputDir)
+                }
+            },
+            reloadMeetingFiles: { appState.pipeline.meetingFileStore.reload() },
+            moveAudioToTrash: { appState.pipeline.moveAudioToTrash(jobID: $0, named: $1) },
+            moveMeetingToTrash: { appState.pipeline.moveMeetingToTrash(jobID: $0, named: $1) },
+            retryDeletion: { appState.pipeline.retryDeletion(jobID: $0) },
+            setKeep: { appState.pipeline.setKeep(jobID: $0, $1) },
+            retention: { appState.settings.recordingRetention },
+            bundleID: appState.pipeline.meetingFileStore.bundleID,
             templateChoices: { appState.protocolTemplateChoices() },
             optionsUse: { appState.protocolOptionsUse() },
             chooseFile: { RegenerateProtocolView.chooseFile(startingIn: appState.settings.effectiveOutputDir) },
@@ -291,6 +304,7 @@ struct MeetingTranscriberApp: App {
         .task {
             appState.remoteVocabulary.start()
         }
+        .task { appState.recordingRetention.start() }
         .task {
             await appState.startPermissionChecks()
         }
@@ -375,6 +389,10 @@ struct MeetingTranscriberApp: App {
                     dbPath: appState.pipeline.speakersDB, notifier: appState.notifier,
                 ),
                 legacyWhisperModels: appState.engines.legacyWhisperModels,
+                retentionActions: RetentionSettingsActions(
+                    preview: { await appState.recordingRetention.preview(for: $0) },
+                    apply: { appState.recordingRetention.apply($0) },
+                ),
             )
         }
         .windowResizability(.contentSize)

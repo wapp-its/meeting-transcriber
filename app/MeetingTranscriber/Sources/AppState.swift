@@ -63,6 +63,8 @@ final class AppState {
     /// `pipeline.queue` by the menu-bar UI + RPC snapshot. `AppState` supplies
     /// the active engine via `activate(engineProvider:)` post-init.
     let pipeline: PipelineController
+    /// Deletes finished meetings' audio as the setting says, from the launch `.task` on.
+    let recordingRetention: RecordingRetentionController
 
     /// Live TCC permission-health concern, extracted into its own controller.
     /// `currentBadge` composes its `health` into the `.error` state.
@@ -171,9 +173,8 @@ final class AppState {
             records: { [pipeline] in pipeline.terminalJobStore.records },
             outputDir: { [settings] in settings.effectiveOutputDir },
             notifier: notifier,
-            // Labelled: a trailing closure would bind to `now`.
-            // swiftlint:disable:next trailing_closure
             regenerated: { [pipeline] in pipeline.queue.recordRegeneratedTemplate(jobID: $0, template: $1) },
+            protocolReplaced: pipeline.meetingFileStore.noteProtocolReplaced,
         ))
     }
 
@@ -205,6 +206,7 @@ final class AppState {
         self.permissions = PermissionsController(notifier: notifier)
         self.updateChecker = updateChecker ?? Self.makeUpdateChecker(notifier: notifier)
         self.pipeline = PipelineController(settings: settings, notifier: notifier, queueEnvironment: pipelineEnvironment)
+        self.recordingRetention = RecordingRetentionController(pipeline: pipeline)
         self.protocolRegenerator = Self.makeProtocolRegenerator(settings: settings, notifier: notifier, pipeline: pipeline)
         self.channelHealth = ChannelHealthController(
             notifier: notifier,

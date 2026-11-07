@@ -16,6 +16,14 @@ final class SpeakerNamingSession {
     typealias SpeakerNamingData = PipelineQueue.SpeakerNamingData
     typealias SpeakerNamingResult = PipelineQueue.SpeakerNamingResult
 
+    /// A meeting's file this session changed on disk.
+    enum FileChange {
+        case namingSaved(URL)
+        case transcriptRewritten(URL)
+        /// `removeNamingData` ran. Which files are gone is for the disk to say.
+        case sidecarsRemoved
+    }
+
     /// The queue. Weak *at rest* so the queue can own the session strongly with
     /// no retain cycle; a nil delegate makes the synchronous callbacks no-ops.
     ///
@@ -31,6 +39,12 @@ final class SpeakerNamingSession {
     /// also keeps this weak var resolving for any helper that still reads it
     /// mid-flow. Flows that start with an already-nil delegate no-op harmlessly.
     weak var delegate: (any SpeakerNamingSessionDelegate)?
+
+    /// Tells the queue about each `FileChange`, for the meeting's file record, of
+    /// which this session knows nothing. An atomic write replaces the file and
+    /// with it the inode the record names, so a write that is not reported here
+    /// makes a later deletion refuse the app's own file as replaced.
+    @ObservationIgnored var onFilesChanged: (@MainActor (UUID, FileChange) -> Void)?
 
     /// Disk persistence for speaker-naming sidecars (keyed by per-job slug).
     private let namingStore: SpeakerNamingStore
@@ -328,7 +342,9 @@ final class SpeakerNamingSession {
         // Without a delegate nobody is left to say the job is gone.
         guard delegate?.isStillQueued(data.jobID) ?? true else { return false }
         do {
-            try SpeakerNamingStore(outputDir: outputDir).save(data, slug: slug)
+            try SpeakerNamingStore(outputDir: outputDir).save(data, slug: slug) { file in
+                onFilesChanged?(data.jobID, .namingSaved(file))
+            }
             return true
         } catch {
             // Error left redacted: the write target is `<title-slug>_naming.json`,
@@ -399,11 +415,12 @@ final class SpeakerNamingSession {
             store.deleteNamingJSON(slug: slug)
             store.cleanupSidecarFiles(slug: slug)
         }
+        onFilesChanged?(jobID, .sidecarsRemoved)
     }
 
     /// The in-memory half of `removeNamingData`: the naming data and the
     /// recognition stashes, no files.
-    private func forgetNamingData(jobID: UUID) {
+    func forgetNamingData(jobID: UUID) {
         speakerNamingDataByJob.removeValue(forKey: jobID)
         lateRerunFailures.removeValue(forKey: jobID)
         stashedSuggestedAtDialog.removeValue(forKey: jobID)

@@ -40,6 +40,7 @@ extension PipelineQueue {
         // state just adopted. Dropping it lost that state whenever the
         // adoption itself writes nothing (see below): a job that had just
         // failed stayed on disk as running and ran again on the next launch.
+        snapshotRestoreFailed = replaced.snapshotRestoreFailed
         var adopted = replaced.jobs
         // An export still running there is not interrupted: it is stopped and
         // started again below, so a slow Notion never keeps the old queue (and
@@ -111,7 +112,7 @@ extension PipelineQueue {
             }
             loaded = decoded
         } catch {
-            logger.error("Failed to load pipeline snapshot: \(error.localizedDescription, privacy: .public)")
+            noteSnapshotRestoreFailed(error)
             return
         }
 
@@ -197,6 +198,11 @@ extension PipelineQueue {
         if !pendingSpeakerNamingJobs.isEmpty {
             NotificationCenter.default.post(name: .showSpeakerNaming, object: nil)
         }
+    }
+
+    private func noteSnapshotRestoreFailed(_ error: any Error) {
+        logger.error("Failed to load pipeline snapshot: \(error.localizedDescription, privacy: .public)")
+        snapshotRestoreFailed = true
     }
 
     /// What to do with each job that was interrupted mid-run, decided before
@@ -334,6 +340,7 @@ extension PipelineQueue {
                 jobID: job.id, event: "discarded_missing_audio",
                 from: interruptedIn[job.id], to: job.state,
             )
+            noteLeftQueue(jobID: job.id)
         }
     }
 
@@ -469,10 +476,23 @@ extension PipelineQueue {
             )
             stampTranscriptOutputOptions(on: &job)
             jobs.append(job)
+            createRecord(ofRecovered: job, mix: mixURL)
             eventLog.append(jobID: job.id, event: "recovered", from: nil, to: .waiting)
         }
         saveSnapshot()
         logger.info("Recovered \(candidates.count) orphaned recording(s)")
         triggerProcessing()
+    }
+
+    /// Recorded, as only the recorder writes to staging, and dated when it entered
+    /// processing, which only keeps its audio longer. A recording from before this
+    /// feature can still arrive here after an upgrade, and is never deleted
+    /// automatically. A date that cannot be read counts as that, the safe side.
+    private func createRecord(ofRecovered job: PipelineJob, mix: URL) {
+        guard let meetingFileStore else { return }
+        var record = MeetingFileRecord(job: job, origin: .recorded, createdBy: meetingFileStore.bundleID)
+        let created = (try? FileManager.default.attributesOfItem(atPath: mix.path))?[.creationDate] as? Date
+        record.excludedFromAutomaticDeletion = created.map { $0 < meetingFileStore.since } ?? true
+        meetingFileStore.create(record)
     }
 }

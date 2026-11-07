@@ -12,7 +12,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-97-delete-recordings-by-hand-and-after-a",
   "spec_path": ".flow/tasks/gh-97-delete-recordings-by-hand-and-after-a.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "Delete a meeting's files: the Trash mover, Keep and the window's actions",
   "updated_at": "2026-10-21T15:31:31.627628Z"
 }

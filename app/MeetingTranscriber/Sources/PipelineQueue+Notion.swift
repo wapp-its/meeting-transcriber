@@ -112,6 +112,7 @@ extension PipelineQueue {
         jobs[index].beginNotionExport(speakerNames: export.speakerNames, localBackupSaved: export.savedLocally)
         pendingNotionExports[jobID] = export
         saveSnapshot()
+        noteNotionExport(of: jobs[index])
     }
 
     /// Runs off the pipeline so a slow or rate-limited Notion cannot hold up the
@@ -233,6 +234,7 @@ extension PipelineQueue {
             // Private: a file-write CocoaError names the file, which is the meeting title.
             logger.warning("[\(shortID, privacy: .public)] protocol_backup_remove_failed error=\(error.localizedDescription, privacy: .private)")
         }
+        meetingFileStore?.markGone(jobID: jobID, roles: [.protocol])
     }
 
     /// Export finished Markdown independently of generation and local saving.
@@ -390,10 +392,19 @@ extension PipelineQueue {
 
     private func persistNotionExportChange(jobID: UUID) {
         saveSnapshot()
-        // Like the snapshot, the shared store is not written from a replaced queue.
-        if !isRetired, let job = jobs.first(where: { $0.id == jobID }), job.state.isTerminal {
-            recordTerminalJob(job)
-        }
+        // Like the snapshot, the shared stores are not written from a replaced queue.
+        guard !isRetired, let job = jobs.first(where: { $0.id == jobID }) else { return }
+        if job.state.isTerminal { recordTerminalJob(job) }
+        noteNotionExport(of: job)
+    }
+
+    /// The meeting's latest export is what counts: a page it created before failing
+    /// never got the rest of the content, and an export that starts over an earlier
+    /// page may leave that page in any state. So the mark goes off when one starts,
+    /// also one still queued, which a quit ends failed without it having run.
+    private func noteNotionExport(of job: PipelineJob) {
+        guard !isRetired else { return }
+        meetingFileStore?.update(jobID: job.id) { $0.savedToNotion = job.hasCompletedNotionExport }
     }
 
     private func addNotionExportWarnings(_ result: NotionPageResult, id jobID: UUID) {

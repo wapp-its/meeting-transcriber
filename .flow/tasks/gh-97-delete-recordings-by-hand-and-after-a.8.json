@@ -12,7 +12,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-97-delete-recordings-by-hand-and-after-a",
   "spec_path": ".flow/tasks/gh-97-delete-recordings-by-hand-and-after-a.8.md",
-  "status": "todo",
+  "status": "done",
   "title": "Multi-select, footer and docs",
   "updated_at": "2026-10-21T15:15:00.715122Z"
 }

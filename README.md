@@ -279,7 +279,7 @@ Open Settings via the menu bar item or ⌘,.
 | **Audio** | Microphone device, voice activity detection (VAD), per-channel silence indicator, echo cancellation (off by default) |
 | **Transcribe** | ASR engine (WhisperKit / Parakeet) and per-engine options (model incl. a custom WhisperKit model, language, custom vocabulary from a file or a URL), terminology normalization rules, live caption overlay (PoC) |
 | **Speakers** | Diarization, mic speaker name, known voices, recognition stats |
-| **Output** | LLM provider (Claude CLI / Codex CLI / custom command / OpenAI-compatible / local model / none), the local model's folder, transcript-retention options, notes language, output folder, meeting notes templates (default, create, edit, delete, open folder) |
+| **Output** | LLM provider (Claude CLI / Codex CLI / custom command / OpenAI-compatible / local model / none), the local model's folder, transcript-retention options, notes language, output folder, recordings (delete audio automatically: never, right after the notes, after 7, 30 or 90 days), meeting notes templates (default, create, edit, delete, open folder) |
 | **Advanced** | Permissions status, diagnostics, version info |
 
 ### Custom WhisperKit models
@@ -306,7 +306,9 @@ In **Settings → Output**, both transcript options default to enabled for backw
 - **Include full transcript in meeting notes** appends the verbatim transcript to generated Markdown.
 - **Save raw transcript separately** retains the standalone `.txt` file.
 
-Disable both to retain only the generated meeting notes. The recording follows its own retention policy and is not deleted by either setting. To avoid data loss, a raw transcript is retained if meeting notes generation is disabled, fails, or the job ends with an error.
+Disable both to retain only the generated meeting notes. Neither setting deletes the recording: its audio follows the **Recordings** section of Settings → Output, which deletes nothing by default (Never). To avoid data loss, a raw transcript is retained if meeting notes generation is disabled, fails, or the job ends with an error.
+
+**Deleting recordings.** With **Delete recordings automatically** set in that section, the audio of a finished meeting the app recorded is deleted for good once its notes are saved (or its transcript, when meeting notes generation is off), right away or after 7, 30 or 90 days counted from the recording date, unless it is marked Keep. Transcripts and meeting notes stay, and imported files are never deleted. Each installed build deletes only the recordings it made itself, by its own setting: a development build beside the release build leaves the other's recordings alone. In the All Recordings window, a meeting's menu has **Keep (Never Delete Automatically)**, **Move Audio to Trash…** and **Move Meeting to Trash…**; select several rows with Shift or Command to move them at once. Each move asks first and goes to the Trash, and a meeting moved to the Trash leaves the list.
 
 **Meeting notes structure:** Summary, Participants, Topics Discussed, Decisions, Tasks (with responsible person, deadline, priority), Open Questions, and optionally the Full Transcript.
 

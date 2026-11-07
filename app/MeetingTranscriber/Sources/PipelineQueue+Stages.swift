@@ -157,6 +157,7 @@ extension PipelineQueue {
             jobs[idx].transcriptPath = path
             jobs[idx].namingSlug = ctx.slug
         }
+        noteWritten(jobID: ctx.jobID, role: .transcript, path: path)
     }
 
     /// Clear `isProcessing` on the way out of `processNext`, unless another
@@ -1004,6 +1005,7 @@ extension PipelineQueue {
             // rather than overwrites; see `previousSidecarOutputDirs`.
             jobs[idx].recordSidecarOutputDir(outputDir)
         }
+        noteWritten(jobID: ctx.jobID, role: .transcript, path: txtPath)
 
         let recordingsDir = outputDir.appendingPathComponent("recordings")
         // Recorded before the transition below, so the snapshot that transition
@@ -1016,25 +1018,28 @@ extension PipelineQueue {
         )
 
         // --- Persist 16kHz audio for re-diarization (move instead of copy to avoid double I/O) ---
-        try? FileManager.default.moveItem(
-            at: workDir.appendingPathComponent("mix_16k.wav"),
-            to: recordingsDir.appendingPathComponent("\(ctx.slug)_16k.wav"),
-        )
+        // Reported only when the copy is there: the move may fail, and a stage
+        // that never produced one has nothing to move.
+        func moveCopy(_ name: String, suffix: String, as role: MeetingFile.Role) -> (role: MeetingFile.Role, path: URL?) {
+            let copy = recordingsDir.appendingPathComponent("\(ctx.slug)\(suffix)")
+            try? FileManager.default.moveItem(at: workDir.appendingPathComponent(name), to: copy)
+            return (role, FileIdentity.of(copy.path) == nil ? nil : copy)
+        }
+        var copies = [moveCopy("mix_16k.wav", suffix: "_16k.wav", as: .mix16k)]
 
         if transcription.isDualSource {
-            for (name, suffix) in [("app_16k.wav", "_app_16k.wav"), ("mic_16k.wav", "_mic_16k.wav")] {
-                try? FileManager.default.moveItem(
-                    at: workDir.appendingPathComponent(name),
-                    to: recordingsDir.appendingPathComponent("\(ctx.slug)\(suffix)"),
-                )
-            }
+            copies.append(moveCopy("app_16k.wav", suffix: "_app_16k.wav", as: .app16k))
+            copies.append(moveCopy("mic_16k.wav", suffix: "_mic_16k.wav", as: .mic16k))
         }
+        noteWritten(jobID: ctx.jobID, copies)
 
         // --- Persist transcript segments for late re-assignment ---
         if let cachedSegments = transcription.cachedSegments {
             let segPath = recordingsDir.appendingPathComponent("\(ctx.slug)_segments.json")
-            if let data = try? JSONEncoder().encode(cachedSegments) {
-                try? data.write(to: segPath, options: .atomic)
+            if let data = try? JSONEncoder().encode(cachedSegments), (try? data.write(to: segPath, options: .atomic)) != nil {
+                // The meeting's words, so owner-only like the transcript.
+                try? FileManager.default.restrictToOwner(segPath)
+                noteWritten(jobID: ctx.jobID, role: .segments, path: segPath)
             }
         }
 
@@ -1090,11 +1095,13 @@ extension PipelineQueue {
         try ensureStillQueued(jobID)
         guard let job = job(withID: jobID) else { return }
         guard let protocolGeneratorFactory, let generator = protocolGeneratorFactory() else {
+            protocolGenerationOn[jobID] = false
             // No protocol, so no export, but an export that is switched on and
             // cannot run is still worth a reason on the job.
             resolveNotionExport(jobID: jobID)
             return
         }
+        protocolGenerationOn[jobID] = true
         let shortID = PipelineJob.shortID(for: jobID)
         // Reuse the basename fixed when the transcript was saved (persisted as
         // namingSlug), so the .md shares the .txt/audio stem exactly. This runs
@@ -1189,6 +1196,7 @@ extension PipelineQueue {
             if let idx = jobs.firstIndex(where: { $0.id == jobID }) {
                 jobs[idx].protocolPath = mdPath
             }
+            noteWritten(jobID: jobID, role: .protocol, path: mdPath)
             return true
         } catch {
             // Private, unlike the generation failure above: a file-write
@@ -1249,6 +1257,27 @@ extension PipelineQueue {
         }
     }
 
+    /// Moves `done` back, last first, and returns the ones that stayed under
+    /// their new name.
+    private func undoRenames(
+        _ done: [ArtifactRenamePlan.Move],
+        shortID: String,
+        moveItem: (_ source: URL, _ destination: URL) throws -> Void,
+    ) -> [ArtifactRenamePlan.Move] {
+        done.reversed().filter { move in
+            do {
+                try moveItem(move.to, move.from)
+                return false
+            } catch {
+                logger
+                    .error(
+                        "[\(shortID, privacy: .public)] ai_title_rename_undo_failed file=\(move.from.lastPathComponent, privacy: .private) error=\(error.localizedDescription, privacy: .private)",
+                    )
+                return true
+            }
+        }
+    }
+
     /// Gives a job's artifacts the stem built from the AI meeting title
     /// (`titleSlug`), and returns the stem the job carries afterwards: the new
     /// one, or `oldStem` when nothing was renamed.
@@ -1271,6 +1300,7 @@ extension PipelineQueue {
         from oldStem: String,
         titleSlug: String,
         protocolsDir: URL,
+        moveItem: (_ source: URL, _ destination: URL) throws -> Void = { try FileManager.default.moveItem(at: $0, to: $1) },
     ) -> String {
         let fm = FileManager.default
         let shortID = PipelineJob.shortID(for: jobID)
@@ -1290,34 +1320,34 @@ extension PipelineQueue {
 
         let moves = ArtifactRenamePlan.moves(from: oldStem, to: newStem, in: dirs, exists: exists)
         var done: [ArtifactRenamePlan.Move] = []
+        // Each source's listed spelling, read while the file is still there.
+        var sources: [URL: String] = [:]
+        func report(_ moves: [ArtifactRenamePlan.Move]) {
+            noteMoved(jobID: jobID, moves.map { (source: sources[$0.from] ?? $0.from.path, destination: $0.to) })
+        }
         do {
             for move in moves {
-                try fm.moveItem(at: move.from, to: move.to)
+                sources[move.from] = MeetingFile.resolvedPath(move.from)
+                try moveItem(move.from, move.to)
                 done.append(move)
             }
         } catch {
-            var undoFailed = false
-            for move in done.reversed() {
-                do {
-                    try fm.moveItem(at: move.to, to: move.from)
-                } catch {
-                    undoFailed = true
-                    logger
-                        .error(
-                            "[\(shortID, privacy: .public)] ai_title_rename_undo_failed file=\(move.from.lastPathComponent, privacy: .private) error=\(error.localizedDescription, privacy: .private)",
-                        )
-                }
-            }
+            // The job keeps its old paths, but a file that could not move back
+            // is under the new name: the record says where it really is, so a
+            // deletion finds it and does not count it as gone.
+            let stayed = undoRenames(done, shortID: shortID, moveItem: moveItem)
             logger.warning("[\(shortID, privacy: .public)] ai_title_rename_failed error=\(error.localizedDescription, privacy: .private)")
+            report(stayed)
             addWarning(
                 id: jobID,
-                undoFailed
+                !stayed.isEmpty
                     ? "Could not rename the output files to the AI meeting title, and some could not be moved back; check the output folder"
                     : "Could not rename the output files to the AI meeting title; the original names were kept",
             )
             return oldStem
         }
         logger.info("[\(shortID, privacy: .public)] ai_title_rename moved=\(done.count, privacy: .public)")
+        report(done)
 
         if let idx = jobs.firstIndex(where: { $0.id == jobID }) {
             func moved(_ url: URL?) -> URL? {
@@ -1410,12 +1440,14 @@ extension PipelineQueue {
         let ctx = Self.makeContext(for: job)
         let staging = stagingDir
         lastRecordingRelocation = Task.detached(priority: .utility) { [self] in
-            withExtendedLifetime(self) {
-                _ = Self.persistAudioToOutput(ctx: ctx, outputDir: destination, stagingDir: staging)
+            let moved = withExtendedLifetime(self) {
+                let paths = Self.persistAudioToOutput(ctx: ctx, outputDir: destination, stagingDir: staging)
                 if staged.contains(where: { FileManager.default.fileExists(atPath: $0.path) }) {
                     logger.warning("[\(ctx.shortID, privacy: .public)] cancelled_recording_left_in_staging")
                 }
+                return paths
             }
+            await noteWritten(jobID: ctx.jobID, [(.mix, moved.mix), (.appTrack, moved.app), (.micTrack, moved.mic)])
         }
     }
 
