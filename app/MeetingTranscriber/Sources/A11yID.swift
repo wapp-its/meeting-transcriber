@@ -386,6 +386,10 @@ enum A11yID {
     /// The line under the Standard count of a two-track job saying the
     /// microphone side is counted automatically; absent for a single file.
     static let rerunMicSideNote = "rerun-mic-side-note"
+    /// The pending-meeting menu at the top of the naming window, shown once
+    /// more than one meeting waits. `scripts/drive-naming-field.swift
+    /// select-job` finds it by this value.
+    static let namingJobPicker = "naming-job-picker"
     /// Why the session did not take the last answer (`SpeakerNamingRefusal`).
     static let namingRefusalMessage = "naming-refusal-message"
 

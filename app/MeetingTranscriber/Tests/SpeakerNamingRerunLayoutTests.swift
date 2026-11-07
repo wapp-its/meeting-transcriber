@@ -93,7 +93,7 @@ final class SpeakerNamingRerunLayoutTests: XCTestCase {
             for (data, kind) in [(twoTrack, "two-track"), (single, "single-file")] {
                 let hosting = host(
                     SpeakerNamingView(data: data, currentDiarizerMode: mode, gracePeriod: 0) { _ in },
-                    width: SpeakerNamingView.minimumWidth,
+                    width: SpeakerNamingView.minWidth,
                 )
                 // A picker always; a stepper only while Standard shows a count.
                 let expected = mode.countsSpeakersItself ? 1 : 2
@@ -112,7 +112,7 @@ final class SpeakerNamingRerunLayoutTests: XCTestCase {
                 SpeakerNamingView(data: twoTrack, currentDiarizerMode: mode, gracePeriod: 0) { _ in },
                 width: nil,
             )
-            XCTAssertGreaterThanOrEqual(hosting.frame.width, SpeakerNamingView.minimumWidth, "\(mode.displayName)")
+            XCTAssertGreaterThanOrEqual(hosting.frame.width, SpeakerNamingView.minWidth, "\(mode.displayName)")
             assertRerunControlsFit(hosting, expected: mode.countsSpeakersItself ? 1 : 2, "\(mode.displayName), opening size")
         }
     }
@@ -120,7 +120,7 @@ final class SpeakerNamingRerunLayoutTests: XCTestCase {
     /// Voice enrollment passes no method: no picker, a stepper, still fitting.
     func testEnrollmentRerunControlsFitAtMinimumWidth() {
         let single = makeData(labels: ["SPEAKER_00"], isDualSource: false)
-        let hosting = host(SpeakerNamingView(data: single, gracePeriod: 0) { _ in }, width: SpeakerNamingView.minimumWidth)
+        let hosting = host(SpeakerNamingView(data: single, gracePeriod: 0) { _ in }, width: SpeakerNamingView.minWidth)
         assertRerunControlsFit(hosting, expected: 1, "enrollment, minimum width")
         XCTAssertTrue(rerunControls(in: hosting).allSatisfy { $0 is NSStepper }, "enrollment shows no method picker")
     }
