@@ -12,8 +12,8 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Recordi
 ///   so `init` only stores its inputs, and the menu-bar `.task` calls `start()`.
 /// - **When it checks:** at `start()`, every `interval`, on `requestCheck`, which the
 ///   pipeline calls when a meeting reaches `.done`, when a Notion export ends and after
-///   a rebuild, and never two at once. `Task.sleep` counts through system sleep (see
-///   `LivenessMarker`).
+///   a rebuild, shortly after `apply`, and never two at once. `Task.sleep` counts
+///   through system sleep (see `LivenessMarker`).
 /// - **Paths come from the record.** It never resolves an output folder to find a
 ///   file, so the silent fallback folder cannot lead it to anything.
 /// - **Automatic deletions never read as incomplete.** A file that is out of reach or
@@ -21,6 +21,10 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Recordi
 @MainActor
 @Observable
 final class RecordingRetentionController {
+    /// How long after a confirmed setting the check comes. A moment, so the choice can
+    /// still be changed, and well inside the minute the preview promises.
+    static let settingChangeDelay = Duration.seconds(5)
+
     private(set) var isChecking = false
 
     @ObservationIgnored private let settings: AppSettings
@@ -32,6 +36,8 @@ final class RecordingRetentionController {
     @ObservationIgnored private let interval: Duration
     @ObservationIgnored private let calendar: Calendar
     @ObservationIgnored private let now: () -> Date
+    @ObservationIgnored private let settingChangeDelay: Duration
+    @ObservationIgnored private let readFile: @Sendable (String) -> RetentionPreview.FileOnDisk
 
     @ObservationIgnored private var started = false
     @ObservationIgnored private var checkAgain = false
@@ -48,6 +54,8 @@ final class RecordingRetentionController {
         interval: Duration = .seconds(24 * 60 * 60),
         calendar: Calendar = .autoupdatingCurrent,
         now: @escaping () -> Date = { Date() },
+        settingChangeDelay: Duration = settingChangeDelay,
+        readFile: @escaping @Sendable (String) -> RetentionPreview.FileOnDisk = RetentionPreview.FileOnDisk.read,
     ) {
         self.settings = settings
         self.store = store
@@ -58,6 +66,8 @@ final class RecordingRetentionController {
         self.interval = interval
         self.calendar = calendar
         self.now = now
+        self.settingChangeDelay = settingChangeDelay
+        self.readFile = readFile
     }
 
     /// Asks `pipeline` for everything and is told by it when a meeting settles.
@@ -118,6 +128,43 @@ final class RecordingRetentionController {
             await runOneCheck()
         } while checkAgain
         isChecking = false
+    }
+
+    // MARK: - The setting
+
+    /// What `retention` would delete now, by the check's own rule, changing nothing. The
+    /// disk is asked off the main actor, as this runs from Settings and a network volume
+    /// can block for as long as it likes. The answer is what the user agrees to; the check
+    /// that follows deletes what the rule selects at that moment.
+    func preview(for retention: RecordingRetention) async -> RetentionPreview {
+        store.reload()
+        let selection = RetentionPreview.Selection(
+            records: store.records, live: { liveState($0) }, retention: retention, now: now(), calendar: calendar,
+        )
+        let paths = Set(selection.meetings.joined().map(\.path))
+        guard !paths.isEmpty else { return RetentionPreview(selection) { _ in .gone } }
+        let closeScope = openOutputFolderScope()
+        defer { closeScope() }
+        let answers = await Self.read(paths, with: readFile)
+        let preview = RetentionPreview(selection) { answers[$0.path] ?? .unreachable }
+        let skipped = preview.skipped
+        logger.notice(
+            """
+            Retention preview for \(retention.rawValue, privacy: .public): \(preview.meetingCount, privacy: .public) meetings, \
+            \(preview.unreachableFiles, privacy: .public) files out of reach; skipped \(skipped.kept, privacy: .public) kept, \
+            \(skipped.failed, privacy: .public) failed, \(skipped.imported, privacy: .public) imported, \
+            \(skipped.fromBeforeThisFeature, privacy: .public) from before this feature
+            """,
+        )
+        return preview
+    }
+
+    /// A value the user confirmed: saved now, and a check within the minute the preview
+    /// promised. The check reads the setting when it runs, so going back to Never during
+    /// the delay keeps the audio.
+    func apply(_ retention: RecordingRetention) {
+        settings.recordingRetention = retention
+        requestCheck(after: settingChangeDelay)
     }
 
     // MARK: - One check
@@ -281,6 +328,14 @@ final class RecordingRetentionController {
     nonisolated private static func presence(of paths: [String]) async -> [String: MeetingFilePresence] {
         await Task.detached(priority: .utility) {
             Dictionary(paths.map { ($0, MeetingFilePresence.of($0)) }) { first, _ in first }
+        }.value
+    }
+
+    nonisolated private static func read(
+        _ paths: Set<String>, with readFile: @escaping @Sendable (String) -> RetentionPreview.FileOnDisk,
+    ) async -> [String: RetentionPreview.FileOnDisk] {
+        await Task.detached(priority: .userInitiated) {
+            Dictionary(uniqueKeysWithValues: paths.map { ($0, readFile($0)) })
         }.value
     }
 

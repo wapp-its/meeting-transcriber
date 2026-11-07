@@ -38,6 +38,9 @@ enum ConnectionTestResult {
 struct OutputSettingsView: View {
     @Bindable var settings: AppSettings
     var templateStore: ProtocolTemplateStore = .production
+    /// The Recordings section's state. Nil leaves the section out, as without the
+    /// check nothing can tell what a value would delete.
+    @State private var retentionChoice: RetentionChoice?
 
     #if !APPSTORE
         @State private var claudeBinaries: [String] = ["claude"]
@@ -46,6 +49,12 @@ struct OutputSettingsView: View {
     @State private var connectionTestResult: ConnectionTestResult?
     @State private var availableModels: [String] = []
     @State private var didAttemptConnectionTest = false
+
+    init(settings: AppSettings, templateStore: ProtocolTemplateStore = .production, retentionChoice: RetentionChoice? = nil) {
+        self.settings = settings
+        self.templateStore = templateStore
+        _retentionChoice = State(initialValue: retentionChoice)
+    }
 
     var body: some View {
         // swiftlint:disable:next closure_body_length
@@ -76,6 +85,10 @@ struct OutputSettingsView: View {
                 }
             }
             .accessibilityIdentifier(A11yID.outputFolderSection)
+
+            if let retentionChoice {
+                RecordingsSettingsSection(choice: retentionChoice)
+            }
 
             NotionExportSettingsView(settings: settings)
 
@@ -346,6 +359,69 @@ struct OutputSettingsView: View {
         panel.message = "Choose a folder for recordings, transcripts and meeting notes"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         settings.setCustomOutputDir(url)
+    }
+}
+
+/// "Delete recordings automatically" and what it means. Stays enabled in record-only
+/// mode, as it still applies to meetings recorded earlier. `RetentionChoice` decides
+/// when a value is saved.
+struct RecordingsSettingsSection: View {
+    let choice: RetentionChoice
+
+    var body: some View {
+        Section("Recordings") {
+            Picker("Delete recordings automatically", selection: Binding(get: { choice.shown }, set: { choice.choose($0) })) {
+                ForEach(RecordingRetention.allCases, id: \.self) { value in
+                    Text(value.title).tag(value)
+                }
+            }
+            .accessibilityIdentifier(A11yID.recordingRetentionPicker)
+            // `presenting`, so the buttons hold their preview whether SwiftUI clears
+            // the binding before or after running them.
+            .alert(choice.preview?.title ?? "", isPresented: previewShown, presenting: choice.preview) { preview in
+                previewButtons(preview)
+            } message: { preview in
+                Text(preview.message)
+            }
+
+            if choice.isChecking {
+                helpLine("Checking which meetings this would delete…")
+            }
+            helpLine("Counts from the recording date. Only audio this app recorded is deleted; imported files never are.")
+            helpLine(
+                "Audio stays until the meeting notes are saved and the speakers are named. "
+                    + "Failed meetings, meetings marked Keep and record-only recordings keep their audio.",
+            )
+            helpLine("Deleted for good, not moved to the Trash. Copies in Time Machine backups or synced folders are not deleted.")
+        }
+    }
+
+    /// Return answers Cancel, as this deletes for good. A SwiftUI alert has no default
+    /// button of its own: measured on macOS 26, Return does nothing without this. A
+    /// button takes one key, so Cancel gives up Escape for it.
+    @ViewBuilder
+    func previewButtons(_ preview: RetentionPreview) -> some View {
+        Button("Cancel", role: .cancel) { choice.cancel() }
+            .keyboardShortcut(.defaultAction)
+            .accessibilityIdentifier(A11yID.retentionPreviewCancelButton)
+        Button(preview.confirmButton, role: .destructive) { choice.confirm(preview) }
+            .accessibilityIdentifier(A11yID.retentionPreviewConfirmButton)
+    }
+
+    private var previewShown: Binding<Bool> {
+        Binding(
+            get: { choice.preview != nil },
+            set: { shown in
+                if !shown { choice.cancel() }
+            },
+        )
+    }
+
+    private func helpLine(_ text: String) -> some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 

@@ -272,6 +272,10 @@ enum A11yID {
     static let notionUpgradeSchemaButton = "notionUpgradeSchemaButton"
     static let notionRefreshButton = "notionRefreshButton"
     static let outputFolderSection = "outputFolderSection"
+    static let recordingRetentionPicker = "recordingRetentionPicker"
+    /// The buttons of the alert before a shorter retention takes effect.
+    static let retentionPreviewCancelButton = "retentionPreviewCancelButton"
+    static let retentionPreviewConfirmButton = "retentionPreviewConfirmButton"
     static let vadSection = "vadSection"
     static let echoCancellationToggle = "echoCancellationToggle"
     static let echoDedupToggle = "echoDedupToggle"

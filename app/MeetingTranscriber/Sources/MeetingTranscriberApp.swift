@@ -389,6 +389,10 @@ struct MeetingTranscriberApp: App {
                     dbPath: appState.pipeline.speakersDB, notifier: appState.notifier,
                 ),
                 legacyWhisperModels: appState.engines.legacyWhisperModels,
+                retentionActions: RetentionSettingsActions(
+                    preview: { await appState.recordingRetention.preview(for: $0) },
+                    apply: { appState.recordingRetention.apply($0) },
+                ),
             )
         }
         .windowResizability(.contentSize)
