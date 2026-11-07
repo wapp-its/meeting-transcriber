@@ -120,3 +120,5 @@ FIT: GO · 2026-11-07 · base 6b7fea70 · engine flow-next 9.6.0 · repaired aga
 Mockup gate: accepted by the owner on 2026-10-28. The boards are on a private design canvas, so this spec writes out their layout and wording; the example names in them ("Budget review", "Short summary") are examples.
 
 Related: #2 and #170 (regenerate, shipped), #189 (sibling spec), gh-97 (delete recordings, builds first), #171 (transcribe and identify speakers again, the next row actions). Upstream check 2026-10-21: the original has no open issue or pull request about several protocols per meeting; templates and "Regenerate Protocol…" exist only in this fork.
+
+FIT: GO · 2026-11-07 · base 3eec09a2 · engine flow-next 9.6.0 · gh-189 merged: title rules fill a job's template only when it brings none, the regenerate sheet does not follow them, and none of the names this spec cites changed; the upstream merge touched only the naming window
