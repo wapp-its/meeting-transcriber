@@ -11,7 +11,7 @@
   ],
   "id": "gh-190-keep-the-current-protocol-when-making",
   "impl_review_rounds": {
-    "gh-190-keep-the-current-protocol-when-making.1": 1
+    "gh-190-keep-the-current-protocol-when-making.1": 2
   },
   "next_task": 1,
   "no_plan": true,
@@ -562,6 +562,90 @@
       "task": "gh-190-keep-the-current-protocol-when-making.1",
       "timestamp": "2026-11-08T08:40:48.705182Z",
       "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "8dd96a2e8bec7a64ddd96e2294840b6f5c0a9abf0dd0b43810e781004febe636",
+      "backend": "codex",
+      "base_sha": "95a71e4b3b941a801095714387ab47d4e1b5b177",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-1a10571ea5da7768c87adad34614e9c6",
+            "classification": "introduced",
+            "findingId": "finding-1a10571ea5da7768c87adad34614e9c6",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-45a23c635d47140d8b07636fb890e4a1",
+            "classification": "introduced",
+            "findingId": "finding-45a23c635d47140d8b07636fb890e4a1",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-af711ed591a7d3178d29be61d4f2c9c6",
+            "classification": "introduced",
+            "findingId": "finding-af711ed591a7d3178d29be61d4f2c9c6",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-c24d513339f9ffdc1ee5f0067d5af36d",
+            "classification": "introduced",
+            "findingId": "finding-c24d513339f9ffdc1ee5f0067d5af36d",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-37b9e0cbeaa2f7c26ad34ae2992d9334",
+            "classification": "introduced",
+            "findingId": "finding-37b9e0cbeaa2f7c26ad34ae2992d9334",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-99571e7f4da6bdf894c46d5b5336a03e",
+            "classification": "introduced",
+            "findingId": "finding-99571e7f4da6bdf894c46d5b5336a03e",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "f66f12451d62017a4a0d8193349dabfc7f1b389e",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1947,
+      "output_sha256": "cac1403355322fdce6c940dbfeea4b61c3fea30700fff75a7e7e32ccead6c066",
+      "reservation_id": "a146f0093cae4288b8b7c1845645cd48",
+      "round_consumed": true,
+      "scope": "impl:gh-190-keep-the-current-protocol-when-making.1",
+      "superseded_by": null,
+      "task": "gh-190-keep-the-current-protocol-when-making.1",
+      "timestamp": "2026-11-08T09:05:50.271923Z",
+      "verdict": "NEEDS_WORK"
     }
   ],
   "review_hash_epoch": {
@@ -590,5 +674,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\n\"Regenerate Protocol\u2026\" (#2, #170) makes a meeting's protocol again with another template. The previous protocol then goes to the Trash, so a meeting has one protocol at a time. One meeting can need a report for each of several audiences, for example full minutes and a short summary (owner request, paraphrased).\n\n## NOTES\n\n- The regenerate dialog offers to save the new protocol as an additional report next to the existing one, named after its template. Replacing stays available. The template choice stays as it is.\n- The meeting's row in All Recordings lists its additional reports and opens them.\n- The main protocol keeps its role: Open Protocol, Open Last Protocol, the automation API and a retry use it.\n- Related: #170, #171.\n\n## TASKS\n\n- [ ] Draw the mockup (regenerate dialog, row menu) and get it accepted\n- [ ] Build the spec",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/190"
   },
-  "updated_at": "2026-11-08T08:42:14.452676Z"
+  "updated_at": "2026-11-08T09:05:50.290799Z"
 }
