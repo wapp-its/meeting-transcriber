@@ -835,7 +835,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-190-keep-the-current-protocol-when-making.md",
-  "status": "open",
+  "status": "done",
   "title": "Keep the current protocol when making another one",
   "tracker": {
     "baseHashFlow": "760d4b04e701383e5bb66987742deccf1493da33e7b5e137473c3c8810b9f05b",
@@ -849,5 +849,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\n\"Regenerate Protocol\u2026\" (#2, #170) makes a meeting's protocol again with another template. The previous protocol then goes to the Trash, so a meeting has one protocol at a time. One meeting can need a report for each of several audiences, for example full minutes and a short summary (owner request, paraphrased).\n\n## NOTES\n\n- The regenerate dialog offers to save the new protocol as an additional report next to the existing one, named after its template. Replacing stays available. The template choice stays as it is.\n- The meeting's row in All Recordings lists its additional reports and opens them.\n- The main protocol keeps its role: Open Protocol, Open Last Protocol, the automation API and a retry use it.\n- Related: #170, #171.\n\n## TASKS\n\n- [ ] Draw the mockup (regenerate dialog, row menu) and get it accepted\n- [ ] Build the spec",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/190"
   },
-  "updated_at": "2026-11-08T11:25:40.709548Z"
+  "updated_at": "2026-11-08T11:29:17.835522Z"
 }

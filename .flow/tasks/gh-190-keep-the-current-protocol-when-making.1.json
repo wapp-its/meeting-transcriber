@@ -10,7 +10,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-190-keep-the-current-protocol-when-making",
   "spec_path": ".flow/tasks/gh-190-keep-the-current-protocol-when-making.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement Keep the current protocol when making another one",
   "updated_at": "2026-11-07T18:44:07.221903Z"
 }
