@@ -50,6 +50,10 @@ struct AllRecordingsActions {
     var moveAudioToTrash: (UUID, Set<String>) -> Bool
     /// "Move Meeting to Trash…", the same way.
     var moveMeetingToTrash: (UUID, Set<String>) -> Bool
+    /// The paths of the meeting's additional reports as Move Meeting to Trash would
+    /// find them now, which its confirmation counts and names. Reads the folder, so
+    /// it is asked when a dialog opens or is confirmed, never on a redraw.
+    var meetingReports: (MeetingFileRecord) -> [String]
     /// "Retry Deletion" on a row whose deletion is incomplete.
     var retryDeletion: (UUID) -> Void
     /// "Keep (Never Delete Automatically)", with the mark's new value.
@@ -70,9 +74,11 @@ struct AllRecordingsActions {
     var chooseFile: () -> URL?
     /// The meeting a chosen protocol or transcript belongs to.
     var resolveFile: (URL) throws -> ProtocolRegenerationTarget
+    /// The sheet's meeting read again after a run ended.
+    var readTargetAgain: (ProtocolRegenerationTarget) -> ProtocolRegenerationTarget
     /// Generate: starts the run, which reports its outcome in the sheet and
-    /// as a notification.
-    var generate: (ProtocolRegenerationTarget, MeetingProtocolOptions) -> Void
+    /// as a notification, writing what "Save as:" chose.
+    var generate: (ProtocolRegenerationTarget, MeetingProtocolOptions, ProtocolRegenerationOutput) -> Void
 
     /// Every action does nothing, no job can be retried or has a file record, no
     /// file is on disk, recordings are kept, the build has no identifier and protocol
@@ -96,6 +102,7 @@ struct AllRecordingsActions {
         reloadMeetingFiles: {},
         moveAudioToTrash: { _, _ in true },
         moveMeetingToTrash: { _, _ in true },
+        meetingReports: { _ in [] },
         retryDeletion: { _ in },
         setKeep: { _, _ in },
         retention: { .never },
@@ -103,7 +110,8 @@ struct AllRecordingsActions {
         optionsUse: { ProtocolOptionsUse(destination: .off, recordOnly: false) },
         chooseFile: { nil },
         resolveFile: { _ in throw ProtocolRegenerationError.noTranscript },
-        generate: { _, _ in },
+        readTargetAgain: { $0 },
+        generate: { _, _, _ in },
     )
 
     // MARK: - Production
@@ -137,22 +145,27 @@ struct AllRecordingsActions {
     /// regenerator's own rule, applied to the two files beside the protocol,
     /// else beside the transcript (`ProtocolRegenerationFiles.transcript`), so
     /// the row and the regenerator cannot disagree: a blank or non-UTF-8
-    /// `.txt` counts only when the protocol holds the full transcript.
-    static func readFilesOnDisk(of entry: TranscriptionEntry, scopeRoot: URL) -> FilesOnDisk {
+    /// `.txt` counts only when the protocol holds the full transcript. The
+    /// meeting's additional reports are the ones the ownership rule gives the
+    /// same two files' name, as the sheet counts them.
+    static func readFilesOnDisk(
+        of entry: TranscriptionEntry, scopeRoot: URL, disk: ProtocolRegenerationFileOperations = .live,
+    ) -> FilesOnDisk {
         let accessing = scopeRoot.startAccessingSecurityScopedResource()
         defer { if accessing { scopeRoot.stopAccessingSecurityScopedResource() } }
-        let disk = ProtocolRegenerationFileOperations.live
-        let transcript = entry.fileToOpen.flatMap { file in
-            ProtocolRegenerationTarget.readFiles(
-                folder: file.deletingLastPathComponent(),
-                basename: file.deletingPathExtension().lastPathComponent,
-                read: disk.read,
-            ).transcript
+        let meeting = entry.fileToOpen.map { (folder: $0.deletingLastPathComponent(), basename: $0.deletingPathExtension().lastPathComponent) }
+        let transcript = meeting.flatMap { meeting in
+            ProtocolRegenerationTarget.readFiles(folder: meeting.folder, basename: meeting.basename, read: disk.read).transcript
+        }
+        let reports = meeting.flatMap { meeting in
+            MeetingReportFolder.read(folder: meeting.folder, basename: meeting.basename, list: disk.list, read: disk.read)?.reports
+                .map { RecordingRowActions.Report(name: $0.name, url: meeting.folder.appendingPathComponent($0.fileName)) }
         }
         return FilesOnDisk(
             protocolExists: entry.protocolURL.map(disk.fileExists) ?? false,
             transcriptExists: entry.transcriptURL.map(disk.fileExists) ?? false,
             transcriptSource: transcriptSource(transcript),
+            reports: reports ?? [],
         )
     }
 

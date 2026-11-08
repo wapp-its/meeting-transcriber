@@ -146,14 +146,20 @@ final class MeetingFileStore {
         let kept = currentFile.map { earlierFilesStillOnDisk(beside: [$0], jobID: jobID) } ?? []
         update(jobID: jobID) { record in
             if let currentFile { record.list(currentFile, keeping: kept) }
-            // Never `list`: each run the Trash refuses leaves one more copy, and
-            // deleting the meeting has to find them all.
-            if let keptFile {
-                record.files.removeAll { $0.path == keptFile.path }
-                record.files.append(keptFile)
-            }
+            if let keptFile { record.appendKept(keptFile) }
         }
         if current == nil { markGone(jobID: jobID, roles: [.protocol]) }
+    }
+
+    /// A file the app itself left on disk for the meeting under a name of its own:
+    /// an old additional report the regenerator kept, or a report a failed rename
+    /// left under the new name. Listed under `previousProtocol`, as no report rule
+    /// may find it any more and Move Meeting to Trash has to; that role also keeps
+    /// it out of the "right after the notes" check, which counts only `.protocol`.
+    func noteKeptFile(jobID: UUID, url: URL) {
+        guard let origin = record(for: jobID)?.origin else { return }
+        let kept = MeetingFile(role: .previousProtocol, url: url, owned: origin.owns(.previousProtocol))
+        update(jobID: jobID) { $0.appendKept(kept) }
     }
 
     /// Read the file again. Creates it when there is none yet. False when that failed,
@@ -298,14 +304,49 @@ extension MeetingFileStore {
     /// save failed, the meeting has no record, a deletion of it is already pending, or
     /// the file's copy differs from `read`, the record the caller decided on, which is
     /// the last look, under the lock another build also takes.
+    ///
+    /// `reports`, the additional reports Move Meeting to Trash found, are listed in the
+    /// same save and join the pending paths, so a crash or a retry carries them. One the
+    /// record already lists keeps the identity it was listed with, so a report replaced
+    /// since is refused as replaced; one an earlier run saw go and that is found again
+    /// is looked at again under that identity. One the record lists as not the app's
+    /// stays out.
     func beginDeletion(
         jobID: UUID, kind: MeetingFileRecord.DeletionKind, paths: [String], unchangedFrom read: MeetingFileRecord? = nil,
+        adding reports: [MeetingFile] = [],
     ) -> Bool {
         transact { document in
             guard let index = document.records.firstIndex(where: { $0.jobID == jobID }),
                   document.records[index].pending == nil,
                   read == nil || document.records[index] == read else { return false }
-            document.records[index].pending = .init(kind: kind, paths: paths)
+            var pending = paths
+            for report in reports {
+                let listed = document.records[index].files.filter { $0.path == report.path }
+                guard listed.allSatisfy(\.owned) else { continue }
+                if listed.isEmpty {
+                    document.records[index].appendKept(report)
+                } else if !listed.contains(where: { $0.state != .gone }) {
+                    document.records[index].setState(.present, ofFileAt: report.path)
+                }
+                if !pending.contains(report.path) { pending.append(report.path) }
+            }
+            document.records[index].pending = .init(kind: kind, paths: pending)
+            return true
+        }
+    }
+
+    /// End a deletion that never started as incomplete, with `reason`, under the same
+    /// checks as `beginDeletion`: nothing moved, and Retry Deletion runs it again.
+    /// The paths are what the deletion covers now.
+    func failBeforeDeletion(
+        jobID: UUID, kind: MeetingFileRecord.DeletionKind, reason: String, unchangedFrom read: MeetingFileRecord? = nil,
+    ) -> Bool {
+        transact { document in
+            guard let index = document.records.firstIndex(where: { $0.jobID == jobID }),
+                  document.records[index].pending == nil,
+                  read == nil || document.records[index] == read else { return false }
+            let paths = document.records[index].filesCovered(by: kind).map(\.path)
+            document.records[index].incomplete = .init(reason: reason, paths: paths, kind: kind)
             return true
         }
     }
@@ -323,7 +364,8 @@ extension MeetingFileStore {
     }
 
     /// Mark one file as being deleted, the last step before it is touched. A path
-    /// another record lists is left alone: that meeting still needs the file. An
+    /// another record lists is left alone: that meeting still needs the file. So is a
+    /// report of a meeting another record lists by its transcript or notes. An
     /// entry the other record knows is gone holds nothing back. An automatic deletion
     /// also stops here when the record no longer allows it: not every write of another
     /// build looks at the mark, and what has not gone yet can still stay.
@@ -332,7 +374,7 @@ extension MeetingFileStore {
         let marked = transact { document in
             let listedElsewhere = document.records.contains { other in
                 other.jobID != jobID && other.files.contains { $0.path == path && $0.state != .gone }
-            }
+            } || MeetingReportScan.isReportOfASharedMeeting(path, jobID: jobID, in: document.records)
             if listedElsewhere { answer = .listedByAnotherMeeting }
             guard !listedElsewhere, let index = document.records.firstIndex(where: { $0.jobID == jobID }) else {
                 return false

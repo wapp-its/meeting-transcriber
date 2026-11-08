@@ -66,9 +66,9 @@ extension PipelineController {
         return named.map { runConfirmedDeletion(.audioToTrash, of: record, named: $0) } ?? runManualDeletion(.audioToTrash, of: record)
     }
 
-    /// Move every file the app owns of the meeting to the Trash, then take the
-    /// meeting off every list. Nothing here talks to Notion: a page stays where it is.
-    /// `named` as for Move Audio.
+    /// Move every file the app owns of the meeting to the Trash, its additional reports
+    /// with them, then take the meeting off every list. Nothing here talks to Notion: a
+    /// page stays where it is. `named` as for Move Audio, the reports included.
     @discardableResult
     func moveMeetingToTrash(jobID: UUID, named: Set<String>? = nil) -> Bool { // swiftlint:disable:this discouraged_optional_collection
         guard let record = actionableMeetingRecord(jobID: jobID) else { return false }
@@ -82,6 +82,12 @@ extension PipelineController {
         guard let record = actionableMeetingRecord(jobID: jobID), let kind = record.incomplete?.kind,
               kind != .automatic else { return false }
         return runManualDeletion(kind, of: record)
+    }
+
+    /// The paths of the meeting's additional reports as Move Meeting to Trash would
+    /// find them now, for its confirmation to name.
+    func meetingReportPaths(of record: MeetingFileRecord) -> [String] {
+        withOutputFolderScope { MeetingReportScan.scan(record).paths }
     }
 
     @discardableResult
@@ -128,18 +134,38 @@ extension PipelineController {
     /// answers it gone, as the dialog leaves out only those. The record must then still
     /// be the one checked when the pending mark is saved, under the lock the other
     /// build also takes.
+    /// A report found since the dialog opened stops it the same way: the scan answers
+    /// only reports that are there.
     private func runConfirmedDeletion(_ kind: MeetingFileRecord.DeletionKind, of record: MeetingFileRecord, named: Set<String>) -> Bool {
         let unnamed = record.filesCovered(by: kind).filter { !named.contains($0.path) }
         guard withOutputFolderScope({ unnamed.allSatisfy { MeetingFilePresence.of($0.path) == .gone } }) else { return false }
-        return runManualDeletion(kind, of: record, unchangedFrom: record)
+        let reports = kind == .meetingToTrash ? withOutputFolderScope { MeetingReportScan.scan(record) } : nil
+        guard reports?.paths.allSatisfy(named.contains) ?? true else { return false }
+        return runManualDeletion(kind, of: record, unchangedFrom: record, reports: reports)
     }
 
+    /// Move Meeting to Trash looks for the meeting's reports first (`reports`, else
+    /// now), and moves nothing when a folder cannot be read (spec A12): moving the
+    /// rest first could end, after a quit, as a finished deletion with reports left.
     private func runManualDeletion(
         _ kind: MeetingFileRecord.DeletionKind, of record: MeetingFileRecord, unchangedFrom read: MeetingFileRecord? = nil,
+        reports: MeetingReportScan? = nil,
     ) -> Bool {
         let jobID = record.jobID
-        let files = record.filesCovered(by: kind)
-        guard meetingFileStore.beginDeletion(jobID: jobID, kind: kind, paths: files.map(\.path), unchangedFrom: read) else { return false }
+        let found = kind == .meetingToTrash ? reports ?? withOutputFolderScope { MeetingReportScan.scan(record) } : MeetingReportScan()
+        if found.unreadableFolder {
+            return meetingFileStore.failBeforeDeletion(
+                jobID: jobID, kind: kind, reason: MeetingReportScan.unreadableFolderReason, unchangedFrom: read,
+            )
+        }
+        let covered = record.filesCovered(by: kind)
+        guard meetingFileStore.beginDeletion(
+            jobID: jobID, kind: kind, paths: covered.map(\.path), unchangedFrom: read, adding: found.reports,
+        ) else { return false }
+        // What the saved record covers now, the reports it listed included.
+        let saved = meetingFileStore.record(for: jobID)
+        let pending = Set(saved?.pending?.paths ?? [])
+        let files = saved?.filesCovered(by: kind).filter { pending.contains($0.path) } ?? covered
         let outcomes = withOutputFolderScope {
             fileRemover.remove(files, mode: .trash, in: meetingFileStore, jobID: jobID)
         }

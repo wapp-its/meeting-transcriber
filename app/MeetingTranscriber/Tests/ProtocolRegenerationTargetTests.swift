@@ -122,4 +122,95 @@ final class ProtocolRegenerationTargetTests: XCTestCase {
         XCTAssertNil(target.jobID)
         XCTAssertFalse(target.hasProtocol)
     }
+
+    // MARK: - A chosen additional report
+
+    // swiftlint:disable:next discouraged_optional_collection
+    private func list(_ url: URL) -> [String]? {
+        try? FileManager.default.contentsOfDirectory(atPath: url.path)
+    }
+
+    func testAChosenReportTargetsTheMeetingItBelongsTo() throws {
+        try write("[Anna] Hello", to: txt)
+        try write("# Protocol", to: md)
+        let report = folder.appendingPathComponent("\(basename) (Short).md")
+        try write("# Short", to: report)
+        let start = Date(timeIntervalSince1970: 1_760_000_000)
+        let meeting = record(title: "Weekly Standup", transcriptPath: storedPath(txt), protocolPath: storedPath(md), start: start)
+
+        let target = try ProtocolRegenerationTarget.resolve(file: report, records: [meeting], read: read, list: list)
+
+        XCTAssertEqual(target.basename, basename)
+        XCTAssertEqual(target.protocolURL, md, "Replace the current notes replaces the meeting's notes, never the report")
+        XCTAssertEqual(target.title, "Weekly Standup")
+        XCTAssertEqual(target.meetingStartTime, start)
+        XCTAssertEqual(target.jobID, meeting.status.jobID)
+        XCTAssertEqual(target.reports.map(\.name), ["Short"])
+        XCTAssertEqual(target.reportSlot(for: .file(name: "Short")), .existing(fileName: report.lastPathComponent))
+    }
+
+    func testAChosenMeetingWithBracketsInItsNameStaysThatMeeting() throws {
+        let other = folder.appendingPathComponent("\(basename) (Q3).txt")
+        try write("[Anna] Hello", to: txt)
+        try write("[Ben] The Q3 meeting", to: other)
+        let chosen = folder.appendingPathComponent("\(basename) (Q3).md")
+        try write("# Q3 notes", to: chosen)
+
+        let target = try ProtocolRegenerationTarget.resolve(file: chosen, records: [], read: read, list: list)
+
+        XCTAssertEqual(target.basename, "\(basename) (Q3)")
+        XCTAssertEqual(target.files.transcript?.text, "[Ben] The Q3 meeting")
+    }
+
+    /// Its own transcript makes a file a meeting even when it cannot be read: the
+    /// file never stands for the shorter meeting.
+    func testAChosenMeetingWhoseTranscriptCannotBeReadStaysThatMeeting() throws {
+        let other = folder.appendingPathComponent("\(basename) (Q3).txt")
+        try write("[Anna] Hello", to: txt)
+        try write("[Ben] The Q3 meeting", to: other)
+        let chosen = folder.appendingPathComponent("\(basename) (Q3).md")
+        try write("# Q3 notes" + ProtocolGenerator.fullTranscriptSeparator + "[Ben] The Q3 meeting", to: chosen)
+        let unreadable: (URL) -> Data? = { url in url.lastPathComponent == other.lastPathComponent ? nil : try? Data(contentsOf: url) }
+
+        let target = try ProtocolRegenerationTarget.resolve(file: chosen, records: [], read: unreadable, list: list)
+
+        XCTAssertEqual(target.basename, "\(basename) (Q3)")
+        XCTAssertEqual(target.protocolURL, chosen)
+    }
+
+    func testReadingAgainSeesTheNotesAndReportsWrittenSince() throws {
+        try write("[Anna] Hello", to: txt)
+        let target = try ProtocolRegenerationTarget.resolve(file: txt, records: [], read: read, list: list)
+        try write("# Protocol", to: md)
+        try write("# Short", to: folder.appendingPathComponent("\(basename) (Short).md"))
+
+        let again = target.readAgain(read: read, list: list)
+
+        XCTAssertFalse(target.hasProtocol)
+        XCTAssertTrue(again.hasProtocol)
+        XCTAssertEqual(again.reports.map(\.name), ["Short"])
+        XCTAssertEqual(again.title, target.title)
+    }
+
+    func testAReportWhoseMeetingIsGoneIsRefused() throws {
+        let report = folder.appendingPathComponent("\(basename) (Short).md")
+        try write("# Short, no transcript section", to: report)
+
+        XCTAssertThrowsError(try ProtocolRegenerationTarget.resolve(file: report, records: [], read: read, list: list)) { error in
+            XCTAssertEqual(error as? ProtocolRegenerationError, .noTranscript)
+        }
+    }
+
+    func testTheReportCountAndASlotTakenByAnotherMeeting() throws {
+        try write("[Anna] Hello", to: txt)
+        try write("# Protocol", to: md)
+        try write("# Minutes", to: folder.appendingPathComponent("\(basename) (Minutes).md"))
+        try write("[Ben] Another meeting", to: folder.appendingPathComponent("\(basename) (Board).txt"))
+
+        let target = try ProtocolRegenerationTarget.resolve(file: md, records: [], read: read, list: list)
+
+        XCTAssertEqual(target.reports.map(\.name), ["Minutes"])
+        XCTAssertEqual(target.reportSlot(for: .file(name: "Board")), .otherMeeting(fileName: "\(basename) (Board).md"))
+        XCTAssertEqual(target.reportSlot(for: .builtIn), .free(fileName: "\(basename) (Standard).md"))
+    }
 }
