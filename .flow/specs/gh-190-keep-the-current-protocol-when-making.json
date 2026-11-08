@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-190-keep-the-current-protocol-when-making",
-  "completion_review_status": "not_required",
-  "completion_reviewed_at": "2026-11-08T10:22:58.903503Z",
+  "completion_review_status": "needs_work",
+  "completion_reviewed_at": "2026-11-08T10:35:51.992179Z",
   "created_at": "2026-10-21T08:27:47.382524Z",
   "default_impl": null,
   "default_review": null,
@@ -15,7 +15,7 @@
   },
   "next_task": 1,
   "no_plan": true,
-  "plan_review_rounds": 0,
+  "plan_review_rounds": 1,
   "plan_review_status": "ship",
   "plan_reviewed_at": "2026-11-07T15:32:49.284984Z",
   "ready": true,
@@ -730,6 +730,51 @@
       "task": "gh-190-keep-the-current-protocol-when-making.1",
       "timestamp": "2026-11-08T09:12:48.621885Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "dddb4f4b8de063bb7833196a44e02acc9ddd3d064be14ffd177677de4b976120",
+      "backend": "codex",
+      "base_sha": "3eec09a2a8c1d00065c4c95c3f4168e04e5bdb5c",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-56164ae0aa9866746c13849df6edfcd3",
+            "classification": "introduced",
+            "findingId": "finding-56164ae0aa9866746c13849df6edfcd3",
+            "firstSeenThisRound": true,
+            "severity": "P0",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "efb97b946b988b16ec4e486df9f59edaab26b4b7",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 655282,
+      "output_sha256": "786b6cc87cd88762a5bf2feacefb05765737f9c2d0f23e31d0555299cc31fb69",
+      "reservation_id": "96adb15eb5ff492188667a83259d98be",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-08T10:35:51.944745Z",
+      "tool_calls": 33,
+      "verdict": "NEEDS_WORK"
     }
   ],
   "review_hash_epoch": {
@@ -741,6 +786,7 @@
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-190-keep-the-current-protocol-when-making.1": 0,
     "plan": 0
   },
@@ -759,5 +805,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\n\"Regenerate Protocol\u2026\" (#2, #170) makes a meeting's protocol again with another template. The previous protocol then goes to the Trash, so a meeting has one protocol at a time. One meeting can need a report for each of several audiences, for example full minutes and a short summary (owner request, paraphrased).\n\n## NOTES\n\n- The regenerate dialog offers to save the new protocol as an additional report next to the existing one, named after its template. Replacing stays available. The template choice stays as it is.\n- The meeting's row in All Recordings lists its additional reports and opens them.\n- The main protocol keeps its role: Open Protocol, Open Last Protocol, the automation API and a retry use it.\n- Related: #170, #171.\n\n## TASKS\n\n- [ ] Draw the mockup (regenerate dialog, row menu) and get it accepted\n- [ ] Build the spec",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/190"
   },
-  "updated_at": "2026-11-08T10:22:58.903771Z"
+  "updated_at": "2026-11-08T10:35:51.999955Z"
 }
