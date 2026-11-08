@@ -1382,16 +1382,16 @@ extension PipelineQueue {
             addWarning(id: jobID, "Could not rename the output files to the AI meeting title; the original names were kept")
             return nil
         }
+        let reports = MeetingReportFolder.read(
+            folder: folder, basename: oldStem, list: { _ in names }, read: { try? Data(contentsOf: $0) },
+        )?.reports.map(\.name) ?? []
         guard let newStem = ArtifactRenamePlan.availableStem(
-            titleSlug: titleSlug, shortID: shortID, currentStem: oldStem, in: dirs, protocolNames: Set(names), exists: exists,
+            titleSlug: titleSlug, shortID: shortID, currentStem: oldStem, in: dirs, protocolNames: Set(names), reports: reports, exists: exists,
         ) else {
             logger.warning("[\(shortID, privacy: .public)] ai_title_rename_skipped reason=no_free_name")
             return nil
         }
         guard newStem != oldStem else { return nil }
-        let reports = MeetingReportFolder.read(
-            folder: folder, basename: oldStem, list: { _ in names }, read: { try? Data(contentsOf: $0) },
-        )?.reports.map(\.name) ?? []
         let moves = ArtifactRenamePlan.moves(from: oldStem, to: newStem, in: dirs, reports: reports, exists: exists)
         return (newStem, moves, Set(moves.suffix(reports.count).map(\.to)))
     }

@@ -138,6 +138,26 @@ extension PipelineControllerTranscriptionsTests {
         XCTAssertTrue(harness.isOnDisk(reports[0]))
     }
 
+    /// Short went to the Trash on the first run; a different file at its name is
+    /// refused as replaced on the retry, never moved.
+    func testAFileAtTheNameOfAReportAlreadyMovedIsRefusedAsReplacedOnTheRetry() throws {
+        let harness = try makeDeletionHarness()
+        let controller = harness.controller(queue: harness.makeQueue())
+        let job = try harness.recordedMeeting()
+        let reports = try writeReports(["Short", "Minutes"], of: job, harness)
+        harness.fakeTrash.refusal = { $0.lastPathComponent.hasSuffix("(Minutes).md") ? CocoaError(.featureUnsupported) : nil }
+        XCTAssertTrue(controller.moveMeetingToTrash(jobID: job.id))
+        XCTAssertFalse(harness.isOnDisk(reports[0]), "test premise: Short went")
+        harness.fakeTrash.refusal = { _ in nil }
+        try Data("# Someone else's".utf8).write(to: URL(fileURLWithPath: reports[0]))
+
+        XCTAssertTrue(controller.retryDeletion(jobID: job.id))
+
+        XCTAssertEqual(try harness.record(of: job).incomplete?.reason, "1 file was replaced")
+        XCTAssertTrue(harness.isOnDisk(reports[0]))
+        XCTAssertFalse(harness.isOnDisk(reports[1]))
+    }
+
     func testAnUnreadableFolderMovesNothingAndTheRetryReadsItAgain() throws {
         for everyListedFileGone in [false, true] {
             let harness = try makeDeletionHarness()

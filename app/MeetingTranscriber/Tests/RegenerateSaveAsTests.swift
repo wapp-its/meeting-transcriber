@@ -33,6 +33,7 @@ final class RegenerateSaveAsTests: XCTestCase {
     private func makeView(
         _ target: ProtocolRegenerationTarget,
         onGenerate: @escaping (ProtocolRegenerationTarget, MeetingProtocolOptions, ProtocolRegenerationOutput) -> Void = { _, _, _ in },
+        refreshTarget: @escaping (ProtocolRegenerationTarget) -> ProtocolRegenerationTarget = \.self,
     ) throws -> (RegenerateProtocolView, RegenerateProtocolDraft) {
         let draft = RegenerateProtocolDraft()
         let close: () -> Void = {}
@@ -44,6 +45,7 @@ final class RegenerateSaveAsTests: XCTestCase {
             allowsChooseFile: false,
             chooseFile: { nil },
             resolveFile: { _ in target },
+            refreshTarget: refreshTarget,
             draft: draft,
             onGenerate: onGenerate,
             onClose: close,
@@ -112,6 +114,31 @@ final class RegenerateSaveAsTests: XCTestCase {
         draft.protocolOptions.template = .builtIn
 
         XCTAssertNoThrow(try sut.inspect().find(text: "Saved as “\(Self.basename) (Standard).md”. The current notes stay as they are."))
+    }
+
+    // MARK: - After a run
+
+    /// The sheet stays open after a run, which may have written the meeting's first
+    /// notes or the chosen report: it reads the meeting again, so the choice and the
+    /// small line follow, and the template stays.
+    func testARunThatEndedReadsTheMeetingAgain() throws {
+        var current = Self.target(hasProtocol: false)
+        let readAgain: (ProtocolRegenerationTarget) -> ProtocolRegenerationTarget = { _ in current }
+        let (sut, draft) = try makeView(current, refreshTarget: readAgain)
+        XCTAssertThrowsError(try sut.inspect().find(text: RegenerateProtocolView.saveAsLabel))
+
+        current = Self.target(names: ["\(Self.basename) (Short).md"])
+        try sut.inspect().vStack().callOnChange(
+            oldValue: ProtocolRegenerator.Phase.running,
+            newValue: .succeeded(URL(fileURLWithPath: "/out/protocols/\(Self.basename).md"), warnings: []),
+        )
+
+        XCTAssertEqual(draft.output, .additionalReport, "the meeting has notes now")
+        XCTAssertNoThrow(try sut.inspect().find(
+            text: "Replaces the existing “\(Self.basename) (Short).md”, which is moved to the Trash. The current notes stay as they are.",
+        ))
+        XCTAssertEqual(draft.protocolOptions.template, .file(name: "Short"))
+        XCTAssertEqual(try sut.inspect().find(text: "\(Self.basename).md · 1 additional report").string(), "\(Self.basename).md · 1 additional report")
     }
 
     // MARK: - A name another meeting holds

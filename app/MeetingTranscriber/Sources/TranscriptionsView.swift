@@ -153,6 +153,7 @@ struct TranscriptionsView: View {
             allowsChooseFile: regenerateSheet.allowsChooseFile,
             chooseFile: actions.chooseFile,
             resolveFile: actions.resolveFile,
+            refreshTarget: actions.readTargetAgain,
             onGenerate: actions.generate,
         ) { regenerateSheet.isPresented = false }
     }

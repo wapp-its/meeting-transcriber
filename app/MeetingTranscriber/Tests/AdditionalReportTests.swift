@@ -118,6 +118,36 @@ final class AdditionalReportTests: XCTestCase {
         XCTAssertEqual(sut.slot(forReportNamed: "Q3) (Short"), .otherMeeting(fileName: "Budget (Q3) (Short).md"))
     }
 
+    // MARK: - Names that differ only in case
+
+    /// The default macOS volume reaches `Budget (q3).md` by the name `Budget (Q3).md`,
+    /// so the template "Q3" would write over the other meeting's notes.
+    func testAnotherMeetingWhoseNameDiffersOnlyInCaseHoldsTheName() {
+        let sut = folder("Budget", ["Budget.txt", "Budget.md", "Budget (q3).txt", "Budget (q3).md"])
+
+        XCTAssertEqual(sut.slot(forReportNamed: "Q3"), .otherMeeting(fileName: "Budget (Q3).md"))
+        XCTAssertEqual(sut.reports, [])
+    }
+
+    func testTheTemplatesReportUnderAnotherCaseIsTheOneItReplaces() {
+        let sut = folder("Budget", ["Budget.txt", "Budget.md", "Budget (short).md"])
+
+        XCTAssertEqual(sut.slot(forReportNamed: "Short"), .existing(fileName: "Budget (Short).md"))
+        XCTAssertEqual(sut.reports, [AdditionalReport.Listed(name: "short", fileName: "Budget (short).md")])
+    }
+
+    func testALongerMeetingWhoseNameDiffersOnlyInCaseClaimsTheFile() throws {
+        let names = ["Budget.txt", "budget (q3).txt", "Budget (Q3) (Short).md"]
+
+        let sut = try XCTUnwrap(MeetingReportFolder.read(
+            folder: URL(fileURLWithPath: "/out"), basename: "Budget", list: { _ in names },
+            read: { names.contains($0.lastPathComponent) ? Data("[Anna] Hi.".utf8) : nil },
+        ))
+
+        XCTAssertEqual(sut.reports, [])
+        XCTAssertEqual(sut.slot(forReportNamed: "Q3) (Short"), .otherMeeting(fileName: "Budget (Q3) (Short).md"))
+    }
+
     // MARK: - Reading a folder
 
     func testReadingAFolderFindsTranscriptsInsideNotes() throws {

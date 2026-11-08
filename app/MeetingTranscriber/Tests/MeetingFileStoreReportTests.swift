@@ -80,6 +80,25 @@ final class MeetingFileStoreReportTests: XCTestCase {
         XCTAssertEqual(listed.map(\.identity), [short.identity])
     }
 
+    /// A report the first run moved away and the retry finds at its path again is
+    /// looked at again under the identity it was listed with, never the new one.
+    func testAReportSeenGoneAndFoundAgainKeepsItsListedIdentity() throws {
+        let store = try makeStore()
+        let short = try report("s (Short).md")
+        XCTAssertTrue(store.beginDeletion(jobID: job.id, kind: .meetingToTrash, paths: [], adding: [short]))
+        store.setState(.gone, ofFileAt: short.path, jobID: job.id)
+        store.update(jobID: job.id) { $0.pending = nil }
+        let replaced = MeetingFile(role: .previousProtocol, path: short.path, identity: FileIdentity(device: 1, inode: 2), owned: true, state: .present)
+
+        XCTAssertTrue(store.beginDeletion(jobID: job.id, kind: .meetingToTrash, paths: [], adding: [replaced]))
+
+        let record = try XCTUnwrap(store.record(for: job.id))
+        let listed = record.files.filter { $0.path == short.path }
+        XCTAssertEqual(listed.map(\.identity), [short.identity])
+        XCTAssertEqual(listed.map(\.state), [.present], "the deletion looks at it again")
+        XCTAssertEqual(record.pending?.paths, [short.path])
+    }
+
     func testAKeptFileReplacesAnEntryOfTheSamePath() throws {
         let store = try makeStore()
         let kept = try file("s (Short).previous-1.md")

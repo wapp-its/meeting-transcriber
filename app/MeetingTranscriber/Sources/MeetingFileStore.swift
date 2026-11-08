@@ -307,9 +307,10 @@ extension MeetingFileStore {
     ///
     /// `reports`, the additional reports Move Meeting to Trash found, are listed in the
     /// same save and join the pending paths, so a crash or a retry carries them. One the
-    /// record already lists is left as listed, with the identity it was listed with: a
-    /// report replaced since is refused as replaced. One the record lists as not the
-    /// app's stays out.
+    /// record already lists keeps the identity it was listed with, so a report replaced
+    /// since is refused as replaced; one an earlier run saw go and that is found again
+    /// is looked at again under that identity. One the record lists as not the app's
+    /// stays out.
     func beginDeletion(
         jobID: UUID, kind: MeetingFileRecord.DeletionKind, paths: [String], unchangedFrom read: MeetingFileRecord? = nil,
         adding reports: [MeetingFile] = [],
@@ -322,7 +323,11 @@ extension MeetingFileStore {
             for report in reports {
                 let listed = document.records[index].files.filter { $0.path == report.path }
                 guard listed.allSatisfy(\.owned) else { continue }
-                if !listed.contains(where: { $0.state != .gone }) { document.records[index].appendKept(report) }
+                if listed.isEmpty {
+                    document.records[index].appendKept(report)
+                } else if !listed.contains(where: { $0.state != .gone }) {
+                    document.records[index].setState(.present, ofFileAt: report.path)
+                }
                 if !pending.contains(report.path) { pending.append(report.path) }
             }
             document.records[index].pending = .init(kind: kind, paths: pending)

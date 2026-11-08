@@ -707,8 +707,10 @@ appended, and nothing is overwritten. If any move fails, the ones already done
 are undone and the job keeps its old stem and paths. The meeting's additional
 reports (see [Additional Reports](#additional-reports)) are the one exception
 to the suffix lists: the ownership rule finds them by their whole name before
-` (`, they move in the same all-or-nothing run, and a title with a report is
-taken. A `protocols/` folder that cannot be listed renames nothing.
+` (`, they move in the same all-or-nothing run, and a title is taken when it
+has a report or when another meeting would own a moved report under the new
+name (`weekly_sync (Short).txt` makes `weekly_sync (Short).md` that meeting's
+notes). A `protocols/` folder that cannot be listed renames nothing.
 The title comes from the first top-level `# ` heading in what the model
 wrote, and only for a job that ran the built-in template (after a fallback
 too): a custom template's first heading is whatever it writes, a section such
@@ -730,9 +732,16 @@ One rule decides whose report a file is (`AdditionalReport`,
 "Regenerate from File…", Move Meeting to Trash and the AI-title rename all use
 it: a file with a `.txt` of its own name is a meeting, otherwise the longest
 name before a ` (` that has a transcript (its `.txt`, or the transcript inside
-its notes) owns it. A report name the rule gives to another meeting disables
-Generate. The run checks the name again right before the write, and a report
-that appeared, changed or vanished meanwhile stops it like any changed file.
+its notes) owns it. The rule compares names without regard to case, as the
+default macOS volume does, where `Budget (Q3).md` reaches the file
+`Budget (q3).md`; on a case-sensitive volume this only refuses more. For a file
+chosen with "Regenerate from File…", the folder's listing tells whether its own
+`.txt` is there, so a transcript that cannot be read still makes it a meeting.
+A report name the rule gives to another meeting disables Generate. The run
+checks the name again right before the write, and a report that appeared,
+changed or vanished meanwhile stops it like any changed file. The sheet stays
+open after a run and reads the meeting again, so its choice, count and small
+lines follow what the run wrote.
 
 Nothing lists a report while its meeting lives, so a report renamed or deleted
 in Finder drops out of the row menu. A report run never tells the job its
@@ -889,8 +898,10 @@ read them again, and a report the dialog did not name stops the action like
 any unnamed file. They enter the record in the same save as the pending mark,
 under the existing role `previous_protocol` (the release and the development
 build share the record file, and a build that cannot decode a role moves the
-file aside as corrupt), so a crash or a retry carries them. A folder that
-cannot be read, or that now resolves elsewhere, moves nothing and leaves
+file aside as corrupt), so a crash or a retry carries them. A report the record
+lists keeps the identity it was listed with: one replaced since, or a different
+file at the name of one an earlier run already moved, is refused as replaced.
+A folder that cannot be read, or that now resolves elsewhere, moves nothing and leaves
 "Deletion incomplete" with Retry Deletion; a meeting another record shares
 keeps its reports; Move Audio and the automatic deletion leave them.
 

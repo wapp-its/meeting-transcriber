@@ -42,29 +42,41 @@ enum ArtifactRenamePlan {
     /// Returns `currentStem` when the job already carries the title (or the
     /// title plus its short id), so a regenerated protocol never renames a job
     /// onto itself or stacks a second suffix. A candidate with an additional report
-    /// in `protocolNames`, the protocols folder's file names, is taken as well.
+    /// in `protocolNames`, the protocols folder's file names, is taken as well, and
+    /// so is one where another meeting would own one of the `reports` that move.
     static func availableStem(
         titleSlug: String,
         shortID: String,
         currentStem: String,
         in dirs: Directories,
         protocolNames: Set<String> = [],
+        reports moving: [String] = [],
         exists: (URL) -> Bool,
     ) -> String? {
         let suffixed = "\(titleSlug)_\(shortID)"
         if currentStem == titleSlug || currentStem == suffixed { return currentStem }
         return [titleSlug, suffixed].first { candidate in
-            !artifactURLs(stem: candidate, in: dirs).contains(where: exists) && reports(of: candidate, in: protocolNames).isEmpty
+            let folder = reportFolder(of: candidate, in: protocolNames)
+            return !artifactURLs(stem: candidate, in: dirs).contains(where: exists) && folder.reports.isEmpty
+                && moving.allSatisfy { name in
+                    if case .otherMeeting = folder.slot(forReportNamed: name) { return false }
+                    return true
+                }
         }
     }
 
     /// The names of `stem`'s additional reports among `protocolNames`, judged from the
-    /// names alone: a longer meeting counts as one only by its transcript file, so a
-    /// report is seen where there may be none, which only ever keeps a name taken.
+    /// names alone.
     static func reports(of stem: String, in protocolNames: Set<String>) -> [String] {
-        let prefix = "\(stem) ("
-        let transcripts = Set(protocolNames.filter { $0.hasPrefix(prefix) && $0.hasSuffix(".txt") }.map { String($0.dropLast(4)) })
-        return MeetingReportFolder(basename: stem, names: protocolNames, transcriptStems: transcripts).reports.map(\.name)
+        reportFolder(of: stem, in: protocolNames).reports.map(\.name)
+    }
+
+    /// `stem`'s view of `protocolNames`: a longer meeting counts as one only by its
+    /// transcript file, so a report is seen where there may be none, which only ever
+    /// keeps a name taken.
+    private static func reportFolder(of stem: String, in protocolNames: Set<String>) -> MeetingReportFolder {
+        let transcripts = Set(protocolNames.filter { MeetingReportFolder.isNamed(after: stem, $0) && $0.hasSuffix(".txt") }.map { String($0.dropLast(4)) })
+        return MeetingReportFolder(basename: stem, names: protocolNames, transcriptStems: transcripts)
     }
 
     /// The moves that carry every existing artifact of `oldStem` over to

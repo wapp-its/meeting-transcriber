@@ -256,6 +256,7 @@ struct MeetingTranscriberApp: App {
             optionsUse: { appState.protocolOptionsUse() },
             chooseFile: { RegenerateProtocolView.chooseFile(startingIn: appState.settings.effectiveOutputDir) },
             resolveFile: { try appState.protocolRegenerator.target(for: $0) },
+            readTargetAgain: { appState.protocolRegenerator.readAgain($0) },
             generate: { target, options, output in
                 Task { await appState.protocolRegenerator.regenerate(target, options: options, saveAs: output) }
             },

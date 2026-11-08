@@ -10,7 +10,9 @@
     "gh-97-delete-recordings-by-hand-and-after-a"
   ],
   "id": "gh-190-keep-the-current-protocol-when-making",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-190-keep-the-current-protocol-when-making.1": 1
+  },
   "next_task": 1,
   "no_plan": true,
   "plan_review_rounds": 0,
@@ -456,6 +458,110 @@
       "task": null,
       "timestamp": "2026-11-07T15:32:49.257744Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "e975ecb783c169d97077d58dc0bdd11da1f36fab6207284c75d5dbd38eae89e6",
+      "backend": "codex",
+      "base_sha": "95a71e4b3b941a801095714387ab47d4e1b5b177",
+      "counter_kind": "impl",
+      "failure_class": "timeout",
+      "failure_message": "codex exec timed out (1800s)",
+      "finalized": {
+        "digest": "not_applicable",
+        "receipt": "not_applicable",
+        "status": "not_applicable"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "312fabc840c968b5df6f95a7bdbcccd341069fb2",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "outcome": "transport_failure",
+      "output_bytes": 186,
+      "output_sha256": "0d92461fd50ac45571ca01528c4f3c74641104debdb24cc2cf9457aaefad4e6c",
+      "reservation_id": "1f9c679023a44a108c5835139db2c8ce",
+      "round_consumed": false,
+      "scope": "impl:gh-190-keep-the-current-protocol-when-making.1",
+      "superseded_by": null,
+      "task": "gh-190-keep-the-current-protocol-when-making.1",
+      "timestamp": "2026-11-08T08:31:37.222858Z",
+      "verdict": null
+    },
+    {
+      "artifact_sha256": "e975ecb783c169d97077d58dc0bdd11da1f36fab6207284c75d5dbd38eae89e6",
+      "backend": "codex",
+      "base_sha": "95a71e4b3b941a801095714387ab47d4e1b5b177",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-1a10571ea5da7768c87adad34614e9c6",
+            "classification": "introduced",
+            "findingId": "finding-1a10571ea5da7768c87adad34614e9c6",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-45a23c635d47140d8b07636fb890e4a1",
+            "classification": "introduced",
+            "findingId": "finding-45a23c635d47140d8b07636fb890e4a1",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-af711ed591a7d3178d29be61d4f2c9c6",
+            "classification": "introduced",
+            "findingId": "finding-af711ed591a7d3178d29be61d4f2c9c6",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-37b9e0cbeaa2f7c26ad34ae2992d9334",
+            "classification": "introduced",
+            "findingId": "finding-37b9e0cbeaa2f7c26ad34ae2992d9334",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-99571e7f4da6bdf894c46d5b5336a03e",
+            "classification": "introduced",
+            "findingId": "finding-99571e7f4da6bdf894c46d5b5336a03e",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "312fabc840c968b5df6f95a7bdbcccd341069fb2",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 4318,
+      "output_sha256": "766133dc975d4469161bf38bc931806c26a572b03be1c7ab289e3308571aeaf0",
+      "reservation_id": "7845aafa0d914f3e9900bbc206cd8bd3",
+      "round_consumed": true,
+      "scope": "impl:gh-190-keep-the-current-protocol-when-making.1",
+      "superseded_by": null,
+      "task": "gh-190-keep-the-current-protocol-when-making.1",
+      "timestamp": "2026-11-08T08:40:48.705182Z",
+      "verdict": "NEEDS_WORK"
     }
   ],
   "review_hash_epoch": {
@@ -463,8 +569,10 @@
     "plan#completion": 0
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-190-keep-the-current-protocol-when-making.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-190-keep-the-current-protocol-when-making.md",
@@ -482,5 +590,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\n\"Regenerate Protocol\u2026\" (#2, #170) makes a meeting's protocol again with another template. The previous protocol then goes to the Trash, so a meeting has one protocol at a time. One meeting can need a report for each of several audiences, for example full minutes and a short summary (owner request, paraphrased).\n\n## NOTES\n\n- The regenerate dialog offers to save the new protocol as an additional report next to the existing one, named after its template. Replacing stays available. The template choice stays as it is.\n- The meeting's row in All Recordings lists its additional reports and opens them.\n- The main protocol keeps its role: Open Protocol, Open Last Protocol, the automation API and a retry use it.\n- Related: #170, #171.\n\n## TASKS\n\n- [ ] Draw the mockup (regenerate dialog, row menu) and get it accepted\n- [ ] Build the spec",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/190"
   },
-  "updated_at": "2026-11-07T15:32:49.286216Z"
+  "updated_at": "2026-11-08T08:42:14.452676Z"
 }

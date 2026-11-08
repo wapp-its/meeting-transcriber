@@ -32,6 +32,17 @@ final class ArtifactRenameReportTests: XCTestCase {
         XCTAssertEqual(stem, "weekly_sync_ab12cd34")
     }
 
+    func testAStemWhereAnotherMeetingWouldOwnAMovedReportIsTaken() {
+        for other in ["weekly_sync (Short).txt", "weekly_sync (short).txt"] {
+            let stem = ArtifactRenamePlan.availableStem(
+                titleSlug: "weekly_sync", shortID: "ab12cd34", currentStem: "old", in: dirs,
+                protocolNames: ["old (Short).md", other], reports: ["Short"],
+            ) { _ in false }
+
+            XCTAssertEqual(stem, "weekly_sync_ab12cd34", other)
+        }
+    }
+
     func testAnotherMeetingsReportDoesNotTakeAShorterStem() {
         XCTAssertEqual(ArtifactRenamePlan.reports(of: "weekly_sync", in: ["weekly_sync_retro (Short).md"]), [])
         XCTAssertEqual(
@@ -117,6 +128,22 @@ final class ArtifactRenameReportTests: XCTestCase {
         let found = try XCTUnwrap(store.record(for: job.id).map { MeetingReportScan.scan($0) })
         XCTAssertFalse(found.paths.contains(listed.path), "no rule finds it by name")
         XCTAssertTrue(try XCTUnwrap(store.record(for: job.id)).filesCovered(by: .meetingToTrash).contains(listed))
+    }
+
+    /// `weekly_sync (Short).md` would be the notes of the meeting `weekly_sync (Short).txt`
+    /// names, so the report would leave the renamed meeting: the title is taken.
+    func testATitleWhereAnotherMeetingWouldClaimAMovedReportIsTaken() throws {
+        let (queue, protocols, job, _) = try makeFolder()
+        try Data("[Ben] Another meeting".utf8).write(to: protocols.appendingPathComponent("weekly_sync (Short).txt"))
+
+        let renamed = queue.renameJobArtifacts(jobID: job.id, from: "old", titleSlug: "weekly_sync", protocolsDir: protocols)
+
+        XCTAssertEqual(renamed, "weekly_sync_\(PipelineJob.shortID(for: job.id))")
+        let folder = try XCTUnwrap(MeetingReportFolder.read(
+            folder: protocols, basename: renamed, list: { try? FileManager.default.contentsOfDirectory(atPath: $0.path) },
+            read: { try? Data(contentsOf: $0) },
+        ))
+        XCTAssertEqual(folder.reports.map(\.name), ["Minutes", "Short"])
     }
 
     func testAFolderThatCannotBeReadRenamesNothing() throws {

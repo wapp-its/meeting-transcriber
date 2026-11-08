@@ -74,6 +74,8 @@ struct AllRecordingsActions {
     var chooseFile: () -> URL?
     /// The meeting a chosen protocol or transcript belongs to.
     var resolveFile: (URL) throws -> ProtocolRegenerationTarget
+    /// The sheet's meeting read again after a run ended.
+    var readTargetAgain: (ProtocolRegenerationTarget) -> ProtocolRegenerationTarget
     /// Generate: starts the run, which reports its outcome in the sheet and
     /// as a notification, writing what "Save as:" chose.
     var generate: (ProtocolRegenerationTarget, MeetingProtocolOptions, ProtocolRegenerationOutput) -> Void
@@ -108,6 +110,7 @@ struct AllRecordingsActions {
         optionsUse: { ProtocolOptionsUse(destination: .off, recordOnly: false) },
         chooseFile: { nil },
         resolveFile: { _ in throw ProtocolRegenerationError.noTranscript },
+        readTargetAgain: { $0 },
         generate: { _, _, _ in },
     )
 

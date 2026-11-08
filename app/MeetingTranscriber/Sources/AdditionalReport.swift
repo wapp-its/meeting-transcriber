@@ -79,6 +79,11 @@ enum AdditionalReport {
 /// The meeting itself counts as having a transcript: from a row's side its
 /// reports stay its reports when its transcript is gone, as long as no longer
 /// meeting name claims them.
+///
+/// Names are compared without regard to case, as the default macOS volume
+/// compares them: there `Budget (Q3).md` reaches the file `Budget (q3).md`, and a
+/// report written under the one name would replace another meeting's notes under
+/// the other. On a case-sensitive volume this only refuses more.
 struct MeetingReportFolder: Equatable, Sendable {
     /// Where the chosen template's report would go.
     enum Slot: Equatable, Sendable {
@@ -96,6 +101,26 @@ struct MeetingReportFolder: Equatable, Sendable {
     /// meetings with a transcript. Every meeting that can claim a file named after
     /// this one is among them.
     let transcriptStems: Set<String>
+    private let foldedNames: Set<String>
+    private let foldedTranscriptStems: Set<String>
+
+    init(basename: String, names: Set<String>, transcriptStems: Set<String>) {
+        self.basename = basename
+        self.names = names
+        self.transcriptStems = transcriptStems
+        foldedNames = Set(names.map(Self.folded))
+        foldedTranscriptStems = Set(transcriptStems.map(Self.folded))
+    }
+
+    /// A name as the comparisons here see it.
+    static func folded(_ name: String) -> String {
+        name.folding(options: .caseInsensitive, locale: nil)
+    }
+
+    /// Whether `name` starts with `"<basename> ("`, without regard to case.
+    static func isNamed(after basename: String, _ name: String) -> Bool {
+        folded(name).hasPrefix(folded("\(basename) ("))
+    }
 
     /// Nil when the folder cannot be listed.
     static func read(
@@ -105,10 +130,9 @@ struct MeetingReportFolder: Equatable, Sendable {
     ) -> Self? {
         guard let listed = list(folder) else { return nil }
         let names = Set(listed)
-        let prefix = "\(basename) ("
         let stems = Set(names.compactMap { name -> String? in
             let stem = [".md", ".txt"].first(where: name.hasSuffix).map { String(name.dropLast($0.count)) }
-            return stem.flatMap { $0.hasPrefix(prefix) ? $0 : nil }
+            return stem.flatMap { isNamed(after: basename, $0) ? $0 : nil }
         })
         return Self(
             basename: basename, names: names,
@@ -121,16 +145,21 @@ struct MeetingReportFolder: Equatable, Sendable {
     func owner(ofFileName name: String) -> (meeting: String, name: String)? {
         guard name.hasSuffix(".md") else { return nil }
         let stem = String(name.dropLast(3))
-        guard !names.contains("\(stem).txt") else { return nil }
-        return AdditionalReport.owner(ofStem: stem) { $0 == basename || transcriptStems.contains($0) }
+        guard !foldedNames.contains(Self.folded("\(stem).txt")) else { return nil }
+        return AdditionalReport.owner(ofStem: stem) { meeting in
+            isThisMeeting(meeting) || foldedTranscriptStems.contains(Self.folded(meeting))
+        }
+    }
+
+    private func isThisMeeting(_ meeting: String) -> Bool {
+        Self.folded(meeting) == Self.folded(basename)
     }
 
     /// This meeting's reports, by name in alphabetical order.
     var reports: [AdditionalReport.Listed] {
-        let prefix = "\(basename) ("
-        return names.filter { $0.hasPrefix(prefix) }
+        names.filter { Self.isNamed(after: basename, $0) }
             .compactMap { name -> AdditionalReport.Listed? in
-                guard let owner = owner(ofFileName: name), owner.meeting == basename else { return nil }
+                guard let owner = owner(ofFileName: name), isThisMeeting(owner.meeting) else { return nil }
                 return AdditionalReport.Listed(name: owner.name, fileName: name)
             }
             .sorted { lhs, rhs in
@@ -142,7 +171,7 @@ struct MeetingReportFolder: Equatable, Sendable {
     /// Where the report named `name` would be written.
     func slot(forReportNamed name: String) -> Slot {
         let fileName = AdditionalReport.fileName(basename: basename, name: name)
-        guard owner(ofFileName: fileName)?.meeting == basename else { return .otherMeeting(fileName: fileName) }
-        return names.contains(fileName) ? .existing(fileName: fileName) : .free(fileName: fileName)
+        guard let owner = owner(ofFileName: fileName), isThisMeeting(owner.meeting) else { return .otherMeeting(fileName: fileName) }
+        return foldedNames.contains(Self.folded(fileName)) ? .existing(fileName: fileName) : .free(fileName: fileName)
     }
 }

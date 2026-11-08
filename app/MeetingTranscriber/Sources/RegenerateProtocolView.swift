@@ -30,6 +30,15 @@ final class RegenerateProtocolDraft {
         protocolOptions.reset(to: defaultTemplate)
     }
 
+    /// After a run ended, the meeting's files and reports as they are now: the
+    /// sheet stays open, and the run may have written the meeting's first notes or
+    /// the chosen report, which change the choice and the small lines. The
+    /// template, the background and the choice stay.
+    func readTargetAgain(_ refresh: (ProtocolRegenerationTarget) -> ProtocolRegenerationTarget) {
+        guard let target else { return }
+        self.target = refresh(target)
+    }
+
     /// What Generate writes: a meeting without notes gets them as its main
     /// protocol, with no choice shown.
     var output: ProtocolRegenerationOutput {
@@ -76,6 +85,8 @@ struct RegenerateProtocolView: View {
     /// Runs the open panel; a test hands in a URL instead.
     let chooseFile: () -> URL?
     let resolveFile: (URL) throws -> ProtocolRegenerationTarget
+    /// The meeting with its files and reports read again, after a run ended.
+    let refreshTarget: (ProtocolRegenerationTarget) -> ProtocolRegenerationTarget
     let onGenerate: (ProtocolRegenerationTarget, MeetingProtocolOptions, ProtocolRegenerationOutput) -> Void
     let onClose: () -> Void
 
@@ -90,6 +101,7 @@ struct RegenerateProtocolView: View {
         allowsChooseFile: Bool,
         chooseFile: @escaping () -> URL?,
         resolveFile: @escaping (URL) throws -> ProtocolRegenerationTarget,
+        refreshTarget: @escaping (ProtocolRegenerationTarget) -> ProtocolRegenerationTarget = \.self,
         draft: RegenerateProtocolDraft = RegenerateProtocolDraft(),
         onGenerate: @escaping (ProtocolRegenerationTarget, MeetingProtocolOptions, ProtocolRegenerationOutput) -> Void,
         onClose: @escaping () -> Void,
@@ -101,6 +113,7 @@ struct RegenerateProtocolView: View {
         self.allowsChooseFile = allowsChooseFile
         self.chooseFile = chooseFile
         self.resolveFile = resolveFile
+        self.refreshTarget = refreshTarget
         _draft = State(initialValue: draft)
         self.onGenerate = onGenerate
         self.onClose = onClose
@@ -134,6 +147,9 @@ struct RegenerateProtocolView: View {
             let opened = templateChoices()
             openedChoices = opened
             draft.reset(target: initialTarget, defaultTemplate: opened.defaultTemplate)
+        }
+        .onChange(of: phase) { old, _ in
+            if old == .running { draft.readTargetAgain(refreshTarget) }
         }
     }
 

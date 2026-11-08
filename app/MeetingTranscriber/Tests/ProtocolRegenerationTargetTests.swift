@@ -162,6 +162,36 @@ final class ProtocolRegenerationTargetTests: XCTestCase {
         XCTAssertEqual(target.files.transcript?.text, "[Ben] The Q3 meeting")
     }
 
+    /// Its own transcript makes a file a meeting even when it cannot be read: the
+    /// file never stands for the shorter meeting.
+    func testAChosenMeetingWhoseTranscriptCannotBeReadStaysThatMeeting() throws {
+        let other = folder.appendingPathComponent("\(basename) (Q3).txt")
+        try write("[Anna] Hello", to: txt)
+        try write("[Ben] The Q3 meeting", to: other)
+        let chosen = folder.appendingPathComponent("\(basename) (Q3).md")
+        try write("# Q3 notes" + ProtocolGenerator.fullTranscriptSeparator + "[Ben] The Q3 meeting", to: chosen)
+        let unreadable: (URL) -> Data? = { url in url.lastPathComponent == other.lastPathComponent ? nil : try? Data(contentsOf: url) }
+
+        let target = try ProtocolRegenerationTarget.resolve(file: chosen, records: [], read: unreadable, list: list)
+
+        XCTAssertEqual(target.basename, "\(basename) (Q3)")
+        XCTAssertEqual(target.protocolURL, chosen)
+    }
+
+    func testReadingAgainSeesTheNotesAndReportsWrittenSince() throws {
+        try write("[Anna] Hello", to: txt)
+        let target = try ProtocolRegenerationTarget.resolve(file: txt, records: [], read: read, list: list)
+        try write("# Protocol", to: md)
+        try write("# Short", to: folder.appendingPathComponent("\(basename) (Short).md"))
+
+        let again = target.readAgain(read: read, list: list)
+
+        XCTAssertFalse(target.hasProtocol)
+        XCTAssertTrue(again.hasProtocol)
+        XCTAssertEqual(again.reports.map(\.name), ["Short"])
+        XCTAssertEqual(again.title, target.title)
+    }
+
     func testAReportWhoseMeetingIsGoneIsRefused() throws {
         let report = folder.appendingPathComponent("\(basename) (Short).md")
         try write("# Short, no transcript section", to: report)

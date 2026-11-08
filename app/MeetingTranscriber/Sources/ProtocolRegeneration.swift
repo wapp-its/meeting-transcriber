@@ -231,6 +231,12 @@ final class ProtocolRegenerator {
         )
     }
 
+    /// `target` with its files and reports as they are now, for the sheet after a run.
+    func readAgain(_ target: ProtocolRegenerationTarget) -> ProtocolRegenerationTarget {
+        let ops = environment.fileOperations
+        return withOutputScope { target.readAgain(read: ops.read, list: ops.list) }
+    }
+
     /// Generates, then replaces the meeting's protocol, or writes the template's
     /// additional report beside it; the outcome lands in `phase` and a
     /// notification. Ignored while a run is going. `notes` join a success's

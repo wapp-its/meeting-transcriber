@@ -75,6 +75,18 @@ struct ProtocolRegenerationTarget: Equatable {
             ?? .free(fileName: AdditionalReport.fileName(basename: basename, name: name))
     }
 
+    /// The same meeting with its two files and its reports read again.
+    func readAgain(
+        read: (URL) -> Data?,
+        list: (URL) -> [String]?, // swiftlint:disable:this discouraged_optional_collection
+    ) -> Self {
+        Self(
+            folder: folder, basename: basename, title: title, meetingStartTime: meetingStartTime, jobID: jobID,
+            files: Self.readFiles(folder: folder, basename: basename, read: read),
+            reportFolder: MeetingReportFolder.read(folder: folder, basename: basename, list: list, read: read),
+        )
+    }
+
     /// `<basename>.txt` and `<basename>.md` in `folder`, read now.
     static func readFiles(folder: URL, basename: String, read: (URL) -> Data?) -> ProtocolRegenerationFiles {
         ProtocolRegenerationFiles(
@@ -93,7 +105,7 @@ struct ProtocolRegenerationTarget: Equatable {
         file: URL, records: [TerminalJobRecord], read: (URL) -> Data?, list: (URL) -> [String]? = { _ in nil },
     ) throws -> Self {
         let folder = file.deletingLastPathComponent()
-        let basename = meetingBasename(of: file, read: read)
+        let basename = meetingBasename(of: file, read: read, list: list)
         let files = readFiles(folder: folder, basename: basename, read: read)
         guard files.transcript != nil else { throw ProtocolRegenerationError.noTranscript }
         let candidates: Set = [
@@ -118,11 +130,20 @@ struct ProtocolRegenerationTarget: Equatable {
 
     /// The name of the meeting a chosen file stands for: a Markdown file with no
     /// transcript file of its own, whose name the ownership rule gives to a meeting
-    /// with a transcript, stands for that meeting; every other file for itself.
-    static func meetingBasename(of file: URL, read: (URL) -> Data?) -> String {
+    /// with a transcript, stands for that meeting; every other file for itself. The
+    /// folder's listing tells whether that transcript file is there, so one that
+    /// cannot be read still makes the file a meeting; without a listing, reading it
+    /// tells.
+    static func meetingBasename(
+        // swiftlint:disable:next discouraged_optional_collection
+        of file: URL, read: (URL) -> Data?, list: (URL) -> [String]? = { _ in nil },
+    ) -> String {
         let folder = file.deletingLastPathComponent()
         let stem = file.deletingPathExtension().lastPathComponent
-        guard file.pathExtension == "md", read(folder.appendingPathComponent("\(stem).txt")) == nil,
+        let transcriptName = MeetingReportFolder.folded("\(stem).txt")
+        let hasTranscriptFile = list(folder).map { $0.contains { MeetingReportFolder.folded($0) == transcriptName } }
+            ?? (read(folder.appendingPathComponent("\(stem).txt")) != nil)
+        guard file.pathExtension == "md", !hasTranscriptFile,
               let owner = AdditionalReport.owner(ofStem: stem, hasTranscript: { meeting in
                   AdditionalReport.hasTranscript(folder: folder, stem: meeting, read: read)
               })
