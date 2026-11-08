@@ -708,9 +708,9 @@ are undone and the job keeps its old stem and paths. The meeting's additional
 reports (see [Additional Reports](#additional-reports)) are the one exception
 to the suffix lists: the ownership rule finds them by their whole name before
 ` (`, they move in the same all-or-nothing run, and a title is taken when it
-has a report or when another meeting would own a moved report under the new
-name (`weekly_sync (Short).txt` makes `weekly_sync (Short).md` that meeting's
-notes). A `protocols/` folder that cannot be listed renames nothing.
+has a report or when a moved report would not land on a free name: another
+meeting would own it (`weekly_sync (Short).txt` makes `weekly_sync (Short).md`
+that meeting's notes), or a file differing only in case is there. A `protocols/` folder that cannot be listed renames nothing.
 The title comes from the first top-level `# ` heading in what the model
 wrote, and only for a job that ran the built-in template (after a fallback
 too): a custom template's first heading is whatever it writes, a section such
@@ -732,9 +732,12 @@ One rule decides whose report a file is (`AdditionalReport`,
 "Regenerate from File…", Move Meeting to Trash and the AI-title rename all use
 it: a file with a `.txt` of its own name is a meeting, otherwise the longest
 name before a ` (` that has a transcript (its `.txt`, or the transcript inside
-its notes) owns it. The rule compares names without regard to case, as the
-default macOS volume does, where `Budget (Q3).md` reaches the file
-`Budget (q3).md`; on a case-sensitive volume this only refuses more. For a file
+its notes) owns it. Where it refuses or keeps a file, the rule compares names
+without regard to case, as the default macOS volume does, where `Budget (Q3).md`
+reaches the file `Budget (q3).md`: a `.txt` or a longer meeting in any case
+claims the file, and a case variant of the chosen report's name is the file it
+replaces. A meeting lists, moves and deletes only reports under its exact name,
+because on a case-sensitive volume `Budget` and `budget` are two meetings. For a file
 chosen with "Regenerate from File…", the folder's listing tells whether its own
 `.txt` is there, so a transcript that cannot be read still makes it a meeting.
 A report name the rule gives to another meeting disables Generate. The run

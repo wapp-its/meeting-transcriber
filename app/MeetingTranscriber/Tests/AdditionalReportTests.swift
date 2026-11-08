@@ -129,11 +129,22 @@ final class AdditionalReportTests: XCTestCase {
         XCTAssertEqual(sut.reports, [])
     }
 
+    /// Written under its own name, the report reaches the case variant on the
+    /// default volume, so the sheet warns that it replaces it.
     func testTheTemplatesReportUnderAnotherCaseIsTheOneItReplaces() {
         let sut = folder("Budget", ["Budget.txt", "Budget.md", "Budget (short).md"])
 
         XCTAssertEqual(sut.slot(forReportNamed: "Short"), .existing(fileName: "Budget (Short).md"))
         XCTAssertEqual(sut.reports, [AdditionalReport.Listed(name: "short", fileName: "Budget (short).md")])
+    }
+
+    /// On a case-sensitive volume `Budget` and `budget` are two meetings: neither
+    /// lists the other's report, so Move Meeting to Trash never takes it.
+    func testAMeetingNeverListsTheReportOfAMeetingWhoseNameDiffersOnlyInCase() {
+        let names: Set = ["Budget.txt", "budget.txt", "budget (Short).md"]
+
+        XCTAssertEqual(folder("Budget", names).reports, [])
+        XCTAssertEqual(folder("budget", names).reports, [AdditionalReport.Listed(name: "Short", fileName: "budget (Short).md")])
     }
 
     func testALongerMeetingWhoseNameDiffersOnlyInCaseClaimsTheFile() throws {

@@ -80,10 +80,14 @@ enum AdditionalReport {
 /// reports stay its reports when its transcript is gone, as long as no longer
 /// meeting name claims them.
 ///
-/// Names are compared without regard to case, as the default macOS volume
-/// compares them: there `Budget (Q3).md` reaches the file `Budget (q3).md`, and a
-/// report written under the one name would replace another meeting's notes under
-/// the other. On a case-sensitive volume this only refuses more.
+/// Names are compared without regard to case wherever that refuses or keeps
+/// more, as the default macOS volume compares them: there `Budget (Q3).md`
+/// reaches the file `Budget (q3).md`, and a report written under the one name
+/// would replace another meeting's notes under the other. So a file with a
+/// `.txt` of its own name in any case is a meeting, a longer meeting claims in
+/// any case, and a case variant of the chosen report's name is the file it
+/// replaces. A meeting lists, and so moves and deletes, only reports under its
+/// exact name: on a case-sensitive volume `Budget` and `budget` are two meetings.
 struct MeetingReportFolder: Equatable, Sendable {
     /// Where the chosen template's report would go.
     enum Slot: Equatable, Sendable {
@@ -152,12 +156,12 @@ struct MeetingReportFolder: Equatable, Sendable {
     }
 
     private func isThisMeeting(_ meeting: String) -> Bool {
-        Self.folded(meeting) == Self.folded(basename)
+        meeting == basename
     }
 
     /// This meeting's reports, by name in alphabetical order.
     var reports: [AdditionalReport.Listed] {
-        names.filter { Self.isNamed(after: basename, $0) }
+        names.filter { $0.hasPrefix("\(basename) (") }
             .compactMap { name -> AdditionalReport.Listed? in
                 guard let owner = owner(ofFileName: name), isThisMeeting(owner.meeting) else { return nil }
                 return AdditionalReport.Listed(name: owner.name, fileName: name)

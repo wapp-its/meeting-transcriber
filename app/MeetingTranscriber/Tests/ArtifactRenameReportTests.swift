@@ -33,7 +33,7 @@ final class ArtifactRenameReportTests: XCTestCase {
     }
 
     func testAStemWhereAnotherMeetingWouldOwnAMovedReportIsTaken() {
-        for other in ["weekly_sync (Short).txt", "weekly_sync (short).txt"] {
+        for other in ["weekly_sync (Short).txt", "weekly_sync (short).txt", "Weekly_sync (Short).md"] {
             let stem = ArtifactRenamePlan.availableStem(
                 titleSlug: "weekly_sync", shortID: "ab12cd34", currentStem: "old", in: dirs,
                 protocolNames: ["old (Short).md", other], reports: ["Short"],

@@ -43,7 +43,8 @@ enum ArtifactRenamePlan {
     /// title plus its short id), so a regenerated protocol never renames a job
     /// onto itself or stacks a second suffix. A candidate with an additional report
     /// in `protocolNames`, the protocols folder's file names, is taken as well, and
-    /// so is one where another meeting would own one of the `reports` that move.
+    /// so is one where a moved report of `reports` would not land on a free name:
+    /// another meeting would own it, or a file differing only in case is there.
     static func availableStem(
         titleSlug: String,
         shortID: String,
@@ -59,8 +60,8 @@ enum ArtifactRenamePlan {
             let folder = reportFolder(of: candidate, in: protocolNames)
             return !artifactURLs(stem: candidate, in: dirs).contains(where: exists) && folder.reports.isEmpty
                 && moving.allSatisfy { name in
-                    if case .otherMeeting = folder.slot(forReportNamed: name) { return false }
-                    return true
+                    if case .free = folder.slot(forReportNamed: name) { return true }
+                    return false
                 }
         }
     }
