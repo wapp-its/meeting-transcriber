@@ -206,11 +206,12 @@ enum TranscriptionList {
         )
     }
 
-    /// What "Open Last Notes" opens: of the jobs that finished with a
-    /// protocol, a transcript or a completed Notion page, the one that finished
-    /// last, by the history's finish order rather than by when it was added,
-    /// since a retry keeps its enqueue time. Nil when none has. A failed job
-    /// does not count: it is listed under "Needs you" with its own Open.
+    /// The menu's last recording, which its open item opens: of the jobs that
+    /// finished with a protocol, a transcript or a completed Notion page, the
+    /// one that finished last, by the history's finish order rather than by
+    /// when it was added, since a retry keeps its enqueue time. Nil when none
+    /// has. A failed job does not count: it is listed under "Needs you" with
+    /// its own Open.
     static func lastFinished(_ entries: [TranscriptionEntry]) -> TranscriptionEntry? {
         entries.filter { $0.state == .done && ($0.fileToOpen != nil || $0.notionPageURL != nil) }
             .max { ($0.finishOrder ?? .min) < ($1.finishOrder ?? .min) }
