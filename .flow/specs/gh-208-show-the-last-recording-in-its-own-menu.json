@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-208-last-recording-section",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-11-12T13:27:35.739954Z",
   "created_at": "2026-11-12T09:43:12.312418Z",
   "default_impl": null,
   "default_review": null,
@@ -97,17 +97,54 @@
       "task": "gh-208-show-the-last-recording-in-its-own-menu.1",
       "timestamp": "2026-11-12T11:55:30.626715Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "d0dd2689b24402c6039969671ec0082c304108f061e3f61f1837bd8809c258cb",
+      "backend": "codex",
+      "base_sha": "67518820f1fd23f9667f7b91934585cb14282045",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "4b7dcc0b5a9dc47219c4e4719c2e5f87f6dddb6d",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 224697,
+      "output_sha256": "375e814ddcc547d804ab7e1f2ac6064918782b5ba237fba91fe5a53cb5cbbd2d",
+      "reservation_id": "c0893a3c9b764984bcb2ef93cc14ca0b",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-12T13:27:35.673821Z",
+      "tool_calls": 32,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-208-show-the-last-recording-in-its-own-menu.1": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-208-show-the-last-recording-in-its-own-menu.1": 0,
     "plan": 0
   },
@@ -126,5 +163,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/208"
   },
-  "updated_at": "2026-11-12T11:55:37.368664Z"
+  "updated_at": "2026-11-12T13:27:35.748431Z"
 }
