@@ -182,7 +182,9 @@ summary_of() {  # $1 = Stand jetzt, $2 = letzter Build, beide "name sha | name s
         next="${out:+$out · }$part"
         if [ $(( ${#next} + ${#rest} )) -gt 80 ]; then
             if [ -z "$out" ]; then
-                next="${part:0:$(( 80 - ${#rest} ))}"
+                # Ohne UTF-8-Locale schneidet ${part:0:N} Bytes und kann ein
+                # Zeichen teilen; iconv -c lässt das angeschnittene Zeichen weg.
+                next="$(printf '%s' "${part:0:$(( 80 - ${#rest} ))}" | iconv -c -f UTF-8 -t UTF-8 2>/dev/null || true)"
             else
                 out+=" · +$(( n - i + 1 )) more"
                 break
