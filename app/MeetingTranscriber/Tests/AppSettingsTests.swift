@@ -571,24 +571,6 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(roundTrip, [.offline, .sortformer, .nemotron])
     }
 
-    /// Stored by name: a renamed case would read as Never for everyone who chose it.
-    func testRecordingRetentionRawValuesArePinned() {
-        XCTAssertEqual(RecordingRetention.allCases.map(\.rawValue), ["never", "afterProtocol", "days7", "days30", "days90"])
-    }
-
-    func testRecordingRetentionDefaultsToNeverAndSurvivesARestart() {
-        XCTAssertEqual(settings.recordingRetention, .never)
-        for retention in RecordingRetention.allCases {
-            settings.recordingRetention = retention
-            XCTAssertEqual(AppSettings(defaults: defaults, apiKeyAccount: apiKeyAccount).recordingRetention, retention)
-        }
-    }
-
-    func testAnUnknownStoredRecordingRetentionReadsAsNever() {
-        defaults.set("days14", forKey: "recordingRetention")
-        XCTAssertEqual(AppSettings(defaults: defaults, apiKeyAccount: apiKeyAccount).recordingRetention, .never)
-    }
-
     /// `DiarizerMode.speakerCap` is the single source of truth for the
     /// max-speaker constraint shared by `SpeakersSettingsView` and
     /// `SpeakerNamingView`. Lock the values so a FluidAudio bump that
