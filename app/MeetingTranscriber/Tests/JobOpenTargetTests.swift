@@ -21,7 +21,7 @@ final class JobOpenTargetTests: XCTestCase {
 
         XCTAssertEqual(target, try .notion(XCTUnwrap(URL(string: "https://www.notion.so/page-1"))))
         XCTAssertEqual(target?.jobActionLabel, "Open in Notion")
-        XCTAssertEqual(target?.lastNotesLabel, "Open Last Notes in Notion")
+        XCTAssertEqual(target?.lastNotesLabel, "Open in Notion")
     }
 
     func testLocalFileWinsWhenNotionIsDisabled() {
@@ -36,6 +36,7 @@ final class JobOpenTargetTests: XCTestCase {
 
         XCTAssertEqual(target, .file(URL(fileURLWithPath: "/tmp/protocol.md")))
         XCTAssertEqual(target?.jobActionLabel, "Open")
+        XCTAssertEqual(target?.lastNotesLabel, "Open Notes")
     }
 
     func testNotionPageIsUsedWhenNoLocalFileExists() throws {

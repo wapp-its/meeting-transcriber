@@ -9,8 +9,8 @@ struct MenuBarView: View {
     /// set, it disables the menu's install item.
     var updateInstallBlockedReason: String?
     /// The finished-job history, read with the queue's jobs so a failed line
-    /// and "Open Last Notes" outlive the queue's one-minute reap and a
-    /// restart.
+    /// and the Last Recording section outlive the queue's one-minute reap and
+    /// a restart.
     var history: [TerminalJobRecord] = []
     /// Whether the user set "No Microphone (app audio only)". Only reaches the
     /// microphone item, which it disables with a reason.
@@ -30,10 +30,10 @@ struct MenuBarView: View {
     var microphoneMenu: MicrophoneMenuState?
     /// The Output entry; nil leaves it out.
     var outputMenu: OutputMenuState?
-    /// Whether Notion export is on, which makes "Open Last Notes" prefer the
-    /// job's Notion page. A page exported before the setting was turned off
-    /// is still the fallback when no local file exists; `JobOpenTarget` owns
-    /// that rule.
+    /// Whether Notion export is on, which makes the last recording's open
+    /// item prefer the job's Notion page. A page exported before the setting
+    /// was turned off is still the fallback when no local file exists;
+    /// `JobOpenTarget` owns that rule.
     var notionExportEnabled = false
     /// What the menu's items do; a nil optional action hides or disables its
     /// item (see `MenuActions`).
@@ -77,6 +77,7 @@ struct MenuBarView: View {
         recordAndImportSection
         audioDevicesSection
         jobSections
+        lastRecordingSection
         recordingsSection
         updateSection
 
@@ -250,24 +251,11 @@ struct MenuBarView: View {
         }
     }
 
-    /// The way to the results: the newest one and every job. "Open Last
-    /// Notes" is the menu's one click to the newest result now that finished
-    /// jobs are not listed, shown while the history holds a finished job with
-    /// a file or a Notion page, and named after where it goes. "All
-    /// Recordings…" is shown at all times: finished jobs are listed in the
-    /// window, not in the menu.
+    /// The way to every job, shown at all times: finished jobs are listed in
+    /// the window, not in the menu. The newest result has its own section
+    /// above this one (`lastRecordingSection`).
     private var recordingsSection: some View {
         Section("Recordings") {
-            if let target = lastNotesTarget {
-                Button {
-                    actions.openLastNotes(target)
-                } label: {
-                    Label(target.lastNotesLabel, systemImage: target.systemImage)
-                }
-                .keyboardShortcut("o")
-                .accessibilityIdentifier(A11yID.openLastNotesMenuItem)
-            }
-
             Button {
                 actions.showAllTranscriptions()
             } label: {
@@ -276,15 +264,6 @@ struct MenuBarView: View {
             .keyboardShortcut("t")
             .accessibilityIdentifier(A11yID.allRecordingsMenuItem)
         }
-    }
-
-    /// Hoisted out of the `ViewBuilder` for the type-check budget (see the
-    /// note on `body`).
-    private var lastNotesTarget: JobOpenTarget? {
-        JobOpenTarget.resolve(
-            forEntry: TranscriptionList.lastFinished(transcriptionEntries),
-            preferNotion: notionExportEnabled,
-        )
     }
 
     /// mt-update mode first; otherwise a GitHub release, installed the way

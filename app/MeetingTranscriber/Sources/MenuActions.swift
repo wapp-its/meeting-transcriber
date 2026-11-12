@@ -23,10 +23,10 @@ struct MenuActions {
     /// A job line's Open: the job's protocol, else its transcript, or its
     /// Notion page as `JobOpenTarget` decides ("Open in Notion").
     var openJob: (JobOpenTarget) -> Void
-    /// "Open Last Notes": the newest finished job's protocol, else its
-    /// transcript, or its Notion page as `JobOpenTarget` decides. Separate
-    /// from a job line's Open because a file that is gone is reported here,
-    /// as the All Recordings window reports it.
+    /// The last recording's open item: the newest finished job's protocol,
+    /// else its transcript, or its Notion page as `JobOpenTarget` decides.
+    /// Separate from a job line's Open because a file that is gone is reported
+    /// here, as the All Recordings window reports it.
     var openLastNotes: (JobOpenTarget) -> Void
     var openSettings: () -> Void
     /// Opens the naming window; set only while a job waits for speaker names.
