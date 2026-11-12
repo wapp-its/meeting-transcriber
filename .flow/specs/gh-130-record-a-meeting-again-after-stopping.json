@@ -1,0 +1,33 @@
+{
+  "branch_name": "gh-130-record-a-meeting-again-after-stopping",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-11-12T20:43:12.695238Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-130-record-a-meeting-again-after-stopping",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 0,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/gh-130-record-a-meeting-again-after-stopping.md",
+  "status": "open",
+  "title": "Record a meeting again after stopping it by hand",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABXGb2DQ",
+    "identifier": "#130",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/130"
+  },
+  "updated_at": "2026-11-12T20:43:46.651273Z"
+}
