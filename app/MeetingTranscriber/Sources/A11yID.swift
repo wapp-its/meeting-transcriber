@@ -92,8 +92,8 @@ enum A11yID {
     /// "Name Speakers..." too.
     static let nameSpeakersMenuItem = "nameSpeakersMenuItem"
 
-    /// The menu's items under "Record & Import" and "Open Last Notes".
-    /// Tests find them by these values: the open recording prompt has a
+    /// The menu's items under "Record & Import" and the last recording's open
+    /// item. Tests find them by these values: the open recording prompt has a
     /// "Record with Options…" button of its own.
     static let recordMicrophoneMenuItem = "recordMicrophoneMenuItem"
     static let recordWithOptionsMenuItem = "recordWithOptionsMenuItem"

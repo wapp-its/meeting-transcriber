@@ -25,10 +25,13 @@ enum JobOpenTarget: Equatable {
         }
     }
 
+    /// The menu's Last Recording section names the recording above this
+    /// item, so the label says only where it goes, in the All Recordings
+    /// window's words.
     var lastNotesLabel: String {
         switch self {
-        case .notion: "Open Last Notes in Notion"
-        case .file: "Open Last Notes"
+        case .notion: "Open in Notion"
+        case .file: "Open Notes"
         }
     }
 

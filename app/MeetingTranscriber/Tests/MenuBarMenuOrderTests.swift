@@ -15,6 +15,9 @@ final class MenuBarMenuOrderTests: XCTestCase {
         case heading(String)
         /// An inert line: the status, a job group's caption.
         case label(String)
+        /// An inert line of plain text, outside any button, submenu, label
+        /// and section header: the last recording's name and details lines.
+        case text(String)
         /// A button or a submenu, by its title.
         case item(String)
         case divider
@@ -27,6 +30,33 @@ final class MenuBarMenuOrderTests: XCTestCase {
         )
         job.state = state
         return job
+    }
+
+    /// A finished job added `minute` minutes into a fixed hour, so two jobs
+    /// can be added in a set order: a fresh job reads the clock.
+    private func makeJob(_ title: String, app: String, addedAt minute: Double) throws -> PipelineJob {
+        let fresh = PipelineJob(
+            meetingTitle: title, appName: app,
+            mixPath: URL(fileURLWithPath: "/tmp/\(title)_mix.wav"), appPath: nil, micPath: nil, micDelay: 0,
+        )
+        var encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(fresh)) as? [String: Any])
+        encoded["enqueuedAt"] = Date(timeIntervalSinceReferenceDate: 800_000_000 + minute * 60).timeIntervalSinceReferenceDate
+        encoded["state"] = JobState.done.rawValue
+        return try JSONDecoder().decode(PipelineJob.self, from: JSONSerialization.data(withJSONObject: encoded))
+    }
+
+    /// A meeting start three days back, which the details line writes as a
+    /// date rather than "Today" or "Yesterday" however close to midnight the
+    /// test runs.
+    private func olderDayStart() throws -> Date {
+        try XCTUnwrap(Calendar.current.date(byAdding: .day, value: -3, to: Date()))
+    }
+
+    /// The details line for a start on an older day, in the locale and time
+    /// zone the menu renders with. The details-line tests pin the wording
+    /// with a fixed locale; here it only has to match the menu's.
+    private func olderDayDetails(app: String, start: Date) -> String {
+        "\(app) · \(start.formatted(date: .abbreviated, time: .omitted)) at \(start.formatted(date: .omitted, time: .shortened))"
     }
 
     private func makeView(
@@ -65,7 +95,7 @@ final class MenuBarMenuOrderTests: XCTestCase {
     private func lines(of view: MenuBarView) throws -> [Line] {
         try view.inspect().findAll { node in
             guard (try? node.section()) != nil || (try? node.divider()) != nil || (try? node.button()) != nil
-                || (try? node.menu()) != nil || (try? node.label()) != nil
+                || (try? node.menu()) != nil || (try? node.label()) != nil || isPlainText(node)
             else { return false }
             return (try? node.find(ViewType.Menu.self, relation: .parent)) == nil
                 && (try? node.find(ViewType.Button.self, relation: .parent)) == nil
@@ -75,18 +105,34 @@ final class MenuBarMenuOrderTests: XCTestCase {
             if (try? node.divider()) != nil { return .divider }
             if let button = try? node.button() { return try .item(button.labelView().find(ViewType.Text.self).string()) }
             if let menu = try? node.menu() { return try .item(menu.labelView().find(ViewType.Text.self).string()) }
+            if let text = try? node.text() { return try .text(text.string()) }
             return try .label(node.label().title().text().string())
         }
     }
 
-    /// The lines of the "Needs you" group, its caption excluded.
-    private func needsYouLines(of view: MenuBarView) throws -> [Line] {
+    /// A `Text` that is a line of its own: not a label's title, which the
+    /// label stands for, and not a section's header, which the section
+    /// stands for. The search reaches a header through the section's
+    /// `header()` call.
+    private func isPlainText(_ node: InspectableView<ViewType.ClassifiedView>) -> Bool {
+        (try? node.text()) != nil
+            && (try? node.find(ViewType.Label.self, relation: .parent)) == nil
+            && !node.pathToRoot.contains("header()")
+    }
+
+    /// The lines after `line` up to the next heading or divider.
+    private func lines(under line: Line, of view: MenuBarView) throws -> [Line] {
         let menu = try lines(of: view)
-        let caption = try XCTUnwrap(menu.firstIndex(of: .label("Needs you")))
-        return Array(menu[(caption + 1)...].prefix { line in
+        let start = try XCTUnwrap(menu.firstIndex(of: line), "no \(line) in \(menu)")
+        return Array(menu[(start + 1)...].prefix { line in
             if case .heading = line { return false }
             return line != .divider
         })
+    }
+
+    /// The lines of the "Needs you" group, its caption excluded.
+    private func needsYouLines(of view: MenuBarView) throws -> [Line] {
+        try lines(under: .label("Needs you"), of: view)
     }
 
     // MARK: - The whole menu
@@ -97,6 +143,8 @@ final class MenuBarMenuOrderTests: XCTestCase {
     func testTheMenuReadsInTheMockupsOrderWithItsShortcuts() throws {
         var finished = makeJob("Retro", state: .done)
         finished.protocolPath = URL(fileURLWithPath: "/tmp/Retro.md")
+        let start = try olderDayStart()
+        finished.meetingStartTime = start
         let queue = try makeIsolatedQueue()
         queue.insertJobForTesting(makeJob("Unnamed", state: .speakerNamingPending))
         var actions = MenuActions.noop
@@ -121,8 +169,11 @@ final class MenuBarMenuOrderTests: XCTestCase {
             .label("Needs you"),
             .item("Name Speakers…"),
             .item("Unnamed — Speaker names needed"),
+            .heading("Last Recording"),
+            .text("Retro"),
+            .text(olderDayDetails(app: "Teams", start: start)),
+            .item("Open Notes"),
             .heading("Recordings"),
-            .item("Open Last Notes"),
             .item("All Recordings…"),
             .divider,
             .item("Settings..."),
@@ -135,7 +186,7 @@ final class MenuBarMenuOrderTests: XCTestCase {
             "Record with Options…": ["r"],
             "Import Audio/Video Files…": ["p"],
             "Name Speakers…": ["n"],
-            "Open Last Notes": ["o"],
+            "Open Notes": ["o"],
             "All Recordings…": ["t"],
             "Settings...": [","],
             "Quit": ["q"],
@@ -156,6 +207,53 @@ final class MenuBarMenuOrderTests: XCTestCase {
             XCTAssertEqual(menu.contains(.heading("Audio Devices")), testCase.shown, testCase.name)
             XCTAssertTrue(menu.contains(.heading("Record & Import")), testCase.name)
         }
+    }
+
+    // MARK: - Last Recording
+
+    /// Without a finished recording that has something to open, the section
+    /// is left out with its heading, and "Recordings" holds "All Recordings…"
+    /// alone, as it does at all times.
+    func testTheLastRecordingSectionIsLeftOutWithoutAFinishedRecordingToOpen() throws {
+        var failed = makeJob("Broken", state: .error)
+        failed.transcriptPath = URL(fileURLWithPath: "/tmp/Broken.txt")
+        let cases: [(name: String, history: [TerminalJobRecord])] = [
+            ("no recording", []),
+            ("only a failed job", [TerminalJobRecord(job: failed)]),
+            ("a finished job with no file and no Notion page", [TerminalJobRecord(job: makeJob("Empty", state: .done))]),
+        ]
+        for testCase in cases {
+            let sut = try makeView(history: testCase.history)
+            let menu = try lines(of: sut)
+
+            XCTAssertFalse(menu.contains(.heading("Last Recording")), testCase.name)
+            XCTAssertFalse(menu.contains { if case .text = $0 { true } else { false } }, "\(testCase.name): \(menu)")
+            XCTAssertEqual(try lines(under: .heading("Recordings"), of: sut), [.item("All Recordings…")], testCase.name)
+        }
+    }
+
+    /// The name, the details line and the open item are one recording's: the
+    /// one that finished last, also when another was added after it (a retry
+    /// keeps when it was added), and the one the open item opens.
+    func testTheLastRecordingSectionNamesTheRecordingItsOpenItemOpens() throws {
+        let start = try olderDayStart()
+        var retried = try makeJob("Retried", app: "Zoom", addedAt: 0)
+        retried.meetingStartTime = start
+        retried.transcriptPath = URL(fileURLWithPath: "/tmp/Retried.txt")
+        var addedLater = try makeJob("Added later", app: "Teams", addedAt: 1)
+        addedLater.protocolPath = URL(fileURLWithPath: "/tmp/Added later.md")
+        var opened: [JobOpenTarget] = []
+        var actions = MenuActions.noop
+        actions.openLastNotes = { opened.append($0) }
+        let sut = try makeView(history: [addedLater, retried].map(TerminalJobRecord.init(job:)), actions: actions)
+
+        XCTAssertEqual(try lines(under: .heading("Last Recording"), of: sut), [
+            .text("Retried"),
+            .text(olderDayDetails(app: "Zoom", start: start)),
+            .item("Open Notes"),
+        ])
+        try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.openLastNotesMenuItem).button().tap()
+        XCTAssertEqual(opened, [.file(URL(fileURLWithPath: "/tmp/Retried.txt"))])
     }
 
     // MARK: - Name Speakers inside "Needs you"

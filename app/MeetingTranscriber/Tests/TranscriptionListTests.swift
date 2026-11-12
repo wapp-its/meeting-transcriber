@@ -230,7 +230,7 @@ final class TranscriptionListTests: XCTestCase {
         XCTAssertEqual(titles(sections.needsYou), ["First unrecorded", "Second unrecorded", "Recorded"])
     }
 
-    /// "Open Last Notes" takes the job that finished last with a file, by
+    /// The menu's last recording is the job that finished last with a file, by
     /// finish order: a retried job added first and finished last is it. A
     /// later finish without a file and a later failure are passed over, and a
     /// job with only a transcript opens that.
@@ -287,7 +287,7 @@ final class TranscriptionListTests: XCTestCase {
 
     /// A finished job whose notes went to Notion and left no local file is
     /// still the last finished one, from the queue and from the history, and
-    /// "Open Last Notes" opens its page. With a file, the page wins only while
+    /// the menu's "Open in Notion" opens its page. With a file, the page wins only while
     /// Notion export is on. A page whose export has not completed counts for
     /// nothing, so a partial page is never opened.
     func testTheLastFinishedJobCarriesItsCompletedNotionPage() throws {
@@ -350,7 +350,7 @@ final class TranscriptionListTests: XCTestCase {
 
     /// Right after it finished, after the queue dropped it a minute later, and
     /// after a restart that reads the history from disk, the finished job is
-    /// the one "Open Last Notes" opens.
+    /// the one the menu's last recording opens.
     @MainActor
     func testTheLastFinishedJobOutlivesTheQueueAndARestart() throws {
         let path = try makeTempDirectory(prefix: "last_finished").appendingPathComponent("terminal_jobs.json")

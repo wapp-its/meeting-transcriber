@@ -158,9 +158,9 @@ final class MenuBarViewTests: XCTestCase {
         return job
     }
 
-    /// "Open Last Notes" follows the finished-job history rather than the
-    /// status file, so it is there for a job that has left the queue or
-    /// finished before a restart, and it opens that job's protocol.
+    /// The last recording's open item follows the finished-job history rather
+    /// than the status file, so it is there for a job that has left the queue
+    /// or finished before a restart, and it opens that job's protocol.
     func testOpenLastNotesOpensTheLastFinishedJobsProtocol() throws {
         let finished = finishedJob(.done, protocolPath: "/tmp/Retro.md", transcriptPath: "/tmp/Retro.txt")
         var openedURL: URL?
@@ -173,6 +173,26 @@ final class MenuBarViewTests: XCTestCase {
         try body.find(viewWithAccessibilityIdentifier: A11yID.openLastNotesMenuItem).button().tap()
 
         XCTAssertEqual(openedURL, URL(fileURLWithPath: "/tmp/Retro.md"))
+    }
+
+    /// The last recording's name and details lines are text, like the meeting
+    /// lines at the top of the menu: no button or submenu holds them and no
+    /// button is titled with them, so choosing them does nothing.
+    func testTheLastRecordingNameAndDetailsLinesAreNotActions() throws {
+        let finished = finishedJob(.done, protocolPath: "/tmp/Retro.md", transcriptPath: nil)
+        let body = try makeView(status: makeStatus(state: .idle), history: [TerminalJobRecord(job: finished)]).inspect()
+
+        let name = try body.find(text: "Retro")
+        let details = try body.find(ViewType.Text.self) { try $0.string().hasPrefix("Zoom · ") }
+        let buttonTexts = body.findAll(ViewType.Button.self).flatMap { button in
+            button.findAll(ViewType.Text.self).compactMap { try? $0.string() }
+        }
+        for line in [name, details] {
+            let text = try line.string()
+            XCTAssertThrowsError(try line.find(ViewType.Button.self, relation: .parent), text)
+            XCTAssertThrowsError(try line.find(ViewType.Menu.self, relation: .parent), text)
+            XCTAssertFalse(buttonTexts.contains(text), text)
+        }
     }
 
     /// No finished job, no item: a failed job does not count.
@@ -199,7 +219,7 @@ final class MenuBarViewTests: XCTestCase {
         queue.updateJobState(id: job.id, to: .done)
 
         let sut = try makeView(status: makeStatus(), pipelineQueue: queue)
-        XCTAssertNoThrow(try sut.inspect().find(button: "Open Last Notes"))
+        XCTAssertNoThrow(try sut.inspect().find(button: "Open Notes"))
     }
 
     private func notionExportedJob(title: String, mix: String, pageID: String, completed: Bool) -> PipelineJob {
@@ -232,7 +252,7 @@ final class MenuBarViewTests: XCTestCase {
             onQuit: { quitCalled = true },
             notionExportEnabled: true,
         )
-        try sut.inspect().find(button: "Open Last Notes in Notion").tap()
+        try sut.inspect().find(button: "Open in Notion").tap()
 
         XCTAssertEqual(openedURL, URL(string: "https://www.notion.so/page-1"))
         XCTAssertFalse(quitCalled)
@@ -253,7 +273,7 @@ final class MenuBarViewTests: XCTestCase {
             onQuit: { quitCalled = true },
             notionExportEnabled: true,
         )
-        let displayedButton = try sut.inspect().find(button: "Open Last Notes in Notion")
+        let displayedButton = try sut.inspect().find(button: "Open in Notion")
 
         queue.removeJob(id: displayedJob.id)
         let newerJob = notionExportedJob(title: "Second", mix: "/tmp/second.wav", pageID: "page-2", completed: false)
