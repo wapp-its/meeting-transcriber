@@ -85,6 +85,7 @@ final class ProtocolTemplatesOpeningTests: XCTestCase {
         XCTAssertNil(model.notice)
     }
 
+    /// The red line stays until a Show in Finder works.
     func testAShowInFinderThatFailsShowsTheErrorInRed() throws {
         let fixture = try ProtocolTemplatesFixture(self, templates: ["Board"])
         let error = CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: fixture.store.fileURL(named: "Board").path])
@@ -94,6 +95,11 @@ final class ProtocolTemplatesOpeningTests: XCTestCase {
         model.showInFinder("Board")
 
         XCTAssertEqual(model.notice, .error(error.localizedDescription))
+
+        fixture.apps.revealError = nil
+        model.showInFinder("Board")
+
+        XCTAssertNil(model.notice)
     }
 
     /// The app chosen under Open With fails: the file is shown in Finder with

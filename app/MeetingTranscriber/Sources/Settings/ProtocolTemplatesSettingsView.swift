@@ -209,6 +209,7 @@ final class ProtocolTemplatesModel {
     func showInFinder(_ name: String) {
         do {
             try opener.reveal(store.fileURL(named: name))
+            notice = nil
         } catch {
             notice = .error(error.localizedDescription)
         }
