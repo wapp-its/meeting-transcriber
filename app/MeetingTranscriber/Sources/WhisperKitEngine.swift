@@ -121,7 +121,11 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
     ) async throws {
         modelState = .loading
         downloadProgress = 1.0
-        pipe = try await source.makePipe(variant, folder)
+        let loaded = try await source.makePipe(variant, folder)
+        // File transcription asks for word timestamps, which WhisperKit aligns
+        // one prompt length off when the vocabulary prompt is on.
+        loaded.segmentSeeker = PromptAlignedSegmentSeeker()
+        pipe = loaded
         modelState = .loaded
 
         // A model change that landed mid-load set `modelVariant` but saw a nil
@@ -347,9 +351,15 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
 
         // Snapshot all settings-derived decoding options before the asynchronous
         // decode starts. A later settings change only affects a subsequent run.
+        // Word timestamps move each segment's start and end to its first and last
+        // word: with segment-level times, a 30-second window that begins in
+        // silence (the other side's turn on a two-track recording) stamps its
+        // first turn at the window start, up to 30 s before it is spoken. A model
+        // without alignment data keeps segment-level times.
         let options = Self.decodingOptions(
             language: language,
             promptTokens: vocabularyPromptTokens(for: decodingClient),
+            wordTimestamps: true,
         )
 
         let results = await decodingClient.transcribeFile(
@@ -395,13 +405,19 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
 
     // Build the WhisperKit `DecodingOptions` for a transcription run.
     // `language` is `nil` for "Auto-detect" and a BCP-47 code otherwise.
-    static func decodingOptions(language: String?, promptTokens: [Int]? = nil) -> DecodingOptions { // swiftlint:disable:this discouraged_optional_collection
+    // `wordTimestamps` is on for file transcription only; live captions return
+    // text without times.
+    static func decodingOptions(
+        language: String?,
+        promptTokens: [Int]? = nil, // swiftlint:disable:this discouraged_optional_collection
+        wordTimestamps: Bool = false,
+    ) -> DecodingOptions {
         // WhisperKit defaults `detectLanguage` to `!usePrefillPrompt` (= false),
         // so without this it skips detection and falls back to English (#339).
         DecodingOptions(
             language: language,
             detectLanguage: language == nil,
-            wordTimestamps: false,
+            wordTimestamps: wordTimestamps,
             promptTokens: promptTokens,
         )
     }

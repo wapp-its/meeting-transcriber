@@ -1,0 +1,274 @@
+{
+  "branch_name": "gh-213-turns-in-two-track-transcripts-start",
+  "completion_review_status": "needs_work",
+  "completion_reviewed_at": "2026-11-12T22:35:25.247392Z",
+  "created_at": "2026-11-12T15:45:28.389627Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-213-turns-in-two-track-transcripts-start",
+  "impl_review_rounds": {
+    "gh-213-turns-in-two-track-transcripts-start.1": 0
+  },
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 1,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-11-12T15:52:36.119965Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "32c5c56d5c8a3c4246b96c2595fd9f9b63add68d0dc6b87f4e31781ba6edba7a",
+      "backend": "codex",
+      "base_sha": "98c2184df41e0a17ea5ee06485767022de497f22",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "2aa65e3c9a1c8011dc3a5eb3a1102e34f442bd41",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 429397,
+      "output_sha256": "46a45c8e37443a0ba1611209d4503f8aafe9869932b3843d80b1908b249039dd",
+      "reservation_id": "6bd3b5cbd03d4e2387e73936f3a70925",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-12T15:52:36.085418Z",
+      "tool_calls": 38,
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "206a272f1c626f10406f831888dc5198cfe669fa68e2e9db8088e658266a050c",
+      "backend": "codex",
+      "base_sha": "30db0ebe311d5d7ae4734c0c11e09cad8a07a499",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-23953e960da5f0c7a34a6ed66e4e493d",
+            "classification": "introduced",
+            "findingId": "finding-23953e960da5f0c7a34a6ed66e4e493d",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "d0a3d147a6841ef4f2a0a5abed0eb5d8a38b3d97",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1338,
+      "output_sha256": "fa056fbf3f0eb74ff3999ce00314d1fa8df1a5307cf0eda28b5d7b1f53ea047e",
+      "reservation_id": "e0f805d263d94f7ca90455eaab8ac6f8",
+      "round_consumed": true,
+      "scope": "impl:gh-213-turns-in-two-track-transcripts-start.1",
+      "superseded_by": null,
+      "task": "gh-213-turns-in-two-track-transcripts-start.1",
+      "timestamp": "2026-11-12T16:48:39.870841Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "22d2e24fded2d3c70ace7916ae2eaad13c5e4473048d3111fc402dd3d84a29d3",
+      "backend": "codex",
+      "base_sha": "30db0ebe311d5d7ae4734c0c11e09cad8a07a499",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-c664fdb5e0cc13716f493b61a0354389",
+            "classification": "introduced",
+            "findingId": "finding-c664fdb5e0cc13716f493b61a0354389",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-23953e960da5f0c7a34a6ed66e4e493d",
+            "classification": "introduced",
+            "findingId": "finding-23953e960da5f0c7a34a6ed66e4e493d",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "263adc7c712457139ed17d9987037e494905fddd",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 2094,
+      "output_sha256": "7a972590b0b96f446ec17a32291bc1a55baed115e5c41caf89fb5903287c9404",
+      "reservation_id": "56f6ca9379e34012b5df01fd67d76dd5",
+      "round_consumed": true,
+      "scope": "impl:gh-213-turns-in-two-track-transcripts-start.1",
+      "superseded_by": null,
+      "task": "gh-213-turns-in-two-track-transcripts-start.1",
+      "timestamp": "2026-11-12T17:01:02.013307Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "c367266a8f18b5ab333584fde5173b081baf1dfba895acbd6e2fb99eb32d5ca0",
+      "backend": "codex",
+      "base_sha": "30db0ebe311d5d7ae4734c0c11e09cad8a07a499",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-c664fdb5e0cc13716f493b61a0354389",
+            "classification": "introduced",
+            "findingId": "finding-c664fdb5e0cc13716f493b61a0354389",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-23953e960da5f0c7a34a6ed66e4e493d",
+            "classification": "introduced",
+            "findingId": "finding-23953e960da5f0c7a34a6ed66e4e493d",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "34928d7c5c9fdbaf55c238169b28571805ca0cb0",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1447,
+      "output_sha256": "bbd76d5913a10ef5918d774d9443d2d321bd731c98445ad3a06a4d4b76874d82",
+      "reservation_id": "69b5e0f37e404beb9ca5630af2f18f9c",
+      "round_consumed": true,
+      "scope": "impl:gh-213-turns-in-two-track-transcripts-start.1",
+      "superseded_by": null,
+      "task": "gh-213-turns-in-two-track-transcripts-start.1",
+      "timestamp": "2026-11-12T20:55:04.686666Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "6888328ea5ceefc30bd6271683b86220fd7b245207a06534283bd89802ed1298",
+      "backend": "codex",
+      "base_sha": "98c2184df41e0a17ea5ee06485767022de497f22",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-11b234dceb44a547c98af6f756b6a915",
+            "classification": "introduced",
+            "findingId": "finding-11b234dceb44a547c98af6f756b6a915",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "14b896078344e764f9562cfd34144b4936b24ac4",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 260584,
+      "output_sha256": "fba30630febd4604177caeb86afbf3ef69d78ff59d53888108485d2185214ed9",
+      "reservation_id": "be4a946f93ab447789caaf94c8e6c4c0",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-12T22:35:25.206048Z",
+      "tool_calls": 18,
+      "verdict": "NEEDS_WORK"
+    }
+  ],
+  "review_hash_epoch": {
+    "impl:gh-213-turns-in-two-track-transcripts-start.1": 1,
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_phase_leases": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-213-turns-in-two-track-transcripts-start.1": 0,
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-213-turns-in-two-track-transcripts-start.md",
+  "status": "open",
+  "title": "Turns in two-track transcripts start when they are spoken",
+  "tracker": {
+    "baseHashFlow": "98d814fd03598b9ebfbcfe65b400ca5c95160360b2b8b1fa5f57b942a398cccf",
+    "baseHashTracker": "5a466285472a8db79aa03587a2f796cc93d95a69f33eedb8a74a8254127035f5",
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABerHdRw",
+    "identifier": "#213",
+    "lastSyncedAt": "2026-11-12T15:45:51.565244Z",
+    "linkState": "linked",
+    "mergeBaseFlow": "# Turns in two-track transcripts start when they are spoken\n\n## Conversation Evidence\n\n> user (turn 2, paraphrased): on the transcript review page the timestamps and the text do not match the audio; the same bug once existed in another of the owner's tools and was fixed there; can it be fixed here too?\n> user (turn 3, paraphrased): only the start was checked: segment 2 carries the text of segment 1, segment 3 has text that does not match what is said, segment 9 roughly fits again, it gets better towards the end, speakers are mostly right; seen on a two-track recording.\n> user (turn 3, selected): \"A: App schreibt Segmentdatei (Empfohlen)\"\n\n## Goal & Context\n\n<!-- Source: 20% user [paraphrase] / 65% measured in the session / 15% [inferred] -->\n\nA two-track recording (call audio and microphone) is transcribed one track at a time. On each track, the other side's turns are silence. With segment-level timestamps only, WhisperKit starts a segment that follows a long silence where the previous segment ended, or at the start of its 30-second window, up to about 30 s before the words are spoken. After both tracks are merged, such a turn is stamped too early and sorts before the other speaker's turn, so the transcript text at a time is not what was said then. The owner saw this on a real recording when listening segment by segment [paraphrase].\n\nWhat was measured (no meeting content was read; real-audio checks compared timings only):\n\n- Synthetic two-track meeting (11 German turns from macOS `say`, 129 s, each track silent while the other speaks), per track, today's decoding options: 8 of 11 turn starts more than 2 s early with the Swiss German fine-tune `spert/flix-swissgerman-whisperkit` (8-bit), worst 19.9 s early; with the stock `openai_whisper-small`, for example a turn spoken at 95.0 s is placed at 67.4 s and one at 39.1 s at 20.0 s.\n- The same tracks with word timestamps requested: every turn starts within 0.4 to 2.0 s of the truth (fine-tune) and within 0.5 s (stock small).\n- A real 27-minute two-track recording: matching each exported line's words against a re-run with good timing put 59 of 80 lines within 3 s and 10 lines more than 10 s off (one 14 s early, one 20 s late).\n- Word timestamps cost no measurable time: 296 s against 307 s for the 27-minute mix with the fine-tune.\n- Ruled out as causes: a constant shift or drift of the whole timeline, decoder looping (WhisperKit resets the decoder context per window), the review page's playback, and the VAD trim (off in the affected install).\n\n## Architecture & Data Models\n\n- File transcription (recorded tracks, imported files, the mix of a single-source recording) builds WhisperKit decoding options from the language setting and the optional vocabulary prompt and transcribes the whole file. The dual-track path then shifts microphone segments by the recorder's measured delay, merges both tracks, assigns speakers from diarization, and the text export writes each turn's start.\n- With word timestamps requested, WhisperKit aligns words from the decoder's cross-attention, moves each segment's start and end to its first and last word, and advances its seek point from the last word (WhisperKit 1.1.1 behaviour) [inferred].\n- Live captions take a separate path that transcribes short sample buffers and returns joined text without timestamps.\n\n## API Contracts\n\n- Decoding options for file transcription: word timestamps on; language, language detection and prompt tokens as today.\n- Decoding options for live captions: unchanged.\n- The transcript segment shape (start and end in seconds, text, speaker) is unchanged; segments with empty text are still dropped.\n\n## Edge Cases & Constraints\n\n- A model that yields no word timings (no alignment data) keeps segment-level times; transcription must not fail because of it [inferred].\n- Word alignment can produce a segment without text over a silence; it must not reach the transcript [inferred].\n- Long recordings: no slowdown beyond measurement noise was seen on 27 minutes; a clearly slower run on long audio is a regression [inferred].\n- Parakeet takes its timings from its own token timings and is not affected.\n\n## Acceptance Criteria\n\n- **R1:** In a file transcribed with WhisperKit, a speech turn that follows at least 10 s of silence on its track starts in the transcript within 2 s of when it is spoken (today it can start up to about 30 s early). Errors: no error surface beyond the existing transcription errors. [paraphrase]\n- **R2:** File transcription requests word timestamps, and each transcript segment's start and end come from its first and last word whenever word timings exist. Errors: when the model returns no word timings, segments keep their segment-level times and the transcription completes without an error. [inferred]\n- **R3:** Live captions keep their current decoding options, without word timestamps. Errors: no error surface beyond R2. [inferred]\n- **R4:** A segment that has no text after word alignment does not appear in the transcript. Errors: no error surface beyond R2. [inferred]\n- **R5:** A regression test runs a synthetic track with a speech turn after a long silence through the WhisperKit engine's file path with the test suite's small stock model and asserts the R1 bound; it fails on the base by the start error. A pure test pins the file-versus-live decoding options. Errors: no error surface beyond R1. [inferred]\n- **R6:** The transcription architecture doc states in one line that file transcription uses word timings and why (silence on a single track pulls segment starts early). Errors: none. [inferred]\n\n## Boundaries\n\n- No machine-readable segment file next to the transcript text in this spec; the owner picked that route before the cause was known, and it is a separate follow-up [paraphrase].\n- Parakeet, diarization, the dual-track merge, the text export format and the VAD setting stay as they are [inferred].\n- Bracketed hallucinations over silence (such as \"[Musik]\") are not this spec [inferred].\n\n## Decision Context\n\n- **D1 \u00b7 Fix the text-versus-audio mismatch in the app.** why: the owner asked whether it can be fixed here as it was in another tool (paraphrased) \u00b7 status: active [owner-stated 2026-11-12]\n- **A1 \u00b7 Request word timestamps for file transcription instead of chunking or trimming silence.** flip at: the file-transcription decoding options \u00b7 test: the R5 regression test \u00b7 alternatives: WhisperKit's VAD chunking (measured: 8 of 11 synthetic turns still more than 2 s early), the app's VAD trim (not measured per track), segment-level times as today \u00b7 status: active [agent-inferred 2026-11-12]\n",
+    "mergeBaseTracker": "# Turns in two-track transcripts start when they are spoken\n\n## Conversation Evidence\n\n> user (turn 2, paraphrased): on the transcript review page the timestamps and the text do not match the audio; the same bug once existed in another of the owner's tools and was fixed there; can it be fixed here too?\n> user (turn 3, paraphrased): only the start was checked: segment 2 carries the text of segment 1, segment 3 has text that does not match what is said, segment 9 roughly fits again, it gets better towards the end, speakers are mostly right; seen on a two-track recording.\n> user (turn 3, selected): \"A: App schreibt Segmentdatei (Empfohlen)\"\n\n## Goal & Context\n\n<!-- Source: 20% user [paraphrase] / 65% measured in the session / 15% [inferred] -->\n\nA two-track recording (call audio and microphone) is transcribed one track at a time. On each track, the other side's turns are silence. With segment-level timestamps only, WhisperKit starts a segment that follows a long silence where the previous segment ended, or at the start of its 30-second window, up to about 30 s before the words are spoken. After both tracks are merged, such a turn is stamped too early and sorts before the other speaker's turn, so the transcript text at a time is not what was said then. The owner saw this on a real recording when listening segment by segment [paraphrase].\n\nWhat was measured (no meeting content was read; real-audio checks compared timings only):\n\n- Synthetic two-track meeting (11 German turns from macOS `say`, 129 s, each track silent while the other speaks), per track, today's decoding options: 8 of 11 turn starts more than 2 s early with the Swiss German fine-tune `spert/flix-swissgerman-whisperkit` (8-bit), worst 19.9 s early; with the stock `openai_whisper-small`, for example a turn spoken at 95.0 s is placed at 67.4 s and one at 39.1 s at 20.0 s.\n- The same tracks with word timestamps requested: every turn starts within 0.4 to 2.0 s of the truth (fine-tune) and within 0.5 s (stock small).\n- A real 27-minute two-track recording: matching each exported line's words against a re-run with good timing put 59 of 80 lines within 3 s and 10 lines more than 10 s off (one 14 s early, one 20 s late).\n- Word timestamps cost no measurable time: 296 s against 307 s for the 27-minute mix with the fine-tune.\n- Ruled out as causes: a constant shift or drift of the whole timeline, decoder looping (WhisperKit resets the decoder context per window), the review page's playback, and the VAD trim (off in the affected install).\n\n## Architecture & Data Models\n\n- File transcription (recorded tracks, imported files, the mix of a single-source recording) builds WhisperKit decoding options from the language setting and the optional vocabulary prompt and transcribes the whole file. The dual-track path then shifts microphone segments by the recorder's measured delay, merges both tracks, assigns speakers from diarization, and the text export writes each turn's start.\n- With word timestamps requested, WhisperKit aligns words from the decoder's cross-attention, moves each segment's start and end to its first and last word, and advances its seek point from the last word (WhisperKit 1.1.1 behaviour) [inferred].\n- Live captions take a separate path that transcribes short sample buffers and returns joined text without timestamps.\n\n## API Contracts\n\n- Decoding options for file transcription: word timestamps on; language, language detection and prompt tokens as today.\n- Decoding options for live captions: unchanged.\n- The transcript segment shape (start and end in seconds, text, speaker) is unchanged; segments with empty text are still dropped.\n\n## Edge Cases & Constraints\n\n- A model that yields no word timings (no alignment data) keeps segment-level times; transcription must not fail because of it [inferred].\n- Word alignment can produce a segment without text over a silence; it must not reach the transcript [inferred].\n- Long recordings: no slowdown beyond measurement noise was seen on 27 minutes; a clearly slower run on long audio is a regression [inferred].\n- Parakeet takes its timings from its own token timings and is not affected.\n\n## Acceptance Criteria\n\n- **R1:** In a file transcribed with WhisperKit, a speech turn that follows at least 10 s of silence on its track starts in the transcript within 2 s of when it is spoken (today it can start up to about 30 s early). Errors: no error surface beyond the existing transcription errors. [paraphrase]\n- **R2:** File transcription requests word timestamps, and each transcript segment's start and end come from its first and last word whenever word timings exist. Errors: when the model returns no word timings, segments keep their segment-level times and the transcription completes without an error. [inferred]\n- **R3:** Live captions keep their current decoding options, without word timestamps. Errors: no error surface beyond R2. [inferred]\n- **R4:** A segment that has no text after word alignment does not appear in the transcript. Errors: no error surface beyond R2. [inferred]\n- **R5:** A regression test runs a synthetic track with a speech turn after a long silence through the WhisperKit engine's file path with the test suite's small stock model and asserts the R1 bound; it fails on the base by the start error. A pure test pins the file-versus-live decoding options. Errors: no error surface beyond R1. [inferred]\n- **R6:** The transcription architecture doc states in one line that file transcription uses word timings and why (silence on a single track pulls segment starts early). Errors: none. [inferred]\n\n## Boundaries\n\n- No machine-readable segment file next to the transcript text in this spec; the owner picked that route before the cause was known, and it is a separate follow-up [paraphrase].\n- Parakeet, diarization, the dual-track merge, the text export format and the VAD setting stay as they are [inferred].\n- Bracketed hallucinations over silence (such as \"[Musik]\") are not this spec [inferred].\n\n## Decision Context\n\n- **D1 \u00b7 Fix the text-versus-audio mismatch in the app.** why: the owner asked whether it can be fixed here as it was in another tool (paraphrased) \u00b7 status: active [owner-stated 2026-11-12]\n- **A1 \u00b7 Request word timestamps for file transcription instead of chunking or trimming silence.** flip at: the file-transcription decoding options \u00b7 test: the R5 regression test \u00b7 alternatives: WhisperKit's VAD chunking (measured: 8 of 11 synthetic turns still more than 2 s early), the app's VAD trim (not measured per track), segment-level times as today \u00b7 status: active [agent-inferred 2026-11-12]",
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/213"
+  },
+  "updated_at": "2026-11-12T22:35:25.252065Z"
+}
