@@ -10,7 +10,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-196-run-summary-clis-without-the-users",
   "spec_path": ".flow/tasks/gh-196-run-summary-clis-without-the-users.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement Run summary CLIs without the user's agent setup",
   "updated_at": "2026-11-12T15:05:27.967357Z"
 }

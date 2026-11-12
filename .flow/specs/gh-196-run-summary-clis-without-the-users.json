@@ -306,7 +306,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-196-run-summary-clis-without-the-users.md",
-  "status": "open",
+  "status": "done",
   "title": "Run summary CLIs without the user's agent setup",
   "tracker": {
     "baseHashFlow": "e74a18293e336146216715408f138ceb55d92deb3816491f541a92dfcefa3dce",
@@ -320,5 +320,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nThe app can write a protocol with the Claude CLI or the Codex CLI preset. That CLI then starts with the user's own setup for the tool. This includes their MCP servers and connectors, tools (also shell commands), hooks, plugins, global instructions and telemetry. The transcript is untrusted input, so these tools should not be in reach. The extra setup also costs input tokens on every summary.\n\n## TASKS\n\n- [ ] Start both CLIs without the user's setup, with the same login and model\n- [ ] Keep the custom command provider as it is",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/196"
   },
-  "updated_at": "2026-11-12T20:51:54.472876Z"
+  "updated_at": "2026-11-12T20:55:41.355209Z"
 }
