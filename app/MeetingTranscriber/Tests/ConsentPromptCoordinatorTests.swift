@@ -147,8 +147,7 @@ final class ConsentPromptCoordinatorTests: XCTestCase {
     func testResolveByIdReportsWhetherThePromptWasWaiting() async {
         let coord = ConsentPromptCoordinator(timeout: 60, sleep: neverSleep)
         XCTAssertFalse(coord.resolve(id: "a", answer: .granted), "an id that was never parked")
-        let task = Task { await coord.awaitDecision(id: "a") {} }
-        await yieldUntilParked()
+        let task = await parkedDecision(coord, id: "a")
         XCTAssertTrue(coord.resolve(id: "a", answer: .granted), "a waiting id")
         XCTAssertFalse(coord.resolve(id: "a", answer: .declined), "an id already resolved")
         let result = await task.value
