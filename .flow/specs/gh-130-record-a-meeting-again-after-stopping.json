@@ -11,9 +11,78 @@
   "impl_review_rounds": {},
   "next_task": 1,
   "no_plan": true,
-  "plan_review_rounds": 0,
-  "plan_review_status": "unknown",
-  "plan_reviewed_at": null,
+  "plan_review_rounds": 1,
+  "plan_review_status": "needs_work",
+  "plan_reviewed_at": "2026-11-12T20:52:35.207923Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "6c16b1ec8ad8f2da7ca52fc96e532d1c207c264df1241a0d4764df6a0930796e",
+      "backend": "codex",
+      "base_sha": "4f3818b4cee0eabc6682b4ac743ae66ae99d533a",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-9ba6c3be9ea332a1d088eb0f1620680e",
+            "classification": "introduced",
+            "findingId": "finding-9ba6c3be9ea332a1d088eb0f1620680e",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-2f95c2356e173770bfdf6b9f1755b925",
+            "classification": "introduced",
+            "findingId": "finding-2f95c2356e173770bfdf6b9f1755b925",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-6a59040511e5e70e17b8d71fcd6be2f7",
+            "classification": "introduced",
+            "findingId": "finding-6a59040511e5e70e17b8d71fcd6be2f7",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "898296f633d492579833e7af5446ec546f0a3b6f",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 357589,
+      "output_sha256": "ab7c14e0d7f011b8c8d8d13acc014c1cfc6011a7f73ef5576a1ee5e40f074f9d",
+      "reservation_id": "4173410168bb4e86a7b4422f9679e63e",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-12T20:52:34.681776Z",
+      "tool_calls": 28,
+      "verdict": "NEEDS_WORK"
+    }
+  ],
+  "review_hash_epoch": {},
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
   "spec_path": ".flow/specs/gh-130-record-a-meeting-again-after-stopping.md",
   "status": "open",
   "title": "Record a meeting again after stopping it by hand",
@@ -29,5 +98,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/130"
   },
-  "updated_at": "2026-11-12T20:43:46.651273Z"
+  "updated_at": "2026-11-12T20:57:23.040014Z"
 }
