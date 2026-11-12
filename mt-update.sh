@@ -75,9 +75,11 @@ fail() {
 # einer App gestartet wird, deren PATH ~/.local/bin nicht enthält. Nur die
 # installierte Kopie heißt mt-update; mt-update.sh im Checkout des Branches tools
 # überschreibt sich nie selbst, sonst gingen ungespeicherte Änderungen verloren.
+# Die Prüfung (--check) ändert nichts, auch dieses Skript nicht: die App startet
+# sie von sich aus, und das nächste mt-update ohne --check holt die neue Fassung.
 self="$(cd "$(dirname "$0")" 2>/dev/null && pwd)/$(basename "$0")"
 if [ "$(basename "$self")" = "mt-update" ] && [ -f "$self" ] && [ -w "$self" ] \
-    && [ -z "${MT_NO_SELF_UPDATE:-}" ]; then
+    && [ -z "${MT_NO_SELF_UPDATE:-}" ] && ! $CHECK_ONLY; then
     tmp="$(mktemp)"
     if curl -fsSL "$TOOLS_RAW" -o "$tmp" 2>/dev/null && ! cmp -s "$tmp" "$self"; then
         install -m 755 "$tmp" "$self"

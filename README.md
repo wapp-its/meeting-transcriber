@@ -32,8 +32,9 @@ Läuft gerade eine Aufnahme oder ein Transkriptions-Job, wartet `mt-update` nach
 dem Bauen, bis die App frei ist (höchstens 3 h), und ersetzt sie erst dann.
 Offene Sprecher-Benennungen blockieren nicht, sie erscheinen nach dem Neustart
 wieder. `MT_NO_WAIT=1 mt-update` bricht stattdessen ab.
-Das Skript aktualisiert sich bei jedem Lauf selbst von diesem Branch, sofern die
-Datei `mt-update` heißt (die Kopie `mt-update.sh` im Checkout nie).
+Das Skript aktualisiert sich bei jedem Lauf außer `--check` selbst von diesem
+Branch, sofern die Datei `mt-update` heißt (die Kopie `mt-update.sh` im Checkout
+nie).
 
 Test der Prüfung (ohne Netz, mit lokalen Repos in einem Temp-Ordner; baut und
 installiert nichts): `bash test-mt-update.sh`
