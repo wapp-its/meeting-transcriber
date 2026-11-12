@@ -34,6 +34,10 @@
         var maxOutputBytes = CLIProcessRunner.defaultMaxStdoutBytes
 
         static let codexUpdateHint = "This Codex CLI does not know an option the app needs (such as --ephemeral). Update Codex."
+        /// What Codex prints on stderr when it stops before the run because
+        /// it does not know an option (`--ephemeral`) or a feature
+        /// (`--disable plugins`) the preset passes.
+        private static let codexTooOldWordings = ["unexpected argument", "Unknown feature flag"]
         private static let maxReasonLength = 300
 
         /// The Codex CLI preset. `--ephemeral` keeps the run out of Codex's
@@ -271,9 +275,9 @@
 
         /// Codex's own reason for a failed run, read from its `--json`
         /// events: the message of the last `turn.failed` event, else of the
-        /// last `error` event; else, for a Codex too old for an option the
-        /// preset passes, `codexUpdateHint`. Capped in length; nil when
-        /// nothing matches.
+        /// last `error` event; else, for a Codex too old for an option or a
+        /// feature the preset passes, `codexUpdateHint`. Capped in length;
+        /// nil when nothing matches.
         static func codexFailureReason(_ output: CLIProcessRunner.Output) -> String? {
             var turnFailure: String?
             var errorEvent: String?
@@ -291,7 +295,8 @@
                 }
             }
             let stderr = lossyText(output.stderr)
-            let reason = turnFailure ?? errorEvent ?? (stderr.contains("unexpected argument") ? codexUpdateHint : nil)
+            let tooOld = codexTooOldWordings.contains { stderr.contains($0) }
+            let reason = turnFailure ?? errorEvent ?? (tooOld ? codexUpdateHint : nil)
             return reason.map { String($0.prefix(maxReasonLength)) }
         }
 
