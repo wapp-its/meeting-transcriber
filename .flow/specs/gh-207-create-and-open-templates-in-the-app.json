@@ -11,9 +11,78 @@
   "impl_review_rounds": {},
   "next_task": 1,
   "no_plan": true,
-  "plan_review_rounds": 0,
-  "plan_review_status": "unknown",
-  "plan_reviewed_at": null,
+  "plan_review_rounds": 1,
+  "plan_review_status": "needs_work",
+  "plan_reviewed_at": "2026-11-12T14:58:28.358361Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "f561e66669cf9017d62f60e4fb3bce05d38c5e0e43248b56f7395b62d5430711",
+      "backend": "codex",
+      "base_sha": "98c2184df41e0a17ea5ee06485767022de497f22",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-c3c09d4aaac897c5fb2119c473302462",
+            "classification": "introduced",
+            "findingId": "finding-c3c09d4aaac897c5fb2119c473302462",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-b17eea86b8490d1b0b68cd00c09e898e",
+            "classification": "introduced",
+            "findingId": "finding-b17eea86b8490d1b0b68cd00c09e898e",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-05ed76f528c474458abf6c211a359696",
+            "classification": "introduced",
+            "findingId": "finding-05ed76f528c474458abf6c211a359696",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "ec446a9d76e00723dc0a208989351b2296ff5936",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 387617,
+      "output_sha256": "9b4a7413886fe3b0555731e19d854631a517b4880da849189a66221a58a8c155",
+      "reservation_id": "2ed6b06775c14fb39d89505fa0be4346",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-12T14:58:28.254250Z",
+      "tool_calls": 25,
+      "verdict": "NEEDS_WORK"
+    }
+  ],
+  "review_hash_epoch": {},
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
   "spec_path": ".flow/specs/gh-207-create-and-open-templates-in-the-app.md",
   "status": "open",
   "title": "Create and open templates in the app you choose",
@@ -29,5 +98,5 @@
     "mergeBaseTracker": "Creating a meeting-notes template uses a name field inside the settings list that is easy to miss, and Edit always opens the template in the Mac's default app for Markdown files, which may not be the editor you want.\n\nProposed:\n\n- A \"New Template\u2026\" button asks for the name in a small window and says what happens next.\n- Each template's Edit button opens it in the app you chose last; its menu offers Open With (any app that opens Markdown, or another app) and Show in Finder. The app remembers the choice.\n- No editor inside the app: templates stay Markdown files you edit in the app of your choice.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/207"
   },
-  "updated_at": "2026-11-12T14:47:01.693152Z"
+  "updated_at": "2026-11-12T15:01:40.898197Z"
 }
