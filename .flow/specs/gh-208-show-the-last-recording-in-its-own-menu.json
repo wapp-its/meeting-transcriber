@@ -8,7 +8,9 @@
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-208-show-the-last-recording-in-its-own-menu",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-208-show-the-last-recording-in-its-own-menu.1": 0
+  },
   "next_task": 1,
   "no_plan": true,
   "plan_review_rounds": 0,
@@ -60,15 +62,53 @@
       "timestamp": "2026-11-12T09:47:10.583978Z",
       "tool_calls": 20,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "cf2e381bebce3adbbfeed4a357c0b677e8724814871329b850f4f39325d51f18",
+      "backend": "codex",
+      "base_sha": "74983b18761ef680a38d3a4070e4b0be62aad574",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "44fb3335d5f7a515be7f4d3b8bd56e3da5c6ca8d",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "1fc2e99ab0744fe2b4d2d7a0b0d79151",
+      "round_consumed": true,
+      "scope": "impl:gh-208-show-the-last-recording-in-its-own-menu.1",
+      "superseded_by": null,
+      "task": "gh-208-show-the-last-recording-in-its-own-menu.1",
+      "timestamp": "2026-11-12T11:55:30.626715Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-208-show-the-last-recording-in-its-own-menu.1": 1,
     "plan": 1,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-208-show-the-last-recording-in-its-own-menu.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-208-show-the-last-recording-in-its-own-menu.md",
@@ -86,5 +126,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/208"
   },
-  "updated_at": "2026-11-12T09:50:54.450247Z"
+  "updated_at": "2026-11-12T11:55:37.368664Z"
 }
