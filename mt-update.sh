@@ -13,6 +13,13 @@
 #
 # Aufruf:  mt-update            bauen + (wenn frei) installieren + starten
 #          mt-update --check    nur zeigen, was sich seit dem letzten Build geändert hat
+#          mt-update --check --porcelain
+#                               dasselbe für die App (Update-Prüfung): auf stdout nur
+#                               format=mt-update-porcelain/1, status=up-to-date|update-available
+#                               und bei einem Update summary=<höchstens 80 Zeichen>; Exit 0 =
+#                               aktuell, 10 = Update verfügbar, alles andere = Prüfung
+#                               fehlgeschlagen. Text für Menschen geht dann nach stderr.
+#                               Test: bash test-mt-update.sh
 #
 # Anpassbar per Umgebung: MT_DIR (Checkout), MT_APP_DIR (Zielordner),
 # MT_NO_LAUNCH=1 (App danach nicht starten), MT_BRANCHES (Liste statt branches.txt),
@@ -37,10 +44,30 @@ MT_DATA_DIR="${MT_DATA_DIR:-$HOME/Library/Application Support/MeetingTranscriber
 MT_WAIT_MAX="${MT_WAIT_MAX:-10800}"
 
 CHECK_ONLY=false
-[ "${1:-}" = "--check" ] && CHECK_ONLY=true
+PORCELAIN=false
+for arg in "$@"; do
+    case "$arg" in
+        --check) CHECK_ONLY=true ;;
+        --porcelain) PORCELAIN=true ;;
+        *) printf '✗ Unbekanntes Argument: %s (erlaubt: --check, --check --porcelain)\n' "$arg" >&2; exit 1 ;;
+    esac
+done
+# --porcelain allein wäre sonst ein voller Lauf mit Bauen und Installieren.
+if $PORCELAIN && ! $CHECK_ONLY; then
+    printf '✗ --porcelain geht nur zusammen mit --check\n' >&2; exit 1
+fi
 
-say() { printf '\033[1m%s\033[0m\n' "$*"; }
-fail() { printf '\033[31m✗ %s\033[0m\n' "$1" >&2; exit "${2:-1}"; }
+# Im Porcelain-Modus gehört stdout den key=value-Zeilen; Text für Menschen geht
+# nach stderr. Farben nur, wenn die Ausgabe ein Terminal ist (nicht im Log der App).
+SAY_FD=1
+if $PORCELAIN; then SAY_FD=2; fi
+say() {
+    if [ -t "$SAY_FD" ]; then printf '\033[1m%s\033[0m\n' "$*"; else printf '%s\n' "$*"; fi >&"$SAY_FD"
+}
+fail() {
+    if [ -t 2 ]; then printf '\033[31m✗ %s\033[0m\n' "$1"; else printf '✗ %s\n' "$1"; fi >&2
+    exit "${2:-1}"
+}
 
 # --- 0. Sich selbst aktuell halten --------------------------------------------
 # Die eigene Datei über den Aufrufpfad finden, nicht über PATH: so aktualisiert
@@ -119,10 +146,61 @@ upstream_sha="$(git rev-parse --short upstream/main)"
 state="upstream $upstream_sha"
 for b in ${branches[@]+"${branches[@]}"}; do state+=" | $b $(git rev-parse --short "origin/$b")"; done
 
+# Was ein Lauf jetzt anders bauen würde als der letzte Build, als eine Zeile von
+# höchstens 80 Zeichen für die App ("Update available: …"): neue oder geänderte
+# Teile ("upstream 1a2b3c4"), weggefallene Branches als "without <Branch>".
+summary_of() {  # $1 = Stand jetzt, $2 = letzter Build, beide "name sha | name sha …"
+    local now="$1" last="$2" part next rest out="" i=0 n nl=$'\n'
+    local -a parts=()
+    while IFS= read -r part; do
+        case " | $last | " in *" | $part | "*) ;; *) parts+=("$part") ;; esac
+    done <<< "${now// | /$nl}"
+    while IFS= read -r part; do
+        [ -n "$part" ] || continue
+        case " | $now | " in *" | ${part%% *} "*) ;; *) parts+=("without ${part%% *}") ;; esac
+    done <<< "${last// | /$nl}"
+    # Nur die Reihenfolge ist anders: den ganzen neuen Stand nennen.
+    if [ "${#parts[@]}" -eq 0 ]; then
+        while IFS= read -r part; do parts+=("$part"); done <<< "${now// | /$nl}"
+    fi
+    # Ganze Teile anhängen, solange die Zeile samt Hinweis auf den Rest
+    # (" · +N more") in 80 Zeichen passt. Ohne UTF-8-Locale zählt ${#} Bytes,
+    # also eher zu viel; die Grenze hält dann erst recht.
+    n="${#parts[@]}"
+    for part in "${parts[@]}"; do
+        i=$(( i + 1 ))
+        rest=""
+        [ "$i" -eq "$n" ] || rest=" · +$(( n - i )) more"
+        next="${out:+$out · }$part"
+        if [ $(( ${#next} + ${#rest} )) -gt 80 ]; then
+            if [ -z "$out" ]; then
+                next="${part:0:$(( 80 - ${#rest} ))}"
+            else
+                out+=" · +$(( n - i + 1 )) more"
+                break
+            fi
+        fi
+        out="$next"
+    done
+    printf '%s\n' "$out"
+}
+
 if $CHECK_ONLY; then
+    last="$(cat "$STAMP" 2>/dev/null || true)"
+    if $PORCELAIN; then
+        # Die Antwort erst schreiben, wenn alles geklappt hat: ein Abbruch vorher
+        # endet mit einem Exit-Code ungleich 0 und 10, also als fehlgeschlagene Prüfung.
+        if [ "$state" = "$last" ]; then
+            printf 'format=mt-update-porcelain/1\nstatus=up-to-date\n'
+            exit 0
+        fi
+        summary="$(summary_of "$state" "$last")"
+        printf 'format=mt-update-porcelain/1\nstatus=update-available\nsummary=%s\n' "$summary"
+        exit 10
+    fi
     say "Stand jetzt:        $state"
-    say "Letzter Build:      $(cat "$STAMP" 2>/dev/null || echo '—')"
-    [ "$state" = "$(cat "$STAMP" 2>/dev/null)" ] && say "Nichts Neues." || say "Neuer Stand verfügbar → mt-update"
+    say "Letzter Build:      ${last:-—}"
+    [ "$state" = "$last" ] && say "Nichts Neues." || say "Neuer Stand verfügbar → mt-update"
     exit 0
 fi
 

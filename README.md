@@ -20,6 +20,10 @@ Danach, in jeder Shell (`~/.local/bin` muss dafür nicht im `PATH` sein):
 
 - `~/.local/bin/mt-update` — neuesten Stand bauen, installieren, starten
 - `~/.local/bin/mt-update --check` — nur anzeigen, ob es Neues gibt
+- `~/.local/bin/mt-update --check --porcelain` — dasselbe maschinenlesbar für die
+  Update-Prüfung der App: stdout `format=mt-update-porcelain/1`,
+  `status=up-to-date|update-available`, `summary=…`; Exit 0 = aktuell,
+  10 = Update verfügbar, alles andere = Prüfung fehlgeschlagen
 
 Liegt `~/.local/bin` im `PATH`, reicht `mt-update`.
 
@@ -30,6 +34,9 @@ Offene Sprecher-Benennungen blockieren nicht, sie erscheinen nach dem Neustart
 wieder. `MT_NO_WAIT=1 mt-update` bricht stattdessen ab.
 Das Skript aktualisiert sich bei jedem Lauf selbst von diesem Branch, sofern die
 Datei `mt-update` heißt (die Kopie `mt-update.sh` im Checkout nie).
+
+Test der Prüfung (ohne Netz, mit lokalen Repos in einem Temp-Ordner; baut und
+installiert nichts): `bash test-mt-update.sh`
 
 ## Einreichen ans Original: `submit.sh`
 
