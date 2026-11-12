@@ -149,7 +149,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-208-show-the-last-recording-in-its-own-menu.md",
-  "status": "open",
+  "status": "done",
   "title": "Show the last recording in its own menu section",
   "tracker": {
     "baseHashFlow": null,
@@ -163,5 +163,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/208"
   },
-  "updated_at": "2026-11-12T13:27:35.748431Z"
+  "updated_at": "2026-11-12T13:32:58.083568Z"
 }

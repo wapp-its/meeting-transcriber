@@ -9,7 +9,7 @@
   "priority": null,
   "spec": "gh-208-show-the-last-recording-in-its-own-menu",
   "spec_path": ".flow/tasks/gh-208-show-the-last-recording-in-its-own-menu.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement Show the last recording in its own menu section",
   "updated_at": "2026-11-12T09:57:03.655410Z"
 }
