@@ -211,14 +211,6 @@ class WatchLoop {
         self.silencePrompt = SilencePromptRuntime(speechActivity: speechActivity, after: silencePromptAfter)
     }
 
-    nonisolated static var defaultOutputDir: URL {
-        AppPaths.downloadsProtocolsDir
-    }
-
-    nonisolated static func defaultDetector() -> any MeetingDetecting {
-        PowerAssertionDetector()
-    }
-
     // MARK: - Start / Stop
 
     func start() {
