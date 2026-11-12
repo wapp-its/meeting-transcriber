@@ -1,3 +1,4 @@
+import CoreML
 import Foundation
 @testable import MeetingTranscriber
 import WhisperKit
@@ -30,6 +31,58 @@ final class WhisperKitWordTimestampsTests: XCTestCase {
         XCTAssertEqual(live.language, "de")
         XCTAssertFalse(file.detectLanguage)
         XCTAssertFalse(live.detectLanguage)
+    }
+
+    // MARK: - Prompt rows in the word alignment (no model)
+
+    /// The rows match what WhisperKit prefills ahead of `<|startoftranscript|>`:
+    /// `<|startofprev|>` plus the prompt tokens it keeps, none without a prompt.
+    func testPromptRowCountMatchesWhatWhisperKitPrefills() {
+        let specialTokenBegin = 50257
+        func rows(_ promptTokens: [Int]?) -> Int { // swiftlint:disable:this discouraged_optional_collection
+            PromptAlignedSegmentSeeker.promptRowCount(
+                for: DecodingOptions(promptTokens: promptTokens),
+                specialTokenBegin: specialTokenBegin,
+            )
+        }
+
+        XCTAssertEqual(rows(nil), 0)
+        XCTAssertEqual(rows([]), 0)
+        XCTAssertEqual(rows([101, 102]), 3)
+        XCTAssertEqual(rows([101, specialTokenBegin + 3, 102]), 3, "special tokens are not prefilled")
+        XCTAssertEqual(rows([specialTokenBegin + 3]), 0, "a prompt with nothing left is not sent")
+        XCTAssertEqual(
+            rows(Array(repeating: 101, count: 300)), Constants.maxTokenContext / 2,
+            "only the last maxTokenContext / 2 - 1 prompt tokens are prefilled",
+        )
+    }
+
+    // MLMultiArray's subscript takes NSNumber indices and values.
+    // swiftlint:disable legacy_objc_type
+    func testDroppingLeadingRowsMovesRowsUpAndZeroFillsTheTail() throws {
+        let weights = try MLMultiArray(shape: [4, 3], dataType: .float16)
+        for row in 0 ..< 4 {
+            for column in 0 ..< 3 {
+                weights[[row, column] as [NSNumber]] = NSNumber(value: row * 10 + column + 1)
+            }
+        }
+
+        let shifted = try XCTUnwrap(PromptAlignedSegmentSeeker.droppingLeadingRows(1, of: weights))
+        let unshifted = try XCTUnwrap(PromptAlignedSegmentSeeker.droppingLeadingRows(0, of: weights))
+
+        func values(_ array: MLMultiArray) -> [[Int]] {
+            (0 ..< 4).map { row in (0 ..< 3).map { column in array[[row, column] as [NSNumber]].intValue } }
+        }
+        XCTAssertEqual(values(shifted), [[11, 12, 13], [21, 22, 23], [31, 32, 33], [0, 0, 0]])
+        XCTAssertEqual(values(unshifted), [[1, 2, 3], [11, 12, 13], [21, 22, 23], [31, 32, 33]])
+        XCTAssertEqual(values(weights)[0], [1, 2, 3], "the passed-in weights are reused by WhisperKit and stay as they were")
+    }
+
+    // swiftlint:enable legacy_objc_type
+
+    func testDroppingLeadingRowsGivesUpOnAnUnexpectedLayout() throws {
+        let weights = try MLMultiArray(shape: [2, 3, 4], dataType: .float16)
+        XCTAssertNil(try PromptAlignedSegmentSeeker.droppingLeadingRows(1, of: weights))
     }
 
     // MARK: - A turn after a long silence (slow, needs model)

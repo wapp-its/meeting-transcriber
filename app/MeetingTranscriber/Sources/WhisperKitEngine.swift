@@ -121,7 +121,11 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
     ) async throws {
         modelState = .loading
         downloadProgress = 1.0
-        pipe = try await source.makePipe(variant, folder)
+        let loaded = try await source.makePipe(variant, folder)
+        // File transcription asks for word timestamps, which WhisperKit aligns
+        // one prompt length off when the vocabulary prompt is on.
+        loaded.segmentSeeker = PromptAlignedSegmentSeeker()
+        pipe = loaded
         modelState = .loaded
 
         // A model change that landed mid-load set `modelVariant` but saw a nil
