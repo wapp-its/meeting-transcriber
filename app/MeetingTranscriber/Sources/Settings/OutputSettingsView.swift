@@ -56,11 +56,11 @@ struct OutputSettingsView: View {
     /// The API key fields type into these, not into the Keychain.
     @StateObject private var apiKeyDrafts: ProtocolAPIKeyDrafts
 
-    // swiftlint:disable:next unneeded_escaping
     init(
         settings: AppSettings,
         templateStore: ProtocolTemplateStore = .production,
         retentionChoice: RetentionChoice? = nil,
+        // swiftlint:disable:next unneeded_escaping
         apiKeyDrafts: @autoclosure @escaping () -> ProtocolAPIKeyDrafts? = nil,
     ) {
         self.settings = settings
