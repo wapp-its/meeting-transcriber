@@ -65,8 +65,9 @@ setup() {
     git clone -q "$D/fork.git" "$MT"
     git -C "$MT" remote add upstream "$D/upstream.git"
 
-    # Für pr_merged: kein PR im Original übernommen. Nie ein Netzzugriff.
-    printf '#!/bin/sh\necho "$*" >> "%s/curl.log"\necho "[]"\n' "$D" > "$D/bin/curl"
+    # Für pr_merged: kein PR im Original übernommen. Mit -o (Selbst-Update): eine
+    # andere Fassung des Skripts. Nie ein Netzzugriff.
+    printf '#!/bin/sh\necho "$*" >> "%s/curl.log"\nout=\nwhile [ $# -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done\nif [ -n "$out" ]; then printf "#!/bin/sh\\necho andere Fassung\\n" > "$out"; else echo "[]"; fi\n' "$D" > "$D/bin/curl"
     # Die Prüfung braucht weder Xcode noch Zertifikat; Bauen, Installieren und
     # Beenden der App sind in ihr verboten.
     for p in xcodebuild security osascript open ditto codesign pgrep install; do
@@ -78,17 +79,21 @@ setup() {
 short() { git -C "$MT" rev-parse --short "$1"; }
 
 EXTRA_ENV=()
+# Leer: mt-update.sh im Checkout mit MT_NO_SELF_UPDATE=1. Sonst diese Datei ohne
+# MT_NO_SELF_UPDATE, wie die App die installierte Kopie startet.
+RUN_SCRIPT=""
 # Startet mt-update.sh wie die App: leere Umgebung (kein LANG), stdin /dev/null,
 # Arbeitsordner HOME. Setzt code, out (stdout), err (stderr).
 run() {  # $1 = bash, Rest = Argumente
-    local sh="$1"
+    local sh="$1" target="${RUN_SCRIPT:-$script}" no_self=MT_NO_SELF_UPDATE=1
     shift
+    [ -z "$RUN_SCRIPT" ] || no_self=""
     set +e
     (cd "$D/home" && env -i HOME="$D/home" PATH="$D/bin:$git_dir:/usr/bin:/bin" \
         GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="$D/gitconfig" GIT_TERMINAL_PROMPT=0 \
-        MT_DIR="$MT" MT_APP_DIR="$D/Applications" MT_DATA_DIR="$D/data" MT_NO_SELF_UPDATE=1 \
+        MT_DIR="$MT" MT_APP_DIR="$D/Applications" MT_DATA_DIR="$D/data" ${no_self:+"$no_self"} \
         ${EXTRA_ENV[@]+"${EXTRA_ENV[@]}"} \
-        "$sh" "$script" "$@" < /dev/null > "$D/out" 2> "$D/err")
+        "$sh" "$target" "$@" < /dev/null > "$D/out" 2> "$D/err")
     code=$?
     set -e
     out="$(cat "$D/out")"
@@ -205,6 +210,23 @@ suite() {  # $1 = bash
     run "$sh" --chek
     check "unbekanntes Argument: Exit 1" 1 "$code"
     read_only "falsche Argumente" "$(cat "$STAMP")"
+
+    # 10. Die installierte Kopie (Name mt-update, beschreibbar) ohne
+    # MT_NO_SELF_UPDATE, wie die App sie startet, während curl eine andere
+    # Fassung liefert: die Prüfung überschreibt sich nicht selbst.
+    mkdir -p "$D/home/.local/bin"
+    RUN_SCRIPT="$D/home/.local/bin/mt-update"
+    cp "$script" "$RUN_SCRIPT"
+    chmod 755 "$RUN_SCRIPT"
+    porcelain "$sh" "installierte Kopie"
+    check "installierte Kopie: Exit 0" 0 "$code"
+    check "installierte Kopie: stdout" "$format"$'\n'"status=up-to-date" "$out"
+    check "installierte Kopie: Skript unverändert" yes "$(cmp -s "$script" "$RUN_SCRIPT" && echo yes || echo no)"
+    run "$sh" --check
+    check "installierte Kopie, --check: Exit 0" 0 "$code"
+    check "installierte Kopie, --check: Skript unverändert" yes "$(cmp -s "$script" "$RUN_SCRIPT" && echo yes || echo no)"
+    read_only "installierte Kopie, --check" "$(cat "$STAMP")"
+    RUN_SCRIPT=""
 }
 
 shells=(/bin/bash)
