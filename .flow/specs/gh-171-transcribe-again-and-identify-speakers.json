@@ -1,0 +1,25 @@
+{
+  "branch_name": "gh-171-transcribe-again-and-identify-speakers",
+  "created_at": "2026-11-12T20:44:44.633550Z",
+  "depends_on_epics": [],
+  "id": "gh-171-transcribe-again-and-identify-speakers",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/gh-171-transcribe-again-and-identify-speakers.md",
+  "status": "open",
+  "title": "Transcribe again and identify speakers again for a finished recording",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABYhuJzg",
+    "identifier": "#171",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/171"
+  },
+  "updated_at": "2026-11-12T20:44:44.658936Z"
+}
