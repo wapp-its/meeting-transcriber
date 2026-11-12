@@ -53,27 +53,62 @@ final class WhisperKitWordTimestampsTests: XCTestCase {
         // This test downloads a WhisperKit model (~0.5 GB) - skip in CI
         try skipIfCIWithoutE2EOptIn("requires WhisperKit model download")
 
-        let fixture = fixtureURL("turn_after_silence_de.wav")
-        let spokenAt: TimeInterval = 12.0
+        try await assertTurnTranscribedWhenSpoken(by: WhisperKitEngine())
+    }
+
+    /// The same track with the vocabulary prompt on. WhisperKit 1.1.1 drops the
+    /// prompt from a decode's returned tokens but keeps the prompt's rows in its
+    /// word-alignment weights, so uncorrected, every word is aligned against
+    /// the attention of a token one prompt length earlier: this turn ended at
+    /// about 29 s, and on tracks with two turns in one window a whole turn went
+    /// missing.
+    func testPromptedTurnAfterLongSilenceKeepsItsWordTimes() async throws {
+        // This test downloads a WhisperKit model (~0.5 GB) - skip in CI
+        try skipIfCIWithoutE2EOptIn("requires WhisperKit model download")
+
+        let vocabularyFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent("word-timestamps-vocabulary-\(UUID().uuidString).txt")
+        try [
+            "Projektstand", "Auswertung", "Messungen", "Ordner", "Treffen", "Zusammenfassung",
+            "Budget", "Termin", "Protokoll", "Kickoff", "Meilenstein", "Lieferant",
+        ].joined(separator: "\n").write(to: vocabularyFile, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: vocabularyFile) }
 
         let engine = WhisperKitEngine()
+        engine.customVocabularyPath = vocabularyFile.path
+        engine.vocabularyPromptEnabled = true
+
+        try await assertTurnTranscribedWhenSpoken(by: engine)
+        XCTAssertGreaterThan(engine.vocabularyPromptTokenCount, 20, "the vocabulary prompt must reach the decoder")
+    }
+
+    /// Transcribes `turn_after_silence_de.wav` with `openai_whisper-small` and
+    /// checks that its one turn starts and ends within 2 s of when it is spoken.
+    private func assertTurnTranscribedWhenSpoken(by engine: WhisperKitEngine) async throws {
+        let spokenFrom: TimeInterval = 12.0
+        let spokenTo: TimeInterval = 14.44
+
         engine.modelVariant = "openai_whisper-small"
         engine.language = "de"
         await engine.loadModel()
         XCTAssertEqual(engine.modelState, .loaded, "Model should be loaded")
 
-        let segments = try await engine.transcribeSegments(audioPath: fixture)
+        let segments = try await engine.transcribeSegments(audioPath: fixtureURL("turn_after_silence_de.wav"))
 
-        let secondTurn = try XCTUnwrap(
+        let turn = try XCTUnwrap(
             segments.first { segment in
                 segment.text.localizedCaseInsensitiveContains("Auswertung")
                     || segment.text.localizedCaseInsensitiveContains("Messung")
             },
-            "no segment of the second turn in \(segments.map { "\($0.start)-\($0.end) \($0.text)" })",
+            "no segment of the turn in \(segments.map { "\($0.start)-\($0.end) \($0.text)" })",
         )
         XCTAssertEqual(
-            secondTurn.start, spokenAt, accuracy: 2.0,
-            "the turn spoken at \(spokenAt) s starts at \(secondTurn.start) s in the transcript",
+            turn.start, spokenFrom, accuracy: 2.0,
+            "the turn spoken at \(spokenFrom) s starts at \(turn.start) s in the transcript",
+        )
+        XCTAssertEqual(
+            turn.end, spokenTo, accuracy: 2.0,
+            "the turn spoken until \(spokenTo) s ends at \(turn.end) s in the transcript",
         )
     }
 }
