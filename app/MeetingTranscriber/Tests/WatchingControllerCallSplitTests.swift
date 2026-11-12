@@ -106,6 +106,7 @@ final class WatchingControllerCallSplitTests: XCTestCase {
             captionFlushOverride: { flushes += 1 },
         )
         controller.settings.pollInterval = 1
+        controller.settings.recordWithoutAskingApps = [testMeetingApp]
         let started = await controller.startWatching()
         addTeardownBlock { _ = await controller.stopWatching() }
         XCTAssertEqual(started, .changed, "precondition")
@@ -141,6 +142,7 @@ final class WatchingControllerCallSplitTests: XCTestCase {
             makeRecorder: { self.makeRecorderWithDeadMic() },
         )
         controller.settings.pollInterval = 1
+        controller.settings.recordWithoutAskingApps = [testMeetingApp]
         let started = await controller.startWatching()
         addTeardownBlock { _ = await controller.stopWatching() }
         XCTAssertEqual(started, .changed, "precondition")

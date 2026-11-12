@@ -334,13 +334,15 @@ final class WatchLoopBrowserConsentTests: XCTestCase {
     }
 
     /// The same rule across detectors: the parked browser call from the first
-    /// must not keep a mic-input call from the second from recording.
+    /// must not keep a mic-input call from the second from recording. Zoom
+    /// records without asking here, as in the test above.
     func testParkedConsentPromptDoesNotBlindALaterDetector() async throws {
         let spy = ParkingConsentSpy()
         let assertions = try SwappableDetector(browserMeeting())
         let micInput = SwappableDetector(nil)
         let (loop, recorder) = makeLoop(
             detector: CompositeMeetingDetector([assertions, micInput]), spy: spy,
+            recordWithoutAsking: ["Zoom"],
         )
         loop.start()
 
