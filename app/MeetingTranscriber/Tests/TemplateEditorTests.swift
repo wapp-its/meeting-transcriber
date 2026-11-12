@@ -27,11 +27,18 @@ final class TemplateEditorTests: XCTestCase {
         XCTAssertEqual(editor, .app(Fake.typora))
     }
 
+    /// Edit shows the template in Finder, so nothing offers to open it in the
+    /// missing app; the bundle identifier names it in the reason.
     func testARememberedAppThatIsGoneIsMissing() {
         let editor = resolve(remembered: Fake.typora.bundleIdentifier, installed: [Fake.textEdit], defaultApp: Fake.textEdit)
 
         XCTAssertEqual(editor, .missing(bundleIdentifier: Fake.typora.bundleIdentifier))
-        XCTAssertEqual(editor.appName, Fake.typora.bundleIdentifier)
+        XCTAssertNil(editor.appName)
+        XCTAssertTrue(editor.helpText.contains("Edit shows one in Finder, as abnerworks.Typora was not found."))
+        XCTAssertEqual(editor.newTemplateNote(name: "Board"), """
+        Creates “Board.md” in the templates folder from the built-in template and shows it in Finder, as \
+        abnerworks.Typora was not found. To use an app, click the arrow beside Edit and choose Open With.
+        """)
     }
 
     func testWithNothingRememberedTheDefaultAppIsTheEditor() {

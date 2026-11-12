@@ -29,26 +29,33 @@ enum TemplateEditor: Equatable {
         return defaultApp().map { .app($0) } ?? .noApp
     }
 
-    /// The name the menu, the help text and the window's note give the editor;
-    /// nil when templates are shown in Finder. A missing app has no name left
-    /// to ask for, so its bundle identifier stands in, as in
-    /// `MicInputDetector.appDisplayName`.
+    /// The app Edit opens templates in, named by the menu's "Open in" item;
+    /// nil when they are shown in Finder.
     var appName: String? {
-        switch self {
-        case let .app(app): app.name
-        case let .missing(bundleIdentifier): bundleIdentifier
-        case .noApp: nil
+        if case let .app(app) = self { app.name } else { nil }
+    }
+
+    /// Why Edit shows templates in Finder, for `.missing` and `.noApp`. A
+    /// missing app has no name left to ask for, so its bundle identifier
+    /// stands in, as in `MicInputDetector.appDisplayName`.
+    private var finderReason: String {
+        if case let .missing(bundleIdentifier) = self {
+            "\(bundleIdentifier) was not found"
+        } else {
+            "no app is set to open Markdown files"
         }
     }
 
     /// The help text under the templates section.
     var helpText: String {
-        let opening = if let appName {
-            "Edit opens one in \(appName). To use another app, click the arrow beside Edit and choose Open With; "
+        let opening = switch self {
+        case let .app(app):
+            "Edit opens one in \(app.name). To use another app, click the arrow beside Edit and choose Open With; "
                 + "the app remembers your choice."
-        } else {
-            "Edit shows one in Finder, as no app is set to open Markdown files. To use an app, click the arrow "
-                + "beside Edit and choose Open With; the app remembers your choice."
+
+        case .missing, .noApp:
+            "Edit shows one in Finder, as \(finderReason). To use an app, click the arrow beside Edit and choose "
+                + "Open With; the app remembers your choice."
         }
         return "Templates are Markdown files in the templates folder. \(opening) {LANGUAGE}, {MEETING_DATE} and "
             + "{MEETING_TIME} are filled in for every template. Background info entered for a meeting is added to "
@@ -60,12 +67,15 @@ enum TemplateEditor: Equatable {
         let name = typed.trimmingCharacters(in: .whitespacesAndNewlines)
         let file = name.isEmpty ? "a Markdown file" : "“\(name).md”"
         let created = "Creates \(file) in the templates folder from the built-in template"
-        guard let appName else {
-            return "\(created) and shows it in Finder, as no app is set to open Markdown files. To use an app, "
-                + "click the arrow beside Edit and choose Open With."
+        return switch self {
+        case let .app(app):
+            "\(created) and opens it in \(app.name), where you change and save it. To use another app, click "
+                + "the arrow beside Edit and choose Open With."
+
+        case .missing, .noApp:
+            "\(created) and shows it in Finder, as \(finderReason). To use an app, click the arrow beside Edit "
+                + "and choose Open With."
         }
-        return "\(created) and opens it in \(appName), where you change and save it. To use another app, click "
-            + "the arrow beside Edit and choose Open With."
     }
 }
 

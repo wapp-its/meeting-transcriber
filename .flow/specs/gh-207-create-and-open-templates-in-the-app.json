@@ -8,7 +8,9 @@
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-207-create-and-open-templates-in-the-app",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-207-create-and-open-templates-in-the-app.1": 0
+  },
   "next_task": 1,
   "no_plan": true,
   "plan_review_rounds": 0,
@@ -136,15 +138,70 @@
       "task": null,
       "timestamp": "2026-11-12T15:03:59.116028Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "3754c33694d9ee4eeac0966c45d3613cd4f0d736efcf387a1e33632caf7243a0",
+      "backend": "codex",
+      "base_sha": "432b2bb08f9b4fcdf8b1af5d294ccadfc44380a0",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-3b22baedbc07c2ad7497bf6a9e586762",
+            "classification": "introduced",
+            "findingId": "finding-3b22baedbc07c2ad7497bf6a9e586762",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-94bf6787554887f5b4433c630836a005",
+            "classification": "introduced",
+            "findingId": "finding-94bf6787554887f5b4433c630836a005",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "635ca99fc4b4d0a8700c05b2cba46c6df5611845",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1442,
+      "output_sha256": "000338cc6e12ef34c21f17461e080b340c2f18d87afc0c43f32e0dd8292ff71f",
+      "reservation_id": "8f87996080c748e79437dab511015991",
+      "round_consumed": true,
+      "scope": "impl:gh-207-create-and-open-templates-in-the-app.1",
+      "superseded_by": null,
+      "task": "gh-207-create-and-open-templates-in-the-app.1",
+      "timestamp": "2026-11-12T16:35:22.787446Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-207-create-and-open-templates-in-the-app.1": 1,
     "plan": 1,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-207-create-and-open-templates-in-the-app.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-207-create-and-open-templates-in-the-app.md",
@@ -162,5 +219,5 @@
     "mergeBaseTracker": "Creating a meeting-notes template uses a name field inside the settings list that is easy to miss, and Edit always opens the template in the Mac's default app for Markdown files, which may not be the editor you want.\n\nProposed:\n\n- A \"New Template\u2026\" button asks for the name in a small window and says what happens next.\n- Each template's Edit button opens it in the app you chose last; its menu offers Open With (any app that opens Markdown, or another app) and Show in Finder. The app remembers the choice.\n- No editor inside the app: templates stay Markdown files you edit in the app of your choice.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/207"
   },
-  "updated_at": "2026-11-12T15:05:04.379341Z"
+  "updated_at": "2026-11-12T16:35:39.315305Z"
 }
