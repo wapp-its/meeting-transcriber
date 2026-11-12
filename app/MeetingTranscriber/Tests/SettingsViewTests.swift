@@ -126,6 +126,17 @@ final class SettingsViewTests: XCTestCase { // swiftlint:disable:this type_body_
         }
     }
 
+    func testAutoWatchToggleBindsToSettings() throws {
+        // The setting existed before it had a control; this pins the control.
+        let settings = makeSettings()
+        XCTAssertFalse(settings.autoWatch, "precondition: auto-watch defaults off")
+        let toggle = try makeGeneral(settings: settings).inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.autoWatchToggle)
+            .toggle()
+        try toggle.tap()
+        XCTAssertTrue(settings.autoWatch, "tapping the toggle must turn auto-watch on")
+    }
+
     func testPollIntervalFieldExists() throws {
         let body = try makeGeneral().inspect()
         XCTAssertNoThrow(try body.find(text: "Poll Interval"))
@@ -434,9 +445,12 @@ final class SettingsViewTests: XCTestCase { // swiftlint:disable:this type_body_
     // Companion: tapping "Manage…" invokes the factory exactly once.
     func testKnownVoicesMatcherCreatedOnManageTap() throws {
         var matcherInits = 0
+        // A temp DB: the tap really builds the matcher, and a default one opens
+        // (and may migrate) the user's own speakers.json.
+        let dbPath = try makeTempDirectory(prefix: "known-voices").appendingPathComponent("speakers.json")
         let view = makeSpeakers {
             matcherInits += 1
-            return SpeakerMatcher()
+            return SpeakerMatcher(dbPath: dbPath)
         }
         let button = try view.inspect().find(button: "Manage\u{2026}")
         try button.tap()

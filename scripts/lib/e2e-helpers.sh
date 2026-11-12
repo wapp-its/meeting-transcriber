@@ -626,6 +626,47 @@ state_why() {
     esac
 }
 
+# --- menu-bar badge seen during a lane ----------------------------------------
+#
+# /state.badge is the BadgeKind the menu bar shows (MenuBarIcon.swift:
+# inactive, recording, transcribing, diarizing, processing, userAction, done,
+# error, updateAvailable). A lane notes it on each snapshot its polls already
+# read and asserts on the set at the end, which needs no extra reads: only a
+# badge that lasts longer than the poll interval can be asserted as seen
+# (recording, for the length of the meeting), while an absence holds whatever
+# the timing.
+E2E_BADGES_SEEN=""
+
+# badge_note [<state json>] — add the snapshot's badge (the argument, or
+# STATE_BODY) to E2E_BADGES_SEEN, space-separated, each value once. Always
+# returns 0, since it runs inside poll predicates.
+badge_note() {
+    local badge
+    badge="$(jq -r '.badge // empty | strings' <<<"${1:-${STATE_BODY:-null}}" 2>/dev/null)" || return 0
+    [ -n "$badge" ] || return 0
+    case " $E2E_BADGES_SEEN " in
+        *" $badge "*) ;;
+        *) E2E_BADGES_SEEN="${E2E_BADGES_SEEN:+$E2E_BADGES_SEEN }$badge" ;;
+    esac
+    return 0
+}
+
+# badge_seen <badge> — whether badge_note has seen that value.
+badge_seen() {
+    case " $E2E_BADGES_SEEN " in *" $1 "*) return 0 ;; esac
+    return 1
+}
+
+# badges_seen_among <badge>... — those of the given values badge_note has seen,
+# space-separated, in the order given; empty when none.
+badges_seen_among() {
+    local badge out=""
+    for badge in "$@"; do
+        if badge_seen "$badge"; then out="${out:+$out }$badge"; fi
+    done
+    printf '%s' "$out"
+}
+
 # watch_state — the app's watch state: the loop's state, empty when there is no
 # watch loop, and `unreadable` when the app did not answer, so a dead or hung
 # app never reads as "not watching".
@@ -864,6 +905,102 @@ read_dev_default_effective() {
     fi
 }
 
+# --- settings as launch arguments ---------------------------------------------
+#
+# A lane that writes its settings into the dev bundle's preferences has to
+# record and restore them, and a killed run leaves them changed for the next
+# lane. Passed as launch arguments instead (`open <app> --args -key value`),
+# they land in the process's argument domain, which UserDefaults.standard
+# consults before the stored preferences and never writes back: nothing to
+# restore, nothing a killed run can leave behind, and the container redirect
+# described at write_dev_default does not matter.
+#
+# Only keys whose read in the app takes an argument-domain value are listed.
+# Arguments arrive as strings: "YES", or a raw value. AppSettings reads the four
+# below through `UserDefaults.flag(forKey:)` (`bool(forKey:default:)`), which
+# accepts "YES"/"NO", and `string(forKey:)` for the engine; the app shell's own
+# auto-watch start reads `bool(forKey: "autoWatch")`, which takes "YES" too.
+# The upgrade lane passes the same kind of arguments to the binary and asserts
+# them. Keys read as `object(forKey:) as? Int` or `as? Double` (numSpeakers,
+# pollInterval, the OpenAI sampling values) would not cast from a string and
+# are deliberately absent. Each listed key has its /state.settings path, which
+# is how the helper proves the argument arrived.
+_e2e_launch_setting() {
+    case "$1" in
+        autoWatch) echo "bool .settings.detection.autoWatch" ;;
+        recordOnly) echo "bool .settings.recording.recordOnly" ;;
+        liveTranscriptionEnabled) echo "bool .settings.recording.liveTranscriptionEnabled" ;;
+        transcriptionEngine) echo "string .settings.transcription.engine" ;;
+        *) return 1 ;;
+    esac
+}
+
+# launch_dev_app <bundle> [--env NAME=VALUE]... [--] [<key>=<value>]...
+# Start the bundle with `open`, the settings as launch arguments (`true`/`false`
+# for a boolean key), wait up to RPC_READY_TIMEOUT_S (default 30) for the RPC
+# server (rpc_ready, so the caller's RPC_TOKEN_FILE), then read
+# /state.settings and require every setting to be what was passed. `--env`
+# goes to `open`, the one way an environment variable reaches a process
+# LaunchServices starts (MEETINGTRANSCRIBER_DEBUG_RPC=1 brings the RPC server
+# up without the debugRPCEnabled preference). The app must not be running:
+# `open` only activates a running app and drops the arguments, which the
+# readback then reports.
+# 0: launched and every setting in effect. 1: the RPC server did not come up,
+# or the app reports another value (a launch argument that did not arrive). 2:
+# a key or value this helper cannot pass, refused before anything starts. On
+# 1 and 2 the reason is in E2E_LAUNCH_ERR.
+# shellcheck disable=SC2034 # E2E_LAUNCH_ERR is the caller's to read
+launch_dev_app() {
+    local bundle="$1" pair key value spec path got
+    shift
+    local -a open_args=() app_args=() settings=()
+    E2E_LAUNCH_ERR=""
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --env) open_args+=(--env "$2"); shift 2 ;;
+            --) shift; break ;;
+            -*) E2E_LAUNCH_ERR="launch_dev_app: unknown option $1"; return 2 ;;
+            *) break ;;
+        esac
+    done
+    for pair in "$@"; do
+        key="${pair%%=*}" value="${pair#*=}"
+        spec="$(_e2e_launch_setting "$key")" \
+            || { E2E_LAUNCH_ERR="launch_dev_app: $key cannot be passed as a launch argument (see _e2e_launch_setting)"; return 2; }
+        case "${spec%% *}:$value" in
+            bool:true) app_args+=("-$key" YES) ;;
+            bool:false) app_args+=("-$key" NO) ;;
+            bool:*) E2E_LAUNCH_ERR="launch_dev_app: $key takes true or false, not '$value'"; return 2 ;;
+            *) app_args+=("-$key" "$value") ;;
+        esac
+        settings+=("$key|$value|$spec")
+    done
+    # `${a[@]+...}`: bash 3.2 under `set -u` calls an empty array unbound.
+    open ${open_args[@]+"${open_args[@]}"} "$bundle" ${app_args[@]+--args "${app_args[@]}"} \
+        || { E2E_LAUNCH_ERR="\`open\` could not launch $bundle (see its message above)"; return 1; }
+    local ready_s="${RPC_READY_TIMEOUT_S:-30}"
+    poll_until "$ready_s" 1 rpc_ready \
+        || { E2E_LAUNCH_ERR="RPC /healthz did not respond within ${ready_s}s of launching $bundle"; return 1; }
+    [ "${#settings[@]}" -gt 0 ] || return 0
+    local rc=0
+    local readback_s="${E2E_LAUNCH_READBACK_S:-20}"
+    poll_state "$readback_s" 1 state_is '.settings | type == "object"' || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        E2E_LAUNCH_ERR="$(state_why "$rc" "the app answered, but no /state carrying settings arrived within ${readback_s}s, so whether the launch arguments took effect could not be read back")"
+        return 1
+    fi
+    for pair in "${settings[@]}"; do
+        IFS='|' read -r key value spec <<<"$pair"
+        path="${spec#* }"
+        got="$(jq -r "$path | if . == null then \"<absent>\" else tostring end" <<<"$STATE_BODY" 2>/dev/null)" || got="<unreadable>"
+        if [ "$got" != "$value" ]; then
+            E2E_LAUNCH_ERR="the app was launched with $key=$value but reports ${path#.}=$got: the launch argument did not reach it (an app that was already running when \`open\` ran, or an \`open\` that dropped the arguments), so the lane would run on the stored setting instead"
+            return 1
+        fi
+    done
+    return 0
+}
+
 # --- mic-stall lane state that outlives one run -------------------------------
 #
 # The --mic-stall lane of e2e-app.sh switches the dev bundle's protocolProvider
@@ -1023,6 +1160,36 @@ transcript_is_german() {
     GERMAN_MARKER_HITS="${hit# }"
     GERMAN_MARKER_MATCHED="$matched"
     [ "$matched" -ge "$GERMAN_MARKER_WORDS_MIN" ]
+}
+
+# transcript_covered_seconds <transcript> — how far into the recording the
+# transcript reaches, in whole seconds, on stdout; status 1 and no output when it
+# has no segment line (or cannot be read). A line is `[MM:SS] Label: text`, or
+# `[H:MM:SS] ...` from an hour on (TimestampedSegment in the app); only a stamp
+# at the start of a line counts, so a time spoken in the text is not one. A line
+# is a block of one speaker's consecutive segments (mergeConsecutiveSpeakers)
+# and carries only its first segment's start, so where it ends is estimated
+# from its words at TRANSCRIPT_WORDS_PER_SECOND, a rate faster than speech:
+# the estimate falls short of the real end, never past it. Without it a
+# complete transcript whose diarization heard one voice, a single block at
+# [00:00], would read as covering nothing. The latest estimated end over all
+# lines, since nothing promises a merged dual-track transcript is in time order.
+TRANSCRIPT_WORDS_PER_SECOND=4
+transcript_covered_seconds() {
+    awk -v rate="$TRANSCRIPT_WORDS_PER_SECOND" '
+        match($0, /^\[([0-9]+:)?[0-9][0-9]:[0-9][0-9]\]/) {
+            n = split(substr($0, 2, RLENGTH - 2), part, ":")
+            s = (n == 3) ? part[1] * 3600 + part[2] * 60 + part[3] : part[1] * 60 + part[2]
+            text = substr($0, RLENGTH + 1)
+            colon = index(text, ": ")
+            if (colon > 0) text = substr(text, colon + 2)
+            words = split(text, w, /[ \t]+/)
+            for (i = 1; i <= words; i++) if (w[i] == "") words--
+            end = s + int(words / rate)
+            if (!found || end > max) { max = end; found = 1 }
+        }
+        END { if (found) print max; else exit 1 }
+    ' "$1" 2>/dev/null
 }
 
 # _pid_is_alive <pid> — does this process exist, whether or not we may signal it.
@@ -1899,6 +2066,20 @@ defaults_record_keys() {
     printf '%s' "$lines" >>"$record"
 }
 
+# dev_defaults_record <record> <bundle> <key>... — defaults_record_keys over
+# every plist write_dev_default writes: the standard one, and the container one
+# when it exists. A lane that snapshots only the standard plist leaves its
+# values in the container on exit. Put back with defaults_restore_record, which
+# is a no-op for a record that does not exist yet, so an exit trap armed before
+# this ran restores nothing rather than deleting keys it never read.
+dev_defaults_record() {
+    local record="$1" bundle="$2" container
+    shift 2
+    defaults_record_keys "$record" "$(dev_standard_plist "$bundle")" "$@" || return 1
+    container="$(dev_container_plist "$bundle")"
+    [ ! -f "$container" ] || defaults_record_keys "$record" "$container" "$@"
+}
+
 # defaults_mark_lane_values <record> — append to each line the value its key
 # holds now, once the lane has written its own. The restore then puts back only
 # keys that still hold the lane's value: anything else is a choice made since (a
@@ -2019,4 +2200,167 @@ openai_stub_request_violations() {
                 (if $user.content != $e.transcript then "the user message is not the transcript (\($user.content | tostring | length) chars sent, \($e.transcript | length) in the transcript file)" else empty end)
              end)
         end'
+}
+
+# --- diagnostics bundle of a failed lane ---------------------------------------
+#
+# What a failed e2e-app.sh lane leaves for the workflow to upload: the app's
+# /state, its queue snapshot, the tail of its pipeline log, the lane's simulator
+# log and the app's crash reports from this run. The artifact is public, since
+# the repository is, so every structured file is rebuilt from an ALLOWLIST of
+# fields (a field the app adds later stays out until someone adds it here), and
+# what is kept was checked field by field for what it can carry:
+#   - left out: speaker names (speakerDB.recentNames, knownSpeakerNames),
+#     meeting titles and naming slugs, participants, spoken text (live-caption
+#     hypotheses and finals), notification bodies, every path (transcript,
+#     protocol, output folder, vocabulary file, Claude CLI), the microphone's
+#     name and device UID, the OpenAI endpoint and model, export page ids and
+#     URLs, the update check's error text;
+#   - also left out: the text of job errors and warnings. It is the most
+#     useful line of a failure, and it is in the lane's own log already, but
+#     it is free text: an NSError names the file it failed on (a recording's
+#     name carries the meeting title), a protocol error can echo a server's
+#     body, and no pattern can tell which words are a title. The bundle says
+#     whether there was an error and how many warnings;
+#   - kept: counts, states, booleans, enum values, durations, levels, the
+#     engine and model names, permission verdicts, notification titles (fixed
+#     strings in the app), window pin flags.
+# The simulator log has the account name taken out of /Users paths. A crash
+# report is taken only when it is the dev app's (the installed app has the
+# same process name) and is rebuilt from an allowlist of its keys too: the
+# exception, the termination, the threads and the binary images, without the
+# application-specific messages (where a fatalError's text lands), the
+# mapped-region summaries (which name mapped files) and the per-machine
+# crash-reporter key; then the account name goes from its paths. Tested by
+# scripts/tests/test_e2e_diagnostics.sh, which feeds each one a sample full of
+# names and asserts they are gone.
+
+# The pipeline-log lines the bundle keeps: the latest transitions, which is
+# what a failure is read from, without the whole history of a long-lived host.
+E2E_DIAG_LOG_TAIL_LINES=200
+
+# e2e_redact_state — a /state answer on stdin, its allowlisted copy on stdout.
+e2e_redact_state() {
+    jq '
+        def pick($o; $keys): if $o == null then null else reduce $keys[] as $k ({}; . + {($k): $o[$k]}) end;
+        {
+            pipeline: pick(.pipeline; ["isProcessing", "activeJobCount", "waitingJobCount", "pendingNamingJobCount"]),
+            speakerDB: (if .speakerDB == null then null else {count: .speakerDB.count} end),
+            pendingNamingJobs: [(.pendingNamingJobs // [])[] | {jobID, speakerCount}],
+            engines: (if .engines == null then null else {
+                active: .engines.active,
+                whisperKit: pick(.engines.whisperKit; ["modelVariant", "language", "modelState"]),
+                parakeet: pick(.engines.parakeet; ["modelState"])
+            } end),
+            lastJob: (if .lastJob == null then null else {
+                jobID: .lastJob.jobID, state: .lastJob.state, appName: .lastJob.appName,
+                durationSec: .lastJob.durationSec,
+                hasTranscript: (.lastJob.transcriptPath != null), hasProtocol: (.lastJob.protocolPath != null),
+                exportStatus: .lastJob.export.status,
+                hasError: (.lastJob.error != null), warningCount: ((.lastJob.warnings // []) | length),
+                participantCount: ((.lastJob.participants // []) | length)
+            } end),
+            channelHealth: pick(.channelHealth; ["micSilent", "appSilent", "recordingSilent", "appNoiseFloorOnly",
+                "micFault", "appFault", "micLevelDBFS", "appLevelDBFS", "micSecondsSinceLastBuffer",
+                "micSecondsSinceLastEnergy", "appSecondsSinceLastBuffer", "appSecondsSinceLastEnergy", "micStallCount"]),
+            permissionHealth: pick(.permissionHealth; ["screenRecording", "microphone", "accessibility", "isHealthy",
+                "notifications", "notificationsAlertStyle", "notificationsTimeSensitive", "notificationsScheduledDelivery"]),
+            liveCaptions: (if .liveCaptions == null then null else {recentFinalsCount: ((.liveCaptions.recentFinals // []) | length)} end),
+            watchState, pendingConsentApp, isManualRecording,
+            notifications: [(.notifications // [])[] | {title, postedAt, posted}],
+            settings: (.settings as $s | if $s == null then null else {
+                detection: pick($s.detection; ["watchTeams", "watchZoom", "watchWebex", "autoWatch", "pollIntervalSeconds"]),
+                recording: pick($s.recording; ["endGraceSeconds", "noMic", "recordOnly", "perChannelIndicatorEnabled",
+                    "liveTranscriptionEnabled", "liveCaptionsOverlayEnabled", "liveCaptionsSize", "asymmetricSilenceWarningSeconds"]),
+                transcription: pick($s.transcription; ["engine", "whisperKitModel", "whisperLanguage", "parakeetLanguage",
+                    "customVocabularyEnabled"]),
+                diarization: pick($s.diarization; ["diarize", "mode", "numSpeakers", "vadEnabled", "vadThreshold",
+                    "clusterThreshold", "warmStartFa", "warmStartFb", "minSegmentDurationSeconds", "excludeOverlap"]),
+                protocolGeneration: pick($s.protocolGeneration; ["provider", "language", "openAITemperature", "openAITopP"]),
+                output: pick($s.output; ["hasCustomDirectory", "hasCustomPrompt", "includeFullTranscriptInProtocol",
+                    "saveRawTranscriptSeparately", "useAITitleForFilenames"]),
+                diagnostics: pick($s.diagnostics; ["verboseDiagnostics", "debugRPCEnabled"]),
+                updates: pick($s.updates; ["checkForUpdates", "includePreReleases"])
+            } end),
+            badge,
+            updateStatus: pick(.updateStatus; ["available", "availableVersion", "isPrerelease", "isChecking"]),
+            windows: [(.windows // [])[] | {id, isVisible, floating, canJoinAllSpaces, fullScreenAuxiliary}]
+        }'
+}
+
+# e2e_redact_queue — a pipeline_queue.json on stdin, its allowlisted copy on
+# stdout: per job its id, state, app, timing and diarizer mode, which audio it
+# has, and whether it has an error and how many warnings.
+e2e_redact_queue() {
+    jq '
+        if type != "array" then {unreadable: true} else [.[] | {
+            id, state, appName, enqueuedAt, usedDiarizerMode, autoSkipNaming,
+            hasMix: (.mixPath != null), hasApp: (.appPath != null), hasMic: (.micPath != null),
+            hasTranscript: (.transcriptPath != null),
+            hasError: (.error != null), warningCount: ((.warnings // []) | length)
+        }] end'
+}
+
+# e2e_redact_pipeline_log — pipeline_log.jsonl lines on stdin, each reduced to
+# the five keys the app writes (PipelineEventLog); a line that is not a JSON
+# object is dropped.
+e2e_redact_pipeline_log() {
+    jq -cR 'fromjson? | objects | {timestamp, job_id, event, from, to}'
+}
+
+# e2e_scrub_text — free text on stdin, with the account name taken out of every
+# /Users path.
+e2e_scrub_text() {
+    sed -E -e 's#/Users/[^/[:space:]"'"'"']+#/Users/<user>#g'
+}
+
+# e2e_redact_crash_report <ips> — the report's allowlisted copy on stdout when
+# it is a crash of the dev app (`MeetingTranscriber-Dev.app` in its procPath);
+# status 1 and nothing written for any other report, or one that does not
+# parse. An .ips file is a one-line JSON header followed by the JSON body.
+e2e_redact_crash_report() {
+    local header body
+    header="$(head -n 1 "$1" | jq -c '{app_name, app_version, build_version, bundleID, bug_type, os_version, timestamp, incident_id, name}' 2>/dev/null)" || return 1
+    body="$(tail -n +2 "$1" | jq -c '
+        select((.procPath // "") | contains("MeetingTranscriber-Dev.app"))
+        | {procName, procPath, bundleInfo, osVersion, captureTime, exception, termination,
+           faultingThread, threads, usedImages, lastExceptionBacktrace}' 2>/dev/null)" || return 1
+    [ -n "$header" ] && [ -n "$body" ] || return 1
+    printf '%s\n%s\n' "$header" "$body" | e2e_scrub_text
+}
+
+# e2e_write_diagnostics <out-dir> <app-data-dir> <marker> <simulator-log> [<crash-dir>]
+# Write the bundle into <out-dir> (created, never emptied: only files of the
+# names below are written, so pointing it at a shared folder deletes nothing).
+# Each part is best effort and the call always returns 0 once <out-dir>
+# exists: a diagnostics step must not change a lane's verdict. /state is read
+# once, bounded to 5 s, through state_read, so the caller's RPC_TOKEN (or
+# MTCLI) decides how. Crash reports are the dev app's (see
+# e2e_redact_crash_report) newer than <marker>; none are taken without a marker.
+e2e_write_diagnostics() {
+    local out="$1" data="$2" marker="$3" sim_log="$4" crash_dir="${5:-$HOME/Library/Logs/DiagnosticReports}"
+    local redacted f report
+    mkdir -p "$out" || return 1
+    if RPC_READ_BOUND_S=5 state_read 2>/dev/null && redacted="$(e2e_redact_state <<<"$STATE_BODY" 2>/dev/null)"; then
+        printf '%s\n' "$redacted" >"$out/state.json"
+    else
+        echo "No usable /state answer when this bundle was written: the app had exited, hung, or answered something that is not a state snapshot." >"$out/state.unavailable.txt"
+    fi
+    if [ -f "$data/ipc/pipeline_queue.json" ] && redacted="$(e2e_redact_queue <"$data/ipc/pipeline_queue.json" 2>/dev/null)"; then
+        printf '%s\n' "$redacted" >"$out/pipeline_queue.json"
+    fi
+    if [ -f "$data/ipc/pipeline_log.jsonl" ]; then
+        tail -n "$E2E_DIAG_LOG_TAIL_LINES" "$data/ipc/pipeline_log.jsonl" 2>/dev/null \
+            | e2e_redact_pipeline_log >"$out/pipeline_log.tail.jsonl" 2>/dev/null || true
+    fi
+    if [ -n "$sim_log" ] && [ -f "$sim_log" ]; then
+        e2e_scrub_text <"$sim_log" >"$out/simulator.log" 2>/dev/null || true
+    fi
+    if [ -n "$marker" ] && [ -f "$marker" ] && [ -d "$crash_dir" ]; then
+        while IFS= read -r f; do
+            report="$(e2e_redact_crash_report "$f")" || continue
+            mkdir -p "$out/crash-reports" && printf '%s\n' "$report" >"$out/crash-reports/$(basename "$f")" || true
+        done < <(find "$crash_dir" -maxdepth 1 -type f -name 'MeetingTranscriber*.ips' -newer "$marker" 2>/dev/null)
+    fi
+    return 0
 }

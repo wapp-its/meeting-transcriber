@@ -12,6 +12,8 @@ struct SettingsView: View {
     /// The URL vocabulary source's controller, forwarded to the Transcription
     /// tab. Nil hides its status line and disables "Update now".
     var remoteVocabulary: RemoteVocabularyController?
+    /// Backs the Launch at Login toggle. Nil hides the row, which is what tests get.
+    var loginItem: LoginItemController?
 
     /// Notification visibility from `PermissionsController`, forwarded to the
     /// General tab so it can warn when browser-meeting consent cannot reach the
@@ -86,6 +88,7 @@ struct SettingsView: View {
             GeneralSettingsView(
                 settings: settings,
                 notificationVisibility: notificationVisibility,
+                loginItem: loginItem,
             )
 
         case .audio:

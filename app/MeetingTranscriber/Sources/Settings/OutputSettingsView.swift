@@ -53,14 +53,23 @@ struct OutputSettingsView: View {
     @State private var connectionTestResult: ConnectionTestResult?
     @State private var availableModels: [String] = []
     @State private var didAttemptConnectionTest = false
+    /// The API key fields type into these, not into the Keychain.
+    @StateObject private var apiKeyDrafts: ProtocolAPIKeyDrafts
 
-    init(settings: AppSettings, templateStore: ProtocolTemplateStore = .production, retentionChoice: RetentionChoice? = nil) {
+    // swiftlint:disable:next unneeded_escaping
+    init(
+        settings: AppSettings,
+        templateStore: ProtocolTemplateStore = .production,
+        retentionChoice: RetentionChoice? = nil,
+        apiKeyDrafts: @autoclosure @escaping () -> ProtocolAPIKeyDrafts? = nil,
+    ) {
         self.settings = settings
         self.templateStore = templateStore
         _retentionChoice = State(initialValue: retentionChoice)
         let templatesModel = ProtocolTemplatesModel(store: templateStore, settings: settings)
         _templatesModel = State(initialValue: templatesModel)
         _templateRulesModel = State(initialValue: TemplateRulesModel(templates: templatesModel, settings: settings))
+        _apiKeyDrafts = StateObject(wrappedValue: apiKeyDrafts() ?? ProtocolAPIKeyDrafts(settings: settings))
     }
 
     var body: some View {
@@ -140,6 +149,14 @@ struct OutputSettingsView: View {
                 claudeBinaries = ClaudeCLIProtocolGenerator.availableClaudeBinaries()
             #endif
         }
+        // A hidden Settings window and a quit reach neither a focus change nor
+        // `onDisappear`, so an edited key is handed over here as well.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { notification in
+            apiKeyDrafts.settingsWindowWillClose(notification, settings: settings)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            apiKeyDrafts.commitPending(to: settings)
+        }
     }
 
     @ViewBuilder
@@ -159,8 +176,11 @@ struct OutputSettingsView: View {
                 HStack {
                     Text("API Key")
                     Spacer()
-                    SecureField("", text: $settings.claudeAPIKey)
-                        .frame(width: 200)
+                    DraftTextField("", value: apiKeyDrafts.savedClaude, draft: $apiKeyDrafts.claude, secure: true) { key in
+                        apiKeyDrafts.commitClaude(key, to: settings)
+                    }
+                    .frame(width: 200)
+                    .accessibilityIdentifier(A11yID.claudeAPIKeyField)
                 }
                 Text("Optional. Leave empty to use your \"claude login\" session.")
                     .font(.caption)
@@ -238,8 +258,11 @@ struct OutputSettingsView: View {
         HStack {
             Text("API Key")
             Spacer()
-            SecureField("", text: $settings.openAIAPIKey)
-                .frame(width: 200)
+            DraftTextField("", value: apiKeyDrafts.savedOpenAI, draft: $apiKeyDrafts.openAI, secure: true) { key in
+                apiKeyDrafts.commitOpenAI(key, to: settings)
+            }
+            .frame(width: 200)
+            .accessibilityIdentifier(A11yID.openAIAPIKeyField)
         }
         Text("Leave empty if your local server doesn't require authentication")
             .font(.caption)

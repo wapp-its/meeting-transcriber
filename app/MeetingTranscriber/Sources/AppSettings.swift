@@ -379,11 +379,10 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         didSet { defaults.set(levelBalanceEnabled, forKey: "levelBalanceEnabled") }
     }
 
-    /// PoC: when on, mic-channel audio is also fed to a live `StreamingTranscriber`
-    /// during recording. Partial / finalised captions are logged via os_log on
-    /// subsystem `com.meetingtranscriber`, category `LiveTranscription` — no
-    /// caption-bar UI yet. Only effective when the active engine is Parakeet;
-    /// other engines silently no-op. Default: off.
+    /// PoC: when on, recording audio is also fed to a live caption pipeline,
+    /// shown in the caption overlay. Which backend runs is `LiveCaptionsGate`'s
+    /// decision from the engine's configured language; both engines support it.
+    /// Default: off.
     var liveTranscriptionEnabled: Bool {
         didSet { defaults.set(liveTranscriptionEnabled, forKey: "liveTranscriptionEnabled") }
     }
@@ -619,6 +618,13 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         didSet { defaults.set(diarize, forKey: "diarize") }
     }
 
+    /// How long a meeting may wait for its speaker names before the next
+    /// launch accepts the automatic names for it. One day by default, which is
+    /// what the cleanup has always used, so an existing install keeps it.
+    var staleNamingTimeout: StaleNamingTimeout {
+        didSet { defaults.set(staleNamingTimeout.rawValue, forKey: "staleNamingTimeout") }
+    }
+
     var vadEnabled: Bool {
         didSet { defaults.set(vadEnabled, forKey: "vadEnabled") }
     }
@@ -665,6 +671,18 @@ final class AppSettings { // swiftlint:disable:this type_body_length
     /// One value for the whole app.
     var recordingRetention: RecordingRetention {
         didSet { defaults.set(recordingRetention.rawValue, forKey: "recordingRetention") }
+    }
+
+    /// Open the "Name Speakers" window by itself when a meeting is ready to be
+    /// named, after processing and again on launch for meetings still waiting.
+    /// On by default, which is how the app has always behaved. Off, the
+    /// meeting still waits for its names, a "Name Speakers" notification says
+    /// so (when it starts waiting, and on launch for meetings that already
+    /// were), and the user opens the window from the menu bar
+    /// ("Name Speakers...") when it suits them. The stale cleanup
+    /// (`staleNamingTimeout`) applies either way.
+    var autoOpenSpeakerNaming: Bool {
+        didSet { defaults.set(autoOpenSpeakerNaming, forKey: "autoOpenSpeakerNaming") }
     }
 
     /// Number of expected speakers. 0 = auto-detect.
@@ -1097,6 +1115,8 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         terminologyRulesFileContents = ""
         customVocabularyValidation = .notConfigured
         diarize = defaults.bool(forKey: "diarize", default: true)
+        staleNamingTimeout = defaults.string(forKey: "staleNamingTimeout")
+            .flatMap(StaleNamingTimeout.init(rawValue:)) ?? .oneDay
         vadEnabled = defaults.bool(forKey: "vadEnabled", default: false)
         vadThreshold = defaults.object(forKey: "vadThreshold") as? Float ?? 0.5
         echoCancellationEnabled = defaults.bool(forKey: "echoCancellationEnabled", default: false)
@@ -1105,6 +1125,7 @@ final class AppSettings { // swiftlint:disable:this type_body_length
             .flatMap(DiarizerMode.init(rawValue:))) ?? .offline
         recordingRetention = (defaults.string(forKey: "recordingRetention")
             .flatMap(RecordingRetention.init(rawValue:))) ?? .never
+        autoOpenSpeakerNaming = defaults.bool(forKey: "autoOpenSpeakerNaming", default: true)
         numSpeakers = defaults.object(forKey: "numSpeakers") as? Int ?? 0
 
         let t = Self.loadDiarizerTuning(from: defaults)

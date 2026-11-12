@@ -5,7 +5,7 @@ import XCTest
 /// Interaction + write-back tests for non-button Settings controls (Picker,
 /// Stepper) and a first LiveCaptionsOverlay render test. The existing suite drove
 /// only Toggle `.tap()`; Picker `.select()` / Stepper `.increment()` / the
-/// captions TimelineView had zero coverage. Each control is driven and the
+/// captions overlay had zero coverage. Each control is driven and the
 /// resulting `AppSettings` write-back (or rendered identifier) is asserted, so a
 /// broken binding — not just a missing control — fails the test.
 @MainActor
@@ -354,6 +354,45 @@ final class SettingsInteractionTests: XCTestCase {
         XCTAssertTrue(toggle.isDisabled())
     }
 
+    // MARK: - Caption backend footnote and download consent
+
+    /// Indonesian is not a Nemotron-trained language: the view must describe
+    /// re-transcribe and must not ask for the Nemotron download.
+    func testUntrainedLanguageShowsReTranscribeFootnoteAndNeedsNoConsent() throws {
+        let settings = makeSettings()
+        settings.transcriptionEngine = .whisperKit
+        settings.whisperLanguage = "id"
+        let strategy = TranscriptionSettingsView.captionStrategy(for: settings)
+        XCTAssertEqual(strategy, .reTranscribe)
+        XCTAssertFalse(TranscriptionSettingsView.needsCaptionModelConsent(strategy: strategy, modelDownloaded: false))
+        let view = TranscriptionSettingsView(
+            settings: settings,
+            whisperKitEngine: WhisperKitEngine(),
+            parakeetEngine: ParakeetEngine(),
+        )
+        let footnote = TranscriptionSettingsView.captionBackendFootnote(strategy: .reTranscribe, languageIsSet: true)
+        XCTAssertFalse(footnote.contains("Nemotron"))
+        XCTAssertNoThrow(try view.inspect().find(text: footnote))
+    }
+
+    func testTrainedLanguageShowsNemotronFootnoteAndNeedsConsentUntilDownloaded() throws {
+        let settings = makeSettings()
+        settings.transcriptionEngine = .whisperKit
+        settings.whisperLanguage = "de"
+        let strategy = TranscriptionSettingsView.captionStrategy(for: settings)
+        XCTAssertEqual(strategy, .nemotronStreaming)
+        XCTAssertTrue(TranscriptionSettingsView.needsCaptionModelConsent(strategy: strategy, modelDownloaded: false))
+        XCTAssertFalse(TranscriptionSettingsView.needsCaptionModelConsent(strategy: strategy, modelDownloaded: true))
+        let view = TranscriptionSettingsView(
+            settings: settings,
+            whisperKitEngine: WhisperKitEngine(),
+            parakeetEngine: ParakeetEngine(),
+        )
+        let footnote = TranscriptionSettingsView.captionBackendFootnote(strategy: .nemotronStreaming, languageIsSet: true)
+        XCTAssertTrue(footnote.contains("Nemotron"))
+        XCTAssertNoThrow(try view.inspect().find(text: footnote))
+    }
+
     // MARK: - Caption size picker
 
     func testCaptionSizePickerSelectionWritesBackToSettings() throws {
@@ -396,14 +435,14 @@ final class SettingsInteractionTests: XCTestCase {
         let state = LiveCaptionsState()
         state.applyFinalized("hello", channel: .mic)
 
-        // No active backend → the backend label (inside the TimelineView) is absent.
+        // No active backend → the backend label is absent.
         XCTAssertThrowsError(
             try LiveCaptionsOverlay(state: state).inspect()
                 .find(viewWithAccessibilityIdentifier: A11yID.liveCaptionBackend),
             "with no active backend the label must not render",
         )
 
-        // Active backend → the label appears, reachable through the TimelineView.
+        // Active backend → the label appears.
         state.setActiveBackend("Parakeet EOU")
         XCTAssertNoThrow(
             try LiveCaptionsOverlay(state: state).inspect()

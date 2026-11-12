@@ -15,13 +15,17 @@ struct StoredSpeaker: Codable, Identifiable {
     /// seed for `centroid` on first confirmation after the v3 schema upgrade.
     let embeddings: [[Float]]
     /// Running mean of all quality-filtered embeddings ever confirmed for this
-    /// speaker. The primary match anchor in v3+. nil for legacy entries; the
-    /// matcher computes `meanEmbedding(embeddings)` lazily until the next
-    /// confirmation persists a real centroid.
+    /// speaker. The primary match anchor in v3+. nil for legacy entries, which
+    /// match on their samples alone until their first confirmation persists
+    /// `meanEmbedding(embeddings)` as the seed.
     let centroid: [Float]?
     /// Number of embeddings folded into `centroid` so far. Drives the running-
     /// average update math and tells us whether we trust the centroid.
     let centroidSampleCount: Int
+    /// True while a non-legacy entry has only short samples, which unlike a
+    /// legacy entry's samples of unknown quality must never seed the centroid.
+    /// Persisted only while true; always false once a centroid exists.
+    let awaitsQualifyingSample: Bool
     /// Wall-clock time when this speaker was last confirmed by the user via
     /// `updateDB`. Used to rank suggestion chips by recency. nil for entries
     /// migrated from older DB versions that didn't track usage.
@@ -35,6 +39,19 @@ struct StoredSpeaker: Codable, Identifiable {
     /// auto-name a real speaker. Defaults to false for legacy entries and
     /// for every user-confirmed speaker.
     let isSynthetic: Bool
+
+    /// `centroid` unless it has no direction: merging two centroids with a
+    /// count of 0 used to write an all-zero vector, which counts as absent.
+    var usableCentroid: [Float]? {
+        centroid.flatMap { $0.contains { $0 != 0 } ? $0 : nil }
+    }
+
+    /// Weight of `usableCentroid` in a running average. Earlier merges
+    /// persisted a centroid with a count of 0, which would make the next fold
+    /// replace it outright, so a usable centroid counts as at least one sample.
+    var centroidWeight: Int {
+        usableCentroid == nil ? 0 : max(centroidSampleCount, 1)
+    }
 
     // Migrate old single-embedding format automatically (legacy `embedding`
     // key); default lastUsed/useCount for entries before recency tracking;
@@ -66,6 +83,8 @@ struct StoredSpeaker: Codable, Identifiable {
         }
         centroid = try container.decodeIfPresent([Float].self, forKey: .centroid)
         centroidSampleCount = try container.decodeIfPresent(Int.self, forKey: .centroidSampleCount) ?? 0
+        let awaiting = try container.decodeIfPresent(Bool.self, forKey: .awaitsQualifyingSample) ?? false
+        awaitsQualifyingSample = centroid == nil && awaiting
         lastUsed = try container.decodeIfPresent(Date.self, forKey: .lastUsed)
         useCount = try container.decodeIfPresent(Int.self, forKey: .useCount) ?? 0
         isSynthetic = try container.decodeIfPresent(Bool.self, forKey: .isSynthetic) ?? false
@@ -76,6 +95,7 @@ struct StoredSpeaker: Codable, Identifiable {
         embeddings: [[Float]],
         centroid: [Float]? = nil,
         centroidSampleCount: Int = 0,
+        awaitsQualifyingSample: Bool = false,
         lastUsed: Date? = nil,
         useCount: Int = 0,
         isSynthetic: Bool = false,
@@ -84,6 +104,7 @@ struct StoredSpeaker: Codable, Identifiable {
         self.embeddings = embeddings
         self.centroid = centroid
         self.centroidSampleCount = centroidSampleCount
+        self.awaitsQualifyingSample = centroid == nil && awaitsQualifyingSample
         self.lastUsed = lastUsed
         self.useCount = useCount
         self.isSynthetic = isSynthetic
@@ -91,7 +112,7 @@ struct StoredSpeaker: Codable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case name, embeddings, embedding, centroid, centroidSampleCount,
-             lastUsed, useCount, isSynthetic
+             awaitsQualifyingSample, lastUsed, useCount, isSynthetic
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -101,6 +122,9 @@ struct StoredSpeaker: Codable, Identifiable {
         try container.encodeIfPresent(centroid, forKey: .centroid)
         if centroidSampleCount > 0 {
             try container.encode(centroidSampleCount, forKey: .centroidSampleCount)
+        }
+        if awaitsQualifyingSample {
+            try container.encode(awaitsQualifyingSample, forKey: .awaitsQualifyingSample)
         }
         try container.encodeIfPresent(lastUsed, forKey: .lastUsed)
         // Skip when 0 so entries that pre-date recency tracking round-trip
@@ -123,6 +147,7 @@ struct StoredSpeaker: Codable, Identifiable {
             embeddings: embeddings,
             centroid: centroid,
             centroidSampleCount: centroidSampleCount,
+            awaitsQualifyingSample: awaitsQualifyingSample,
             lastUsed: lastUsed,
             useCount: useCount,
             isSynthetic: isSynthetic,

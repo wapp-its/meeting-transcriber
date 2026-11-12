@@ -3,11 +3,11 @@ import os.log
 
 private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "PipelineQueue")
 
-/// Snapshot restore and orphaned-recording recovery for `PipelineQueue`, split
-/// out of `PipelineQueue.swift` so the primary class body drops under the
-/// `type_body_length` lint cap. An extension of a globally `@MainActor`-isolated
-/// type inherits that isolation, so the moved methods need no explicit
-/// annotation. Pure move; no behavior change.
+/// Snapshot restore for `PipelineQueue`, split out of `PipelineQueue.swift` so
+/// the primary class body drops under the `type_body_length` lint cap. Orphan
+/// recovery is in `PipelineQueue+OrphanRecovery.swift`. An extension of a
+/// globally `@MainActor`-isolated type inherits that isolation, so the moved
+/// methods need no explicit annotation. Pure move; no behavior change.
 extension PipelineQueue {
     // MARK: - Adopting the jobs of a replaced queue
 
@@ -192,12 +192,9 @@ extension PipelineQueue {
         cleanupStalePending()
         logger.info("Restored \(loaded.count) jobs from snapshot")
         triggerProcessing()
-        // Auto-popup the naming dialog if any restored job is still
-        // waiting for confirmation. Same notification as the in-pipeline
-        // pop, so MeetingTranscriberApp brings the window forward.
-        if !pendingSpeakerNamingJobs.isEmpty {
-            NotificationCenter.default.post(name: .showSpeakerNaming, object: nil)
-        }
+        // Restored jobs still waiting for names: the window, or with auto-open
+        // off a notification, since they never make the transition again.
+        announceRestoredSpeakerNaming()
     }
 
     private func noteSnapshotRestoreFailed(_ error: any Error) {
@@ -393,106 +390,5 @@ extension PipelineQueue {
                 jobID: job.id, slug: job.namingSlug, in: allSidecarDirs(of: job),
             )
         }
-    }
-
-    // MARK: - Orphaned Recording Recovery
-
-    /// Scan `recordingsDir` for `*_mix.wav` files not tracked by any loaded job.
-    /// Creates recovery jobs for untracked recordings younger than `maxAge`.
-    /// Skips files the pipeline is already finished with, successfully or not
-    /// (tracked in processed_recordings.json), and recordings whose meeting-end
-    /// cut is not settled yet (`RecoveredCut.keepsFromOrphanScan`).
-    ///
-    /// The directory scan + per-file `attributesOfItem` calls run on a
-    /// detached task — startup callers don't block the UI on a potentially
-    /// slow filesystem (e.g. iCloud-backed recordings dir). Mutations to
-    /// `jobs` and the snapshot still happen on the main actor.
-    func recoverOrphanedRecordings(
-        recordingsDir: URL = AppPaths.recordingsDir,
-        maxAge: TimeInterval = 86400,
-    ) async {
-        // One-time migration: seed processed list with existing recordings
-        // Only for the default recordings directory (not test overrides)
-        if recordingsDir == AppPaths.recordingsDir {
-            await processedLedger.migrate(recordingsDir: recordingsDir)
-        }
-
-        // Both reads happen here, on the main actor, before the detached hop:
-        // the registry is main-actor isolated, and reading it from inside the
-        // detached task would be a different question anyway, asked later.
-        let trackedPaths = Set(jobs.compactMap { $0.mixPath?.standardizedFileURL.path })
-        let runningPaths = inFlightRuns.claimedAudioPaths
-        let ledger = processedLedger
-
-        // Off-main: directory scan + processed-list read + per-file
-        // attributesOfItem probes + filtering all happen here.
-        let candidates: [PairedRecordingResolver.Group] = await Task.detached(priority: .utility) {
-            let fm = FileManager.default
-            guard let entries = try? fm.contentsOfDirectory(
-                at: recordingsDir,
-                includingPropertiesForKeys: [.fileSizeKey, .creationDateKey],
-            ) else { return [] }
-            let processedPaths = ledger.load()
-            let now = Date()
-            return PairedRecordingResolver.resolve(urls: entries).paired.filter { group in
-                // Groups without a real mix file (app+mic-only paired imports)
-                // aren't recoverable from the dir scan alone.
-                guard let mixURL = group.mix else { return false }
-                let stdPath = mixURL.standardizedFileURL.path
-                guard !trackedPaths.contains(stdPath) else { return false }
-                guard !runningPaths.contains(stdPath) else { return false }
-                guard !processedPaths.contains(stdPath) else { return false }
-                // A recording whose meeting-end cut is still to come is the
-                // stop's, or the next recovery pass's, to queue once cut.
-                guard !RecoveredCut.keepsFromOrphanScan(stem: group.stem, in: recordingsDir) else { return false }
-                let attrs = try? fm.attributesOfItem(atPath: mixURL.path)
-                if let created = attrs?[.creationDate] as? Date,
-                   now.timeIntervalSince(created) > maxAge {
-                    return false
-                }
-                // Header-only WAVs are 44 bytes.
-                if let size = attrs?[.size] as? Int, size <= 44 {
-                    return false
-                }
-                return true
-            }
-        }.value
-
-        // Left in staging for the active queue's next recovery: the one its
-        // build ran, or after a folder-change rebuild (which runs none), the
-        // next watch start or launch. Taking them on here would process each
-        // one on a queue nobody sees, and a second time on the active one.
-        guard !candidates.isEmpty, !isRetired else { return }
-
-        for group in candidates {
-            guard let mixURL = group.mix else { continue }
-            var job = PipelineJob(
-                meetingTitle: "Recovered Recording (\(group.stem))",
-                appName: "Unknown",
-                mixPath: mixURL,
-                appPath: group.app,
-                micPath: group.mic,
-                micDelay: 0,
-            )
-            stampTranscriptOutputOptions(on: &job)
-            jobs.append(job)
-            createRecord(ofRecovered: job, mix: mixURL)
-            eventLog.append(jobID: job.id, event: "recovered", from: nil, to: .waiting)
-        }
-        saveSnapshot()
-        logger.info("Recovered \(candidates.count) orphaned recording(s)")
-        triggerProcessing()
-    }
-
-    /// Recorded, as only the recorder writes to staging, and dated when it entered
-    /// processing, which only keeps its audio longer. A recording from before this
-    /// feature can still arrive here after an upgrade, and is never deleted
-    /// automatically. A date that cannot be read counts as that, the safe side.
-    private func createRecord(ofRecovered job: PipelineJob, mix: URL) {
-        guard let meetingFileStore else { return }
-        var record = MeetingFileRecord(job: job, origin: .recorded, createdBy: meetingFileStore.bundleID)
-        let created = (try? FileManager.default.attributesOfItem(atPath: mix.path))?[.creationDate] as? Date
-        record.excludedFromAutomaticDeletion = created.map { $0 < meetingFileStore.since } ?? true
-        meetingFileStore.create(record)
     }
 }

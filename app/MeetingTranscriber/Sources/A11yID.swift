@@ -19,8 +19,11 @@ import Foundation
 enum A11yID {
     // Settings — section anchors + record-only controls.
     static let recordOnlyToggle = "recordOnlyToggle"
+    static let autoWatchToggle = "autoWatchToggle"
+    /// Stays off the `/ui/press` allowlist: a live press would add a real login item.
+    static let launchAtLoginToggle = "launchAtLoginToggle"
+    static let launchAtLoginHint = "launchAtLoginHint"
     static let watchBrowserToggle = "watchBrowserToggle"
-    static let watchAtLaunchToggle = "watchAtLaunchToggle"
     static let silencePromptToggle = "silencePromptToggle"
     static let silencePromptMinutesStepper = "silencePromptMinutesStepper"
     static let watchSlackToggle = "watchSlackToggle"
@@ -295,6 +298,8 @@ enum A11yID {
     static let includeFullTranscriptToggle = "includeFullTranscriptToggle"
     static let saveRawTranscriptToggle = "saveRawTranscriptToggle"
     static let useAITitleForFilenamesToggle = "useAITitleForFilenamesToggle"
+    static let openAIAPIKeyField = "openAIAPIKeyField"
+    static let claudeAPIKeyField = "claudeAPIKeyField"
     static let openAIAPIKeyPlacementPicker = "openAIAPIKeyPlacementPicker"
     static let openAIAPIKeyHeaderNameField = "openAIAPIKeyHeaderNameField"
     static let openAIAPIKeyHeaderNameWarning = "openAIAPIKeyHeaderNameWarning"
@@ -323,9 +328,11 @@ enum A11yID {
     static let retentionPreviewCancelButton = "retentionPreviewCancelButton"
     static let retentionPreviewConfirmButton = "retentionPreviewConfirmButton"
     static let vadSection = "vadSection"
+    static let staleNamingTimeoutPicker = "staleNamingTimeoutPicker"
     static let echoCancellationToggle = "echoCancellationToggle"
     static let echoDedupToggle = "echoDedupToggle"
     static let diarizationSection = "diarizationSection"
+    static let autoOpenSpeakerNamingToggle = "autoOpenSpeakerNamingToggle"
     static let liveTranscriptionSection = "liveTranscriptionSection"
     static let liveCaptionsOverlayToggle = "liveCaptionsOverlayToggle"
     static let liveCaptionsSizePicker = "liveCaptionsSizePicker"

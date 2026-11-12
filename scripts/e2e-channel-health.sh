@@ -13,16 +13,16 @@
 #   - Pixel-level visual regression: with --screenshot, asserts the
 #     menubar actually renders red-tinted pixels via assert-red-pixels.swift
 #
-# What this does NOT cover (see docs/plans/.local/open/2026-05-17-channel-health-live-e2e.md):
+# What this does NOT cover:
 #   - The polling task lifecycle (start/cancel on `.recording` transitions)
 #   - `.recovered` event path (flag clears back to false on channel unmute)
-#
-# The first two of those gaps are now covered by scripts/e2e-channel-fault.sh,
-# which drives the real CATapDescription tap → LevelPublisher → polling task
-# chain and asserts on what is notified. Note that as of issue #614 a latched
-# episode does NOT notify by itself: the notification follows the capture
-# fault, not the silence episode.
 #   - Real-world false-positive resistance during legitimate recordings
+#
+# The first two are covered by scripts/e2e-channel-fault.sh, which drives the
+# real CATapDescription tap → LevelPublisher → polling task chain and asserts
+# on what is notified. Note that as of issue #614 a latched episode does NOT
+# notify by itself: the notification follows the capture fault, not the
+# silence episode.
 #
 # Runs on:
 #   - Any macOS host with Xcode + zsh + jq
@@ -134,7 +134,9 @@ if [ "$TAKE_SCREENSHOT" = true ]; then
     # by 1-2 frames, so the assertion is polled rather than run once. Cold
     # `swift` invocation per attempt provides the natural pacing.
     if ! screencapture -R 0,0,3000,30 "$OUT" 2>/dev/null || [ ! -s "$OUT" ]; then
-        echo "▸ Menubar screenshot skipped (no display rect available — pixel assertion skipped)"
+        # Through host_skip, so a scheduled run that asked for the pixel
+        # assertion does not read a skipped one as a pass.
+        host_skip channel-health "screencapture produced no image of the menu bar (no display, or this process may not record the screen), so the red-pixel assertion did not run. Fix: $(tcc_fix_hint 'Screen & System Audio Recording')"
         rm -f "$OUT"
     else
         attempt=1

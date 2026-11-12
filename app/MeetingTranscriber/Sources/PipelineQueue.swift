@@ -106,6 +106,19 @@ class PipelineQueue {
     /// without writing into the real user directory; see `AudioPersistencePolicy`.
     let stagingDir: URL
     let diarizeEnabled: Bool
+
+    /// How long a job may wait for its names before `cleanupStalePending()`
+    /// accepts the auto-names (`AppSettings.staleNamingTimeout`); nil keeps it
+    /// waiting. Read through a closure, like `isEchoCancellationEnabled`. Its
+    /// only caller today is the cleanup on snapshot restore, which runs right
+    /// after the queue is built, so in practice a change applies at the next
+    /// launch.
+    private let staleNamingMaxAgeProvider: () -> TimeInterval?
+
+    var staleNamingMaxAge: TimeInterval? {
+        staleNamingMaxAgeProvider()
+    }
+
     /// Leave loudspeaker copies out of the transcript (`AppSettings.echoDedupEnabled`).
     let echoDedupEnabled: Bool
 
@@ -123,6 +136,17 @@ class PipelineQueue {
 
     var echoCancellationEnabled: Bool {
         isEchoCancellationEnabled()
+    }
+
+    /// Pop the naming window when a job reaches `.speakerNamingPending`
+    /// (`AppSettings.autoOpenSpeakerNaming`). Read through a closure for the
+    /// same reason as `isEchoCancellationEnabled`: the queue outlives a
+    /// Settings change. Only the automatic pops ask; a window the user opens,
+    /// or one a late re-run they started returns to, opens regardless.
+    private let isSpeakerNamingAutoOpenEnabled: () -> Bool
+
+    var autoOpensSpeakerNaming: Bool {
+        isSpeakerNamingAutoOpenEnabled()
     }
 
     /// Produces the canceller for a run, or nil when no model can be resolved.
@@ -268,6 +292,11 @@ class PipelineQueue {
     /// DB because their voice sample was unusable (NaN/Inf embedding), at
     /// most once per name and job — for notifications.
     var onUnusableVoices: ((PipelineJob, [String]) -> Void)?
+    /// Called instead of opening the naming window when auto-open is off
+    /// (`AppSettings.autoOpenSpeakerNaming`): with the meeting that just
+    /// started waiting for names, or on launch with all that were already
+    /// waiting — for notifications.
+    var onSpeakerNamesWaiting: (([PipelineJob]) -> Void)?
     /// Names `onUnusableVoices` already reported, per job. A job can be
     /// confirmed more than once (late naming, re-runs): the same name needs
     /// telling once, a newly affected one still does.
@@ -399,12 +428,14 @@ class PipelineQueue {
         notionExportConfigurationProvider: (() -> NotionExportResolution)? = nil,
         terminalJobStore: TerminalJobStore? = nil,
         meetingFileStore: MeetingFileStore? = nil,
+        staleNamingMaxAge: @escaping () -> TimeInterval? = { StaleNamingTimeout.oneDay.maxAge },
         inFlightRuns: InFlightRunRegistry? = nil,
         echoCancellationEnabled: @escaping () -> Bool = { false },
         echoCancellerFactory: (() -> (any EchoCancelling)?)? = nil,
         defaultProtocolTemplateProvider: @escaping () -> ProtocolTemplateID = { .builtIn },
         protocolTemplateRulesProvider: @escaping () -> [ProtocolTemplateRule] = { [] },
         protocolTemplateStore: ProtocolTemplateStore = .production,
+        autoOpenSpeakerNaming: @escaping () -> Bool = { true },
     ) {
         self.logDir = logDir
         self.processedLedger = ProcessedRecordingsLedger(logDir: self.logDir)
@@ -418,9 +449,11 @@ class PipelineQueue {
         scopedOutputDir = nil
         self.stagingDir = stagingDir
         self.diarizeEnabled = false
+        staleNamingMaxAgeProvider = staleNamingMaxAge
         echoDedupEnabled = true
         isEchoCancellationEnabled = echoCancellationEnabled
         self.echoCancellerFactory = echoCancellerFactory ?? { Self.bundledEchoCanceller() }
+        isSpeakerNamingAutoOpenEnabled = autoOpenSpeakerNaming
         self.numSpeakers = 0
         self.micLabel = "Me"
         let outputOptions = TranscriptOutputOptions(
@@ -515,6 +548,29 @@ class PipelineQueue {
             + "or too quiet to remember, so it will not be recognised next time. The transcript keeps the name."
     }
 
+    /// On snapshot restore: brings jobs that still wait for names to the user,
+    /// by the naming window (the same post as after processing, which
+    /// `MeetingTranscriberApp` brings forward) or, with auto-open off, by
+    /// `onSpeakerNamesWaiting`. A job restored already pending never makes the
+    /// `.speakerNamingPending` transition again, so this is its only prompt.
+    func announceRestoredSpeakerNaming() {
+        let waiting = pendingSpeakerNamingJobs
+        guard !waiting.isEmpty else { return }
+        if autoOpensSpeakerNaming {
+            NotificationCenter.default.post(name: .showSpeakerNaming, object: nil)
+        } else {
+            onSpeakerNamesWaiting?(waiting)
+        }
+    }
+
+    /// Notification text for `onSpeakerNamesWaiting`.
+    static func speakerNamesWaitingMessage(_ jobs: [PipelineJob]) -> String {
+        let what = jobs.count == 1
+            ? "\"\(jobs[0].meetingTitle)\" is waiting for speaker names."
+            : "\(jobs.count) meetings are waiting for speaker names."
+        return what + " Open Name Speakers... in the menu bar."
+    }
+
     /// Full init with all processing dependencies.
     init(
         engine: any TranscribingEngine,
@@ -525,9 +581,11 @@ class PipelineQueue {
         logDir: URL,
         stagingDir: URL = AppPaths.recordingsDir,
         diarizeEnabled: Bool = false,
+        staleNamingMaxAge: @escaping () -> TimeInterval? = { StaleNamingTimeout.oneDay.maxAge },
         echoDedupEnabled: Bool = true,
         echoCancellationEnabled: @escaping () -> Bool = { false },
         echoCancellerFactory: (() -> (any EchoCancelling)?)? = nil,
+        autoOpenSpeakerNaming: @escaping () -> Bool = { true },
         numSpeakers: Int = 0,
         micLabel: String = "Me",
         includeFullTranscriptInProtocol: Bool = true,
@@ -562,9 +620,11 @@ class PipelineQueue {
         scopedOutputDir = securityScope.start(outputDir) ? outputDir : nil
         self.stagingDir = stagingDir
         self.diarizeEnabled = diarizeEnabled
+        staleNamingMaxAgeProvider = staleNamingMaxAge
         self.echoDedupEnabled = echoDedupEnabled
         isEchoCancellationEnabled = echoCancellationEnabled
         self.echoCancellerFactory = echoCancellerFactory ?? { Self.bundledEchoCanceller() }
+        isSpeakerNamingAutoOpenEnabled = autoOpenSpeakerNaming
         self.numSpeakers = numSpeakers
         // "Remote" is the reserved routing tag for the app/remote track
         // (DiarizationProcess.remoteSpeakerLabel). If the user names the mic
@@ -901,7 +961,7 @@ class PipelineQueue {
         guard oldState != newState || error != nil else { return }
         jobs[index].state = newState
         if let error { jobs[index].error = error }
-        // The stale-naming day counts from the first entry, see
+        // The stale-naming wait counts from the first entry, see
         // `namingDeadlineStart`. Returning from a late re-diarization is the
         // same wait, not a new one.
         if newState == .speakerNamingPending, jobs[index].namingStartedAt == nil {
@@ -1275,11 +1335,19 @@ class PipelineQueue {
 
     // MARK: - Speaker Naming forwarders
 
-    /// Auto-resolve pending naming items older than maxAge (default: 24h).
+    /// Auto-resolve pending naming items older than the user's
+    /// `staleNamingTimeout` (one day unless changed); does nothing when it is
+    /// `.never`. Runs on snapshot restore.
+    func cleanupStalePending() {
+        guard let maxAge = staleNamingMaxAge else { return }
+        cleanupStalePending(maxAge: maxAge)
+    }
+
+    /// Auto-resolve pending naming items older than `maxAge`.
     /// Thin forwarder passing the queue's already-filtered
     /// `.speakerNamingPending` list to the session, which generates the protocol
     /// with auto-names, transitions them to .done, and deletes sidecar files.
-    func cleanupStalePending(maxAge: TimeInterval = 86400) {
+    func cleanupStalePending(maxAge: TimeInterval) {
         naming.cleanupStalePending(pendingJobs: pendingSpeakerNamingJobs, maxAge: maxAge)
     }
 

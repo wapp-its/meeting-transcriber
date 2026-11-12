@@ -12,7 +12,7 @@ import XCTest
 /// These properties used to be approximated inside the pipeline actors with
 /// re-entrancy guards (the production driver spawned one unstructured `Task`
 /// per buffer, so ordering and stop-completeness were scheduler luck). They
-/// are now properties of the channel itself — one bounded `AsyncStream` per
+/// are now properties of the channel itself — one bounded feed per
 /// channel with a single consumer — and this suite pins them at the boundary
 /// where the recorder hands buffers over.
 ///
@@ -93,9 +93,9 @@ final class LiveCaptionFeedTests: XCTestCase {
         controller.micSink(buffer(value: 0))
         await factory.mic.waitUntilBlocked()
 
-        let total = 2000
+        let total = 80
         for i in 1 ..< total {
-            controller.micSink(buffer(value: Float(i)))
+            controller.micSink(buffer(value: Float(i), sampleCount: 16000))
         }
         await factory.mic.releaseProcess()
         await controller.flush()
@@ -118,6 +118,83 @@ final class LiveCaptionFeedTests: XCTestCase {
         } else {
             XCTFail("at least the newest buffers must have been ingested after release")
         }
+    }
+
+    func testFeedKeepsFixtureBurstForSmallAndLargeBuffers() async {
+        // 176 × 4530 and 1360 × 587 cover the 49.8 s fixture at 16 kHz with two buffer shapes.
+        for (sampleCount, bufferCount) in [(176, 4530), (1360, 587)] {
+            // The fixture arrives much faster than real time; keep its lossless contract.
+            let feed = CaptionChannelFeed(maxQueuedSeconds: 60)
+            let pipeline = RecordingCaptionPipeline()
+            await feed.bind(to: pipeline)
+            feed.sink(buffer(value: 0, sampleCount: sampleCount))
+            await pipeline.waitUntilBlocked()
+
+            for i in 1 ..< bufferCount {
+                feed.sink(buffer(value: Float(i), sampleCount: sampleCount))
+            }
+            await pipeline.release()
+            await feed.retire()
+
+            let events = await pipeline.events
+            XCTAssertEqual(events.count, bufferCount)
+            XCTAssertEqual(events.first, .buffer(0))
+            XCTAssertEqual(events.last, .buffer(Float(bufferCount - 1)))
+        }
+    }
+
+    func testDurationOverflowResetsBeforeNewestAudioAndReportsBacklog() async {
+        for sampleCount in [176, 1360] {
+            let feed = CaptionChannelFeed(maxQueuedSeconds: 60)
+            let pipeline = RecordingCaptionPipeline()
+            await feed.bind(to: pipeline)
+            feed.sink(buffer(value: 0, sampleCount: sampleCount))
+            await pipeline.waitUntilBlocked()
+
+            let bufferCount = 61 * 16000 / sampleCount + 1
+            for i in 1 ..< bufferCount {
+                feed.sink(buffer(value: Float(i), sampleCount: sampleCount))
+            }
+            await pipeline.release()
+            await feed.retire()
+
+            let events = await pipeline.events
+            XCTAssertEqual(events.first, .buffer(0))
+            XCTAssertEqual(events.dropFirst().first, .reset)
+            let tail = events.dropFirst(2)
+            let retainedSamples = tail.count * sampleCount
+            XCTAssertLessThanOrEqual(retainedSamples, 60 * 16000)
+            XCTAssertGreaterThan(retainedSamples, 60 * 16000 - sampleCount)
+            let firstRetained = bufferCount - tail.count
+            XCTAssertTrue(zip(tail, firstRetained ..< bufferCount).allSatisfy { event, index in
+                event == .buffer(Float(index))
+            })
+            let backlog = await pipeline.peakBacklogSeconds
+            XCTAssertGreaterThanOrEqual(backlog, 59)
+        }
+    }
+
+    func testFeedDropsOldestOnOverflowWithOneResetAndCountsDrops() async {
+        let feed = CaptionChannelFeed(maxQueuedSeconds: 5)
+        let pipeline = RecordingCaptionPipeline()
+        await feed.bind(to: pipeline)
+        feed.sink(buffer(value: 0, sampleCount: 16000))
+        await pipeline.waitUntilBlocked()
+
+        // A 0.5 s first buffer makes the count seconds, not buffers.
+        feed.sink(buffer(value: 1, sampleCount: 8000))
+        for i in 2 ... 7 {
+            feed.sink(buffer(value: Float(i), sampleCount: 16000))
+        }
+        await pipeline.release()
+        let drops = await feed.retire()
+
+        let events = await pipeline.events
+        XCTAssertEqual(events, [
+            .buffer(0), .reset,
+            .buffer(3), .buffer(4), .buffer(5), .buffer(6), .buffer(7),
+        ])
+        XCTAssertEqual(drops, CaptionQueueDrops(seconds: 1.5, gaps: 1))
     }
 
     // MARK: - 4. Feed rebinds for the next recording
@@ -180,6 +257,28 @@ final class LiveCaptionFeedTests: XCTestCase {
         )
     }
 
+    /// The controller's default feed bound is what the app runs with: a
+    /// stall of more than 10 s drops the oldest audio instead of letting captions lag.
+    func testControllerDefaultBoundKeepsNewestTenSeconds() async {
+        let factory = ChannelMockFactory()
+        let controller = makeController(factory: factory)
+        await controller.prepare()
+
+        await factory.mic.setBlockNextProcess(true)
+        controller.micSink(buffer(value: 0))
+        await factory.mic.waitUntilBlocked()
+
+        for i in 1 ... 16 {
+            controller.micSink(buffer(value: Float(i), sampleCount: 16000))
+        }
+        await factory.mic.releaseProcess()
+        await controller.flush()
+
+        // Only the newest 10 s (7-16) survive the stall.
+        let appended = await factory.mic.appendedFirstSamples
+        XCTAssertEqual(appended, [0] + (7 ... 16).map(Float.init))
+    }
+
     // MARK: - Helpers
 
     private func makeController(factory: ChannelMockFactory) -> LiveTranscriptionController {
@@ -196,13 +295,57 @@ final class LiveCaptionFeedTests: XCTestCase {
 
     /// A 16-sample 16 kHz mono buffer whose samples all carry `value` so the
     /// mock can identify it by its first sample.
-    private func buffer(value: Float) -> LiveAudioBuffer {
+    private func buffer(value: Float, sampleCount: Int = 16) -> LiveAudioBuffer {
         LiveAudioBuffer(
-            samples: [Float](repeating: value, count: 16),
+            samples: [Float](repeating: value, count: sampleCount),
             channelCount: 1,
             sampleRate: 16000,
             hostTime: 0,
         )
+    }
+}
+
+private actor RecordingCaptionPipeline: LiveCaptionPipeline {
+    enum Event: Equatable {
+        case buffer(Float)
+        case reset
+    }
+
+    private(set) var events: [Event] = []
+    private(set) var peakBacklogSeconds: TimeInterval = 0
+    private var firstIngest = true
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
+    private var blockedWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func ingest(_ buffer: LiveAudioBuffer, backlog: @Sendable () -> TimeInterval) async {
+        if firstIngest {
+            firstIngest = false
+            await withCheckedContinuation { continuation in
+                releaseContinuation = continuation
+                for waiter in blockedWaiters {
+                    waiter.resume()
+                }
+                blockedWaiters.removeAll()
+            }
+        }
+        peakBacklogSeconds = max(peakBacklogSeconds, backlog())
+        events.append(.buffer(buffer.samples[0]))
+    }
+
+    func reset() {
+        events.append(.reset)
+    }
+
+    func flush() {}
+
+    func waitUntilBlocked() async {
+        if releaseContinuation != nil { return }
+        await withCheckedContinuation { blockedWaiters.append($0) }
+    }
+
+    func release() {
+        releaseContinuation?.resume()
+        releaseContinuation = nil
     }
 }
 

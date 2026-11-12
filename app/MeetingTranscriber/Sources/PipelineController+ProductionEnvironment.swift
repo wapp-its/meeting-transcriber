@@ -71,6 +71,7 @@ extension PipelineController {
             }
             await recoverOrphans(
                 into: q, holdingBack: unsettled.map { staging.appendingPathComponent($0 + RecordingFileSuffix.mix) },
+                recordingsDir: staging,
             )
         }
         stagedRecoveryPass = pass
@@ -120,7 +121,7 @@ extension PipelineController {
     static func recoverOrphans(
         into q: PipelineQueue,
         holdingBack mixes: [URL],
-        recordingsDir: URL = AppPaths.recordingsDir,
+        recordingsDir: URL,
     ) async {
         let holds = mixes.map { (id: UUID(), mix: $0) }
         for hold in holds {

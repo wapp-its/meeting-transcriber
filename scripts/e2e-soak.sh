@@ -10,8 +10,9 @@
 #
 # This lane holds ONE meeting open for the requested duration, samples
 # `GET /metrics` throughout, and reports how memory moved across the run. It
-# then asserts the pipeline still produces a job at the end — a soak that leaks
-# and a soak that quietly stops working are different failures, and both matter.
+# then asserts the meeting still lands as a recording at the end — a soak that
+# leaks and a soak that quietly stops working are different failures, and both
+# matter.
 #
 # Measurement: `/metrics` self-reports `physFootprintBytes` (Activity Monitor's
 # "Memory" column) via proc_pid_rusage. Growth is a least-squares slope over all
@@ -161,31 +162,25 @@ case "$SAMPLE_EVERY_MIN" in ''|*[!0-9]*) fail "--sample-every must be a positive
 [ $((SOAK_MINUTES / SAMPLE_EVERY_MIN)) -ge 2 ] \
     || fail "--minutes/--sample-every must yield at least 2 samples (got $((SOAK_MINUTES / SAMPLE_EVERY_MIN)))"
 
-# Address the standard-domain plist directly, and write through
-# `write_dev_default`. `defaults <bundle-id>` is redirected into the app's
-# container once containermanagerd has registered one, while the dev .app is not
-# sandboxed and
-# resolves the standard domain, so the two disagree and a lane can configure
-# nothing at all without any error. See write_dev_default in
-# scripts/lib/e2e-helpers.sh.
-_STANDARD_PLIST="$(dev_standard_plist "$BUNDLE_ID")"
-SAVED_DEBUG_RPC=$(snapshot_default "$_STANDARD_PLIST" debugRPCEnabled)
-SAVED_AUTO_WATCH=$(snapshot_default "$_STANDARD_PLIST" autoWatch)
-SAVED_RECORD_ONLY=$(snapshot_default "$_STANDARD_PLIST" recordOnly)
+# Snapshot the settings this lane changes, in both plists write_dev_default
+# writes, so on_exit puts each back to its own earlier value (see
+# dev_defaults_record in scripts/lib/e2e-helpers.sh).
+DEFAULTS_RECORD="$(mktemp "${TMPDIR:-/tmp}/e2e-soak-defaults.XXXXXX")"
+dev_defaults_record "$DEFAULTS_RECORD" "$BUNDLE_ID" debugRPCEnabled autoWatch recordOnly \
+    || fail "could not record the dev bundle's settings; nothing was changed"
 
 RUN_START_MARKER="$(mktemp "${TMPDIR:-/tmp}/e2e-soak-start.XXXXXX")"
 SIM_PID=""
 
 on_exit() {
     [ -n "${SIM_PID:-}" ] && kill "$SIM_PID" 2>/dev/null || true
-    restore_bool_default "$_STANDARD_PLIST" debugRPCEnabled "$SAVED_DEBUG_RPC"
-    restore_bool_default "$_STANDARD_PLIST" autoWatch       "$SAVED_AUTO_WATCH"
-    restore_bool_default "$_STANDARD_PLIST" recordOnly      "$SAVED_RECORD_ONLY"
     if [ "$APP_AFTER" = quit ]; then
         quit_running_app || true
         sweep_run_artifacts "$REC_DIR" "$RUN_START_MARKER"
     fi
     rm -f "${RUN_START_MARKER:-}" 2>/dev/null || true
+    # After the quit, which may write the app's in-memory settings back.
+    defaults_restore_record "$DEFAULTS_RECORD" || true
 }
 # INT/TERM exit (and so run on_exit once, from EXIT): a trap that only ran
 # on_exit would return into the interrupted command and let the lane carry on
@@ -209,15 +204,20 @@ if [ ! -x "$SIMULATOR_BIN" ]; then
         || fail "meeting-simulator build failed"
 fi
 
+# Quit first, then write: a running app holds its settings in memory and may
+# write them back as it quits, which would undo the writes below (see
+# e2e-channel-fault.sh, where that was measured).
+quit_running_app || true
+
 # Record-only: the soak is about the resident process over an hour, and running
 # transcription on every loop of the fixture would measure the ASR engine
-# instead. The pipeline assertion at the end re-enables the full path.
+# instead. That capture still works at the end is checked by the recording's
+# sidecar, not by a pipeline job.
 write_dev_default "$BUNDLE_ID" debugRPCEnabled true bool
 write_dev_default "$BUNDLE_ID" autoWatch true bool
 write_dev_default "$BUNDLE_ID" recordOnly true bool
 
 mkdir -p "$REC_DIR"
-quit_running_app || true
 log "Launching $DEV_BUNDLE_DEPLOY"
 open "$DEV_BUNDLE_DEPLOY"
 
@@ -228,7 +228,7 @@ log "RPC up"
 # Launch-time work (model preload, snapshot load, orphan recovery) allocates;
 # letting it finish keeps it out of the growth curve, where it would read as a
 # leak in the first samples.
-log "Settling for up to ${SETTLE_TIMEOUT_S}s before the baseline sample"
+log "Settling for ${SETTLE_TIMEOUT_S}s before the baseline sample"
 sleep "$SETTLE_TIMEOUT_S"
 
 # --- soak -----------------------------------------------------------------

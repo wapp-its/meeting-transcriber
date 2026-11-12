@@ -71,6 +71,8 @@ struct SpeakersSettingsView: View {
                 .accessibilityIdentifier(A11yID.diarizationSection)
                 .recordOnlyDisabled(settings.recordOnly)
 
+            speakerNamingSection
+
             if !settings.noMic {
                 Section("Speaker Identity") {
                     HStack {
@@ -136,6 +138,41 @@ struct SpeakersSettingsView: View {
                     experimentalTuningDisclosure
                 }
             }
+        }
+    }
+
+    // MARK: - Speaker Naming Section
+
+    /// Only shown with diarization on: without it no job waits for naming.
+    @ViewBuilder private var speakerNamingSection: some View {
+        if settings.diarize {
+            Section("Speaker Naming") {
+                Toggle("Open naming window automatically", isOn: $settings.autoOpenSpeakerNaming)
+                    .accessibilityIdentifier(A11yID.autoOpenSpeakerNamingToggle)
+                Text("When off, a notification says a meeting is waiting, and you name speakers from the menu bar (Name Speakers...).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Picker("Keep unnamed meetings for", selection: $settings.staleNamingTimeout) {
+                    ForEach(StaleNamingTimeout.allCases) { timeout in
+                        Text(timeout.label).tag(timeout)
+                    }
+                }
+                .pickerStyle(.menu)
+                .accessibilityIdentifier(A11yID.staleNamingTimeoutPicker)
+                Text(settings.staleNamingTimeout.caption)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                // A waiting meeting keeps `PipelineController.canReplaceQueue`
+                // false, so these changes wait for it; with "Forever" nothing
+                // else bounds that wait.
+                Text(
+                    "While a meeting waits for names, changes to the transcription engine, diarization or output folder "
+                        + "apply to new meetings only after it is named or skipped, or after the app restarts.",
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            .recordOnlyDisabled(settings.recordOnly)
         }
     }
 

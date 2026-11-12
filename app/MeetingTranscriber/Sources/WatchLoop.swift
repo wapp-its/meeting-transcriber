@@ -150,7 +150,7 @@ class WatchLoop {
     private var watchTask: Task<Void, Never>?
 
     /// Hook called when state changes (for UI updates, notifications, etc.)
-    var onStateChange: ((State, State) -> Void)?
+    var onStateChange: ((State, State, PhaseChangeCause) -> Void)?
     /// Told true as a detected meeting's capture begins and false once its recorder stopped, also after `stop()` left `.recording`.
     var onMeetingCapture: ((Bool) -> Void)?
     /// Told once a manual recording has ended, after `stopManualRecording` went idle; a quit (`stop()`, `finishForQuit`) never tells it.
@@ -224,10 +224,7 @@ class WatchLoop {
     func start() {
         guard watchTask == nil else { return }
 
-        update { next in
-            next.phase = .watching
-            next.detail = "Polling for meetings..."
-        }
+        returnToWatching()
         logger.info("Watch mode started (poll: \(self.pollInterval)s, grace: \(self.endGracePeriod)s)")
 
         watchTask = Task { [weak self] in
@@ -476,32 +473,40 @@ class WatchLoop {
             try? await sleepProvider(10)
         }
 
-        // Back to watching first, also after a split, so the next recording gets its own `.recording` transition.
-        if !Task.isCancelled {
-            update { next in
-                next.phase = .watching
-                next.currentMeeting = nil
-                next.detail = "Polling for meetings..."
-            }
-        }
-
         // After a split the next call is already live. Neither the cooldown
         // nor a reset applies: the app's confirmation count still stands
         // from the detection that started this recording, so this poll
         // confirms the new call at once instead of `confirmationCount` polls
         // later, which would cut its first seconds. It still passes the
         // consent gate like any detection.
+        var nextCall: DetectedMeeting?
         if endReason == .replacedByNewCall {
             if !Task.isCancelled,
                let next = detector.checkOnce(excluding: appsExcludedFromDetection.union(appsHeldFromDetection)) {
-                if !requestConsentIfNeeded(for: next) { return await runMeeting(next) }
+                if !requestConsentIfNeeded(for: next) { nextCall = next }
             } else {
                 detector.reset()
             }
         } else {
             detector.reset(appName: meeting.pattern.identityKey)
         }
+
+        // Back to watching first, also after a split, so the next recording
+        // gets its own `.recording` transition. Both transitions run in one
+        // main-actor stretch, so no UI renders the gap. A split straight into
+        // the next call is marked so the handler skips what only a real stop
+        // does (see `PhaseChangeCause`).
+        if !Task.isCancelled { returnToWatching(cause: nextCall == nil ? .regular : .callSplit) }
+        if let nextCall { return await runMeeting(nextCall) }
         return false
+    }
+
+    private func returnToWatching(cause: PhaseChangeCause = .regular) {
+        update(cause: cause) { next in
+            next.phase = .watching
+            next.currentMeeting = nil
+            next.detail = "Polling for meetings..."
+        }
     }
 
     // MARK: - Meeting Handling
@@ -570,17 +575,17 @@ class WatchLoop {
     /// separate property writes that consumers could observe mid-flight).
     /// Every way out of `.recording` also ends a pause. Internal so the
     /// extensions in `WatchLoop+*.swift` write through it too.
-    func update(_ transform: (inout WatchLoopState) -> Void) {
+    func update(cause: PhaseChangeCause = .regular, _ transform: (inout WatchLoopState) -> Void) {
         var next = snapshot
         transform(&next)
         if next.phase != .recording { next.pausedSince = nil }
-        apply(next)
+        apply(next, cause: cause)
     }
 
     /// Commit a new snapshot field-wise. Each `if old != new { old = new }`
     /// guard avoids gratuitous `@Observable` invalidations for fields the
     /// transform left alone; emit `onStateChange` if the phase moved.
-    private func apply(_ next: WatchLoopState) {
+    private func apply(_ next: WatchLoopState, cause: PhaseChangeCause) {
         let oldPhase = state
         if state != next.phase { state = next.phase }
         if currentMeeting != next.currentMeeting { currentMeeting = next.currentMeeting }
@@ -592,7 +597,7 @@ class WatchLoop {
         if pausedSince != next.pausedSince { pausedSince = next.pausedSince }
         if oldPhase == .recording, next.phase != .recording { recordingSource = nil }
         if oldPhase != next.phase {
-            onStateChange?(oldPhase, next.phase)
+            onStateChange?(oldPhase, next.phase, cause)
         }
     }
 }

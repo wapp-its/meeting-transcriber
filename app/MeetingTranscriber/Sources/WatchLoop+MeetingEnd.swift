@@ -25,6 +25,14 @@ struct MeetingEndOutcome: Equatable {
     }
 }
 
+/// Why `WatchLoop.onStateChange` fired.
+enum PhaseChangeCause: Equatable {
+    case regular
+    /// Leaving `.recording` for a call split: the next call's recording starts
+    /// in the same main-actor stretch, so this is not a real stop.
+    case callSplit
+}
+
 /// How a detected meeting's recording ends, split out of `WatchLoop.swift` to
 /// keep that file under the line cap.
 ///

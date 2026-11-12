@@ -229,7 +229,8 @@ final class AppPickerViewTests: XCTestCase {
     }
 
     func testMeetingTitleFieldExists() throws {
-        XCTAssertNoThrow(try makeView().inspect().find(ViewType.TextField.self))
+        let field = try makeView().inspect().find(ViewType.TextField.self)
+        XCTAssertEqual(try field.labelView().text().string(), "Meeting title (optional)")
     }
 
     func testRefreshButtonExists() throws {

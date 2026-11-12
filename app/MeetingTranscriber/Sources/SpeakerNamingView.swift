@@ -49,8 +49,7 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
     /// stray Enter/Escape keystrokes that leak from another app's focus when
     /// `bringWindowToFront` steals focus mid-keystroke. Historical pipeline_log data
     /// shows ~19% of speaker-naming sessions exiting within 2-3 s — an isolated cluster
-    /// outside the log-normal human-confirm distribution. See
-    /// `docs/plans/.local/research/2026-05-19-late-speaker-renaming-after-done.md`.
+    /// outside the log-normal human-confirm distribution.
     static let defaultKeyboardGracePeriod: TimeInterval = 0.75
 
     let gracePeriod: TimeInterval
@@ -661,22 +660,11 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
         // Perform file I/O off the main thread
         Task.detached { [source, balanceSampleLevels] in
             do {
-                let (samples, sampleRate) = try await AudioMixer.loadAudioAsFloat32(url: source.url)
-                guard let range = Self.sampleRange(
-                    start: source.start,
-                    end: source.end,
-                    sampleRate: sampleRate,
-                    totalSamples: samples.count,
+                guard let snippet = try await Self.playbackWAVData(
+                    from: source, balanced: balanceSampleLevels,
                 ) else { return }
 
-                let snippet = Self.playbackSnippet(
-                    of: samples, range: range, sampleRate: sampleRate, balanced: balanceSampleLevels,
-                )
-                let tmpPath = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("speaker_\(label).wav")
-                try AudioMixer.saveWAV(samples: snippet, sampleRate: sampleRate, url: tmpPath)
-
-                let newPlayer = try AVAudioPlayer(contentsOf: tmpPath)
+                let newPlayer = try AVAudioPlayer(data: snippet)
                 let duration = newPlayer.duration
 
                 await MainActor.run {
@@ -767,6 +755,30 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
             )
         }
         return snippet
+    }
+
+    /// The WAV to play for `source`, held in memory so that no copy of the
+    /// meeting's audio stays on disk. Unbalanced, only the played span is
+    /// read (`snippetWAVData`). Balanced, the whole track is decoded, because
+    /// `playbackSnippet` judges which frames are speech against the noise
+    /// floor of the whole file.
+    nonisolated static func playbackWAVData(
+        from source: (url: URL, start: TimeInterval, end: TimeInterval),
+        balanced: Bool,
+        scratchDir: URL = FileManager.default.temporaryDirectory,
+    ) async throws -> Data? {
+        guard balanced else {
+            return try snippetWAVData(audioPath: source.url, start: source.start, end: source.end, scratchDir: scratchDir)
+        }
+        let (samples, sampleRate) = try await AudioMixer.loadAudioAsFloat32(url: source.url)
+        guard let range = sampleRange(
+            start: source.start, end: source.end, sampleRate: sampleRate, totalSamples: samples.count,
+        ) else { return nil }
+        let snippet = playbackSnippet(of: samples, range: range, sampleRate: sampleRate, balanced: true)
+        let wav = scratchDir.appendingPathComponent("speaker_snippet_\(UUID().uuidString).wav")
+        defer { try? FileManager.default.removeItem(at: wav) }
+        try AudioMixer.saveWAV(samples: snippet, sampleRate: sampleRate, url: wav)
+        return try Data(contentsOf: wav)
     }
 
     /// Picks the longest temporally-pure segment for `label`, falling back to

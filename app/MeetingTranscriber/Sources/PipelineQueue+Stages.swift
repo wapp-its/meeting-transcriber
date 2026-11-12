@@ -591,7 +591,7 @@ extension PipelineQueue {
                 ctx, engine: engine, workDir: workDir,
                 appAudioPath: appAudioPath, micAudioPath: micAudioPath,
             )
-            let normalizedSegments = normalize(segments, with: normalizer)
+            let normalizedSegments = normalizer.normalize(segments)
             cachedSegments = normalizedSegments
             transcript = normalizedSegments.transcriptText(
                 note: transcriptNote(ctx.jobID), pauses: transcriptPauses(ctx.jobID),
@@ -618,7 +618,7 @@ extension PipelineQueue {
 
             // Use transcribeSegments to cache results for diarization
             let rawSegments = try await engine.transcribeSegments(audioPath: transcriptionPath)
-            var segments = normalize(rawSegments, with: normalizer)
+            var segments = normalizer.normalize(rawSegments)
 
             // Remap timestamps back to original timeline if VAD was used
             if let map = vadMap {
@@ -649,21 +649,6 @@ extension PipelineQueue {
             isDualSource: isDualSource,
             terminologyNormalizer: normalizer,
         )
-    }
-
-    private func normalize(
-        _ segments: [TimestampedSegment],
-        with normalizer: TerminologyNormalizer,
-    ) -> [TimestampedSegment] {
-        guard !normalizer.isEmpty else { return segments }
-        return segments.map { segment in
-            TimestampedSegment(
-                start: segment.start,
-                end: segment.end,
-                text: normalizer.normalize(segment.text),
-                speaker: segment.speaker,
-            )
-        }
     }
 
     /// Stage 2 — optional speaker diarization. Returns the labeled transcript
@@ -928,7 +913,7 @@ extension PipelineQueue {
             return nil
         } else {
             let rawSegments = try await engine.transcribeSegments(audioPath: mix16k)
-            cachedSegments = normalize(rawSegments, with: transcription.terminologyNormalizer)
+            cachedSegments = transcription.terminologyNormalizer.normalize(rawSegments)
         }
         return renderLabeledTranscript(
             run: run, cachedSegments: cachedSegments,
@@ -1018,11 +1003,16 @@ extension PipelineQueue {
         )
 
         // --- Persist 16kHz audio for re-diarization (move instead of copy to avoid double I/O) ---
-        // Reported only when the copy is there: the move may fail, and a stage
-        // that never produced one has nothing to move.
+        // Replacing, because a job run a second time keeps its stem and the
+        // first run's copies are already there; a plain move fails on them.
+        // Only when this run has a copy, so a missing one never costs the old.
+        // Reported only when a copy is there afterwards: the move may fail.
         func moveCopy(_ name: String, suffix: String, as role: MeetingFile.Role) -> (role: MeetingFile.Role, path: URL?) {
+            let source = workDir.appendingPathComponent(name)
             let copy = recordingsDir.appendingPathComponent("\(ctx.slug)\(suffix)")
-            try? FileManager.default.moveItem(at: workDir.appendingPathComponent(name), to: copy)
+            if FileManager.default.fileExists(atPath: source.path) {
+                try? Self.moveIntoPlace(source, to: copy)
+            }
             return (role, FileIdentity.of(copy.path) == nil ? nil : copy)
         }
         var copies = [moveCopy("mix_16k.wav", suffix: "_16k.wav", as: .mix16k)]
@@ -1060,8 +1050,14 @@ extension PipelineQueue {
             // Auto-pop the dialog now that the job is in the right state.
             // The window's onAppear guard reads pendingSpeakerNamingJobs,
             // which only includes .speakerNamingPending jobs, so the
-            // notification has to come after the transition above.
-            NotificationCenter.default.post(name: .showSpeakerNaming, object: nil)
+            // notification has to come after the transition above. With
+            // auto-open off the job waits for the menu bar, and a user
+            // notification says so instead.
+            if autoOpensSpeakerNaming {
+                NotificationCenter.default.post(name: .showSpeakerNaming, object: nil)
+            } else if let job = job(withID: ctx.jobID) {
+                onSpeakerNamesWaiting?([job])
+            }
             // Tests drive naming through an injected handler instead of the UI.
             // Re-invoke it here, after the `.speakerNamingPending` transition,
             // mirroring the late-rerun re-invocation, so the test path runs the
