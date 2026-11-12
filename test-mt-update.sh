@@ -188,6 +188,25 @@ suite() {  # $1 = bash
     s="$(printf '%s\n' "$out" | sed -n 's/^summary=//p')"
     check "ein langer Teil: auf 80 Zeichen gekürzt" "feat/$(printf 'x%.0s' $(seq 1 75))" "$s"
 
+    # 6b. Dasselbe mit Zeichen aus zwei Bytes: Ohne UTF-8-Locale zählt bash 3.2
+    # Bytes; die Kürzung darf kein Zeichen teilen.
+    local long_utf8
+    long_utf8="feat/$(printf 'é%.0s' $(seq 1 90))"
+    git -C "$W" checkout -q -B "$long_utf8" main
+    commit "$W" e.txt e
+    git -C "$W" push -q "$D/fork.git" "$long_utf8"
+    git -C "$W" checkout -q main
+    EXTRA_ENV=("MT_BRANCHES=$long_utf8")
+    porcelain "$sh" "langer Teil mit é"
+    EXTRA_ENV=()
+    s="$(printf '%s\n' "$out" | sed -n 's/^summary=//p')"
+    check "langer Teil mit é: gültiges UTF-8" yes \
+        "$(printf '%s' "$s" | iconv -f UTF-8 -t UTF-8 >/dev/null 2>&1 && echo yes || echo no)"
+    check "langer Teil mit é: höchstens 80 Zeichen" yes \
+        "$([ "$(printf '%s' "$s" | LC_ALL=en_US.UTF-8 wc -m | tr -d ' ')" -le 80 ] && echo yes || echo no)"
+    check "langer Teil mit é: Anfang des Branch-Namens" yes \
+        "$(case "$long_utf8" in "$s"*) [ "${#s}" -gt 40 ] && echo yes || echo no ;; *) echo no ;; esac)"
+
     # 7. Offline / Original nicht erreichbar: Exit weder 0 noch 10, keine Antwort.
     echo "upstream $u | wapp/main $w | local/diag $d" > "$STAMP"
     mv "$D/upstream.git" "$D/upstream.off"
