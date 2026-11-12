@@ -1,0 +1,167 @@
+{
+  "branch_name": "gh-208-last-recording-section",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-11-12T13:27:35.739954Z",
+  "created_at": "2026-11-12T09:43:12.312418Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-208-show-the-last-recording-in-its-own-menu",
+  "impl_review_rounds": {
+    "gh-208-show-the-last-recording-in-its-own-menu.1": 0
+  },
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-11-12T09:47:10.621291Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "095df23316fc9c801e65d1f064d2bdf460fca9c5574d0430c51e4a37602aae86",
+      "backend": "codex",
+      "base_sha": "67518820f1fd23f9667f7b91934585cb14282045",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-21d917a13174f2c3083f1a957df85b36",
+            "classification": "introduced",
+            "findingId": "finding-21d917a13174f2c3083f1a957df85b36",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "ae0e41f1c52c50f794060f465f2afda1420c9c09",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 291272,
+      "output_sha256": "f1c6b0b76ff53323563b2dfa53bbbfc72cb2241371691745fda8c675df22275a",
+      "reservation_id": "56122231a0c5488eba33c007a4dd4611",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-12T09:47:10.583978Z",
+      "tool_calls": 20,
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "cf2e381bebce3adbbfeed4a357c0b677e8724814871329b850f4f39325d51f18",
+      "backend": "codex",
+      "base_sha": "74983b18761ef680a38d3a4070e4b0be62aad574",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "44fb3335d5f7a515be7f4d3b8bd56e3da5c6ca8d",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "1fc2e99ab0744fe2b4d2d7a0b0d79151",
+      "round_consumed": true,
+      "scope": "impl:gh-208-show-the-last-recording-in-its-own-menu.1",
+      "superseded_by": null,
+      "task": "gh-208-show-the-last-recording-in-its-own-menu.1",
+      "timestamp": "2026-11-12T11:55:30.626715Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "d0dd2689b24402c6039969671ec0082c304108f061e3f61f1837bd8809c258cb",
+      "backend": "codex",
+      "base_sha": "67518820f1fd23f9667f7b91934585cb14282045",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "4b7dcc0b5a9dc47219c4e4719c2e5f87f6dddb6d",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 224697,
+      "output_sha256": "375e814ddcc547d804ab7e1f2ac6064918782b5ba237fba91fe5a53cb5cbbd2d",
+      "reservation_id": "c0893a3c9b764984bcb2ef93cc14ca0b",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-12T13:27:35.673821Z",
+      "tool_calls": 32,
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "impl:gh-208-show-the-last-recording-in-its-own-menu.1": 1,
+    "plan": 1,
+    "plan#completion": 1
+  },
+  "review_pending_rounds": {},
+  "review_phase_leases": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-208-show-the-last-recording-in-its-own-menu.1": 0,
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-208-show-the-last-recording-in-its-own-menu.md",
+  "status": "done",
+  "title": "Show the last recording in its own menu section",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABek635A",
+    "identifier": "#208",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/208"
+  },
+  "updated_at": "2026-11-12T13:32:58.083568Z"
+}
