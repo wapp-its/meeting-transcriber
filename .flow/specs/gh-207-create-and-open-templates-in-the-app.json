@@ -242,7 +242,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-207-create-and-open-templates-in-the-app.md",
-  "status": "open",
+  "status": "done",
   "title": "Create and open templates in the app you choose",
   "tracker": {
     "baseHashFlow": "28e6356b99a28935ecfded13127f67f192b35e6ccdb421f74b2db4cc96bff2f2",
@@ -256,5 +256,5 @@
     "mergeBaseTracker": "Creating a meeting-notes template uses a name field inside the settings list that is easy to miss, and Edit always opens the template in the Mac's default app for Markdown files, which may not be the editor you want.\n\nProposed:\n\n- A \"New Template\u2026\" button asks for the name in a small window and says what happens next.\n- Each template's Edit button opens it in the app you chose last; its menu offers Open With (any app that opens Markdown, or another app) and Show in Finder. The app remembers the choice.\n- No editor inside the app: templates stay Markdown files you edit in the app of your choice.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/207"
   },
-  "updated_at": "2026-11-12T20:58:58.899999Z"
+  "updated_at": "2026-11-12T21:02:22.075223Z"
 }

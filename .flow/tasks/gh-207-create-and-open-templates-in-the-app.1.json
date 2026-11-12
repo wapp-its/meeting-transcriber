@@ -10,7 +10,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-207-create-and-open-templates-in-the-app",
   "spec_path": ".flow/tasks/gh-207-create-and-open-templates-in-the-app.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement Create and open templates in the app you choose",
   "updated_at": "2026-11-12T15:07:42.789935Z"
 }
