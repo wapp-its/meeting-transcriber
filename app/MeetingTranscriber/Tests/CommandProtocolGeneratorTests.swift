@@ -13,7 +13,8 @@
         private static let pinned = ProtocolInstructions(template: pinnedPrompt, background: nil)
         private static let codexTemplate = [
             "codex", "exec", "--json", "--ephemeral", "--skip-git-repo-check",
-            "--sandbox", "read-only", "--output-last-message", "{output_file}", "-",
+            "--sandbox", "read-only", "--disable", "apps", "--disable", "plugins", "-c", "notify=[]",
+            "--output-last-message", "{output_file}", "-",
         ]
 
         /// Holds the fake programs and what fakes record.

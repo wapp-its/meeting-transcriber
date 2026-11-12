@@ -45,6 +45,12 @@
 
                 XCTAssertEqual(result, "Protocol", name)
                 XCTAssertEqual(try cli.runArguments(), Self.base + [Self.noSessionPersistence] + expected, name)
+                let listed = ClaudeCLIProtocolGenerator.optionsListed(inHelp: help.joined(separator: "\n"))
+                XCTAssertEqual(
+                    ClaudeCLIProtocolGenerator.missingIsolationOptions(listed: listed),
+                    ["--tools", "--strict-mcp-config", "--setting-sources"].filter { !expected.contains($0) },
+                    "\(name): the run's warning names the options left out",
+                )
             }
         }
 

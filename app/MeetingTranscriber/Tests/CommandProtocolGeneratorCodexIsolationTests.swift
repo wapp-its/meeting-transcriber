@@ -82,6 +82,12 @@
             XCTAssertEqual(try codex.recorded("run-args"), ["exec", "-"])
         }
 
+        /// A control character in a name is escaped too, so the table value
+        /// stays one valid TOML value.
+        func testServerNamesWithControlCharactersStayQuotedKeys() {
+            XCTAssertEqual(CommandProtocolGenerator.tomlQuoted("tab\there\nnl\u{7F}"), #""tab\u0009here\u000Anl\u007F""#)
+        }
+
         // MARK: - Helpers
 
         private struct FakeCodex {

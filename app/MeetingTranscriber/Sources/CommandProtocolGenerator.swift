@@ -24,6 +24,11 @@
         /// Turns a failed run's output into a content-free reason for the
         /// error, or nil when the tool reports none.
         let failureReason: (@Sendable (CLIProcessRunner.Output) -> String?)?
+        /// Arguments only a run can know, put right after the template's
+        /// subcommand (its first argument after the program) once the
+        /// placeholders are replaced, so nothing in them is substituted.
+        /// Nil for the custom command, which runs exactly as the user wrote it.
+        let addedArguments: (@Sendable (RunSetup) async -> [String])?
         var timeout = CLIProcessRunner.defaultTimeout
         /// The most protocol bytes a run may return, from stdout or the output file.
         var maxOutputBytes = CLIProcessRunner.defaultMaxStdoutBytes
@@ -34,23 +39,38 @@
         /// The Codex CLI preset. `--ephemeral` keeps the run out of Codex's
         /// session store, `--skip-git-repo-check` lets it run in the run
         /// folder, `--sandbox read-only` keeps the transcript from steering
-        /// writes, and `--json` makes its error events readable. Model and
-        /// login come from the user's Codex configuration.
+        /// writes, and `--json` makes its error events readable. Model,
+        /// reasoning effort and login come from the user's Codex
+        /// configuration; its connectors, plugins, notify command and MCP
+        /// servers are switched off (see `codexServerOverride(for:)`).
         static func codex(language: String, program: String = "codex") -> Self {
             Self(
                 tool: "Codex CLI",
                 arguments: [
                     program, "exec", "--json", "--ephemeral", "--skip-git-repo-check",
-                    "--sandbox", "read-only", "--output-last-message", "{output_file}", "-",
+                    "--sandbox", "read-only", "--disable", "apps", "--disable", "plugins", "-c", "notify=[]",
+                    "--output-last-message", "{output_file}", "-",
                 ],
                 model: "",
                 language: language,
                 failureReason: codexFailureReason,
+                addedArguments: codexServerOverride(for:),
             )
         }
 
         static func custom(arguments: [String], model: String, language: String) -> Self {
-            Self(tool: "Custom command", arguments: arguments, model: model, language: language, failureReason: nil)
+            Self(
+                tool: "Custom command", arguments: arguments, model: model, language: language,
+                failureReason: nil, addedArguments: nil,
+            )
+        }
+
+        /// What one run starts: the resolved program, its environment and
+        /// its private run folder.
+        struct RunSetup {
+            let executable: URL
+            let environment: [String: String]
+            let directory: URL
         }
 
         // MARK: - ProtocolGenerating
@@ -80,15 +100,20 @@
             let invocation = try Self.prepare(
                 arguments: arguments, model: model, prompt: prompt, transcript: transcript, in: runDirectory,
             )
+            var runArguments = invocation.arguments
+            if let addedArguments {
+                let added = await addedArguments(RunSetup(executable: executable, environment: environment, directory: runDirectory))
+                runArguments.insert(contentsOf: added, at: min(1, runArguments.count))
+            }
             let (inputMode, outputMode) = (invocation.inputMode.rawValue, invocation.outputMode.rawValue)
             let stdinBytes = invocation.standardInput?.count ?? 0
             logger.info(
-                "command_start tool=\(tool, privacy: .public) program=\(programName, privacy: .public) arguments=\(invocation.arguments.count, privacy: .public) input=\(inputMode, privacy: .public) output=\(outputMode, privacy: .public) stdin_bytes=\(stdinBytes, privacy: .public)",
+                "command_start tool=\(tool, privacy: .public) program=\(programName, privacy: .public) arguments=\(runArguments.count, privacy: .public) input=\(inputMode, privacy: .public) output=\(outputMode, privacy: .public) stdin_bytes=\(stdinBytes, privacy: .public)",
             )
             let output = try await run(
                 CLIProcessRunner.Request(
                     executable: executable,
-                    arguments: invocation.arguments,
+                    arguments: runArguments,
                     environment: environment,
                     workingDirectory: runDirectory,
                     standardInput: invocation.standardInput,
