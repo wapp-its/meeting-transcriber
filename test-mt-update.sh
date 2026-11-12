@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Tests für `mt-update --check` und `mt-update --check --porcelain`, ohne Netz und
 # ohne die echte App: Fork und Original sind lokale Bare-Repos in einem
-# Temp-Ordner, curl, xcodebuild und security sind Attrappen, und jedes Programm,
-# mit dem mt-update installieren oder die App beenden würde, schlägt an.
+# Temp-Ordner, curl ist eine Attrappe, und jedes Programm, mit dem mt-update
+# bauen, installieren oder die App beenden würde, schlägt an.
 # Geprüft wird der Vertrag, den die App liest (MtUpdatePorcelain in
 # app/MeetingTranscriber/Sources/MtUpdateContract.swift auf wapp/main):
 # Zeilen format=, status=, summary= und Exit 0 / 10 / sonst.
@@ -65,11 +65,11 @@ setup() {
     git clone -q "$D/fork.git" "$MT"
     git -C "$MT" remote add upstream "$D/upstream.git"
 
-    printf '#!/bin/sh\nprintf "Xcode 26.1\\nBuild version 17B1\\n"\n' > "$D/bin/xcodebuild"
-    printf '#!/bin/sh\nprintf "  1) 0123 \\"Apple Development: Test\\"\\n"\n' > "$D/bin/security"
     # Für pr_merged: kein PR im Original übernommen. Nie ein Netzzugriff.
     printf '#!/bin/sh\necho "$*" >> "%s/curl.log"\necho "[]"\n' "$D" > "$D/bin/curl"
-    for p in osascript open ditto codesign pgrep install; do
+    # Die Prüfung braucht weder Xcode noch Zertifikat; Bauen, Installieren und
+    # Beenden der App sind in ihr verboten.
+    for p in xcodebuild security osascript open ditto codesign pgrep install; do
         printf '#!/bin/sh\necho "%s $*" >> "%s/forbidden.log"\nexit 1\n' "$p" "$D" > "$D/bin/$p"
     done
     chmod +x "$D"/bin/*
@@ -196,6 +196,7 @@ suite() {  # $1 = bash
     check "--check: Exit 0" 0 "$code"
     check "--check: meldet 'Nichts Neues.'" "Nichts Neues." "$(printf '%s\n' "$out" | tail -1)"
     no_ansi "--check"
+    read_only "--check" "$(cat "$STAMP")"
 
     # 9. --porcelain allein und unbekannte Argumente bauen nie.
     run "$sh" --porcelain

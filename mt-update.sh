@@ -90,13 +90,19 @@ fi
 
 # --- 1. Voraussetzungen --------------------------------------------------------
 command -v git >/dev/null || fail "git fehlt"
-xcode="$(xcodebuild -version 2>/dev/null | awk 'NR==1 {print $2}')" || true
-[ -n "$xcode" ] || fail "Xcode fehlt (xcodebuild nicht gefunden)"
-[ "${xcode%%.*}" -ge 26 ] || fail "Xcode $xcode ist zu alt, gebraucht wird 26 oder neuer"
-if ! security find-identity -v -p codesigning 2>/dev/null | grep -q '[0-9]) '; then
-    say "Hinweis: kein Signaturzertifikat gefunden. macOS fragt dann nach jedem Update"
-    say "neu nach Mikrofon-/Bildschirmfreigabe. Abhilfe: Xcode → Settings → Accounts →"
-    say "Apple-ID → Manage Certificates → + Apple Development."
+# Xcode und Zertifikat braucht nur das Bauen. Die Prüfung (--check) baut nichts
+# und fragt xcodebuild darum nicht: `xcodebuild -version` kann hängen (am
+# 2026-11-12 mehrfach über 15 min), und die Update-Prüfung der App bricht nach
+# 5 min ab.
+if ! $CHECK_ONLY; then
+    xcode="$(xcodebuild -version 2>/dev/null | awk 'NR==1 {print $2}')" || true
+    [ -n "$xcode" ] || fail "Xcode fehlt (xcodebuild nicht gefunden)"
+    [ "${xcode%%.*}" -ge 26 ] || fail "Xcode $xcode ist zu alt, gebraucht wird 26 oder neuer"
+    if ! security find-identity -v -p codesigning 2>/dev/null | grep -q '[0-9]) '; then
+        say "Hinweis: kein Signaturzertifikat gefunden. macOS fragt dann nach jedem Update"
+        say "neu nach Mikrofon-/Bildschirmfreigabe. Abhilfe: Xcode → Settings → Accounts →"
+        say "Apple-ID → Manage Certificates → + Apple Development."
+    fi
 fi
 
 # --- 2. Checkout holen ---------------------------------------------------------
