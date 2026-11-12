@@ -1,0 +1,194 @@
+{
+  "branch_name": "gh-196-run-summary-clis-without-the-users",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-11-06T15:41:34.136933Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-196-run-summary-clis-without-the-users",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-11-06T15:52:57.187666Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "472bbbe5f5f311bccd785a47cd9e63b6db2903e696900ebbf83acceaa11dcb6e",
+      "backend": "codex",
+      "base_sha": "c9951a5251e1f90877fca8866a49eb3b52650694",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-d73f2bb6289be12137eb784c68efb0f5",
+            "classification": "introduced",
+            "findingId": "finding-d73f2bb6289be12137eb784c68efb0f5",
+            "firstSeenThisRound": true,
+            "severity": "P0",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "183593038c9eeb1cfc2656f8ae79e66713600d61",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 582287,
+      "output_sha256": "f9e19f1285eca8a992d0a4497556adebf6df07e63974e9f6f9e26323c8c82991",
+      "reservation_id": "7a6d518b872d4cf8b98339789804a170",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-06T15:47:34.165324Z",
+      "tool_calls": 32,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "35292990965fde87924eb52278c903d526cb9f46d4ae6abd8d3465c7e344bb98",
+      "backend": "codex",
+      "base_sha": "c9951a5251e1f90877fca8866a49eb3b52650694",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-d73f2bb6289be12137eb784c68efb0f5",
+            "classification": "introduced",
+            "findingId": "finding-d73f2bb6289be12137eb784c68efb0f5",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-78808cb034de5c2ed025d4089de124c5",
+            "classification": "introduced",
+            "findingId": "finding-78808cb034de5c2ed025d4089de124c5",
+            "firstSeenThisRound": true,
+            "severity": "P0",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "778fa9aa99d7816633e4fa83cac185b72f243010",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1612,
+      "output_sha256": "1d1cae02b01c0f3d8fe2046b4e65e846f6a99348eb9d54e9013d8d6809365052",
+      "reservation_id": "fe1095ef0a8e4c52bb942ad99900e241",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-06T15:51:15.360834Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "718d29422fde90f1fb7e1e476218c8f7c50c7312e21d08d79d89aa8fc7908d87",
+      "backend": "codex",
+      "base_sha": "c9951a5251e1f90877fca8866a49eb3b52650694",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-d73f2bb6289be12137eb784c68efb0f5",
+            "classification": "introduced",
+            "findingId": "finding-d73f2bb6289be12137eb784c68efb0f5",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-78808cb034de5c2ed025d4089de124c5",
+            "classification": "introduced",
+            "findingId": "finding-78808cb034de5c2ed025d4089de124c5",
+            "firstSeenThisRound": false,
+            "severity": "P0",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "7f5dc932ee2781cba52df20229531fbba04851ff",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 666,
+      "output_sha256": "54b80015ed4ec53d6c48bc46f3e5d36056e00816689e2417c5ffaf6bb44b41fd",
+      "reservation_id": "b849b99c45624f278659f2fafac7f14b",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-06T15:52:57.155566Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-196-run-summary-clis-without-the-users.md",
+  "status": "open",
+  "title": "Run summary CLIs without the user's agent setup",
+  "tracker": {
+    "baseHashFlow": "e74a18293e336146216715408f138ceb55d92deb3816491f541a92dfcefa3dce",
+    "baseHashTracker": "634f7afd03b41e5bb4e9fd54884227820464a4e0a26dfec72a79892cabb8378e",
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABdEXm9A",
+    "identifier": "#196",
+    "lastSyncedAt": "2026-11-06T15:41:52.676396Z",
+    "linkState": "linked",
+    "mergeBaseFlow": "# Run summary CLIs without the user's agent setup\n\n## Conversation Evidence\n\nThe fork is public, so the owner's turns are paraphrased, not quoted.\n\n> owner (paraphrased): asked why the installed app was seen in a network monitor connecting to several hosts besides the model provider, among them an MCP server host and a telemetry host.\n> owner (paraphrased): picked locking the summary run down through a spec, over only turning telemetry off and over leaving it as it is.\n> owner (paraphrased): asked whether the same applies to the other AI tools the app can start.\n> owner (selected, paraphrased): ignore the user's own Claude Code settings fully for summary runs.\n> owner (selected, paraphrased): leave the custom command provider untouched.\n\n## Goal & Context\n\nThe app writes the meeting protocol by starting an AI command-line tool: the Claude CLI, or the Codex CLI preset. Both start with the user's own configuration for that tool, which most users set up for coding work, not for summarising meetings. Measured on a developer machine (Claude CLI 2.1.306, Codex CLI 0.162.1):\n\n- **Claude CLI:** a summary run loaded every MCP server the user configured, the account's claude.ai connectors, all built-in tools including shell commands, the user's permission mode (which may let tools run without asking), the user's hooks, plugins and global instructions file, and sent usage telemetry. A one-word prompt used about 20 times the input tokens of an isolated run.\n- **Codex CLI:** already runs with a read-only sandbox and an ephemeral session, but still starts the MCP servers from the user's Codex configuration and runs the configured notify hook.\n\nWhy it matters:\n\n- **Untrusted input meets live tools.** The transcript is whatever was said in the meeting, and it reaches the model as input. With tools in reach, a sentence that reads like an instruction could make the model act: send a message through a connected account, run a command, drive the screen. Nothing suggests this has happened; the exposure exists anyway.\n- **Cost and drift.** The user's setup is paid for in input tokens on every summary, and the user's coding instructions can shape the protocol.\n- **Unexpected traffic.** The app contacts hosts the user never connected to the app.\n\nThe user effect after this spec: a summary run gets the transcript and the prompt and nothing else from the user's agent setup; the protocol is written exactly as before, with the same login and model.\n\n<!-- Source: 0% user / 70% [paraphrase] / 30% [inferred] -->\n\n## Architecture & Data Models\n\n- **One launch configuration per run** owns the isolation. The Claude CLI generator already builds its executable, arguments and environment per run, and already decides whether `--no-session-persistence` goes in by reading the CLI's help text once. The isolation options join that same configuration and the same help-text check; nothing is stored outside the run. [inferred]\n- **The Codex preset is a fixed argument template.** The isolation for Codex is two more configuration overrides in that template; the user's model and login still come from the user's Codex configuration. [inferred]\n- **The custom command and the providers that start no agent CLI** (OpenAI-compatible HTTP, the local model helper) are outside this change. [paraphrase]\n\n## API Contracts\n\nThe contract is what the started tool receives for one summary run.\n\n- **Claude CLI arguments:** today's arguments (`-p - --output-format stream-json --verbose --model sonnet`, plus `--no-session-persistence` when the help lists it), then the isolation options from `## Resolved via Experiment`, each included only when the CLI's help lists it. [inferred]\n- **Claude CLI environment:** today's environment (nested-session variable removed, search paths prepended, the app's API key when set, auto memory off), plus the two isolation variables from `## Resolved via Experiment`, always set, overriding any inherited value. A CLI that does not know a variable ignores it. [inferred]\n- **Codex CLI arguments:** today's preset (`exec --json --ephemeral --skip-git-repo-check --sandbox read-only --output-last-message {output_file} -`) plus the two overrides from `## Resolved via Experiment`. [inferred]\n- **Warning line:** when an isolation option is left out because the help does not list it, the run logs one content-free warning per run naming the missing options (option names only, never transcript text or paths). [inferred]\n\n## Edge Cases & Constraints\n\n- **An older Claude CLI** that lacks an option runs without that option and logs the warning; it is never worse than today. [inferred]\n- **Provider settings kept only in the user's Claude Code settings file** (for example a gateway URL or a cloud provider switch in its environment block) no longer apply to summary runs. Organisation-managed settings still apply, and the app's own API key field keeps working. This is the accepted cost of ignoring the settings file fully. [paraphrase]\n- **A wrapper program** standing in for `claude` (one that sets its own configuration folder) receives the same options and environment; whether it passes them on is its own business. [inferred]\n- **Codex's own built-in instructions and global instructions file** still load: no option removes them without also dropping the user's model choice. Known limit. [inferred]\n- **No real meeting content in tests or probes.** Live checks use a made-up transcript. [inferred]\n\n## Acceptance Criteria\n\n- **R1:** A Claude CLI summary run has no tools available: the CLI's start-up event lists no built-in tools and no MCP tools. Errors: a CLI whose help does not list the tools option runs without it and logs the warning line naming it. [paraphrase]\n- **R2:** A Claude CLI summary run starts no MCP server from any source: none from the user's configuration, none from a project configuration, none of the account's claude.ai connectors. Errors: a CLI whose help does not list the option runs without it and logs the warning line naming it. [paraphrase]\n- **R3:** A Claude CLI summary run ignores the user's, project and local Claude Code settings files: no hook runs, no plugin enabled there loads, the user's permission mode and global instructions file do not apply. Errors: a CLI whose help does not list the option runs without it and logs the warning line naming it. [paraphrase]\n- **R4:** A Claude CLI summary run sends no nonessential traffic (usage telemetry, error reports): the CLI's start-up event reports analytics disabled. No error surface beyond an older CLI ignoring the variable. [paraphrase]\n- **R5:** Login and model are unchanged: a CLI signed in with its own login, and a run with the app's API key field set, each still return a protocol for a made-up transcript, on the same model as before. Errors: a signed-out CLI fails with today's error, unchanged. [inferred]\n- **R6:** The Codex CLI preset starts no MCP server from the user's Codex configuration and runs no notify hook, while keeping its read-only sandbox, its ephemeral session, and the model and login from the user's configuration. Errors: a Codex CLI too old for an option the preset needs fails with today's update hint, unchanged. [paraphrase]\n\n## Boundaries\n\n- The custom command provider is unchanged: no added arguments, no environment changes. [paraphrase]\n- No setting to switch the isolation off. [inferred]\n- The help-probe timeout and the fail-or-degrade rule for a missing capability are not changed here; that question is open on #85. [inferred]\n- The OpenAI-compatible and local model providers are not touched; they start no agent CLI. [inferred]\n- Submitting this to the original project is a separate step, not part of this spec. [inferred]\n\n## Decision Context\n\n- **D1 \u00b7 Lock the summary run down instead of only turning telemetry off or blocking hosts in a firewall.** why: tools stay in reach while the model reads untrusted transcript text, and a firewall rule protects one machine only \u00b7 alternatives: B telemetry off only, C leave it and block hosts locally \u00b7 status: active [owner-ratified 2026-11-06]\n- **D2 \u00b7 The Codex CLI preset gets the same treatment.** why: the owner asked whether other AI tools are affected, and Codex was measured loading its configured MCP servers and notify hook \u00b7 status: active [owner-ratified 2026-11-06]\n- **D3 \u00b7 The user's Claude Code settings files are ignored entirely for summary runs.** why: simplest and strongest, proven in a test run with login intact; switching settings off one by one lets each new CLI feature back in, and the global instructions file cannot be switched off that way \u00b7 alternatives: B keep the settings file and switch parts off \u00b7 status: active [owner-ratified 2026-11-06]\n- **D4 \u00b7 The custom command provider stays untouched, without a settings hint.** why: the app cannot know another tool's options, and the user chose that command \u00b7 alternatives: add one sentence in Settings (declined) \u00b7 status: active [owner-ratified 2026-11-06]\n- **A1 \u00b7 An isolation option the installed Claude CLI does not list in its help is left out, and the run goes ahead with a content-free warning, the same rule session persistence follows today.** flip at: the decision on #85 (fail or degrade for a missing capability, one rule for every preset) \u00b7 test: a launch-configuration unit test with a help text lacking each option \u00b7 status: active [agent-assumed 2026-11-06]\n- **A2 \u00b7 Codex keeps the model and login from the user's configuration; only its MCP servers and notify hook are overridden.** flip at: a Codex option that drops the user configuration but keeps the model \u00b7 test: a preset-arguments unit test \u00b7 status: active [agent-inferred 2026-11-06]\n- **A3 \u00b7 No setting to switch the isolation off.** flip at: a user report that needs their own agent setup inside summaries \u00b7 test: none, an absence \u00b7 status: active [agent-assumed 2026-11-06]\n\n## Resolved via Experiment\n\nMeasured on 2026-10-21 and 2026-11-06 with a one-word prompt, from an empty folder, on a machine with a typical coding agent setup.\n\n- **Claude CLI 2.1.306, today's arguments:** start-up event listed the user's MCP servers (including claude.ai connectors), 172 tools including shell commands, permission mode `auto`, seven start-up hooks and the user's plugins.\n- **Claude CLI 2.1.306 with `--tools \"\"`, `--strict-mcp-config` (no `--mcp-config`), `--setting-sources \"\"`, and the environment variables `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` and `ENABLE_CLAUDEAI_MCP_SERVERS=false`:** no tools, no MCP servers, no hook events, `analytics_disabled: true`, permission mode `default`, login through the CLI's own sign-in still worked, input about 20 times smaller. Which of the two MCP-related settings removes the claude.ai connectors was not separated.\n- **`--bare` was rejected:** its help says it never reads the CLI's own sign-in or keychain, so a subscription login would stop working.\n- **Codex CLI 0.162.1, today's preset:** the user's configured MCP servers start and the notify hook is configured. With `-c 'mcp_servers={}'` the input dropped by the servers' tool definitions and the protocol text still came back. `-c 'notify=[]'` is expected to clear the hook; not measured yet. `--ignore-user-config` also works but drops the user's model choice, which the preset relies on.\n",
+    "mergeBaseTracker": "## BACKGROUND\n\nThe app can write a protocol with the Claude CLI or the Codex CLI preset. That CLI then starts with the user's own setup for the tool. This includes their MCP servers and connectors, tools (also shell commands), hooks, plugins, global instructions and telemetry. The transcript is untrusted input, so these tools should not be in reach. The extra setup also costs input tokens on every summary.\n\n## TASKS\n\n- [ ] Start both CLIs without the user's setup, with the same login and model\n- [ ] Keep the custom command provider as it is",
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/196"
+  },
+  "updated_at": "2026-11-12T09:36:00.435249Z"
+}
