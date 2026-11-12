@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-207-create-and-open-templates-in-the-app",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-11-12T20:58:58.895043Z",
   "created_at": "2026-11-12T14:46:58.086269Z",
   "default_impl": null,
   "default_review": null,
@@ -190,17 +190,54 @@
       "task": "gh-207-create-and-open-templates-in-the-app.1",
       "timestamp": "2026-11-12T16:35:22.787446Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "163884d129c9bde90a77a110f91854f4d0b125e1f5ef6b17cec207c555cafc9e",
+      "backend": "codex",
+      "base_sha": "4f3818b4cee0eabc6682b4ac743ae66ae99d533a",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "e07b78ad838be2d1746ad6e58f9aed622b6beb70",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 318581,
+      "output_sha256": "d075a2b6ea331f57c20e75ee819dbc0bca46da48d4830c15897d25550ede75dd",
+      "reservation_id": "ad7defbd155c452ab2b77c7686af29a5",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-12T20:58:58.866326Z",
+      "tool_calls": 23,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-207-create-and-open-templates-in-the-app.1": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-207-create-and-open-templates-in-the-app.1": 0,
     "plan": 0
   },
@@ -219,5 +256,5 @@
     "mergeBaseTracker": "Creating a meeting-notes template uses a name field inside the settings list that is easy to miss, and Edit always opens the template in the Mac's default app for Markdown files, which may not be the editor you want.\n\nProposed:\n\n- A \"New Template\u2026\" button asks for the name in a small window and says what happens next.\n- Each template's Edit button opens it in the app you chose last; its menu offers Open With (any app that opens Markdown, or another app) and Show in Finder. The app remembers the choice.\n- No editor inside the app: templates stay Markdown files you edit in the app of your choice.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/207"
   },
-  "updated_at": "2026-11-12T16:35:39.315305Z"
+  "updated_at": "2026-11-12T20:58:58.899999Z"
 }
