@@ -1,13 +1,16 @@
-// Settings → Output → Protocol Templates: the default template, one row per
-// template file with Edit and Delete, Create Template and Open Templates Folder.
+// Settings → Output → Meeting Notes Templates: the default template, one row per
+// template file with the split button Edit and Delete, New Template… and Open
+// Templates Folder. Templates open in the app the user chose last
+// (`TemplateEditor`); the New Template window is `NewProtocolTemplateSheet`.
 
 import AppKit
 import Observation
 import SwiftUI
 
-/// What the Meeting Notes Templates section shows and every write it makes, held as
-/// a reference type so a test reads back the object the view writes to (as
-/// with `SpeakerNamingRowState`, CLAUDE.md, GUI Testing, rung 2).
+/// What the Meeting Notes Templates section and its New Template window show, and
+/// every write they make, held as a reference type so a test reads back the
+/// object the view writes to (as with `SpeakerNamingRowState`, CLAUDE.md, GUI
+/// Testing, rung 2).
 ///
 /// Reads the folder through the store on `reload()`, never caches template
 /// text, and never writes the migration marker, so a migration that failed
@@ -19,26 +22,42 @@ final class ProtocolTemplatesModel {
 
     /// Template names in Finder's order, as of the last `reload()`.
     private(set) var names: [String] = []
-    /// What the name field holds.
-    var newName = ""
-    /// The refusal or I/O error of the last create, delete or folder open.
-    private(set) var message: String?
+    /// The line under New Template…, about the last action that went wrong;
+    /// the next successful open, create, delete or folder open clears it.
+    private(set) var notice: ProtocolTemplatesNotice?
     /// The template whose Delete was pressed and awaits confirmation.
     var pendingDeletion: String?
 
+    /// Whether the New Template window is shown.
+    var isNewTemplateShown = false
+    /// What the window's Name field holds.
+    var newTemplateName = "" {
+        didSet { createError = nil }
+    }
+
+    /// Why the window's last Create failed; typing clears it.
+    private(set) var createError: String?
+
+    /// The open started last. Read by tests, which wait for it.
+    @ObservationIgnored private(set) var openTask: Task<Void, Never>?
+
     private let store: ProtocolTemplateStore
     private let settings: AppSettings
+    private let opener: TemplateOpener
     private let openFile: (URL) -> Void
     private let trashItem: (URL) throws -> Void
 
+    /// `openFile` opens the templates folder; templates open through `opener`.
     init(
         store: ProtocolTemplateStore,
         settings: AppSettings,
+        opener: TemplateOpener = .live,
         openFile: @escaping (URL) -> Void = { _ = NSWorkspace.shared.open($0) },
         trashItem: @escaping (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) },
     ) {
         self.store = store
         self.settings = settings
+        self.opener = opener
         self.openFile = openFile
         self.trashItem = trashItem
     }
@@ -49,6 +68,20 @@ final class ProtocolTemplatesModel {
     var defaultSelection: ProtocolTemplateID {
         get { listed(store.effectiveDefault(settings.defaultProtocolTemplate)) }
         set { settings.defaultProtocolTemplate = newValue }
+    }
+
+    /// The app Edit and Create open a template in.
+    var editor: TemplateEditor {
+        TemplateEditor.resolve(
+            remembered: settings.templateEditorBundleIdentifier,
+            installedApp: opener.installedApp,
+            defaultApp: opener.defaultMarkdownApp,
+        )
+    }
+
+    /// Every template's Open With submenu.
+    var openWithEntries: [TemplateOpenWithEntry] {
+        TemplateOpenWithEntry.entries(defaultApp: opener.defaultMarkdownApp(), offered: opener.markdownApps())
     }
 
     func reload() {
@@ -63,24 +96,6 @@ final class ProtocolTemplatesModel {
               let listedName = names.first(where: { $0.caseInsensitiveCompare(name) == .orderedSame })
         else { return id }
         return .file(name: listedName)
-    }
-
-    /// Creates a template from the built-in text under the typed name and
-    /// opens it; a refused name or a failed write leaves the field as typed.
-    func create() {
-        do {
-            let url = try store.create(name: newName)
-            newName = ""
-            message = nil
-            openFile(url)
-        } catch {
-            message = error.localizedDescription
-        }
-        reload()
-    }
-
-    func edit(_ name: String) {
-        openFile(store.fileURL(named: name))
     }
 
     func requestDelete(_ name: String) {
@@ -98,9 +113,9 @@ final class ProtocolTemplatesModel {
             if deletesTheDefault {
                 settings.defaultProtocolTemplate = .builtIn
             }
-            message = nil
+            notice = nil
         } catch {
-            message = error.localizedDescription
+            notice = .error(error.localizedDescription)
         }
         reload()
     }
@@ -109,24 +124,144 @@ final class ProtocolTemplatesModel {
     func openFolder() {
         do {
             try FileManager.default.createDirectory(at: store.directory, withIntermediateDirectories: true)
-            message = nil
+            notice = nil
             openFile(store.directory)
         } catch {
-            message = error.localizedDescription
+            notice = .error(error.localizedDescription)
+        }
+    }
+
+    // MARK: - New Template window
+
+    func showNewTemplate() {
+        newTemplateName = ""
+        isNewTemplateShown = true
+    }
+
+    func cancelNewTemplate() {
+        isNewTemplateShown = false
+    }
+
+    /// The store's refusal of the typed name against the folder as last
+    /// listed, nil for an empty name, which only disables Create.
+    var nameRefusal: String? {
+        do {
+            _ = try ProtocolTemplateName.validate(newTemplateName, existing: names)
+            return nil
+        } catch ProtocolTemplateName.Refusal.empty {
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    /// The red line under the Name field.
+    var nameProblem: String? {
+        createError ?? nameRefusal
+    }
+
+    var canCreate: Bool {
+        (try? ProtocolTemplateName.validate(newTemplateName, existing: names)) != nil
+    }
+
+    /// The window's note for the name typed so far.
+    var newTemplateNote: String {
+        editor.newTemplateNote(name: newTemplateName)
+    }
+
+    /// Creates a template from the built-in text under the typed name, closes
+    /// the window and opens the file in the editor app. The store checks the
+    /// name against the folder again, so one taken since the window opened is
+    /// refused; a refusal or a failed write keeps the window and the name.
+    func createTemplate() {
+        do {
+            let url = try store.create(name: newTemplateName)
+            isNewTemplateShown = false
+            newTemplateName = ""
+            notice = nil
+            reload()
+            openInEditor(url)
+        } catch {
+            reload()
+            createError = error.localizedDescription
+        }
+    }
+
+    // MARK: - Opening templates
+
+    func edit(_ name: String) {
+        openInEditor(store.fileURL(named: name))
+    }
+
+    /// Opens the template in `app` and makes it the editor app for every
+    /// template.
+    func openWith(_ app: TemplateEditorApp, template name: String) {
+        settings.templateEditorBundleIdentifier = app.bundleIdentifier
+        open(store.fileURL(named: name), in: app)
+    }
+
+    /// Asks for any app, then does what Open With does with it.
+    func openWithOtherApp(template name: String) {
+        guard let app = opener.chooseApp() else { return }
+        openWith(app, template: name)
+    }
+
+    func showInFinder(_ name: String) {
+        do {
+            try opener.reveal(store.fileURL(named: name))
+        } catch {
+            notice = .error(error.localizedDescription)
+        }
+    }
+
+    private func openInEditor(_ file: URL) {
+        switch editor {
+        case let .app(app):
+            open(file, in: app)
+
+        case let .missing(bundleIdentifier):
+            settings.templateEditorBundleIdentifier = nil
+            showInFinder(file, because: .notFound(app: bundleIdentifier))
+
+        case .noApp:
+            showInFinder(file, because: .noApp)
+        }
+    }
+
+    private func open(_ file: URL, in app: TemplateEditorApp) {
+        openTask = Task {
+            do {
+                try await opener.open(file, app)
+                notice = nil
+            } catch {
+                showInFinder(file, because: .couldNotOpen(app: app.name))
+            }
+        }
+    }
+
+    private func showInFinder(_ file: URL, because failure: TemplateOpenFailure) {
+        let fileName = file.lastPathComponent
+        do {
+            try opener.reveal(file)
+            notice = .warning(failure.shownInFinder(file: fileName))
+        } catch {
+            notice = .warning(failure.notShown(file: fileName, error: error.localizedDescription))
         }
     }
 }
 
-/// The Meeting Notes Templates section. Rows and their buttons are addressed by row
-/// index, never by template name, because a name is user input and `/ui/tree`
-/// publishes identifiers unredacted.
-struct ProtocolTemplatesSettingsView: View {
-    private static let helpText = """
-    Templates are Markdown files in this folder. {LANGUAGE}, {MEETING_DATE} and {MEETING_TIME} \
-    are filled in for every template. Background info entered for a meeting is added to the \
-    prompt automatically.
-    """
+/// The line under New Template….
+enum ProtocolTemplatesNotice: Equatable {
+    /// A failed delete, folder open or Show in Finder, in red.
+    case error(String)
+    /// A template shown in Finder instead of opened, in orange with a warning icon.
+    case warning(String)
+}
 
+/// The Meeting Notes Templates section. Rows and their controls are addressed by
+/// row index, never by template name, because a name is user input and
+/// `/ui/tree` publishes identifiers unredacted.
+struct ProtocolTemplatesSettingsView: View {
     /// SwiftUI keeps the first object it is handed for the view's lifetime, so
     /// a test holds the object every control of this section writes to.
     @State private var model: ProtocolTemplatesModel
@@ -136,13 +271,12 @@ struct ProtocolTemplatesSettingsView: View {
     }
 
     var body: some View {
+        let editor = model.editor
         Section("Meeting Notes Templates") {
             defaultPicker
-            templateRows
-            createRow
-            Button("Open Templates Folder") { model.openFolder() }
-                .accessibilityIdentifier(A11yID.protocolTemplatesOpenFolderButton)
-            Text(Self.helpText)
+            templateRows(editor: editor)
+            actionsRow
+            Text(editor.helpText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -166,13 +300,13 @@ struct ProtocolTemplatesSettingsView: View {
         }
     }
 
-    private var templateRows: some View {
-        ForEach(Array(model.names.enumerated()), id: \.element) { index, name in
+    private func templateRows(editor: TemplateEditor) -> some View {
+        let openWith = model.openWithEntries
+        return ForEach(Array(model.names.enumerated()), id: \.element) { index, name in
             HStack {
                 Text(name)
                 Spacer()
-                Button("Edit") { model.edit(name) }
-                    .accessibilityIdentifier(A11yID.protocolTemplateEdit(index))
+                editButton(row: index, template: name, editor: editor, openWith: openWith)
                 Button("Delete") { model.requestDelete(name) }
                     .accessibilityIdentifier(A11yID.protocolTemplateDelete(index))
                     .confirmationDialog(
@@ -186,19 +320,80 @@ struct ProtocolTemplatesSettingsView: View {
         }
     }
 
-    private var createRow: some View {
+    /// Edit opens the template in the editor app; its arrow opens the menu.
+    private func editButton(
+        row: Int, template name: String, editor: TemplateEditor, openWith: [TemplateOpenWithEntry],
+    ) -> some View {
+        Menu {
+            if let appName = editor.appName {
+                Button("Open in \(appName)") { model.edit(name) }
+                    .accessibilityIdentifier(A11yID.protocolTemplateOpenInEditor(row))
+                Divider()
+            }
+            Menu("Open With") {
+                openWithItems(row: row, template: name, entries: openWith)
+            }
+            Button("Show in Finder") { model.showInFinder(name) }
+                .accessibilityIdentifier(A11yID.protocolTemplateShowInFinder(row))
+        } label: {
+            Text("Edit")
+        } primaryAction: {
+            model.edit(name)
+        }
+        .fixedSize()
+        .accessibilityIdentifier(A11yID.protocolTemplateEdit(row))
+    }
+
+    private func openWithItems(row: Int, template name: String, entries: [TemplateOpenWithEntry]) -> some View {
+        ForEach(Array(entries.enumerated()), id: \.offset) { position, entry in
+            switch entry {
+            case let .app(app, title):
+                Button(title) { model.openWith(app, template: name) }
+                    .accessibilityIdentifier(A11yID.protocolTemplateOpenWithApp(row, position))
+
+            case .separator:
+                Divider()
+
+            case .other:
+                Button(TemplateOpenWithEntry.otherTitle) { model.openWithOtherApp(template: name) }
+                    .accessibilityIdentifier(A11yID.protocolTemplateOpenWithOther(row))
+            }
+        }
+    }
+
+    private var actionsRow: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                TextField("New template name", text: $model.newName)
-                    .accessibilityIdentifier(A11yID.protocolTemplateNameField)
-                Button("Create Template") { model.create() }
-                    .accessibilityIdentifier(A11yID.protocolTemplateCreateButton)
+                Button {
+                    model.showNewTemplate()
+                } label: {
+                    Label("New Template…", systemImage: "plus")
+                }
+                .accessibilityIdentifier(A11yID.protocolTemplateNewButton)
+                .sheet(isPresented: $model.isNewTemplateShown) {
+                    NewProtocolTemplateSheet(model: model)
+                }
+                Button("Open Templates Folder") { model.openFolder() }
+                    .accessibilityIdentifier(A11yID.protocolTemplatesOpenFolderButton)
             }
-            if let message = model.message {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
+            noticeLine
+        }
+    }
+
+    @ViewBuilder private var noticeLine: some View {
+        switch model.notice {
+        case let .error(text):
+            Text(text)
+                .font(.caption)
+                .foregroundStyle(.red)
+
+        case let .warning(text):
+            Label(text, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption)
+                .foregroundStyle(.orange)
+
+        case nil:
+            EmptyView()
         }
     }
 
