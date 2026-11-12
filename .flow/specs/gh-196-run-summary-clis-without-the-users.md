@@ -79,6 +79,8 @@ The contract is what the started tool receives for one summary run.
 - **A3 · No setting to switch the isolation off.** flip at: a user report that needs their own agent setup inside summaries · test: none, an absence · status: active [agent-assumed 2026-11-06]
 - **A4 · Codex keeps the model, reasoning effort and login from the user's configuration; its MCP servers are switched off one by one by name, plus its connectors, plugins and notify hook.** why: the Settings text promises model and effort from Codex's configuration, and the one switch that drops everything (`--ignore-user-config`) breaks that promise · flip at: the owner prefers ignoring the whole Codex configuration as D3 does for Claude, with Codex's default model · test: R6's sentinel run · alternatives: B `--ignore-user-config` · status: superseded by D5 [agent-assumed 2026-11-06]
 
+FIT: GO · 2026-11-12 · base 98c2184d · engine flow-next 9.9.1 · the Claude CLI launcher, its session-persistence file and the Codex preset are unchanged since the plan review; gh-189/gh-190 touched only template and regeneration code; no open issue or PR in the original covers this
+
 ## Resolved via Experiment
 
 Measured on 2026-10-21 and 2026-11-06 with a one-word prompt, from an empty folder, on a machine with a typical coding agent setup.
