@@ -1,0 +1,33 @@
+{
+  "branch_name": "gh-77-record-only-mode-file-a-recording",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-11-12T20:43:15.851448Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-77-record-only-mode-file-a-recording",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 0,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/gh-77-record-only-mode-file-a-recording.md",
+  "status": "open",
+  "title": "Record-only mode: file a recording recovered after a crash instead of processing it",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABVe4w-g",
+    "identifier": "#77",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/77"
+  },
+  "updated_at": "2026-11-12T20:43:49.065083Z"
+}

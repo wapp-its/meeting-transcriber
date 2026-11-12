@@ -579,8 +579,8 @@ final class SettingsViewTests: XCTestCase { // swiftlint:disable:this type_body_
         let store = try ProtocolTemplateStore(directory: makeTempDirectory(prefix: "settings-templates"))
         let body = try OutputSettingsView(settings: makeSettings(), templateStore: store).inspect()
         for identifier in [
-            A11yID.protocolTemplateDefaultPicker, A11yID.protocolTemplateNameField,
-            A11yID.protocolTemplateCreateButton, A11yID.protocolTemplatesOpenFolderButton,
+            A11yID.protocolTemplateDefaultPicker, A11yID.protocolTemplateNewButton,
+            A11yID.protocolTemplatesOpenFolderButton,
         ] {
             XCTAssertNoThrow(try body.find(viewWithAccessibilityIdentifier: identifier), identifier)
         }

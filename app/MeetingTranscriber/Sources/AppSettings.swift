@@ -771,6 +771,14 @@ final class AppSettings { // swiftlint:disable:this type_body_length
     /// `ProtocolTemplateMigration`, which sets it when it is absent.
     static let defaultProtocolTemplateKey = "defaultProtocolTemplate"
 
+    /// The app meeting-notes templates open in, by bundle identifier: the one
+    /// last chosen under Open With or Other… in Settings → Output. Absent until
+    /// one is chosen, which means the Mac's default app for Markdown files
+    /// (`TemplateEditor.resolve`).
+    var templateEditorBundleIdentifier: String? {
+        didSet { defaults.set(templateEditorBundleIdentifier, forKey: "templateEditorBundleIdentifier") }
+    }
+
     /// The template rules, in the order they are tried: a new meeting gets the
     /// template of the first rule whose pattern matches its title, else the
     /// default (`ProtocolTemplateRules.resolve`). Kept per build, like the
@@ -1146,6 +1154,7 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         #endif
         protocolLanguage = defaults.string(forKey: "protocolLanguage") ?? "German"
         defaultProtocolTemplate = ProtocolTemplateID(storedValue: defaults.string(forKey: Self.defaultProtocolTemplateKey) ?? "")
+        templateEditorBundleIdentifier = defaults.string(forKey: "templateEditorBundleIdentifier")
         protocolTemplateRules = ProtocolTemplateRule.list(fromStored: defaults.array(forKey: Self.protocolTemplateRulesKey) ?? [])
         includeFullTranscriptInProtocol = defaults.bool(forKey: "includeFullTranscriptInProtocol", default: true)
         saveRawTranscriptSeparately = defaults.bool(forKey: "saveRawTranscriptSeparately", default: true)
