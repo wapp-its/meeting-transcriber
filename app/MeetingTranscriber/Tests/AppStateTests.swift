@@ -774,10 +774,12 @@ final class AppStateTests: XCTestCase { // swiftlint:disable:this type_body_leng
             XCTAssertEqual(generator.tool, "Codex CLI")
             XCTAssertEqual(generator.arguments, [
                 "codex", "exec", "--json", "--ephemeral", "--skip-git-repo-check",
-                "--sandbox", "read-only", "--output-last-message", "{output_file}", "-",
+                "--sandbox", "read-only", "--disable", "apps", "--disable", "plugins", "-c", "notify=[]",
+                "--output-last-message", "{output_file}", "-",
             ])
             XCTAssertEqual(generator.language, "English")
             XCTAssertNotNil(generator.failureReason)
+            XCTAssertNotNil(generator.addedArguments, "the Codex preset must switch the configured MCP servers off per run")
         }
 
         func testMakeProtocolGeneratorCustomCommand() throws {
@@ -793,6 +795,7 @@ final class AppStateTests: XCTestCase { // swiftlint:disable:this type_body_leng
             XCTAssertEqual(generator.model, "qwen3:32b")
             XCTAssertEqual(generator.language, "English")
             XCTAssertNil(generator.failureReason)
+            XCTAssertNil(generator.addedArguments, "the custom command runs exactly as written")
         }
     #endif
 

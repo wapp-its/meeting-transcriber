@@ -9,7 +9,8 @@
 
         func testBuildSubprocessArgsAddsTheFlagWhenTheCLISupportsIt() {
             let args = ClaudeCLIProtocolGenerator.buildSubprocessArgs(
-                claudeBin: "claude", resolvedBin: "/opt/homebrew/bin/claude", noSessionPersistence: true,
+                claudeBin: "claude", resolvedBin: "/opt/homebrew/bin/claude",
+                options: [ClaudeCLIProtocolGenerator.noSessionPersistenceFlag],
             )
             XCTAssertEqual(
                 args,
@@ -18,12 +19,16 @@
         }
 
         func testHelpListsNoSessionPersistenceReadsTheOptionList() {
-            XCTAssertTrue(ClaudeCLIProtocolGenerator.helpListsNoSessionPersistence(
-                "  --no-session-persistence              Disable session persistence - sessions",
-            ))
-            XCTAssertFalse(ClaudeCLIProtocolGenerator.helpListsNoSessionPersistence(
-                "  -p, --print                           Print response and exit",
-            ))
+            XCTAssertEqual(
+                ClaudeCLIProtocolGenerator.optionsListed(
+                    inHelp: "  --no-session-persistence              Disable session persistence - sessions",
+                ),
+                [ClaudeCLIProtocolGenerator.noSessionPersistenceFlag],
+            )
+            XCTAssertEqual(
+                ClaudeCLIProtocolGenerator.optionsListed(inHelp: "  -p, --print                           Print response and exit"),
+                [],
+            )
         }
 
         // MARK: - generate (subprocess)

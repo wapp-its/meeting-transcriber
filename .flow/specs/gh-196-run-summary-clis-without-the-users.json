@@ -1,14 +1,16 @@
 {
   "branch_name": "gh-196-run-summary-clis-without-the-users",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-11-13T00:59:34.924656Z",
   "created_at": "2026-11-06T15:41:34.136933Z",
   "default_impl": null,
   "default_review": null,
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-196-run-summary-clis-without-the-users",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-196-run-summary-clis-without-the-users.1": 0
+  },
   "next_task": 1,
   "no_plan": true,
   "plan_review_rounds": 0,
@@ -164,19 +166,182 @@
       "task": null,
       "timestamp": "2026-11-06T15:52:57.155566Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "01221e3dc14a656688675b8db86c9a64fe0f8db65978713b9598937b26a65114",
+      "backend": "codex",
+      "base_sha": "02acb024baf24101533f6b1b24b8723a266f7768",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-c39e62d3b6fd37455bf1d20b1f8bb8a1",
+            "classification": "introduced",
+            "findingId": "finding-c39e62d3b6fd37455bf1d20b1f8bb8a1",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "2b28c28d99d880ffaec8634c68e15130f6e3d8d4",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1087,
+      "output_sha256": "6364b12d43069ec5c020c7fd800b6a3151de5be175442f35f4a2b037479034b3",
+      "reservation_id": "4376feb31acb410b84c023695b61b0b3",
+      "round_consumed": true,
+      "scope": "impl:gh-196-run-summary-clis-without-the-users.1",
+      "superseded_by": null,
+      "task": "gh-196-run-summary-clis-without-the-users.1",
+      "timestamp": "2026-11-12T16:48:37.665673Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "3213e5bd34da21438b5e5e8eca13475ff5ea494363fd97a36329d63e9055999d",
+      "backend": "codex",
+      "base_sha": "02acb024baf24101533f6b1b24b8723a266f7768",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-c39e62d3b6fd37455bf1d20b1f8bb8a1",
+            "classification": "introduced",
+            "findingId": "finding-c39e62d3b6fd37455bf1d20b1f8bb8a1",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "864e45df0dd1a9109d1e8480e461264e6559839a",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1029,
+      "output_sha256": "e2d8e171db30f2be693b47d19db1a895db68d1e6a7ed9ed902f1359571262609",
+      "reservation_id": "2d9d16d5390441f9bd811e578ead0173",
+      "round_consumed": true,
+      "scope": "impl:gh-196-run-summary-clis-without-the-users.1",
+      "superseded_by": null,
+      "task": "gh-196-run-summary-clis-without-the-users.1",
+      "timestamp": "2026-11-12T20:33:38.697260Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "14d7db1773f99fcd3e4061b7d3324c061e5fee14a62b2b4f9d68b81c4f43b96a",
+      "backend": "codex",
+      "base_sha": "4f3818b4cee0eabc6682b4ac743ae66ae99d533a",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "a08def059fa156fdee6abb5d8a136fbcbf12b32e",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 332543,
+      "output_sha256": "19968ff2457d917d1484de1fd1fcf82c208d8a2a4ae3b86a0cc8a0ac71a8386b",
+      "reservation_id": "e7c467868af0451e9afadce810582f71",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-12T20:51:54.436177Z",
+      "tool_calls": 20,
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "dafca28aa8f74b6796f58fd958ec8f6dfe713c63653528911e49b5887a5814f9",
+      "backend": "codex",
+      "base_sha": "4f3818b4cee0eabc6682b4ac743ae66ae99d533a",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "d5b91901c0fb9481e24ef3366d817b901c650439",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 5321,
+      "output_sha256": "ec82d713b6564da108ab903b911606a9d2af9c9305bf40bb8a3cb249de03fd48",
+      "reservation_id": "e73be972c02446b8b0427a8f90f1d592",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-13T00:59:34.899027Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-196-run-summary-clis-without-the-users.1": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-196-run-summary-clis-without-the-users.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-196-run-summary-clis-without-the-users.md",
-  "status": "open",
+  "status": "done",
   "title": "Run summary CLIs without the user's agent setup",
   "tracker": {
     "baseHashFlow": "e74a18293e336146216715408f138ceb55d92deb3816491f541a92dfcefa3dce",
@@ -190,5 +355,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nThe app can write a protocol with the Claude CLI or the Codex CLI preset. That CLI then starts with the user's own setup for the tool. This includes their MCP servers and connectors, tools (also shell commands), hooks, plugins, global instructions and telemetry. The transcript is untrusted input, so these tools should not be in reach. The extra setup also costs input tokens on every summary.\n\n## TASKS\n\n- [ ] Start both CLIs without the user's setup, with the same login and model\n- [ ] Keep the custom command provider as it is",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/196"
   },
-  "updated_at": "2026-11-12T09:36:00.435249Z"
+  "updated_at": "2026-11-13T00:59:34.925959Z"
 }

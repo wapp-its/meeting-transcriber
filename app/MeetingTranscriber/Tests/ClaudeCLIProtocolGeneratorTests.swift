@@ -124,7 +124,7 @@
         func testBuildSubprocessArgsForAbsolutePathDoesNotPrependBinary() {
             let args = ClaudeCLIProtocolGenerator.buildSubprocessArgs(
                 claudeBin: "claude",
-                resolvedBin: "/opt/homebrew/bin/claude", noSessionPersistence: false,
+                resolvedBin: "/opt/homebrew/bin/claude", options: [],
             )
             XCTAssertEqual(
                 args,
@@ -137,7 +137,7 @@
             // resolve it via PATH (set in buildEnvironment).
             let args = ClaudeCLIProtocolGenerator.buildSubprocessArgs(
                 claudeBin: "claude-work",
-                resolvedBin: "/usr/bin/env", noSessionPersistence: false,
+                resolvedBin: "/usr/bin/env", options: [],
             )
             XCTAssertEqual(
                 args,

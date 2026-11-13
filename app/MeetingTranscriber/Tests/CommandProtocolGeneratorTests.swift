@@ -13,7 +13,8 @@
         private static let pinned = ProtocolInstructions(template: pinnedPrompt, background: nil)
         private static let codexTemplate = [
             "codex", "exec", "--json", "--ephemeral", "--skip-git-repo-check",
-            "--sandbox", "read-only", "--output-last-message", "{output_file}", "-",
+            "--sandbox", "read-only", "--disable", "apps", "--disable", "plugins", "-c", "notify=[]",
+            "--output-last-message", "{output_file}", "-",
         ]
 
         /// Holds the fake programs and what fakes record.
@@ -364,6 +365,7 @@
                 ("last error event", #"{"type":"error","message":"first"}"# + "\n" + #"{"type":"error","message":"second"}"#, "", "second"),
                 ("capped", #"{"type":"error","message":""# + long + #""}"#, "", String(long.prefix(300))),
                 ("old Codex", "", "error: unexpected argument '--ephemeral' found", CommandProtocolGenerator.codexUpdateHint),
+                ("Codex without a feature the preset disables", "", "Error: Unknown feature flag: plugins", CommandProtocolGenerator.codexUpdateHint),
                 ("unknown shapes", "not json\n{\"type\":\"error\"}\n[1]\n{\"type\":\"turn.failed\",\"error\":\"x\"}", "boom", nil),
             ]
             for (name, stdout, stderr, expected) in cases {
