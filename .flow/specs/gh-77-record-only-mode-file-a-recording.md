@@ -137,3 +137,5 @@ FIT: GO · 2026-11-13 · base 4f4fbb6 · engine flow-next 9.9.1 · the upstream 
   - unchanged anchors: `RecordingSidecar.currentVersion` is 3 and its init still takes a non-optional `trigger`; `reportStagingFilesKept` and `removeSources` still say the next launch processes the recording again; `WatchLoop.enqueueRecording` reads `recordOnly()` at the stop; `QueueEnvironment.recoverStagedRecordings` takes `(queue, levelBalance)`
   - upstream retention (arrived with PR 227) deletes only `RecordingRetentionRegistry` entries, which record-only output never gets; the spec now names that registry
   - no open spec claims this scope (gh-5 and gh-6 mention recovery and record-only for their own fields only); no open issue or PR in the original addresses record-only recovery
+
+Maintainability (plan review): duplication - the recovery hand-on and `WatchLoop.enqueueRecording` each decide record-only versus processing; structure - none identified
