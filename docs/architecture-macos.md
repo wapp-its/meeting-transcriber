@@ -96,6 +96,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `MeetingTranscriberApp+PureHelpers.swift` | Helpers split out of `MeetingTranscriberApp` at its line cap: the previous-exit report, whether watching starts at launch, opening the last notes file with its moved-or-deleted notice, a job line's Open (a file in the output folder's scope or a Notion page), and handing a Notion page to `ProtocolOpener` |
 | `AppState.swift` | `@Observable @MainActor` composition root — wires the concern controllers (`engines`, `watching`, `pipeline`, `permissions`, `channelHealth`, `microphone`, `liveTranscription`, `rpcController`) and exposes the derived UI state (badge, status label) rather than owning it |
 | `AppState+Microphone.swift` | The menu-bar body's accessors for the recording's microphone and app-audio channels (the two red tints, and the Microphone entry's `MicrophoneMenuState`), split out of `AppState.swift` at its line cap |
+| `AppState+Updates.swift` | The menu's update actions in mt-update mode (why "Install Update" is blocked, install, and resuming after an install), split out of `AppState.swift` at its line cap |
 | `LivenessMarker.swift` | Process-lifetime marker (issue #703): written at launch, touched once a minute, removed by a clean AppKit quit; the next launch reads it as `PreviousExit` to tell a crash, kill or power loss from a quit, which the per-recording marker cannot do for an idle app |
 | `PreviousExitNotice.swift` | Wording of the launch-time notification for a run that ended without a quit: the window in which nothing was watching for meetings |
 | `MenuBarView.swift` | Menu bar dropdown (state, actions, meeting info, the Microphone entry: a submenu whose inline picker checks the chosen microphone and stores a choice in `AppSettings.micDeviceUID`; at the top, the open recording prompt with Record / Record with Options… / Ignore; the "Recordings" section with "All Recordings…") |
@@ -1039,12 +1040,12 @@ AppSettings (UserDefaults)
 |------------|-------------|-------|
 | Screen Recording | Real meeting titles; fallback grant for the app-audio tap. Detection does not need it | CGWindowListCopyWindowInfo |
 | Microphone | Mic recording | AVAudioEngine |
-| Accessibility | Participant reading (optional) | Teams AX tree |
+| Accessibility | Participant reading (optional; not applicable in the App Store build) | Teams AX tree |
 | Audio Recording | App audio capture | CATapDescription (Screen Recording also accepted) |
 
 ### Permission health check + badge overlay
 
-`PermissionHealthCheck` verifies each of the three TCC permissions by combining the system verdict with a live probe (e.g. `CGWindowListCopyWindowInfo` returning non-empty window titles for Screen Recording). Each permission resolves to `PermissionStatus.healthy | .denied | .broken | .notDetermined` — `.broken` means "TCC says allowed but the probe disagrees," which happens when macOS hasn't actually wired the permission through and the user needs to toggle it off and on in System Settings.
+`PermissionHealthCheck` verifies each of the three TCC permissions the build uses by combining the system verdict with a live probe (e.g. `CGWindowListCopyWindowInfo` returning non-empty window titles for Screen Recording). Each permission resolves to `PermissionStatus.healthy | .denied | .broken | .notDetermined | .notApplicable` (the last is the App Store build's Accessibility verdict: that build does not use the grant, so it is not probed and raises no badge or notification) — `.broken` means "TCC says allowed but the probe disagrees," which happens when macOS hasn't actually wired the permission through and the user needs to toggle it off and on in System Settings.
 
 `WatchLoop` runs the check on startup and `AppState` re-runs it on app activation. When the result is unhealthy:
 
@@ -1068,7 +1069,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 |---|---|---|---|
 | **General** | Startup · Mode · Apps to Watch · Record Without Asking · Detection · Long Silence | `settings` | — |
 | **Audio** | Microphone · Recording Levels · VAD · Echo · Per-Channel Indicator | `settings` | `audioDevices` |
-| **Transcription** | Engine + per-engine options + vocabulary source + status | `settings`, three engines, `remoteVocabulary?` | — |
+| **Transcription** | Engine + per-engine options + vocabulary source + status + idle-model retention | `settings`, three engines, `remoteVocabulary?` | — |
 | **Speakers** | Diarization · Speaker Naming · Speaker Identity · Known Voices · Recognition Stats · Experimental: Diarization Tuning | `settings`, `recognitionStatsLog`, `enrollmentDiarizerFactory` | `knownVoicesSheet` |
 | **Output** | LLM Provider (with the local model's folder and Check Model) · Notes Language · Output Folder · Notion Export · Recording Retention · Meeting Notes Templates · Template Rules | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel`, the rules section in `TemplateRulesModel` |
 | **Advanced** | Permissions · Diagnostics | — | `micPermission`, `screenRecordingOK`, `accessibilityOK` |
@@ -1081,6 +1082,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 - `transcriptionEngine` switches between WhisperKit / Parakeet option panels
 - `customVocabularyEnabled` hides the vocabulary source picker, the vocabulary file row and the URL controls
 - `vocabularySource` switches between the local vocabulary file row and the URL controls (address, token, "Update now", status)
+- `unloadModelsWhenIdle` (default on) skips the launch ASR load (a missing model is still downloaded at launch) and releases in-memory ASR and batch VAD models at a safe pipeline drain; the toggle sits beside model status and "Load Model". Turning it off restores launch preload and retains models across drains and engine switches. With the setting on, unloaded status reads "Loads when needed" while `/state` continues to report `"unloaded"`.
 - `protocolProvider` switches between Claude CLI / Codex CLI / Custom Command / OpenAI-compatible / Local model / None panels
 - `#if APPSTORE` removes the Claude CLI, Codex CLI, Custom Command and Local model provider options entirely
 - `updateChecker == nil` hides the entire Updates section in About

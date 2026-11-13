@@ -245,17 +245,19 @@ final class AppState {
             self.rpcController = RPCServerController(isEnabled: { [settings] in settings.debugRPCEnabled })
         #endif
 
-        // Wire the active-engine source + the watch-start up-front engine sync
-        // (post stored-property init so the `[weak self]` closures are valid).
-        // `EngineController` does its own up-front sync + reactive observe in its
-        // init; these hooks let the pipeline / live-transcription / watch paths
-        // reach the active engine and re-sync before the first transcription.
+        // Wire engine, pipeline and recording probes after stored-property init.
+        // The lifetime probe includes the caption tail after recording stops.
         liveTranscription.beginPrewarm(
             engineProvider: { [weak self] in self?.engines.activeTranscriptionEngine },
             isRecording: { [weak self] in self?.watching.isRecording == true },
         )
         pipeline.activate { [weak self] in self?.engines.activeTranscriptionEngine }
         watching.activate { [weak self] in self?.engines.syncEngineSettings() }
+        engines.activateModelLifetime(
+            queue: { [weak self] in self?.pipeline.queue },
+            isRecording: { [weak self] in self?.watching.isRecording == true || (self?.watching.captionFlushesInFlight ?? 0) > 0 },
+            captionsUseEngine: { [weak self] in self?.liveTranscription.captionsUseEngine == true },
+        )
 
         #if !APPSTORE
             applyForcedChannelFlagsFromEnvironment()
@@ -533,34 +535,6 @@ final class AppState {
     /// moment before its recorder is up, and nothing pretends to pause then.
     var canPauseRecording: Bool {
         watching.canPauseRecording
-    }
-
-    // MARK: - Updates (mt-update mode)
-
-    /// Why "Install Update" is not possible right now, or nil: what mt-update
-    /// itself waits for. The manual-recording predicate is the controller's
-    /// wide one, so a manual start that has not built its loop yet counts.
-    var updateInstallBlockedReason: String? {
-        UpdateInstallGate.blockedReason(
-            isRecording: watching.isRecording,
-            manualRecordingStarting: watching.isManualRecording,
-            waitingJobs: pipeline.queue.pendingJobs.count,
-            activeJobs: pipeline.queue.activeJobs.count,
-        )
-    }
-
-    func installUpdate() {
-        updateChecker.installNow(blockedReason: updateInstallBlockedReason, isWatching: watching.isWatching)
-    }
-
-    /// Reports an install the previous instance started, and turns meeting
-    /// watching back on through the auto-watch path when it was on then.
-    /// The auto-watch start posted at launch also checks "not already
-    /// watching", so whichever of the two runs second does nothing.
-    func resumeUpdateAfterLaunch() {
-        if updateChecker.resumeAfterLaunch(), !watching.isWatching {
-            watching.toggleWatching(userInitiated: false)
-        }
     }
 
     // Internal (not private): also formats `postedAt` in the RPC snapshot

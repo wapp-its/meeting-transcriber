@@ -1153,12 +1153,14 @@ _UG_SANDBOX_PROFILE='(version 1)(allow default)(deny network-outbound (remote ip
 # is needed behind the closed network, protocol generation is off so no
 # transcript leaves the machine, and auto-watch is off so nothing asks for the
 # microphone: a binary started directly, as here, is not the bundle the
-# runner's grants were made for.
+# runner's grants were made for. Idle unloading is off so the launch preload,
+# which `_ug_await_model` waits for, still loads the model.
 _UG_APP_ARGS=(
     -transcriptionEngine whisperKit -whisperKitModel "$_UG_VARIANT"
     -whisperKitCustomModelEnabled NO -whisperLanguage de
     -diarize NO -vadEnabled NO -protocolProvider none -autoWatch NO
     -recordOnly NO -liveTranscriptionEnabled NO -echoCancellationEnabled NO
+    -unloadModelsWhenIdle NO
 )
 
 _ug_preflight() {
@@ -2077,6 +2079,23 @@ fi
 
 [ "$UPGRADE" = true ] && _ug_seed
 
+# The meeting lanes check that a finished job keeps its recording while
+# recording retention is off (`_assert_recording_kept_by_default`). Under the
+# default period of 30 days a recording minutes old is never due, so that check
+# alone would pass with the switch ignored. In CI the period is therefore set to
+# 0 days for the run, as a launch argument (nothing stored, nothing to restore):
+# the switch is then all that keeps the recording. Only in CI and only with the
+# switch not on, because with 0 days a broken switch would delete every listed
+# recording in the host's output folder, which on a developer's Mac is theirs.
+# `<integer>`: the app reads the days as `object(forKey:) as? Int`, and a bare
+# `0` arrives as a string.
+_RETENTION_LAUNCH_ARGS=()
+if [ "${GITHUB_ACTIONS:-}" = "true" ] \
+    && ! retention_reads_as_on "$(read_dev_default_effective "$DEV_BUNDLE_ID" "$_CONTAINER_PLIST" recordingRetentionEnabled)"; then
+    _RETENTION_LAUNCH_ARGS=(--args -recordingRetentionDays "<integer>0</integer>")
+    log "CI: recording retention period 0 days for this run (switch left as the host has it)"
+fi
+
 log "Launching $DEV_BUNDLE_DEPLOY"
 if [ -n "$MIC_STALL" ]; then
     # `open --env`, not a leading `env`: only the former reaches a process
@@ -2089,9 +2108,11 @@ elif [ "$UPGRADE" = true ]; then
 elif [ "$MIC_DEVICE_CHANGE" = true ]; then
     # The fault build injects nothing unless asked, so a leftover fault bundle
     # cannot inject into a later, unrelated launch.
-    open --env MEETINGTRANSCRIBER_E2E_MIC_FAULT=device-change "$DEV_BUNDLE_DEPLOY"
+    open --env MEETINGTRANSCRIBER_E2E_MIC_FAULT=device-change "$DEV_BUNDLE_DEPLOY" \
+        ${_RETENTION_LAUNCH_ARGS[@]+"${_RETENTION_LAUNCH_ARGS[@]}"}
 else
-    open "$DEV_BUNDLE_DEPLOY"
+    # `${a[@]+...}`: bash 3.2 under `set -u` calls an empty array unbound.
+    open "$DEV_BUNDLE_DEPLOY" ${_RETENTION_LAUNCH_ARGS[@]+"${_RETENTION_LAUNCH_ARGS[@]}"}
 fi
 
 # A failed lane's diagnostics, written before on_exit changes anything (the
@@ -2542,6 +2563,24 @@ _assert_recording_badge_seen() {
 # simulator's --title; without one it shows its default. The finished job goes
 # to LAST_MEETING_JOB for the title checks below.
 LAST_MEETING_JOB=""
+# A finished job keeps its relocated audio while recording retention is off;
+# see `retention_default_verdict` for what is checked and why it waits.
+_RETENTION_GRACE_S=5
+_assert_recording_kept_by_default() {
+    local label="$1" transcript_path="$2"
+    local enabled setting mix
+    enabled="$(read_dev_default_effective "$DEV_BUNDLE_ID" "$_CONTAINER_PLIST" recordingRetentionEnabled)"
+    setting="recordingRetentionEnabled=${enabled:-<unset, default off>}"
+    mix="$RECORDINGS_DIR/$(basename "$transcript_path" .txt)_mix.wav"
+    case "$(retention_default_verdict "$enabled" "$mix" "$_RETENTION_GRACE_S")" in
+        skip) log "$label: SKIP retention default check: $setting on this host" ;;
+        kept) log "$label: recording still in $RECORDINGS_DIR ${_RETENTION_GRACE_S}s after done ($setting)" ;;
+        missing) fail "$label: no relocated recording at $mix right after the job finished ($setting)" ;;
+        deleted) fail "$label: $mix was deleted after the job finished with $setting; it must stay unless retention is switched on" ;;
+        *) fail "$label: retention_default_verdict gave no verdict for $mix" ;;
+    esac
+}
+
 run_one_meeting() {
     local label="$1" window_title="${2:-}"
     local -a sim_args=("$SIMULATOR_FIXTURE")
@@ -2572,6 +2611,7 @@ run_one_meeting() {
     [ -f "$transcript_path" ] || fail "$label: transcript file does not exist: $transcript_path"
 
     _read_transcript_size "$label" "$transcript_path"
+    _assert_recording_kept_by_default "$label" "$transcript_path"
 
     log "$label: transcript $transcript_path ($TRANSCRIPT_SIZE bytes)"
     log "$label: preview:"
@@ -4244,11 +4284,12 @@ _ug_assert_settings() {
     snap="$(state_query .)" || _ug_fail "$(state_why $? "$label: whether the app took the lane's launch arguments")"
     jq -e --arg v "$_UG_VARIANT" '.settings.transcription.engine == "whisperKit"
         and .settings.transcription.whisperKitModel == $v
+        and .settings.transcription.unloadModelsWhenIdle == false
         and .settings.diarization.diarize == false and .settings.diarization.vadEnabled == false
         and .settings.protocolGeneration.provider == "none" and .settings.detection.autoWatch == false
         and .watchState == null' <<<"$snap" >/dev/null \
         || _ug_fail "$label: the app did not take the lane's launch arguments: $(jq -c '{t: .settings.transcription, d: .settings.diarization.diarize, v: .settings.diarization.vadEnabled, p: .settings.protocolGeneration.provider, w: .settings.detection.autoWatch, watchState}' <<<"$snap")"
-    log "$label: launch arguments in effect (WhisperKit $_UG_VARIANT, no diarization, no VAD, no protocol, not watching)"
+    log "$label: launch arguments in effect (WhisperKit $_UG_VARIANT, idle unloading off, no diarization, no VAD, no protocol, not watching)"
 }
 
 _ug_assert_model() {
@@ -4393,6 +4434,7 @@ _ug_relaunch_and_assert() {
     _ug_launch
     poll_until "$RPC_READY_TIMEOUT_S" 1 rpc_ready || _ug_fail "$label: RPC did not come back after the relaunch"
     _record_launched_app
+    _ug_assert_settings
     _ug_await_model "$label"
     _ug_expect_fingerprint "$label" "$_UG_VARIANT in the app's folder (the second launch must not move or rewrite it)" \
         "$new_repo/$_UG_VARIANT" "$_UG_LANE_DIR/variant.before-relaunch"

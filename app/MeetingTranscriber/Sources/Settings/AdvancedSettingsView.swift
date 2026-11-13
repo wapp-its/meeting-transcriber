@@ -12,12 +12,14 @@ struct AdvancedSettingsView: View {
     /// Runs one permission row's button. Injected so a test never raises a
     /// TCC prompt or opens System Settings.
     var requestAccess: @MainActor (PermissionKind) async -> Void = { await PermissionAccessRequester.live.run($0) }
+    /// Whether to show the Accessibility row. A build that cannot use the
+    /// grant has nothing to offer there (`PermissionHealthCheck.accessibilityApplies`).
+    var showsAccessibility: Bool = PermissionHealthCheck.accessibilityApplies
 
     @State private var micPermission: AVAuthorizationStatus = .notDetermined
     @State private var screenRecordingOK = false
     @State private var accessibilityOK = false
-    @State private var lastExportFile: String?
-    @State private var lastExportError: String?
+    @State private var lastExportStatus: DiagnosticExportStatus?
     /// True while a `DiagnosticExporter.export` call is running off-main.
     /// Used to dim the button and surface a spinner so a 50-200 MB persistent
     /// log doesn't look like the app froze.
@@ -49,15 +51,8 @@ struct AdvancedSettingsView: View {
                             .controlSize(.small)
                     }
                 }
-                if let file = lastExportFile {
-                    Text("Exported to: \(file)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                if let err = lastExportError {
-                    Text("Export failed: \(err)")
-                        .font(.caption)
-                        .foregroundStyle(.red)
+                if let lastExportStatus {
+                    DiagnosticExportStatusText(status: lastExportStatus)
                 }
 
                 #if !APPSTORE
@@ -94,7 +89,6 @@ struct AdvancedSettingsView: View {
     /// A named property rather than inline in `body`, which is already among
     /// the slowest bodies to type-check against the 300 ms limit CI enforces.
     private var permissionsSection: some View {
-        // swiftlint:disable:next closure_body_length
         Section("Permissions") {
             PermissionRow(
                 label: "Screen Recording",
@@ -119,14 +113,9 @@ struct AdvancedSettingsView: View {
                 help: "System Settings → Privacy & Security → Microphone → enable Meeting Transcriber",
                 action: requestAction(.microphone, state: PermissionAccessState(microphone: micPermission)),
             )
-            PermissionRow(
-                label: "Accessibility",
-                detail: "Optional — reads Teams participant names",
-                granted: accessibilityOK,
-                optional: true,
-                help: "System Settings → Privacy & Security → Accessibility → enable Meeting Transcriber",
-                action: requestAction(.accessibility, state: accessibilityOK ? .granted : .notGranted),
-            )
+            if showsAccessibility {
+                accessibilityRow
+            }
 
             Button("Refresh") {
                 refreshPermissions()
@@ -149,6 +138,20 @@ struct AdvancedSettingsView: View {
                 refreshPermissions()
             }
         }
+    }
+
+    /// A container element, so the row's identifier leaves its button's own.
+    private var accessibilityRow: some View {
+        PermissionRow(
+            label: "Accessibility",
+            detail: "Optional — reads Teams participant names",
+            granted: accessibilityOK,
+            optional: true,
+            help: "System Settings → Privacy & Security → Accessibility → enable Meeting Transcriber",
+            action: requestAction(.accessibility, state: accessibilityOK ? .granted : .notGranted),
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(A11yID.accessibilityPermissionRow)
     }
 
     /// Meeting detection reads no window titles. The grant sharpens the meeting
@@ -182,27 +185,24 @@ struct AdvancedSettingsView: View {
         )
 
         isExportingDiagnostics = true
-        // The persistent-log file source can be 50-200 MB and reads via
-        // `String(contentsOf:)` + `split(separator:)` — and the OSLogStore
-        // fallback's `getEntries` is famously slow on the main actor. Detach
+        // The persistent-log file source can be 50-200 MB and is decoded and
+        // split into lines in one go, and the OSLogStore fallback's
+        // `getEntries` is famously slow on the main actor. Detach
         // so the Settings UI stays responsive while the export runs.
         Task.detached(priority: .userInitiated) {
             let result = Result { try DiagnosticExporter.export(to: outURL, info: info) }
             await MainActor.run {
                 isExportingDiagnostics = false
+                lastExportStatus = DiagnosticExportStatus(fileName: outURL.lastPathComponent, outcome: result)
                 switch result {
                 case let .success(count):
-                    lastExportFile = outURL.lastPathComponent
-                    lastExportError = nil
                     NSWorkspace.shared.activateFileViewerSelecting([outURL])
                     let exportedFile = outURL.lastPathComponent
                     logger.info(
-                        "diagnostics_exported lines=\(count, privacy: .public) file=\(exportedFile, privacy: .public)",
+                        "diagnostics_exported entries=\(count, privacy: .public) file=\(exportedFile, privacy: .public)",
                     )
 
                 case let .failure(error):
-                    lastExportFile = nil
-                    lastExportError = error.localizedDescription
                     logger.error(
                         "diagnostics_export_failed error=\(error.localizedDescription, privacy: .public)",
                     )

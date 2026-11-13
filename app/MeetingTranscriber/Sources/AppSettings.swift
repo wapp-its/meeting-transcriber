@@ -446,6 +446,10 @@ final class AppSettings { // swiftlint:disable:this type_body_length
 
     // MARK: - Transcription
 
+    var unloadModelsWhenIdle: Bool {
+        didSet { defaults.set(unloadModelsWhenIdle, forKey: "unloadModelsWhenIdle") }
+    }
+
     var transcriptionEngine: TranscriptionEngineSetting {
         didSet { defaults.set(transcriptionEngine.rawValue, forKey: "transcriptionEngine") }
     }
@@ -1090,6 +1094,7 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         silencePromptEnabled = defaults.bool(forKey: "silencePromptEnabled", default: true)
         silencePromptMinutes = max(1, min(60, defaults.object(forKey: "silencePromptMinutes") as? Int ?? 5))
 
+        unloadModelsWhenIdle = defaults.bool(forKey: "unloadModelsWhenIdle", default: true)
         transcriptionEngine = (defaults.string(forKey: "transcriptionEngine")
             .flatMap(TranscriptionEngineSetting.init(rawValue:))) ?? .whisperKit
         whisperKitModel = defaults.object(forKey: "whisperKitModel") as? String
