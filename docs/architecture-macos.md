@@ -104,7 +104,8 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `Settings/AudioSettingsView.swift` | Microphone device · VAD (enabled + threshold) · Per-Channel Indicator |
 | `Settings/TranscriptionSettingsView.swift` | ASR engine picker · engine-specific options · model status · Vocabulary section · Live transcription (PoC) toggle |
 | `Settings/SpeakersSettingsView.swift` | Diarization · Speaker Naming (open the naming window automatically, how long unnamed meetings wait) · Mic Speaker Name · Known Voices · Recognition Stats · Experimental: Diarization Tuning |
-| `Settings/OutputSettingsView.swift` | LLM provider · notes language · output folder · recording retention · custom prompt |
+| `Settings/OutputSettingsView.swift` | LLM provider · notes language · output folder · recording retention · Meeting Notes Templates section |
+| `Settings/ProtocolTemplatesSettingsView.swift` | Meeting Notes Templates section: default template picker, per template file Edit and Delete (to the Trash, confirmed), Open Templates Folder; its state and writes live in the `@Observable` `ProtocolTemplatesModel` |
 | `Settings/AdvancedSettingsView.swift` | Permissions · Diagnostics |
 | `Settings/AboutSettingsView.swift` | Version · bundle identifier · build date · ffmpeg status · project link · Updates |
 | `Settings/HelpBadge.swift` / `Settings/SettingsHelp.swift` | Reusable "?" help-popover badge + its shared copy, used across Settings sections |
@@ -633,7 +634,7 @@ is taken only if none of its artifacts exist, otherwise `_<shortID>` is
 appended, and nothing is overwritten. If any move fails, the ones already done
 are undone and the job keeps its old stem and paths.
 
-The prompt is the job's meeting-notes template: the built-in one or a Markdown file in `~/Library/Application Support/MeetingTranscriber/Protocol Templates/`, named after the file. A job captures the default template's name when it enters the queue, and the file is read when the notes are made; a file that is missing or blank by then falls back to the built-in template with a warning on the job. A custom prompt from an earlier version (`protocol_prompt.md`) is copied in once as the template "Custom Prompt" and made the default; the old file is left in place. The rules and the reasons are in [pipeline.md](architecture/pipeline.md).
+The prompt is the job's meeting-notes template: the built-in one or a Markdown file in `~/Library/Application Support/MeetingTranscriber/Protocol Templates/`, named after the file and managed in Settings → Output. A job captures the default template's name when it enters the queue, and the file is read when the notes are made; a file that is missing or blank by then falls back to the built-in template with a warning on the job. A custom prompt from an earlier version (`protocol_prompt.md`) is copied in once as the template "Custom Prompt" and made the default; the old file is left in place. The rules and the reasons are in [pipeline.md](architecture/pipeline.md).
 
 `AppSettings.protocolLanguage` (default `"German"`) is substituted into the prompt as `{LANGUAGE}`. Every template can also use `{MEETING_DATE}` (`YYYY-MM-DD`) and `{MEETING_TIME}` (`HH:mm`), derived from the captured recording start time. Imports and recovery jobs resolve those time placeholders to `Unknown` rather than their enqueue or processing time. Only recordings with a captured start receive the authoritative meeting-metadata block, so existing templates receive reliable temporal context without needing to add the placeholders.
 
@@ -798,7 +799,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 | **Audio** | Microphone · VAD · Echo · Per-Channel Indicator | `settings` | `audioDevices` |
 | **Transcription** | Engine + per-engine options + status + idle-model retention | `settings`, three engines | — |
 | **Speakers** | Diarization · Speaker Identity · Known Voices · Recognition Stats · Experimental: Diarization Tuning | `settings`, `recognitionStatsLog`, `enrollmentDiarizerFactory` | `knownVoicesSheet` |
-| **Output** | LLM Provider · Notes Language · Output Folder · Recording Retention · Prompt | `settings` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`, `hasCustomPrompt` |
+| **Output** | LLM Provider · Notes Language · Output Folder · Recording Retention · Meeting Notes Templates | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel` |
 | **Advanced** | Permissions · Diagnostics | — | `micPermission`, `screenRecordingOK`, `accessibilityOK` |
 | **About** | Build identity · Dependencies · Updates | `settings`, `updateChecker?` | — |
 

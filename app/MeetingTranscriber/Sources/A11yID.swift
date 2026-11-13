@@ -76,6 +76,20 @@ enum A11yID {
     }
 
     static let protocolSection = "protocolSection"
+    static let protocolTemplateDefaultPicker = "protocolTemplateDefaultPicker"
+    static let protocolTemplatesOpenFolderButton = "protocolTemplatesOpenFolderButton"
+
+    /// A template row's Edit button, addressed by ROW INDEX, never by template
+    /// name: the name is user input, for the reason on `consentDeniedAppRemove`.
+    static func protocolTemplateEdit(_ index: Int) -> String {
+        "protocolTemplateEdit.\(index)"
+    }
+
+    /// A template row's Delete button, addressed like `protocolTemplateEdit`.
+    static func protocolTemplateDelete(_ index: Int) -> String {
+        "protocolTemplateDelete.\(index)"
+    }
+
     static let includeFullTranscriptToggle = "includeFullTranscriptToggle"
     static let saveRawTranscriptToggle = "saveRawTranscriptToggle"
     static let useAITitleForFilenamesToggle = "useAITitleForFilenamesToggle"
