@@ -1,11 +1,11 @@
 // Which app a meeting-notes template opens in, the Open With list, and the words
-// the templates section and the New Template window use for both. Pure values,
-// so the choices are tested without an app, a window or a file.
+// the templates section uses for both. Pure values, so the choices are tested
+// without an app, a window or a file.
 
 import Foundation
 
-/// The app Edit and a newly created template open in: the one last chosen under
-/// Open With or Other…, else the Mac's default app for Markdown files.
+/// The app Edit opens a template in: the one last chosen under Open With or
+/// Other…, else the Mac's default app for Markdown files.
 enum TemplateEditor: Equatable {
     case app(TemplateEditorApp)
     /// The remembered app is no longer installed: the file is shown in Finder
@@ -60,22 +60,6 @@ enum TemplateEditor: Equatable {
         return "Templates are Markdown files in the templates folder. \(opening) {LANGUAGE}, {MEETING_DATE} and "
             + "{MEETING_TIME} are filled in for every template. Background info entered for a meeting is added to "
             + "the prompt automatically."
-    }
-
-    /// The New Template window's note for the name typed so far.
-    func newTemplateNote(name typed: String) -> String {
-        let name = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-        let file = name.isEmpty ? "a Markdown file" : "“\(name).md”"
-        let created = "Creates \(file) in the templates folder from the built-in template"
-        return switch self {
-        case let .app(app):
-            "\(created) and opens it in \(app.name), where you change and save it. To use another app, click "
-                + "the arrow beside Edit and choose Open With."
-
-        case .missing, .noApp:
-            "\(created) and shows it in Finder, as \(finderReason). To use an app, click the arrow beside Edit "
-                + "and choose Open With."
-        }
     }
 }
 

@@ -170,25 +170,25 @@ final class ProtocolTemplatesSettingsTests: XCTestCase {
         XCTAssertEqual(fixture.files, ["Board.md", "Retro.md"])
     }
 
-    func testTheWindowsCreateCreatesTheTypedTemplate() async throws {
+    func testTheWindowsCreateCreatesTheTypedTemplateAndOpensNothing() throws {
         let (view, model, fixture) = try makeView()
         let sheet = try newTemplateSheet(in: view)
         model.newTemplateName = "Workshop"
 
         try sheet.find(viewWithAccessibilityIdentifier: A11yID.protocolTemplateNewCreateButton).button().tap()
-        await model.openTask?.value
 
         XCTAssertEqual(model.names, ["Board", "Retro", "Workshop"])
-        XCTAssertEqual(fixture.apps.opened, [.init(file: fixture.store.fileURL(named: "Workshop"), app: "com.apple.TextEdit")])
+        XCTAssertNil(model.openTask)
+        XCTAssertEqual(fixture.apps.opened, [])
     }
 
-    /// The note and the help text name the editor app, here the Mac's default.
-    func testTheNoteAndTheHelpTextNameTheEditorApp() throws {
-        let (view, model, _) = try makeView()
+    /// The window shows the note, which names no app; the help text names
+    /// the editor app, here the Mac's default.
+    func testTheWindowShowsTheNoteAndTheHelpTextNamesTheEditorApp() throws {
+        let (view, _, _) = try makeView()
         let sheet = try newTemplateSheet(in: view)
 
-        XCTAssertNoThrow(try sheet.find(text: model.editor.newTemplateNote(name: "")))
-        XCTAssertTrue(model.editor.newTemplateNote(name: "").contains("opens it in TextEdit"))
+        XCTAssertNoThrow(try sheet.find(text: ProtocolTemplatesModel.newTemplateNote(name: "")))
         XCTAssertNoThrow(try view.inspect().find(text: TemplateEditor.app(FakeTemplateOpener.textEdit).helpText))
     }
 
