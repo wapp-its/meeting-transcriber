@@ -50,12 +50,15 @@ final class ProtocolTemplateStoreTests: XCTestCase {
         let fallback = { (name: String) in
             ProtocolTemplateStore.Resolution(
                 text: ProtocolGenerator.protocolPrompt,
+                used: .builtIn,
                 warning: "Meeting notes template \"\(name)\" was not found or is empty, so the built-in template was used",
             )
         }
 
-        XCTAssertEqual(store.resolve(.builtIn), .init(text: ProtocolGenerator.protocolPrompt, warning: nil))
-        XCTAssertEqual(store.resolve(.file(name: "Board")), .init(text: "Board template", warning: nil))
+        XCTAssertEqual(store.resolve(.builtIn), .init(text: ProtocolGenerator.protocolPrompt, used: .builtIn, warning: nil))
+        XCTAssertEqual(
+            store.resolve(.file(name: "Board")), .init(text: "Board template", used: .file(name: "Board"), warning: nil),
+        )
         for name in ["Empty", "Blank", "Gone"] {
             XCTAssertEqual(store.resolve(.file(name: name)), fallback(name), name)
         }
@@ -79,15 +82,19 @@ final class ProtocolTemplateStoreTests: XCTestCase {
         XCTAssertEqual(store.effectiveDefault(.file(name: "Gone")), .builtIn)
     }
 
-    func testInstructionsCarryTheTemplateText() throws {
+    /// The template the instructions came from is what decides whether the
+    /// notes' first heading is a meeting title: after a fallback, the built-in.
+    func testInstructionsCarryTheTemplateTextAndTheTemplateUsed() throws {
         try write("Board template", as: "Board")
 
         let found = store.instructions(for: .file(name: "Board"))
         let missing = store.instructions(for: .file(name: "Gone"))
 
         XCTAssertEqual(found.instructions, ProtocolInstructions(template: "Board template"))
+        XCTAssertEqual(found.used, .file(name: "Board"))
         XCTAssertNil(found.warning)
         XCTAssertEqual(missing.instructions, ProtocolInstructions(template: ProtocolGenerator.protocolPrompt))
+        XCTAssertEqual(missing.used, .builtIn)
         XCTAssertNotNil(missing.warning)
     }
 

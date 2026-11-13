@@ -109,6 +109,17 @@ final class OutputSettingsViewTests: XCTestCase {
         XCTAssertNoThrow(try view.inspect())
     }
 
+    /// The toggle says that only notes from the built-in template rename the files.
+    func testUseAITitleForFilenamesToggleExplainsTheTemplateRule() throws {
+        let view = OutputSettingsView(settings: AppSettings(defaults: makeIsolatedDefaults()))
+
+        let badge = try view.inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.useAITitleForFilenamesToggle)
+            .find(HelpBadge.self)
+
+        XCTAssertEqual(try badge.actualView().text, SettingsHelp.aiTitleForFilenames)
+    }
+
     func testOpenAIProviderExplainsConnectionsAndTheirSettingsInHelp() throws {
         let settings = AppSettings(defaults: makeIsolatedDefaults())
         settings.protocolProvider = .openAICompatible

@@ -161,8 +161,12 @@ struct OutputSettingsView: View {
                 .accessibilityIdentifier(A11yID.includeFullTranscriptToggle)
             Toggle("Save raw transcript separately", isOn: $settings.saveRawTranscriptSeparately)
                 .accessibilityIdentifier(A11yID.saveRawTranscriptToggle)
-            Toggle("Name files with AI meeting title", isOn: $settings.useAITitleForFilenames)
-                .accessibilityIdentifier(A11yID.useAITitleForFilenamesToggle)
+            HelpfulToggle(
+                title: "Name files with AI meeting title",
+                help: SettingsHelp.aiTitleForFilenames,
+                isOn: $settings.useAITitleForFilenames,
+            )
+            .accessibilityIdentifier(A11yID.useAITitleForFilenamesToggle)
             Toggle("Notify when meeting notes fail", isOn: $settings.notifyOnMeetingNotesFailure)
                 .accessibilityIdentifier(A11yID.notifyOnMeetingNotesFailureToggle)
         }

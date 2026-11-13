@@ -5,7 +5,8 @@ import XCTest
 /// transcript the user picks, and a retry of notes that failed. They follow
 /// the rule of every other job: the template is fixed when the job enters the
 /// queue and read when the notes are made, so a default changed later never
-/// reaches them, not even after a relaunch.
+/// reaches them, not even after a relaunch. And as for every job, only notes
+/// from the built-in template lend their first heading as the meeting title.
 @MainActor
 final class NotesOnlyProtocolTemplateTests: XCTestCase {
     // swiftlint:disable implicitly_unwrapped_optional
@@ -105,16 +106,78 @@ final class NotesOnlyProtocolTemplateTests: XCTestCase {
         XCTAssertEqual(generator.capturedInstructions, ProtocolInstructions(template: boardText))
     }
 
+    // MARK: - The AI title
+
+    /// Notes for a picked transcript never rename it, and their Notion page
+    /// follows the rule of every job: a custom template's first heading is no
+    /// title, so the page takes the job's, the transcript's name.
+    func testNotesForAPickedTranscriptFromACustomTemplateTitleThePageAfterTheJob() async throws {
+        let exporter = TitleCapturingNotionExporter()
+        let generator = MockProtocolGen()
+        generator.headingTitle = "Action items"
+        let queue = makeQueue(generator: generator, exporter: exporter, useAITitleForFilenames: true)
+        currentDefault = .file(name: "Board")
+
+        try queue.enqueueNotes(fromTranscripts: [transcript("20261030_0900_standup")])
+        await queue.awaitProcessing()
+        await queue.awaitNotionExports()
+
+        XCTAssertEqual(queue.jobs.first?.protocolPath?.lastPathComponent, "20261030_0900_standup.md")
+        let titles = await exporter.titles
+        XCTAssertEqual(titles, ["20261030_0900_standup"])
+    }
+
+    /// A retry runs the template the job recorded, so notes from a custom
+    /// one keep the date-based name and title the page after the job.
+    func testARetryOfCustomTemplateNotesTakesNoTitleFromThem() async throws {
+        let exporter = TitleCapturingNotionExporter()
+        let generator = MockProtocolGen()
+        generator.headingTitle = "Action items"
+        let queue = makeQueue(generator: generator, exporter: exporter, useAITitleForFilenames: true)
+        let id = try await failNotes(in: queue, generator: generator)
+        let stem = try XCTUnwrap(queue.jobs.first { $0.id == id }?.namingSlug)
+
+        XCTAssertTrue(queue.retryMeetingNotes(id: id))
+        await queue.awaitProcessing()
+        await queue.awaitNotionExports()
+
+        XCTAssertEqual(queue.jobs.first { $0.id == id }?.protocolPath?.lastPathComponent, "\(stem).md")
+        let titles = await exporter.titles
+        XCTAssertEqual(titles, ["Sprint"])
+    }
+
     // MARK: - Fixtures
 
-    private func makeQueue(generator: MockProtocolGen) -> PipelineQueue {
+    /// Records the page title of each export.
+    private actor TitleCapturingNotionExporter: NotionExporting {
+        private(set) var titles: [String] = []
+
+        func exportMeeting( // swiftlint:disable:this function_parameter_count
+            title: String, date _: Date?, tags _: [String], markdown _: String,
+            transcript _: String?, existingPageID _: String?,
+            onPageCreated _: @Sendable (NotionPageResult) async -> Void,
+        ) -> NotionPageResult {
+            titles.append(title)
+            return NotionPageResult(pageID: "page-1", url: "https://www.notion.so/page-1")
+        }
+    }
+
+    /// `exporter` switches the Notion export on, into that exporter.
+    private func makeQueue(
+        generator: MockProtocolGen, exporter: TitleCapturingNotionExporter? = nil, useAITitleForFilenames: Bool = false,
+    ) -> PipelineQueue {
         let engine = MockEngine()
         engine.segmentsToReturn = [TimestampedSegment(start: 0, end: 5, text: "Hello everyone")]
+        let notion: (() -> NotionExportResolution)? = exporter.map { exporter in
+            { .ready(NotionExportConfiguration(exporter: exporter, databaseID: "database-1")) }
+        }
         return PipelineQueue(
             engine: engine, diarizationFactory: { MockDiarization() }, protocolGeneratorFactory: { generator },
             outputDir: dir, logDir: dir, stagingDir: dir.appendingPathComponent("staging"),
+            useAITitleForFilenames: useAITitleForFilenames,
             defaultProtocolTemplateProvider: { self.currentDefault },
             protocolTemplateStore: store,
+            notionExportConfigurationProvider: notion,
             inFlightRuns: InFlightRunRegistry(),
         )
     }

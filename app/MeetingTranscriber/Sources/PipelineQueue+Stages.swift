@@ -1118,7 +1118,7 @@ extension PipelineQueue {
         let initialBasename = job.notesBasename ?? job.namingSlug
             ?? Self.namingSlug(title: title, jobID: jobID, startTime: Date())
         let meetingStartTime = job.meetingStartTime
-        let instructions = protocolInstructions(for: job)
+        let (instructions, usedTemplate) = protocolInstructions(for: job)
         updateJobState(id: jobID, to: .generatingProtocol)
         let protocolMD: String
         do {
@@ -1166,8 +1166,7 @@ extension PipelineQueue {
 
         let outputOptions = transcriptOutputOptions(forJobID: jobID)
         var basename = initialBasename
-        if outputOptions.useAITitleForFilenames,
-           let titleSlug = ProtocolGenerator.extractTitle(from: protocolMD).flatMap(ProtocolGenerator.toSnakeCase) {
+        if let titleSlug = ProtocolGenerator.fileTitleSlug(from: protocolMD, enabled: outputOptions.useAITitleForFilenames, template: usedTemplate) {
             basename = renameJobArtifacts(
                 jobID: jobID, from: initialBasename, titleSlug: titleSlug, protocolsDir: protocolsDir,
             )
@@ -1177,17 +1176,18 @@ extension PipelineQueue {
 
         saveGeneratedNotes(
             protocolMD, transcript: outputOptions.includeFullTranscriptInProtocol ? transcript : nil,
-            basename: basename, jobID: jobID, protocolsDir: protocolsDir, speakerNames: speakerNames,
+            basename: basename, jobID: jobID, protocolsDir: protocolsDir, speakerNames: speakerNames, template: usedTemplate,
         )
         return .attempted
     }
 
     /// Saves the notes the model wrote and queues their Notion export when one
     /// is configured. `transcript` is the full transcript to carry along with
-    /// them, nil when the job's output options leave it out.
+    /// them, nil when the job's output options leave it out. `template` is the
+    /// one the notes came from, which decides the Notion page title.
     private func saveGeneratedNotes( // swiftlint:disable:this function_parameter_count
         _ protocolMD: String, transcript: String?, basename: String, jobID: UUID, protocolsDir: URL,
-        speakerNames: [String],
+        speakerNames: [String], template: ProtocolTemplateID,
     ) {
         let markdown = transcript.map { protocolMD + "\n\n---\n\n## Full Transcript\n\n" + $0 } ?? protocolMD
 
@@ -1205,6 +1205,7 @@ extension PipelineQueue {
                     speakerNames: speakerNames,
                     configuration: configuration,
                     savedLocally: savedLocally,
+                    template: template,
                 ),
                 jobID: jobID,
             )
@@ -1214,14 +1215,18 @@ extension PipelineQueue {
     /// What `job`'s meeting notes are asked for with: its template, or the
     /// current default for a job from a snapshot written before templates, with
     /// a warning on the job when the template fell back to the built-in one.
-    private func protocolInstructions(for job: PipelineJob) -> ProtocolInstructions {
+    /// Also returns the template the instructions came from, which decides
+    /// whether the notes' first heading is a meeting title.
+    private func protocolInstructions(
+        for job: PipelineJob,
+    ) -> (instructions: ProtocolInstructions, used: ProtocolTemplateID) {
         let templateID = job.protocolTemplate ?? defaultProtocolTemplateProvider()
-        let (instructions, templateWarning) = protocolTemplateStore.instructions(for: templateID)
+        let (instructions, usedTemplate, templateWarning) = protocolTemplateStore.instructions(for: templateID)
         if let templateWarning { addWarning(id: job.id, templateWarning) }
         logger.info(
             "[\(job.shortID, privacy: .public)] protocol_template template=\(templateID.storedValue, privacy: .private) fallback=\(templateWarning != nil, privacy: .public)",
         )
-        return instructions
+        return (instructions, usedTemplate)
     }
 
     /// Reads the export configuration and, when the export is on but cannot run
