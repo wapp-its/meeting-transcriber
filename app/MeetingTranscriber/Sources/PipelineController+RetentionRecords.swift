@@ -7,8 +7,8 @@ extension PipelineController {
     /// Set once from `activate`, before the first pass can run.
     func connectRetentionToMeetingRecords() {
         recordingRetention.recordGate = { [weak self] jobs in self?.retentionRecordGate(for: jobs) }
-        recordingRetention.didDelete = { [weak self] jobID, gone in
-            self?.noteDeletedByRetention(jobID: jobID, paths: gone)
+        recordingRetention.didDelete = { [weak self] jobID, gone, removed in
+            self?.noteDeletedByRetention(jobID: jobID, gone: gone, removed: removed)
         }
     }
 
@@ -28,10 +28,11 @@ extension PipelineController {
         return .only(Set(allowed))
     }
 
-    /// Mark the files a pass deleted as gone in the meeting's record, and date the
-    /// deletion once no audio of the meeting is left, so its row says
-    /// "Audio deleted automatically" instead of "Audio not found".
-    func noteDeletedByRetention(jobID: UUID, paths: [URL]) {
+    /// Mark the files a pass found gone as gone in the meeting's record, and date
+    /// the deletion once no audio of the meeting is left, so its row says "Audio
+    /// deleted automatically" instead of "Audio not found". Only when the pass
+    /// removed a file itself: audio removed behind the app gets no date.
+    func noteDeletedByRetention(jobID: UUID, gone paths: [URL], removed: [URL]) {
         // Compared with the folder resolved, as the files no longer exist to be
         // resolved themselves (`MeetingFile.resolvedPath`).
         let key = { (url: URL) in
@@ -46,7 +47,7 @@ extension PipelineController {
                 changed = true
             }
             let audioLeft = record.files.contains { $0.role.isSourceTrack && $0.state != .gone }
-            if changed, !audioLeft, record.audioDeletion == nil {
+            if changed, !audioLeft, !removed.isEmpty, record.audioDeletion == nil {
                 record.audioDeletion = .init(kind: .automatic, at: date)
             }
         }

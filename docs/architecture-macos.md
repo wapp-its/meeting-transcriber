@@ -958,9 +958,10 @@ things on top of it (`PipelineController+RetentionRecords.swift`):
   that build relocated.
 - **The row says what happened.** The files a pass found gone are marked gone
   in the meeting's record, and once no audio is left the deletion is dated, so
-  the row reads "Audio deleted automatically on …". Before that, the row's
-  audio line and the window's footer say what the setting will do, the row only
-  for a meeting this build's registry lists and its record allows.
+  the row reads "Audio deleted automatically on …"; audio that was already gone
+  when the pass reached it gets no date. Before that, the row's audio line and
+  the window's footer say what the setting will do, the row only for a meeting
+  this build's registry lists and its record allows.
 - **Records do not pile up.** `MeetingRecordPruner` removes, at launch and once
   a day, the record of a meeting the window no longer lists and of which the disk
   answers gone for every file.

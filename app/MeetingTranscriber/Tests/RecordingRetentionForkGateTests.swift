@@ -171,6 +171,38 @@ final class RecordingRetentionForkGateTests: XCTestCase {
         }
     }
 
+    /// Gone before the pass got to it, so the row says what the disk says, with
+    /// no date of a deletion the app did not make.
+    func testAudioGoneBehindTheAppIsMarkedGoneWithoutADate() throws {
+        let harness = try makeHarness()
+        let pipeline = makePipeline(harness)
+        let job = try harness.recordedMeeting()
+        let urls = tracks(of: job)
+
+        pipeline.noteDeletedByRetention(jobID: job.id, gone: urls, removed: [])
+        var record = try harness.record(of: job)
+        XCTAssertEqual(record.files.filter(\.role.isSourceTrack).map(\.state), [.gone, .gone, .gone])
+        XCTAssertNil(record.audioDeletion)
+
+        let other = try harness.recordedMeeting()
+        pipeline.noteDeletedByRetention(jobID: other.id, gone: Array(tracks(of: other).prefix(2)), removed: tracks(of: other))
+        record = try harness.record(of: other)
+        XCTAssertNil(record.audioDeletion, "a track is still there")
+    }
+
+    /// The deleter tells a file it removed from one already missing.
+    func testTheDeleterTellsRemovedFromAlreadyMissing() async throws {
+        let folder = try makeTempDirectory(prefix: "retention_fork_deleter")
+        let present = folder.appendingPathComponent("a_mix.wav")
+        try Data("RIFF".utf8).write(to: present)
+        let missing = folder.appendingPathComponent("b_mix.wav")
+
+        let result = await RecordingFileDeleter().deleteTellingRemoved([present, missing])
+
+        XCTAssertEqual(result.gone, [present, missing])
+        XCTAssertEqual(result.removed, [present])
+    }
+
     /// Unread, a Keep cannot be told from no Keep, so the pass deletes nothing.
     func testARecordFileThatDoesNotReadSkipsThePass() async throws {
         let harness = try makeHarness()

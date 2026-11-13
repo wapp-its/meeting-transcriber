@@ -36,23 +36,33 @@ actor RecordingFileDeleter {
     /// is skipped and stays listed: removing a folder would take everything
     /// in it, and a link is not the recording.
     func delete(_ urls: [URL]) -> [URL] {
-        urls.filter { url in
+        deleteTellingRemoved(urls).gone
+    }
+
+    /// `delete`, also telling the files this call removed from the ones that
+    /// were already missing. The fork's addition: only a removal dates an
+    /// automatic deletion on the meeting's row.
+    func deleteTellingRemoved(_ urls: [URL]) -> (gone: [URL], removed: [URL]) {
+        var gone: [URL] = []
+        var removed: [URL] = []
+        for url in urls {
             guard RecordingRetentionPolicy.isRegularFileOrGone(url) else {
                 logger.warning("Retention skipped a listed path that is not a regular file")
-                return false
+                continue
             }
             do {
                 try remove(url)
-                return true
+                gone.append(url)
+                removed.append(url)
             } catch CocoaError.fileNoSuchFile {
-                return true
+                gone.append(url)
             } catch {
                 // Private: a file-system error names the file, and the file name
                 // is the meeting title.
                 logger.warning("Could not delete a retained recording: \(error.localizedDescription, privacy: .private)")
-                return false
             }
         }
+        return (gone, removed)
     }
 }
 
@@ -114,9 +124,10 @@ final class RecordingRetention {
     /// fork's addition.
     var recordGate: (Set<UUID>) -> RecordingRetentionPolicy.RecordGate? = { _ in .everything }
 
-    /// Told which files of a job a pass deleted or found gone, so the meeting's
-    /// record can say so. Set by the controller. The fork's addition.
-    var didDelete: (_ jobID: UUID, _ gone: [URL]) -> Void = { _, _ in }
+    /// Told which files of a job a pass found gone after its deletes, and which
+    /// of them it removed itself, so the meeting's record can say so. Set by the
+    /// controller. The fork's addition.
+    var didDelete: (_ jobID: UUID, _ gone: [URL], _ removed: [URL]) -> Void = { _, _, _ in }
 
     private let settings: () -> RecordingRetentionSettings
     private let deleter: RecordingFileDeleter
@@ -278,15 +289,18 @@ final class RecordingRetention {
     /// returns how many are gone afterwards.
     private func deleteDue(_ urls: [URL], of jobID: UUID, _ context: SweepContext) async -> Int {
         var gone: [URL] = []
+        var removed: [URL] = []
         for url in urls {
             guard mayStillDelete(url, of: jobID, context) else { break }
-            gone += await deleter.delete([url])
+            let result = await deleter.deleteTellingRemoved([url])
+            gone += result.gone
+            removed += result.removed
         }
         // One write per recording. Forgetting after the deletes is safe:
         // a listed file that is gone is dropped by the next pass, and a
         // path a newer recording takes over leaves this entry on its own.
         registry.forget(gone, of: jobID)
-        if !gone.isEmpty { didDelete(jobID, gone) }
+        if !gone.isEmpty { didDelete(jobID, gone, removed) }
         return gone.count
     }
 
