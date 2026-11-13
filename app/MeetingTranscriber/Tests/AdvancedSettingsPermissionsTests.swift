@@ -18,7 +18,13 @@ final class AdvancedSettingsPermissionsTests: XCTestCase {
         let suiteName = "AdvancedSettingsPermissionsTests.\(UUID().uuidString)"
         let suite = try XCTUnwrap(DefaultsSuite.open(suiteName))
         addTeardownBlock { DefaultsSuite.remove(suiteName) }
-        return AdvancedSettingsView(settings: AppSettings(defaults: suite), requestAccess: requestAccess)
+        // The Accessibility row shown in both variants: the App Store build hides it
+        // (`PermissionHealthCheck.accessibilityApplies`), but its button is still tested.
+        return AdvancedSettingsView(
+            settings: AppSettings(defaults: suite),
+            requestAccess: requestAccess,
+            showsAccessibility: true,
+        )
     }
 
     /// Taps the row's button and waits for the request, which runs in a `Task`:
@@ -55,8 +61,9 @@ final class AdvancedSettingsPermissionsTests: XCTestCase {
     }
 
     func testAccessibilityButtonRequestsAccessibility() async throws {
-        // The sandboxed build never asks for Accessibility, so its button only
-        // opens the page; the injected request still receives the click.
+        // The sandboxed build never asks for Accessibility and hides the row, so
+        // its button, shown here anyway, only opens the page; the injected
+        // request still receives the click.
         #if APPSTORE
             let title = "Open System Settings"
         #else
