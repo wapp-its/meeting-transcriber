@@ -90,6 +90,9 @@ actor RecordingFileDeleter {
 ///   held are no longer tracked.
 /// - A process kill between the AI-title rename and the registry update
 ///   leaves that recording untracked.
+/// - The fork's record check runs right before each delete but writes no
+///   mark of its own, so Keep set by the other build while an unlink of this
+///   build stalls does not stop that one file; it stops the files after it.
 @MainActor
 final class RecordingRetention {
     /// What one pass needs from the queue that asks for it.
@@ -313,8 +316,12 @@ final class RecordingRetention {
         guard registry.isPersisted,
               let entry = registry.entry(listing: url, for: jobID),
               RecordingRetentionPolicy.isDue(entry, now: now(), settings: effectiveSettings),
-              !RecordingRetentionPolicy.isInUse(entry, excludedPaths: inUse(context))
+              !RecordingRetentionPolicy.isInUse(entry, excludedPaths: inUse(context)),
+              recordGate([jobID])?.allows(jobID) == true
         else { return false }
-        return recordGate([jobID])?.allows(jobID) ?? false
+        // The fork's addition: the output is checked again too, after the
+        // record check, as notes deleted since the decision leave the audio the
+        // only copy.
+        return entry.outputExported || entry.outputPath.map(RecordingRetentionPolicy.isWrittenFile) == true
     }
 }

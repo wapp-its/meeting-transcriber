@@ -277,6 +277,40 @@ final class RecordingRetentionForkGateTests: XCTestCase {
         XCTAssertEqual(onDisk(paths), [false, true, true])
     }
 
+    /// Notes removed after the pass decided leave the audio the only copy, so
+    /// no file of it goes.
+    func testNotesRemovedDuringThePassStopTheDeletes() async throws {
+        let root = try makeTempDirectory(prefix: "retention_fork_notes_gone")
+        let recordings = root.appendingPathComponent("recordings", isDirectory: true)
+        try FileManager.default.createDirectory(at: recordings, withIntermediateDirectories: true)
+        let output = root.appendingPathComponent("notes.md")
+        try Data("# Notes".utf8).write(to: output)
+        let paths = try ["b_mix.wav", "b_app.wav", "b_mic.wav"].map { name in
+            let url = recordings.appendingPathComponent(name)
+            try Data("RIFF".utf8).write(to: url)
+            return url
+        }
+        let jobID = UUID()
+        let asked = HeldJobs()
+        let retention = RecordingRetention(
+            registry: RecordingRetentionRegistry(path: root.appendingPathComponent("logs/retained_recordings.json")),
+        ) { RecordingRetentionSettings(enabled: true, days: 0) }
+        // The pass asks once for every listed job, then once before each file:
+        // the notes go between the decision and the first delete.
+        retention.recordGate = { _ in
+            if asked.jobs.contains(jobID) { try? FileManager.default.removeItem(at: output) }
+            asked.add(jobID)
+            return .only([jobID])
+        }
+        retention.registry.register(jobID: jobID, paths: paths, root: root, recordedAt: Date(timeIntervalSince1970: 0))
+        retention.registry.markEligible(jobID: jobID, output: output, at: Date(timeIntervalSince1970: 0))
+
+        await sweep(retention)
+
+        XCTAssertEqual(onDisk(paths), [true, true, true])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: output.path), "test premise")
+    }
+
     func testThePolicyKeepsAJobTheRecordsDoNotAllow() {
         let root = URL(fileURLWithPath: "/Volumes/Archive/Protocols")
         let entry = RetainedRecording(

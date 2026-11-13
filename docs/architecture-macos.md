@@ -952,6 +952,8 @@ things on top of it (`PipelineController+RetentionRecords.swift`):
   deleted, and a record file that does not read skips the pass. The queue has
   to be through with the job as well (`LiveMeetingState.isSettled`): a running
   Notion export holds the audio, and so do saved jobs the queue could not read.
+  Before each file the notes are checked again too, so notes removed during a
+  pass stop it.
 - **One registry per build.** The development and the release build share the
   data folder but not their settings, so each keeps its own registry,
   `retained_recordings.<bundle id>.json`: a build's setting reaches only what
