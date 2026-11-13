@@ -25,20 +25,17 @@
     /// a gateway URL in their `env` block for instance; managed settings and
     /// the app's API key field still apply.
     extension ClaudeCLIProtocolGenerator {
-        /// An option a run gets only when the CLI's `--help` lists `name`,
-        /// as `arguments`: a CLI older than the option rejects it.
-        struct IsolationOption {
-            let name: String
-            let arguments: [String]
-        }
-
         /// No built-in tool (`""` switches them all off), no MCP server but
         /// those of an `--mcp-config` the app never passes, and no user,
-        /// project or local settings file.
-        static let isolationOptions = [
-            IsolationOption(name: "--tools", arguments: ["--tools", ""]),
-            IsolationOption(name: "--strict-mcp-config", arguments: ["--strict-mcp-config"]),
-            IsolationOption(name: "--setting-sources", arguments: ["--setting-sources", ""]),
+        /// project or local settings file. A run gets each option, as
+        /// `arguments`, only when the CLI's `--help` lists its `name`: a CLI
+        /// older than the option rejects it. Tuples rather than a small
+        /// struct: SwiftLint's analyzer does not see a struct used inside an
+        /// extension of another struct and reports it as unused.
+        static let isolationOptions: [(name: String, arguments: [String])] = [
+            (name: "--tools", arguments: ["--tools", ""]),
+            (name: "--strict-mcp-config", arguments: ["--strict-mcp-config"]),
+            (name: "--setting-sources", arguments: ["--setting-sources", ""]),
         ]
 
         /// Turns off telemetry, error reports and the CLI's other
