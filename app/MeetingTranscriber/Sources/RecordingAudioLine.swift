@@ -130,7 +130,8 @@ struct RecordingAudioLine: Equatable, Sendable {
         /// Keep is true in every state, and the setting only reaches a finished meeting
         /// this build's retention registry lists and whose record lets the pass
         /// delete it (`allowsRetention`): no import, no record-only recording, none
-        /// of another build or from before the registry. Days count as the pass
+        /// of another build or from before the registry. A running Notion export
+        /// holds the audio, as the pass waits for it. Days count as the pass
         /// counts them, in 24-hour steps.
         func next(_ standing: Standing) -> String? {
             if record.keep { return "kept, never deleted automatically" }
@@ -146,6 +147,7 @@ struct RecordingAudioLine: Equatable, Sendable {
 
             case .finished:
                 guard retention.enabled, let retained, record.allowsRetention(by: bundleID) else { return nil }
+                if live?.notionExportRunning == true { return "kept until the Notion export ends" }
                 guard retained.eligibleAt != nil else { return "kept, no notes were saved" }
                 let due = retained.recordedAt.addingTimeInterval(TimeInterval(max(0, retention.days)) * 86400)
                 return "deleted automatically \(due <= now ? "at the next check" : "on \(day(due))")"

@@ -154,7 +154,7 @@ extension TranscriptionsViewTests {
         let sut = makeView([exporting, naming], actions: actions(meetings, retention: .init(enabled: true, days: 30)))
 
         XCTAssertEqual(try texts(in: sut).filter { $0.hasPrefix("Audio") }, [
-            "Audio · 48 MB · deleted automatically at the next check",
+            "Audio · 48 MB · kept until the Notion export ends",
             "Audio · 48 MB · kept until the speakers are named",
         ])
         for index in 0 ... 1 {

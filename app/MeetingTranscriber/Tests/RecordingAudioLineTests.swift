@@ -160,11 +160,11 @@ final class RecordingAudioLineTests: XCTestCase {
     }
 
     /// The export uploads the notes, not the audio, so the pass does not wait for it.
-    func testARunningExportChangesNothing() {
-        XCTAssertEqual(
-            line(Fixture.record(), live: live(.done, exporting: true)).text, "Audio · 286 MB · deleted automatically on 15 Nov",
-        )
+    /// The pass waits for a running export, so the line does too.
+    func testARunningExportHoldsTheLineUnlessTheSettingIsOff() {
+        XCTAssertEqual(line(Fixture.record(), live: live(.done, exporting: true)).text, "Audio · 286 MB · kept until the Notion export ends")
         XCTAssertEqual(line(Fixture.record(), live: live(.done, exporting: true), retention: Self.off).text, "Audio · 286 MB")
+        XCTAssertEqual(line(Fixture.record(), live: live(.done)).text, "Audio · 286 MB · deleted automatically on 15 Nov")
     }
 
     func testSwitchedOffAFinishedMeetingShowsItsSizeOnly() {
