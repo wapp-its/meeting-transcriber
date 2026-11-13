@@ -1,0 +1,33 @@
+{
+  "branch_name": "gh-127-start-the-app-at-login-and-date-both",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-11-12T20:43:04.308801Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-127-start-the-app-at-login-and-date-both",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 0,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/gh-127-start-the-app-at-login-and-date-both.md",
+  "status": "open",
+  "title": "Start the app at login and date both ends of the not-running notice",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABXFD7Nw",
+    "identifier": "#127",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/127"
+  },
+  "updated_at": "2026-11-12T20:43:45.552217Z"
+}

@@ -116,7 +116,11 @@ final class ParakeetEngine: TranscribingEngine, StreamingTranscribingEngine {
             asrManager = manager
             modelState = .loaded
         } catch {
-            logger.error("Parakeet model load failed: \(error.localizedDescription, privacy: .public)")
+            // Type public, message redacted: FluidAudio's `AsrModelsError.modelNotFound`
+            // names the model folder, and through the home folder the account name.
+            logger.error(
+                "Parakeet model load failed (\(String(describing: type(of: error)), privacy: .public): \(error.localizedDescription, privacy: .private))",
+            )
             modelState = .unloaded
             downloadProgress = 0
         }
@@ -431,7 +435,12 @@ final class ParakeetEngine: TranscribingEngine, StreamingTranscribingEngine {
         ) else { return }
         vocabularyBooster = nil
         vocabularyPreparationState = .failed(configuration)
-        logger.warning("Parakeet: vocabulary preparation failed for \(configuration.path): \(error.localizedDescription, privacy: .public)")
+        // Type public, message redacted: loading the CTC models can fail with
+        // `CtcTokenizer.Error`, whose message names their folder under the home folder.
+        let kind = String(describing: type(of: error))
+        logger.warning(
+            "Parakeet: vocabulary preparation failed for \(configuration.path): \(kind, privacy: .public): \(error.localizedDescription, privacy: .private)",
+        )
     }
 
     private func canAdoptVocabulary(

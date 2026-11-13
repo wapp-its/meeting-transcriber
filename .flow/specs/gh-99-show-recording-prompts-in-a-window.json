@@ -1,0 +1,25 @@
+{
+  "branch_name": "gh-99-show-recording-prompts-in-a-window",
+  "created_at": "2026-11-12T20:43:18.772986Z",
+  "depends_on_epics": [],
+  "id": "gh-99-show-recording-prompts-in-a-window",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/gh-99-show-recording-prompts-in-a-window.md",
+  "status": "open",
+  "title": "Show recording prompts in a window below the menu bar icon",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABV4PpkA",
+    "identifier": "#99",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/99"
+  },
+  "updated_at": "2026-11-12T20:43:18.788933Z"
+}
