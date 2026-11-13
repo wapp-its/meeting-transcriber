@@ -11,9 +11,78 @@
   "impl_review_rounds": {},
   "next_task": 1,
   "no_plan": true,
-  "plan_review_rounds": 0,
-  "plan_review_status": "unknown",
-  "plan_reviewed_at": null,
+  "plan_review_rounds": 1,
+  "plan_review_status": "needs_work",
+  "plan_reviewed_at": "2026-11-13T11:18:38.408900Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "f410fe47b58048c90ab1cd74ce3c4a1a78f065f3eac3a9a31a08acb548bbd57f",
+      "backend": "codex",
+      "base_sha": "4f4fbb6fa10e0d3d3b8295d645b0cb16140a40a7",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-3274e66dc0dfdd3d154a90cd43e844f2",
+            "classification": "introduced",
+            "findingId": "finding-3274e66dc0dfdd3d154a90cd43e844f2",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-1dbbf65cfeb7115b938371e3c5e54991",
+            "classification": "introduced",
+            "findingId": "finding-1dbbf65cfeb7115b938371e3c5e54991",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-0da7f2ca9ca536a22d9e6492926d8b81",
+            "classification": "introduced",
+            "findingId": "finding-0da7f2ca9ca536a22d9e6492926d8b81",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "1676a6849c0ba705ed87fa37c968bd3da5a756b8",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 382302,
+      "output_sha256": "fc5493760781d20ae2559005b59ba50081565f84d5df1e11a71da91f0e0382c2",
+      "reservation_id": "5ac61312890749f5be0eef117b9a0a45",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-13T11:18:36.167128Z",
+      "tool_calls": 18,
+      "verdict": "NEEDS_WORK"
+    }
+  ],
+  "review_hash_epoch": {},
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
   "spec_path": ".flow/specs/gh-77-record-only-mode-file-a-recording.md",
   "status": "open",
   "title": "Record-only mode: file a recording recovered after a crash instead of processing it",
@@ -29,5 +98,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/77"
   },
-  "updated_at": "2026-11-12T20:43:49.065083Z"
+  "updated_at": "2026-11-13T11:18:38.414868Z"
 }
