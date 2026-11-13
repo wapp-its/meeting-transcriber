@@ -89,7 +89,6 @@ struct AdvancedSettingsView: View {
     /// A named property rather than inline in `body`, which is already among
     /// the slowest bodies to type-check against the 300 ms limit CI enforces.
     private var permissionsSection: some View {
-        // swiftlint:disable:next closure_body_length
         Section("Permissions") {
             PermissionRow(
                 label: "Screen Recording",
