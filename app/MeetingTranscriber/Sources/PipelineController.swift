@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 import Observation
 import os.log
@@ -43,6 +44,8 @@ final class PipelineController {
     /// Durable finished-job record store, shared across queue rebuilds and read
     /// by `jobStatus(forID:)` for the automation API. Test-injectable.
     let terminalJobStore: TerminalJobStore
+    /// Shared across queue rebuilds; see `PipelineController+Retention.swift`.
+    let recordingRetention: RecordingRetention
 
     /// Durable record of each meeting's files, shared across queue rebuilds like
     /// the finished-job records beside it. Test-injectable.
@@ -96,6 +99,11 @@ final class PipelineController {
         /// The one gate every local-model protocol goes through (spec R10).
         let localModelGate = LocalModelGate()
     #endif
+    /// How the queues this controller builds open the output folder's scope,
+    /// for a retention pass that runs before any of them is built.
+    var queueSecurityScope: SecurityScopeAccess {
+        queueEnvironment.securityScope
+    }
 
     /// Called with the new queue whenever `rebuild()` replaces it, so a holder
     /// of the old one can follow. The active `WatchLoop` is one: it enqueues
@@ -103,11 +111,6 @@ final class PipelineController {
     /// following a folder change its recordings would land in the old folder
     /// through a queue nothing else shows.
     @ObservationIgnored var onQueueReplaced: ((PipelineQueue) -> Void)?
-
-    /// Called when a meeting reaches `.done`, when a Notion export ends and after a
-    /// rebuild, whose restore can finish a job before the queue has its callbacks. It is
-    /// what the automatic deletion waits for. Read at each call, so it reaches every queue.
-    @ObservationIgnored var onMeetingSettled: (() -> Void)?
 
     /// The output-folder bookmark the current queue was built from, so a change
     /// of folder can be noticed without resolving the bookmark again.
@@ -151,6 +154,9 @@ final class PipelineController {
             ?? PipelineQueue(
                 logDir: queueEnvironment.logDir, stagingDir: queueEnvironment.stagingDir,
             )
+        recordingRetention = Self.makeRecordingRetention(
+            logDir: queueEnvironment.logDir, settings: settings, bundleID: self.meetingFileStore.bundleID,
+        )
     }
 
     /// Wire the active-engine source. Called once from `AppState.init` after its
@@ -159,6 +165,8 @@ final class PipelineController {
         self.engineProvider = engineProvider
         reconcileInterruptedDeletions()
         observeOutputFolder()
+        connectRetentionToMeetingRecords()
+        startRecordingRetention()
     }
 
     // MARK: - Queue lifecycle
@@ -225,7 +233,7 @@ final class PipelineController {
         queueBuiltFromBookmark = settings.customOutputDirBookmark
         builtQueue = built
         onQueueReplaced?(queue)
-        onMeetingSettled?()
+        Task { [weak self] in await self?.sweepRetainedRecordings() }
     }
 
     /// Whether the installed queue is one this controller built, as opposed to
@@ -362,6 +370,7 @@ final class PipelineController {
             terminalJobStore: terminalJobStore,
             meetingFileStore: meetingFileStore,
             securityScope: queueEnvironment.securityScope,
+            recordingRetention: recordingRetention,
         )
     }
 
@@ -452,7 +461,6 @@ final class PipelineController {
         #if !APPSTORE
             LocalModelJobNotices(notifier: notifier, settings: settings).install(on: queue)
         #endif
-        chainRetentionTriggers() // Last: the notices above can end a job's callback early.
     }
 
     // MARK: - File enqueue

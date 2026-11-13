@@ -15,13 +15,39 @@ final class RecordingAudioLineTests: XCTestCase {
     /// The decimal separator is the machine's, as `ByteCountFormatter` has no locale.
     private let gb1point1 = ByteCountFormatter.string(fromByteCount: 1_100_000_000, countStyle: .file)
 
+    private static let after30Days = RecordingRetentionSettings(enabled: true, days: 30)
+    private static let off = RecordingRetentionSettings(enabled: false, days: 30)
+    private static let rightAfterTheNotes = RecordingRetentionSettings(enabled: true, days: 0)
+    private static let everySetting = [after30Days, off, rightAfterTheNotes]
+
+    /// How this build's retention registry lists the meeting.
+    private enum Listing {
+        /// Relocated here, and its notes are written.
+        case eligible
+        /// Relocated here, with no notes written yet.
+        case awaitingNotes
+        /// Not at all: an import, a record-only recording, another build's meeting
+        /// or one from before the registry.
+        case unlisted
+    }
+
     private func line(
         _ record: MeetingFileRecord?, live: LiveMeetingState? = nil, audio: AudioOnDisk? = nil,
-        retention: RecordingRetention = .days30, now: Date? = nil, calendar: Calendar = RetentionFixture.calendar,
-        locale: Locale = RetentionFixture.locale,
+        retention: RecordingRetentionSettings = after30Days, listed: Listing = .eligible, now: Date? = nil,
+        calendar: Calendar = RetentionFixture.calendar, locale: Locale = RetentionFixture.locale,
     ) -> RecordingAudioLine {
-        RecordingAudioLine.resolve(
-            record: record, live: live, audio: audio ?? mb286, retention: retention, bundleID: Fixture.thisBuild,
+        let retained: RetainedRecording? = switch listed {
+        case .unlisted:
+            nil
+
+        case .eligible, .awaitingNotes:
+            RetainedRecording(
+                jobID: record?.jobID ?? UUID(), paths: [], root: URL(fileURLWithPath: "/output"),
+                recordedAt: Fixture.recorded, eligibleAt: listed == .eligible ? Fixture.recorded : nil, outputPath: nil,
+            )
+        }
+        return RecordingAudioLine.resolve(
+            record: record, live: live, audio: audio ?? mb286, retention: retention, retained: retained,
             now: now ?? beforeDue, calendar: calendar, locale: locale,
         )
     }
@@ -51,7 +77,7 @@ final class RecordingAudioLineTests: XCTestCase {
 
     func testWhileNamingIsOpenTheAudioIsKeptUntilTheSpeakersAreNamed() {
         let audio = AudioOnDisk(presentCount: 3, unreachableCount: 0, totalCount: 3, bytes: 412_000_000)
-        for retention in RecordingRetention.allCases {
+        for retention in Self.everySetting {
             XCTAssertEqual(
                 line(Fixture.record(outcome: .inProgress), live: live(.speakerNamingPending), audio: audio, retention: retention).text,
                 "Audio · 412 MB · kept until the speakers are named", "\(retention)",
@@ -68,15 +94,16 @@ final class RecordingAudioLineTests: XCTestCase {
         let passed = "Audio · 286 MB · deleted automatically at the next check"
         XCTAssertEqual(line(Fixture.record(), now: Fixture.date(2026, 11, 15)).text, passed, "at the due date")
         XCTAssertEqual(line(Fixture.record(), now: Fixture.longAfter).text, passed)
-        XCTAssertEqual(line(Fixture.record(), retention: .afterProtocol).text, passed, "right after the notes")
+        XCTAssertEqual(line(Fixture.record(), retention: Self.rightAfterTheNotes).text, passed, "right after the notes")
     }
 
     func testAKeptMeetingIsKeptInEveryStateAndCarriesTheBadge() {
         let audio = AudioOnDisk(presentCount: 3, unreachableCount: 0, totalCount: 3, bytes: 1_100_000_000)
         let kept = Fixture.record { $0.keep = true }
         let expected = "Audio · \(gb1point1) · kept, never deleted automatically"
-        let rows: [(LiveMeetingState?, RecordingRetention)] = [
-            (nil, .days30), (nil, .never), (live(.speakerNamingPending), .days30), (live(.error), .days30), (live(.done, exporting: true), .days30),
+        let rows: [(LiveMeetingState?, RecordingRetentionSettings)] = [
+            (nil, Self.after30Days), (nil, Self.off), (live(.speakerNamingPending), Self.after30Days), (live(.error), Self.after30Days),
+            (live(.done, exporting: true), Self.after30Days),
         ]
         for (live, retention) in rows {
             let line = line(kept, live: live, audio: audio, retention: retention)
@@ -93,8 +120,8 @@ final class RecordingAudioLineTests: XCTestCase {
             (nil, mb286), (nil, nothingLeft), (nil, unplugged), (live(.speakerNamingPending), mb286), (live(.error), mb286),
         ]
         for (live, audio) in rows {
-            for retention in RecordingRetention.allCases {
-                let line = line(Fixture.record(origin: .imported), live: live, audio: audio, retention: retention)
+            for retention in Self.everySetting {
+                let line = line(Fixture.record(origin: .imported), live: live, audio: audio, retention: retention, listed: .unlisted)
                 XCTAssertEqual(line.text, expected, "\(String(describing: live)), \(audio), \(retention)")
                 XCTAssertFalse(line.showsKeepBadge)
             }
@@ -105,7 +132,7 @@ final class RecordingAudioLineTests: XCTestCase {
     func testAFailedMeetingKeepsItsAudio() {
         let audio = AudioOnDisk(presentCount: 3, unreachableCount: 0, totalCount: 3, bytes: 48_000_000)
         let expected = "Audio · 48 MB · kept while the meeting has failed"
-        for retention in RecordingRetention.allCases {
+        for retention in Self.everySetting {
             XCTAssertEqual(line(Fixture.record(outcome: .inProgress), live: live(.error), audio: audio, retention: retention).text, expected)
             XCTAssertEqual(line(Fixture.record(outcome: .failed), audio: audio, retention: retention).text, expected)
         }
@@ -118,42 +145,35 @@ final class RecordingAudioLineTests: XCTestCase {
             (.automatic, "Audio deleted automatically on 20 Oct"),
         ]
         for (kind, expected) in rows {
-            for retention in RecordingRetention.allCases {
+            for retention in Self.everySetting {
                 let record = Fixture.record { $0.audioDeletion = .init(kind: kind, at: date) }
                 XCTAssertEqual(line(record, audio: nothingLeft, retention: retention).text, expected, "\(retention)")
             }
         }
     }
 
-    func testAFinishedMeetingWithoutNotesSaysSo() {
-        let record = Fixture.record { $0.setFiles(.protocol, to: nil) }
-        XCTAssertEqual(line(record).text, "Audio · 286 MB · kept, no notes were saved")
-        let gone = Fixture.record { $0.setFiles(.protocol, to: .gone) }
-        XCTAssertEqual(line(gone).text, "Audio · 286 MB · kept, no notes were saved", "a failed export without its Markdown")
+    /// The registry entry, not the record, says whether notes were written: the
+    /// pass keeps an entry until they are, so the line promises no date.
+    func testAListedMeetingWithoutWrittenNotesSaysSo() {
+        XCTAssertEqual(line(Fixture.record(), listed: .awaitingNotes).text, "Audio · 286 MB · kept, no notes were saved")
+        XCTAssertEqual(line(Fixture.record(), retention: Self.off, listed: .awaitingNotes).text, "Audio · 286 MB", "off promises nothing")
     }
 
-    /// With notes off (A1) the transcript is what is saved, and without it the check
-    /// keeps the audio, so the line promises no date.
-    func testWithNotesOffAndNoTranscriptTheAudioIsKept() {
-        let record = Fixture.record(outcome: .finished(protocolExpected: false)) { record in
-            record.setFiles(.protocol, to: nil)
-            record.setFiles(.transcript, to: .gone)
-        }
-        XCTAssertEqual(line(record).text, "Audio · 286 MB · kept, no notes were saved")
-        XCTAssertEqual(line(record, retention: .never).text, "Audio · 286 MB", "Never promises nothing (A16)")
+    /// The export uploads the notes, not the audio, so the pass does not wait for it.
+    func testARunningExportChangesNothing() {
+        XCTAssertEqual(
+            line(Fixture.record(), live: live(.done, exporting: true)).text, "Audio · 286 MB · deleted automatically on 15 Nov",
+        )
+        XCTAssertEqual(line(Fixture.record(), live: live(.done, exporting: true), retention: Self.off).text, "Audio · 286 MB")
     }
 
-    func testARunningExportHoldsTheLineUnlessTheSettingIsNever() {
-        XCTAssertEqual(line(Fixture.record(), live: live(.done, exporting: true)).text, "Audio · 286 MB · kept until the Notion export ends")
-        XCTAssertEqual(line(Fixture.record(), live: live(.done, exporting: true), retention: .never).text, "Audio · 286 MB")
+    func testSwitchedOffAFinishedMeetingShowsItsSizeOnly() {
+        XCTAssertEqual(line(Fixture.record(), retention: Self.off).text, "Audio · 286 MB")
+        XCTAssertEqual(line(Fixture.record { $0.setFiles(.protocol, to: nil) }, retention: Self.off).text, "Audio · 286 MB", "no notes")
     }
 
-    func testUnderNeverAFinishedMeetingShowsItsSizeOnly() {
-        XCTAssertEqual(line(Fixture.record(), retention: .never).text, "Audio · 286 MB")
-        XCTAssertEqual(line(Fixture.record { $0.setFiles(.protocol, to: nil) }, retention: .never).text, "Audio · 286 MB", "no notes")
-    }
-
-    /// What the rule counts as saved reads the same here (A1, A8).
+    /// Notes written elsewhere (Notion, or the transcript with no provider) count as
+    /// the registry counts them.
     func testAMeetingWithoutALocalProtocolCanStillBeDue() {
         let due = "Audio · 286 MB · deleted automatically on 15 Nov"
         XCTAssertEqual(line(Fixture.record(outcome: .finished(protocolExpected: false)) { $0.setFiles(.protocol, to: nil) }).text, due)
@@ -163,27 +183,25 @@ final class RecordingAudioLineTests: XCTestCase {
         }).text, due)
     }
 
-    /// The setting never reaches these, so no date may be promised.
-    func testAMeetingTheCheckNeverDeletesShowsItsSizeOnly() {
-        XCTAssertEqual(line(Fixture.record { $0.excludedFromAutomaticDeletion = true }).text, "Audio · 286 MB", "from before this feature")
-        XCTAssertEqual(line(Fixture.record(recordingDate: nil)).text, "Audio · 286 MB", "no recording date")
+    /// The pass never reaches these, so no date may be promised.
+    func testAMeetingThePassNeverDeletesShowsItsSizeOnly() {
+        XCTAssertEqual(line(Fixture.record { $0.excludedFromAutomaticDeletion = true }).text, "Audio · 286 MB", "from before the records")
+        XCTAssertEqual(line(Fixture.record(), listed: .unlisted).text, "Audio · 286 MB", "not in this build's registry")
         XCTAssertEqual(line(Fixture.record(outcome: .leftUnfinished)).text, "Audio · 286 MB", "left the queue unfinished")
-        XCTAssertEqual(line(Fixture.record { $0.createdBy = Fixture.otherBuild }).text, "Audio · 286 MB", "another build's meeting")
-        XCTAssertEqual(line(Fixture.record { $0.createdBy = nil }).text, "Audio · 286 MB", "a record from before the field")
+        XCTAssertEqual(
+            line(Fixture.record { $0.pending = .init(kind: .audioToTrash, paths: []) }).text, "Audio · 286 MB",
+            "a deletion of the user's under way",
+        )
     }
 
     /// Nor a reason to wait, which would say the audio goes afterwards.
-    func testAMeetingTheCheckNeverDeletesNamesNoWaitEither() {
-        let rows: [(String, MeetingFileRecord, LiveMeetingState?)] = [
-            ("another build's, notes not saved", Fixture.record { record in
-                record.createdBy = Fixture.otherBuild
-                record.setFiles(.protocol, to: nil)
-            }, nil),
-            ("another build's, export running", Fixture.record { $0.createdBy = Fixture.otherBuild }, live(.done, exporting: true)),
-            ("from before this feature, export running", Fixture.record { $0.excludedFromAutomaticDeletion = true }, live(.done, exporting: true)),
+    func testAMeetingThePassNeverDeletesNamesNoWaitEither() {
+        let rows: [(String, MeetingFileRecord, Listing)] = [
+            ("not listed, notes not saved", Fixture.record { $0.setFiles(.protocol, to: nil) }, .unlisted),
+            ("from before the records, notes not written", Fixture.record { $0.excludedFromAutomaticDeletion = true }, .awaitingNotes),
         ]
-        for (name, record, live) in rows {
-            XCTAssertEqual(line(record, live: live).text, "Audio · 286 MB", name)
+        for (name, record, listed) in rows {
+            XCTAssertEqual(line(record, listed: listed).text, "Audio · 286 MB", name)
         }
     }
 
@@ -255,7 +273,7 @@ final class RecordingAudioLineTests: XCTestCase {
         for (audio, expected) in rows {
             for kind in [MeetingFileRecord.DeletionKind.audioToTrash, .meetingToTrash] {
                 let record = Fixture.record { $0.incomplete = self.incomplete(kind: kind) }
-                XCTAssertEqual(line(record, audio: audio, retention: .never).text, expected, "\(kind)")
+                XCTAssertEqual(line(record, audio: audio, retention: Self.off).text, expected, "\(kind)")
             }
         }
     }

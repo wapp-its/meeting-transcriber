@@ -110,7 +110,6 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `RecordingAudioLine.swift` | Pure wording of a row's audio line, its Keep badge and why a deletion stopped |
 | `RowAvailability.swift` | The rows' files and audio on disk, read once per row and refresh, so a redraw never reads the disk |
 | `AllRecordingsActions.swift` | What the window's controls do, handed to `TranscriptionsView` as one value |
-| `RetentionPreview.swift` | What a retention value would delete now, shown before it is saved, and `RetentionChoice`, the picker's value on its way to the setting |
 | `MicrophoneMenuState.swift` | Pure decision for the menu bar's Microphone entry: its title (the device a recording reports, otherwise the chosen device or `System Default (<name>)`, a chosen device that is not connected, no microphone available, the "No Microphone" off line), the items (`System Default (<name>)` then the Settings list) and the checked choice, and every string the entry shows |
 | `ProtocolOpener.swift` | Opens local protocols with the default handler and prefers an already-running Notion desktop app for Notion pages, falling back to the default handler |
 | `MenuBarIcon.swift` | Renders the animated waveform icon + badge overlays (watching dot, question mark while a recording prompt is open, pulse while a meeting-end countdown runs, permission, record-only, channel-silent) |
@@ -129,7 +128,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `WhisperKitStockModel.swift` | The six stock WhisperKit variants in picker order, each with its label and approximate download size (measured 2026-10-06) for the load offer |
 | `Settings/VocabularySourceSettingsView.swift` | "Vocabulary source" picker (Local file / URL), shown in the Vocabulary section while "Use custom vocabulary" is on; for URL the address, the Keychain-backed access token, "Update now" and the status line from `RemoteVocabularyController` |
 | `Settings/SpeakersSettingsView.swift` | Diarization · Speaker Naming (open the naming window automatically, how long unnamed meetings wait) · Mic Speaker Name · Known Voices · Recognition Stats · Experimental: Diarization Tuning |
-| `Settings/OutputSettingsView.swift` | Output folder · Notion export · Meeting Notes (transcript options, AI-title file names, LLM provider, notes language) · Meeting Notes Templates and Template Rules sections |
+| `Settings/OutputSettingsView.swift` | Output folder · Notion export · Recording Retention · Meeting Notes (transcript options, AI-title file names, LLM provider, notes language) · Meeting Notes Templates and Template Rules sections |
 | `Settings/LocalModelSettingsView.swift` | The local model provider's panel in Settings → Output: the model folder with Choose…, the status line with Check Model (runs the helper's `check` mode, no weights loaded), and the memory and recording notes (`#if !APPSTORE`) |
 | `Settings/ProtocolTemplatesSettingsView.swift` | Meeting Notes Templates section: default template picker, per template file the split button Edit (Open in the editor app, Open With, Show in Finder) and Delete, New Template…, Open Templates Folder; its state and writes live in the `@Observable` `ProtocolTemplatesModel`, also for the New Template window |
 | `Settings/NewProtocolTemplateSheet.swift` | The New Template window: Name field, a note on what Create does, Cancel and Create |
@@ -219,6 +218,11 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `ProtocolOpener.swift` | Opens a job's target, preferring a running Notion desktop app |
 | `Settings/NotionExportSettingsView.swift`, `Settings/NotionExportSettingsModel.swift` | Notion settings UI and its connection and schema state |
 | `PipelineQueue+Recovery.swift` | Snapshot restore for `PipelineQueue` |
+| `PipelineQueue+Retention.swift` | The queue's side of recording retention: records what stage 3 moved, marks a recording due once its output is written, runs passes with the tracks its unfinished jobs hold |
+| `PipelineController+Retention.swift` | When retention passes run (launch, hourly, after a rebuild, once the settings settle), and the pass before a queue is built |
+| `RecordingRetention.swift` | Runs retention passes: decides on the main actor, deletes off it via `RecordingFileDeleter`, rechecks each delete |
+| `RecordingRetentionPolicy.swift` | Pure decision per registry entry: delete, keep (with the reason) or drop |
+| `RecordingRetentionRegistry.swift` | The list of relocated recordings retention may delete (`retained_recordings.<bundle id>.json` in the fork, one per build), the only thing the cleaner acts on |
 | `PipelineQueue+OrphanRecovery.swift` | Orphaned-recording recovery for `PipelineQueue`: the staging scan and the jobs it creates |
 | `RecoveredCut.swift` | Applies a stored meeting-end cut when launch recovery brings back a recording the app died with while asking: collects the stored cuts before headers are repaired, places the cut by the live cut's rule (or applies one already resolved), refuses a recording that ran on past the countdown's deadline, and logs one line per stored cut it settles; the orphan scan passes over a recording whose cut is not settled yet (its stem held by a live stop of this process, or a stored cut beside it that recovery could still apply), so it is never queued before it is cut |
 | `PipelineQueue+EchoBleed.swift` | Warns when a dual-source recording carries the same speech on both tracks (loudspeaker bleeding into the microphone) — measurement half of the echo mitigation (issue #581) |
@@ -416,8 +420,9 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `MeetingFileStore.swift` | `meeting_files.json`: every meeting's record, lock-guarded writes shared with a second running build |
 | `MeetingFilePresence.swift` | The one probe of a meeting's file: present, gone, or out of reach |
 | `MeetingFileRemover.swift` | Moves a meeting's files to the Trash or deletes them for good, after the pending mark is on disk |
-| `RecordingRetention.swift` | The retention setting's values and `RecordingRetentionRule`, which decides from the record alone whether a meeting's audio is due |
-| `RecordingRetentionController.swift` | The automatic deletion check: when it runs, and what it asks the disk and the queue right before it deletes |
+| `PipelineController+RetentionRecords.swift` | The fork's link from recording retention to the records: the meetings a pass must leave (Keep, a deletion of the user's, a recording from before the records), and marking what a pass deleted |
+| `PipelineController+LiveMeetingState.swift` | What the queue knows of a meeting (`LiveMeetingState`), which the window's actions ask before they act |
+| `MeetingRecordPruner.swift` | Removes the record of a meeting nothing is left of, at launch and once a day |
 | `AppSettings+RPC.swift` | Builds the read-only settings projection for the debug RPC `/state` endpoint |
 | `AppState+RPC.swift` | Builds `RPCStateSnapshot` from live `AppState` for the `/state` endpoint (`#if !APPSTORE`) |
 | `RPCStateSnapshot.swift` | JSON-serializable RPC state snapshot type (`#if !APPSTORE`) |
@@ -755,8 +760,8 @@ lines follow what the run wrote.
 Nothing lists a report while its meeting lives, so a report renamed or deleted
 in Finder drops out of the row menu. A report run never tells the job its
 template and never lists its file as the meeting's notes, so Open Notes, the
-automation API, a retried Notion export and the "right after the notes"
-retention keep using the main notes (`ProtocolRegenerator.regenerate`).
+automation API, a retried Notion export and recording retention keep using
+the main notes (`ProtocolRegenerator.regenerate`).
 
 `AppSettings.protocolLanguage` (default `"German"`) is substituted into the prompt as `{LANGUAGE}`. Every template can also use `{MEETING_DATE}` (`YYYY-MM-DD`) and `{MEETING_TIME}` (`HH:mm`), derived from the captured recording start time. Imports and recovery jobs resolve those time placeholders to `Unknown` rather than their enqueue or processing time. Only recordings with a captured start receive the authoritative meeting-metadata block, so templates receive reliable temporal context without needing to add the placeholders.
 
@@ -931,50 +936,41 @@ Only rows the search shows count as selected. The footer counts those rows (or
 says "N of M selected"), adds the audio on disk of the ones with a record, and
 says what the retention setting deletes.
 
-**Automatically.** Settings → Output → Recordings, "Delete recordings
-automatically": Never (the default), Right after the notes, After 7 days, After
-30 days or After 90 days. `RecordingRetentionRule` selects, from the record
-alone, the audio of meetings this build recorded, whose outcome is finished (notes
-saved, or with notes generation off a transcript the record lists as present;
-speakers named), that
-are not marked Keep and whose recording date plus the chosen days has passed. `RecordingRetentionController` deletes that audio
-for good, not to the Trash; the transcript, the notes and all other files stay.
-It never touches imports, failed meetings, kept meetings, meetings without a
-record, recordings from before this feature or meetings another build recorded.
-A row the setting never reaches shows only its audio size. It skips a meeting whose state
-changed since the check began or whose Notion export is running. Right before it
-deletes, it asks the disk and the queue again, and it keeps the audio in cases
-the rule cannot see: a folder, a link or an unreadable file at the notes path,
-notes switched off with the transcript removed by hand, or saved jobs it cannot
-read (the meeting then counts as not through). A file out of reach or one that
-refuses to go stays listed and is tried again at the next check. The check runs
-at launch, once a day, when a meeting finishes, when a Notion export ends, when
-the pipeline builds or rebuilds its queue (the first time it is needed and each
-time watching starts) and 5 seconds after a confirmed setting change, and never
-two at once.
+**Automatically.** The original's recording retention does it (Settings →
+Output → Recording Retention, see `docs/architecture/pipeline.md`): it deletes
+only what its registry lists, the audio this build's stage 3 relocated, once the
+notes are saved and the days since the recording have passed. The fork adds four
+things on top of it (`PipelineController+RetentionRecords.swift`):
 
-Choosing a value that would delete audio now first shows what it deletes
-(`RetentionPreview`). Cancel is that alert's default button, so Return cancels.
-A confirmed value is saved and starts a check 5 seconds later; the check reads
-the setting when it runs, so going back to Never in between keeps the audio.
-When nothing would be deleted, and for Never or a longer time, the value is
-saved without asking. When what the value deletes cannot be told, because the
-records or the queue's saved jobs do not read, the value is not saved.
+- **What the user holds stays.** A pass reads the record file fresh, also right
+  before each delete, and keeps the audio of a meeting marked Keep, of one with a
+  deletion of the user's under way or left incomplete, and of a recovered
+  recording from before the records existed (`isHeldFromRetention`). A record
+  file that does not read skips the pass.
+- **One registry per build.** The development and the release build share the
+  data folder but not their settings, so each keeps its own registry,
+  `retained_recordings.<bundle id>.json`: a build's setting reaches only what
+  that build relocated. On top of that a pass keeps every import and every
+  meeting whose record another build created (`createdBy`, or none in a record
+  from before that field), whatever reaches the registry.
+- **The row says what happened.** The files a pass deleted are marked gone in
+  the meeting's record, and once no audio is left the deletion is dated, so the
+  row reads "Audio deleted automatically on …". Before that, the row's audio
+  line and the window's footer say what the setting will do, the row only for a
+  meeting this build's registry lists.
+- **Records do not pile up.** `MeetingRecordPruner` removes, at launch and once
+  a day, the record of a meeting the window no longer lists and of which the disk
+  answers gone for every file.
+
+The fork's own automatic deletion (a five-value setting with a preview of what
+it deletes) was removed when the original's arrived; its stored
+`recordingRetention` value is not read and not carried over.
 
 The development and the release build share the data folder. Every write to
 `meeting_files.json` takes a lock and changes only its one record, and a
 deletion found pending is left alone while the process that started it still
-runs. Each build keeps its own retention setting, so a build's setting reaches
-only the records it created: the record names that build's bundle identifier
-(`createdBy`, written once), and the rule, the row's audio line, the preview and
-the store's last look before each file all take the running build's identifier
-(`MeetingFileStore.bundleID`). A record without the field is never deleted
-automatically. A build that does not know a field of the record drops it from
-every record when it saves the file, so a field the automatic deletion depends
-on has to keep the audio when it is missing, as `createdBy` does. The record
-file and `createdBy` arrive in the same change, so no build that writes the file
-deletes automatically without asking the field. The manual actions act on any
-meeting the window lists.
+runs. A record names the build that created it (`createdBy`, written once). The
+manual actions act on any meeting the window lists.
 
 ---
 
@@ -1066,7 +1062,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 | **Audio** | Microphone · Recording Levels · VAD · Echo · Per-Channel Indicator | `settings` | `audioDevices` |
 | **Transcription** | Engine + per-engine options + vocabulary source + status | `settings`, three engines, `remoteVocabulary?` | — |
 | **Speakers** | Diarization · Speaker Naming · Speaker Identity · Known Voices · Recognition Stats · Experimental: Diarization Tuning | `settings`, `recognitionStatsLog`, `enrollmentDiarizerFactory` | `knownVoicesSheet` |
-| **Output** | LLM Provider (with the local model's folder and Check Model) · Notes Language · Output Folder · Recordings (automatic deletion, with its preview) · Notion Export · Meeting Notes Templates · Template Rules | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel`, the rules section in `TemplateRulesModel` |
+| **Output** | LLM Provider (with the local model's folder and Check Model) · Notes Language · Output Folder · Notion Export · Recording Retention · Meeting Notes Templates · Template Rules | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel`, the rules section in `TemplateRulesModel` |
 | **Advanced** | Permissions · Diagnostics | — | `micPermission`, `screenRecordingOK`, `accessibilityOK` |
 | **About** | Build identity · Dependencies · Updates | `settings`, `updateChecker?` | — |
 

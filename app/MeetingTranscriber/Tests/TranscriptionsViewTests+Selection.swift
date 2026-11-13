@@ -14,7 +14,8 @@ extension TranscriptionsViewTests {
 
     /// A window whose rows have these meetings, the rest no record.
     private func rowActions(
-        _ meetings: [(entry: TranscriptionEntry, meeting: Meeting)], retention: RecordingRetention = .never, base: AllRecordingsActions = .noop,
+        _ meetings: [(entry: TranscriptionEntry, meeting: Meeting)], retention: RecordingRetentionSettings = .init(enabled: false, days: 30),
+        base: AllRecordingsActions = .noop,
     ) -> AllRecordingsActions {
         var actions = base
         actions.filesOnDisk = { Self.recordedFilesOnDisk($0) }
@@ -73,18 +74,16 @@ extension TranscriptionsViewTests {
         XCTAssertEqual(try footer(of: noMatch), "0 recordings · no audio")
     }
 
-    /// The window hands the footer the setting it was given, for each value.
-    func testTheFooterFollowsEachRetentionValue() throws {
+    /// The window hands the footer the settings it was given.
+    func testTheFooterFollowsTheRetentionSettings() throws {
         let retro = row("Retro")
         let selection = TranscriptionsSelection()
-        let third: [(RecordingRetention, String)] = [
-            (.never, ""),
-            (.afterProtocol, " · recordings are deleted automatically right after the notes (Settings → Output)"),
-            (.days7, " · recordings are deleted automatically after 7 days (Settings → Output)"),
-            (.days30, " · recordings are deleted automatically after 30 days (Settings → Output)"),
-            (.days90, " · recordings are deleted automatically after 90 days (Settings → Output)"),
+        let third: [(RecordingRetentionSettings, String)] = [
+            (.init(enabled: false, days: 7), ""),
+            (.init(enabled: true, days: 0), " · recordings are deleted automatically right after the notes (Settings → Output)"),
+            (.init(enabled: true, days: 7), " · recordings are deleted automatically after 7 days (Settings → Output)"),
+            (.init(enabled: true, days: 30), " · recordings are deleted automatically after 30 days (Settings → Output)"),
         ]
-        XCTAssertEqual(third.map(\.0), RecordingRetention.allCases)
         for (retention, sentence) in third {
             let actions = rowActions([(retro, meeting(retro))], retention: retention)
             selection.ids = []

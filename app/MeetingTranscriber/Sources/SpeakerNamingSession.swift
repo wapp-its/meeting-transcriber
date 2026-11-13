@@ -209,7 +209,7 @@ final class SpeakerNamingSession {
                 await self.generateProtocolForExistingJob(jobID: jobID, delegate: delegate, speakerNames: speakerNames)
             }
         } else if delegate?.job(withID: jobID)?.state == .speakerNamingPending {
-            delegate?.updateJobState(id: jobID, to: .done)
+            delegate?.finishWithAcceptedAutoNames(jobID: jobID)
         }
     }
 

@@ -186,7 +186,7 @@ extension PipelineControllerTranscriptionsTests {
             XCTAssertEqual(
                 RecordingAudioLine.resolve(
                     record: record, live: nil, audio: RecordingAudioLine.AudioOnDisk(presentCount: 0, unreachableCount: 0, totalCount: 3, bytes: 0),
-                    retention: .never, bundleID: nil, now: .now, calendar: .current, locale: .current,
+                    retention: .init(enabled: false, days: 30), retained: nil, now: .now, calendar: .current, locale: .current,
                 ).incompleteText,
                 "Deletion incomplete: the notes folder could not be read to look for additional reports",
             )

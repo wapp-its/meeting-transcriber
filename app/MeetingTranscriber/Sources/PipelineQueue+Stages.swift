@@ -997,10 +997,9 @@ extension PipelineQueue {
         // writes already names the new locations. That ordering is the whole
         // fix: a quit during the protocol call must leave a snapshot the restore
         // can still find the audio by.
-        recordRelocatedAudio(
-            jobID: ctx.jobID,
-            Self.persistAudioToOutput(ctx: ctx, outputDir: recordingsDir, stagingDir: stagingDir),
-        )
+        let (relocated, moved) = Self.persistAudioToOutput(ctx: ctx, outputDir: recordingsDir, stagingDir: stagingDir)
+        recordRelocatedAudio(jobID: ctx.jobID, relocated)
+        registerRelocatedAudio(jobID: ctx.jobID, moved: moved, root: outputDir)
 
         // --- Persist 16kHz audio for re-diarization (move instead of copy to avoid double I/O) ---
         // Replacing, because a job run a second time keeps its stem and the
@@ -1087,6 +1086,19 @@ extension PipelineQueue {
         jobID: UUID, transcript: String, title: String, protocolsDir: URL,
         speakerNames: [String] = [],
     ) async throws(CancellationError) {
+        try await generateProtocol(
+            jobID: jobID, transcript: transcript, title: title, protocolsDir: protocolsDir,
+            speakerNames: speakerNames, transcriptIsTheOutputWithoutAProvider: true,
+        )
+    }
+
+    /// `transcriptIsTheOutputWithoutAProvider: false` for a run that was
+    /// started with a provider: resumed after the provider was switched off,
+    /// it still owes a protocol, so its transcript does not stand in for one.
+    func generateProtocol( // swiftlint:disable:this function_parameter_count
+        jobID: UUID, transcript: String, title: String, protocolsDir: URL,
+        speakerNames: [String], transcriptIsTheOutputWithoutAProvider: Bool,
+    ) async throws(CancellationError) {
         // No generator and no LLM call for a job that is already gone.
         try ensureStillQueued(jobID)
         guard let job = job(withID: jobID) else { return }
@@ -1095,6 +1107,7 @@ extension PipelineQueue {
             // No protocol, so no export, but an export that is switched on and
             // cannot run is still worth a reason on the job.
             resolveNotionExport(jobID: jobID)
+            if transcriptIsTheOutputWithoutAProvider { markOutputWritten(jobID: jobID, output: job.transcriptPath) }
             return
         }
         protocolGenerationOn[jobID] = true
@@ -1156,6 +1169,7 @@ extension PipelineQueue {
         // the queue moves on while the export runs, so this is what a quit or a
         // failed export falls back on. A successful Notion-only export removes it.
         let savedLocally = saveProtocolLocally(markdown, basename: basename, jobID: jobID, protocolsDir: protocolsDir)
+        if savedLocally { markOutputWritten(jobID: jobID, output: self.job(withID: jobID)?.protocolPath) }
         if let configuration {
             queueNotionExport(
                 PendingNotionExport(
@@ -1300,8 +1314,10 @@ extension PipelineQueue {
         from oldStem: String,
         titleSlug: String,
         protocolsDir: URL,
-        moveItem: (_ source: URL, _ destination: URL) throws -> Void = { try FileManager.default.moveItem(at: $0, to: $1) },
+        moveItem: ((_ source: URL, _ destination: URL) throws -> Void)? = nil,
     ) -> String {
+        // The queue's own move unless a test hands one in.
+        let moveItem = moveItem ?? moveArtifact
         let shortID = PipelineJob.shortID(for: jobID)
         let dirs = ArtifactRenamePlan.Directories(
             protocols: protocolsDir,
@@ -1327,6 +1343,9 @@ extension PipelineQueue {
             // is under the new name: the record says where it really is, so a
             // deletion finds it and does not count it as gone.
             let stayed = undoRenames(done, shortID: shortID, moveItem: moveItem)
+            // The retention registry follows exactly those files too, or it
+            // would forget them.
+            recordingRetention?.registry.repoint(jobID: jobID, moves: stayed.map { ($0.from, $0.to) })
             logger.warning("[\(shortID, privacy: .public)] ai_title_rename_failed error=\(error.localizedDescription, privacy: .private)")
             report(stayed)
             // No record lists a report, and under the new name no rule finds it for
@@ -1356,6 +1375,7 @@ extension PipelineQueue {
             jobs[idx].recordRelocatedAudio(RelocatedAudioPaths(
                 mix: moved(jobs[idx].mixPath), app: moved(jobs[idx].appPath), mic: moved(jobs[idx].micPath),
             ))
+            recordingRetention?.registry.repoint(jobID: jobID, moves: done.map { (from: $0.from, to: $0.to) })
             saveSnapshot()
         }
         return newStem
@@ -1468,7 +1488,9 @@ extension PipelineQueue {
         let staging = stagingDir
         lastRecordingRelocation = Task.detached(priority: .utility) { [self] in
             let moved = withExtendedLifetime(self) {
-                let paths = Self.persistAudioToOutput(ctx: ctx, outputDir: destination, stagingDir: staging)
+                // Not registered for retention: a cancelled job writes no
+                // outputs, so its recording is the only copy and stays.
+                let (paths, _) = Self.persistAudioToOutput(ctx: ctx, outputDir: destination, stagingDir: staging)
                 if staged.contains(where: { FileManager.default.fileExists(atPath: $0.path) }) {
                     logger.warning("[\(ctx.shortID, privacy: .public)] cancelled_recording_left_in_staging")
                 }
@@ -1521,9 +1543,13 @@ extension PipelineQueue {
     /// without a `_mix.wav` source) → mix slot is skipped, no persistent mix is
     /// written. `outputDir` here is `<root>/recordings`, reachable because the
     /// queue holds the security scope on the root.
+    ///
+    /// `moved` lists the destinations this run moved this job's audio to; the
+    /// retention registry records exactly these. Imports, files already in the output
+    /// folder and failed moves are never in it.
     nonisolated private static func persistAudioToOutput(
         ctx: JobContext, outputDir: URL, stagingDir: URL,
-    ) -> RelocatedAudioPaths {
+    ) -> (paths: RelocatedAudioPaths, moved: [URL]) {
         let (mixPath, appPath, micPath) = (ctx.mixPath, ctx.appPath, ctx.micPath)
         // Each move below renames-in-place — if two of the three URLs point at
         // the same file, the first move destroys the source for the next one.
@@ -1542,6 +1568,7 @@ extension PipelineQueue {
         let fm = FileManager.default
         try? fm.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
+        var moved: [URL] = []
         // Reuse the job's single basename so the audio copies match the
         // transcript/protocol stems exactly (same meeting-start stamp + shortID).
         func persist(_ src: URL?, _ suffix: String) -> URL? {
@@ -1573,11 +1600,15 @@ extension PipelineQueue {
             // rather than copied, no copy would remain anywhere.
             guard fm.fileExists(atPath: src.path) else {
                 logger.info("Audio already relocated, skipping: \(name, privacy: .private)")
+                // Not reported as moved: the file there may be one the user or
+                // a sync tool put there, and this run cannot show it moved it.
+                // The run that did move it recorded it at the time.
                 return fm.fileExists(atPath: dst.path) ? dst : src
             }
             do {
                 try moveIntoPlace(src, to: dst)
                 logger.info("Audio moved: \(name, privacy: .private)")
+                moved.append(dst)
                 return dst
             } catch {
                 // Error left redacted: a file-move CocoaError embeds the
@@ -1588,11 +1619,12 @@ extension PipelineQueue {
             }
         }
 
-        return RelocatedAudioPaths(
+        let paths = RelocatedAudioPaths(
             mix: persist(mixPath, RecordingFileSuffix.mix),
             app: persist(appPath, RecordingFileSuffix.app),
             mic: persist(micPath, RecordingFileSuffix.mic),
         )
+        return (paths, moved)
     }
 }
 

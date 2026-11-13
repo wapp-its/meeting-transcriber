@@ -58,11 +58,11 @@ struct AllRecordingsActions {
     var retryDeletion: (UUID) -> Void
     /// "Keep (Never Delete Automatically)", with the mark's new value.
     var setKeep: (UUID, Bool) -> Void
-    /// The setting the audio line says what happens next by.
-    var retention: () -> RecordingRetention
-    /// The running build's bundle identifier, as the record store has it: the line
-    /// promises an automatic deletion only for a meeting this build recorded.
-    var bundleID: String?
+    /// The retention settings the audio line and the footer say what happens next by.
+    var retention: () -> RecordingRetentionSettings
+    /// This build's retention registry entry for a meeting, nil when it lists none:
+    /// the audio line promises an automatic deletion only for a listed meeting.
+    var retainedRecording: (UUID) -> RetainedRecording? = { _ in nil }
 
     // MARK: Regenerate sheet
 
@@ -105,7 +105,7 @@ struct AllRecordingsActions {
         meetingReports: { _ in [] },
         retryDeletion: { _ in },
         setKeep: { _, _ in },
-        retention: { .never },
+        retention: { RecordingRetentionSettings(enabled: false, days: 0) },
         templateChoices: { ProtocolTemplateChoices(templates: [.builtIn], defaultTemplate: .builtIn) },
         optionsUse: { ProtocolOptionsUse(destination: .off, recordOnly: false) },
         chooseFile: { nil },

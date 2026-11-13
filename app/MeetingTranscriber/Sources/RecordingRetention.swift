@@ -1,124 +1,303 @@
 import Foundation
+import os.log
 
-/// How long a recorded meeting's audio stays: one app-wide setting.
-enum RecordingRetention: String, CaseIterable, Sendable {
-    // `AppSettings` stores the raw value, which is the case name. A renamed case
-    // has to keep its raw value or come with a migration:
-    // `AppSettingsTests.testRecordingRetentionRawValuesArePinned` surfaces the need.
-    case never
-    case afterProtocol
-    case days7
-    case days30
-    case days90
+private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "RecordingRetention")
 
-    /// The days after the recording date, for a value that counts them.
-    var days: Int? {
-        switch self {
-        case .never, .afterProtocol: nil
-        case .days7: 7
-        case .days30: 30
-        case .days90: 90
-        }
+/// Deletes files off the main actor.
+///
+/// A remove can stall for seconds on a folder Spotlight is indexing, the same
+/// stall `SnapshotWriterActor` keeps away from the UI for the queue snapshot.
+/// Awaiting this actor is a real suspension, so the deletes never run on the
+/// caller's thread.
+actor RecordingFileDeleter {
+    private let remove: @Sendable (URL) throws -> Void
+
+    /// Removes one file with `unlink(2)`, which fails on a folder and removes
+    /// a link rather than what it points to. Unlike `removeItem`, it cannot
+    /// take a folder's contents with it, so a folder that replaced the file
+    /// after the last check is safe even in that window.
+    static func unlinkFile(_ url: URL) throws {
+        let result = url.withUnsafeFileSystemRepresentation { path in path.map(unlink) ?? -1 }
+        guard result != 0 else { return }
+        let code = errno
+        if code == ENOENT { throw CocoaError(.fileNoSuchFile) }
+        throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO)
     }
 
-    var title: String {
-        switch self {
-        case .never: "Never"
-        case .afterProtocol: "Right after the notes"
-        case .days7: "After 7 days"
-        case .days30: "After 30 days"
-        case .days90: "After 90 days"
+    init(remove: @escaping @Sendable (URL) throws -> Void = RecordingFileDeleter.unlinkFile) {
+        self.remove = remove
+    }
+
+    /// Delete each of `urls` and return the ones that are gone afterwards,
+    /// including those already missing. A failure is logged and the file left
+    /// out of the result, so it stays listed for the next pass.
+    ///
+    /// Only regular files are removed. A path that is now a folder or a link
+    /// is skipped and stays listed: removing a folder would take everything
+    /// in it, and a link is not the recording.
+    func delete(_ urls: [URL]) -> [URL] {
+        urls.filter { url in
+            guard RecordingRetentionPolicy.isRegularFileOrGone(url) else {
+                logger.warning("Retention skipped a listed path that is not a regular file")
+                return false
+            }
+            do {
+                try remove(url)
+                return true
+            } catch CocoaError.fileNoSuchFile {
+                return true
+            } catch {
+                // Private: a file-system error names the file, and the file name
+                // is the meeting title.
+                logger.warning("Could not delete a retained recording: \(error.localizedDescription, privacy: .private)")
+                return false
+            }
         }
     }
 }
 
-/// What the queue knows of a job it still lists. A job stays `.done` through its
-/// Notion export, first run or retry, so its state alone cannot say the queue is
-/// through with it.
-struct LiveMeetingState: Equatable, Sendable {
-    let state: JobState
-    let notionExportRunning: Bool
+/// Deletes relocated recordings once the retention setting says they are due.
+///
+/// Decisions and every registry change happen on the main actor; only the
+/// deletes leave it. The settings are read through a closure on every pass, so
+/// switching retention on, off or to a shorter period takes effect on the next
+/// pass without rebuilding anything.
+///
+/// Known limits, accepted:
+/// - Each delete is checked right before it runs, but the check and the
+///   unlink are not one step. A due recording re-imported during the few
+///   seconds a stalled unlink is in flight can still be lost; it is the file
+///   this pass was about to delete anyway, and the new job then fails with a
+///   missing-file error.
+/// - Files are identified by path. A file, or a folder link pointed
+///   elsewhere, placed at an old path takes on the old entry's deletion, and
+///   paths that name the same file through letter case or a system alias are
+///   not treated as one.
+/// - Entries under an earlier output folder stay unreachable while another
+///   folder's access is held, so they and their files stay until that folder
+///   is chosen again.
+/// - If an unreadable registry file cannot be moved aside, the entries it
+///   held are no longer tracked.
+/// - A process kill between the AI-title rename and the registry update
+///   leaves that recording untracked.
+@MainActor
+final class RecordingRetention {
+    /// What one pass needs from the queue that asks for it.
+    struct SweepContext {
+        /// Standardized paths of every track a job that is not finished holds,
+        /// read once per pass, right before deciding.
+        let excludedPaths: () -> Set<String>
+        /// The output folder as resolved from its bookmark, or nil when the
+        /// queue has none. Access is opened on this exact object, since a URL
+        /// rebuilt from a path carries no sandbox grant.
+        let scopeRoot: URL?
+        let securityScope: SecurityScopeAccess
+    }
 
-    /// Whether the queue is through with the job for now.
-    var isSettled: Bool {
-        switch state {
-        case .done: !notionExportRunning
-        case .waiting, .transcribing, .diarizing, .generatingProtocol, .speakerNamingPending, .error: false
+    let registry: RecordingRetentionRegistry
+
+    /// Paths held by the unfinished jobs of the queue currently in use, set by
+    /// the controller. Read with the pass's own on every check, because a pass
+    /// started from an earlier queue would otherwise not see jobs that arrive
+    /// in the one that replaced it.
+    var heldPaths: () -> Set<String> = { [] }
+
+    private func inUse(_ context: SweepContext) -> Set<String> {
+        context.excludedPaths().union(heldPaths())
+    }
+
+    /// The jobs whose meeting the user holds in All Recordings
+    /// (`Environment.heldJobs`), read on every pass and again right before each
+    /// delete, since another build can change a record meanwhile. Nil when that
+    /// cannot be told because the meeting records do not read: the pass then
+    /// deletes nothing. Set by the controller. The fork's addition.
+    var heldJobs: () -> Set<UUID>? = { [] } // swiftlint:disable:this discouraged_optional_collection
+
+    /// Told which files of a job a pass deleted or found gone, so the meeting's
+    /// record can say so. Set by the controller. The fork's addition.
+    var didDelete: (UUID, [URL]) -> Void = { _, _ in }
+
+    private let settings: () -> RecordingRetentionSettings
+    private let deleter: RecordingFileDeleter
+    private let now: () -> Date
+    /// Told once per pass that looks at entries; see `init`.
+    private let report: (RecordingRetentionPassSummary) -> Void
+
+    /// The pass running now, so a second request waits for it instead of
+    /// deleting the same files twice.
+    private var running: Task<Void, Never>?
+    /// The newest context asked for while a pass was running, served by one
+    /// more pass when it ends.
+    private var pending: SweepContext?
+
+    /// `report` defaults to one info line per pass, so a log shows that a pass
+    /// ran and why it kept what it kept. Public: the line holds counts and
+    /// reason names only.
+    init(
+        registry: RecordingRetentionRegistry,
+        settings: @escaping () -> RecordingRetentionSettings,
+        now: @escaping () -> Date = Date.init,
+        deleter: RecordingFileDeleter = RecordingFileDeleter(),
+        report: @escaping (RecordingRetentionPassSummary) -> Void = { logger.info("\($0.logLine, privacy: .public)") },
+    ) {
+        self.registry = registry
+        self.settings = settings
+        self.deleter = deleter
+        self.now = now
+        self.report = report
+        settled = settings()
+    }
+
+    /// Waiting to run `afterSettling`'s action; replaced by each new call.
+    private var settling: Task<Void, Never>?
+
+    /// Run `action` once no further call has arrived for `delay`.
+    func afterSettling(for delay: Duration, _ action: @escaping @MainActor () async -> Void) {
+        settling?.cancel()
+        settling = Task {
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
+            await action()
         }
     }
-}
 
-/// When a meeting's audio is due and which of its files the automatic check
-/// deletes now. Pure: the clock, the calendar and the running build's bundle
-/// identifier come in, and "present" is what the record marks. The check is what
-/// asks the disk, right before it deletes.
-enum RecordingRetentionRule {
-    /// Whether the automatic deletion reaches the meeting at all, whatever the date
-    /// and its state: audio the app recorded, of a meeting this build created the
-    /// record of, not kept and not from before this feature. The development and the
-    /// release build share the record file but not the setting, so a build's setting
-    /// never reaches the other build's meetings, nor a record from before the field.
-    static func reaches(_ record: MeetingFileRecord, bundleID: String?) -> Bool {
-        guard let bundleID, record.createdBy == bundleID else { return false }
-        return record.origin == .recorded && !record.keep && !record.excludedFromAutomaticDeletion
+    /// The settings as they were when they last settled; see `settle`.
+    private var settled: RecordingRetentionSettings
+
+    /// Adopt the current settings as the ones a pass acts on. Called once a
+    /// change has stopped moving, so a value the stepper only passes through
+    /// never reaches any pass, whoever starts it.
+    func settle() {
+        settled = settings()
     }
 
-    /// Nil where the audio is never due: under Never, for an import, a kept meeting,
-    /// another build's meeting, a recording from before this feature or one without a
-    /// recording date. Right after the notes is due from the start, so only
-    /// `audioToDelete`'s other conditions hold it back.
-    static func dueDate(
-        record: MeetingFileRecord, retention: RecordingRetention, calendar: Calendar, bundleID: String?,
-    ) -> Date? {
-        guard reaches(record, bundleID: bundleID), let recorded = record.recordingDate else { return nil }
-        switch retention {
-        case .never:
-            return nil
+    /// The settings as they are now. Reading it inside
+    /// `withObservationTracking` observes both underlying settings.
+    var currentSettings: RecordingRetentionSettings {
+        settings()
+    }
 
-        case .afterProtocol:
-            return recorded
+    /// What a pass acts on: the settled settings, except that switching off
+    /// and lengthening the period apply at once. Only the direction that
+    /// deletes waits to settle.
+    var effectiveSettings: RecordingRetentionSettings {
+        let live = settings()
+        return RecordingRetentionSettings(
+            enabled: settled.enabled && live.enabled, days: max(settled.days, live.days),
+        )
+    }
 
-        case .days7, .days30, .days90:
-            return retention.days.flatMap { calendar.date(byAdding: .day, value: $0, to: recorded) }
+    /// Run one pass, or join the one already running and make sure another
+    /// follows it. Returns once the work asked for is done.
+    func sweep(_ context: SweepContext) async {
+        if let running {
+            pending = context
+            await running.value
+            return
+        }
+        let task = Task { [self] in
+            var next: SweepContext? = context
+            while let current = next {
+                pending = nil
+                await sweepOnce(current)
+                next = pending
+            }
+            running = nil
+        }
+        running = task
+        await task.value
+    }
+
+    private func sweepOnce(_ context: SweepContext) async {
+        // Off, every entry is kept, so there is nothing to work out.
+        guard effectiveSettings.enabled, !registry.entries.isEmpty else { return }
+        guard registry.persist() else {
+            logger.warning("Retention pass skipped: the registry could not be saved")
+            return
+        }
+        guard let held = heldJobs() else {
+            logger.warning("Retention pass skipped: the meeting records could not be read")
+            return
+        }
+        let current = effectiveSettings
+        let environment = RecordingRetentionPolicy.Environment.live(
+            excludedPaths: inUse(context), scopedRoot: context.scopeRoot, heldJobs: held,
+        )
+        let instant = now()
+        var due: [(jobID: UUID, urls: [URL])] = []
+        var dropped: [RetainedRecording] = []
+        var outside = 0
+        // Reported on every way out below, with what the deletes achieved.
+        var summary = RecordingRetentionPassSummary()
+        defer { report(summary) }
+        for entry in registry.entries {
+            let decision = RecordingRetentionPolicy.decide(
+                entry, now: instant, settings: current, environment: environment,
+            )
+            summary.count(decision)
+            switch decision {
+            case let .delete(urls):
+                due.append((entry.jobID, urls))
+                outside += entry.paths.count { path in
+                    !RecordingRetentionPolicy.isInRecordingsFolder(path, of: entry.root, in: environment)
+                }
+
+            case .drop(.filesGone):
+                dropped.append(entry)
+
+            case .keep(.outsideRoot):
+                outside += entry.paths.count
+
+            case .keep:
+                break
+            }
+        }
+        if outside > 0 {
+            logger.warning("Retention skipped \(outside, privacy: .public) listed files outside the recordings folder")
+        }
+        registry.remove(dropped)
+        guard !due.isEmpty else { return }
+
+        // No delete without the scope when one is held: in the sandbox it
+        // would fail anyway, and outside it nothing should depend on that.
+        if let scopeRoot = context.scopeRoot {
+            guard context.securityScope.start(scopeRoot) else {
+                logger.warning("Retention pass skipped: the output folder's access could not be opened")
+                return
+            }
+        }
+        defer { context.scopeRoot.map(context.securityScope.stop) }
+
+        for (jobID, urls) in due {
+            var gone: [URL] = []
+            for url in urls {
+                guard mayStillDelete(url, of: jobID, context) else { break }
+                gone += await deleter.delete([url])
+            }
+            // One write per recording. Forgetting after the deletes is safe:
+            // a listed file that is gone is dropped by the next pass, and a
+            // path a newer recording takes over leaves this entry on its own.
+            forget(gone, of: jobID)
+            summary.deletedFiles += gone.count
         }
     }
 
-    /// Saved on disk or as a completed Notion export. A page whose export failed
-    /// holds only part of the notes, so it does not count; a failed export with its
-    /// Markdown on disk counts through that file.
-    static func hasSavedProtocol(_ record: MeetingFileRecord) -> Bool {
-        record.savedToNotion || record.files.contains { $0.role == .protocol && $0.state == .present }
+    /// Checked again right before each delete, on the main actor: a job may have
+    /// taken a track into use, a newer recording may have taken the path over,
+    /// the settings may have been switched off or lengthened, a registry write
+    /// may have failed since the decision, or (the fork's addition) the user may
+    /// have come to hold the meeting.
+    private func mayStillDelete(_ url: URL, of jobID: UUID, _ context: SweepContext) -> Bool {
+        guard registry.isPersisted,
+              let entry = registry.entry(listing: url, for: jobID),
+              RecordingRetentionPolicy.isDue(entry, now: now(), settings: effectiveSettings),
+              !RecordingRetentionPolicy.isInUse(entry, excludedPaths: inUse(context))
+        else { return false }
+        return heldJobs().map { !$0.contains(jobID) } ?? false
     }
 
-    /// What a finished meeting has to have saved for its audio to go: its protocol
-    /// when generation was on, otherwise (A1) its transcript, as the record marks it.
-    /// The check asks the disk for the same file right before it deletes.
-    static func hasSavedNotes(_ record: MeetingFileRecord, protocolExpected: Bool) -> Bool {
-        protocolExpected ? hasSavedProtocol(record) : record.files.contains { $0.role == .transcript && $0.state == .present }
-    }
-
-    /// What the record alone has to say for the audio to go, whatever the date: a
-    /// recording of this build that finished with its notes saved, or with notes off
-    /// its transcript, not kept and with no failed deletion on it. Also asked under the
-    /// store's lock before each file of an automatic deletion, as another build can
-    /// change any of it meanwhile.
-    static func recordAllowsDeletion(_ record: MeetingFileRecord, bundleID: String?) -> Bool {
-        guard case let .finished(protocolExpected) = record.outcome else { return false }
-        return reaches(record, bundleID: bundleID) && record.incomplete == nil
-            && hasSavedNotes(record, protocolExpected: protocolExpected)
-    }
-
-    /// The audio to delete now: the owned files still marked present of a meeting of
-    /// this build that finished with its notes saved, or with notes off its
-    /// transcript, whose queue is through with it, with no deletion under way or left
-    /// unfinished, and that is due. Empty in every other case.
-    static func audioToDelete( // swiftlint:disable:this function_parameter_count
-        record: MeetingFileRecord, live: LiveMeetingState?, retention: RecordingRetention, now: Date, calendar: Calendar,
-        bundleID: String?,
-    ) -> [MeetingFile] {
-        guard recordAllowsDeletion(record, bundleID: bundleID), live?.isSettled ?? true, record.pending == nil,
-              let due = dueDate(record: record, retention: retention, calendar: calendar, bundleID: bundleID), due <= now
-        else { return [] }
-        return record.filesCovered(by: .automatic).filter { $0.state == .present }
+    private func forget(_ gone: [URL], of jobID: UUID) {
+        registry.forget(gone, of: jobID)
+        if !gone.isEmpty { didDelete(jobID, gone) }
     }
 }

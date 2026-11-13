@@ -25,7 +25,6 @@ extension TranscriptionsViewTests {
         var actions = AllRecordingsActions.noop
         actions.meetingFiles = { _ in meeting.record }
         actions.audioOnDisk = { _ in meeting.audio }
-        actions.bundleID = RetentionFixture.thisBuild
         actions.filesOnDisk = { _ in
             FilesOnDisk(protocolExists: true, transcriptExists: true, transcriptSource: .transcriptFile, reports: [
                 .init(name: "Board summary for the partners and the regional leads", url: URL(fileURLWithPath: "/out/s (Board).md")),

@@ -38,15 +38,16 @@ struct RecordingAudioLine: Equatable, Sendable {
     let incompleteText: String?
 
     /// `live` is nil when the queue no longer lists the job, and `audio` nil when the
-    /// row has no record. `bundleID` is the running build's: the line promises an
-    /// automatic deletion only where that build's check would make it.
+    /// row has no record. `retained` is the running build's retention registry entry
+    /// for the meeting, nil when it lists none: the line promises an automatic
+    /// deletion only where that build's retention pass would make it.
     static func resolve( // swiftlint:disable:this function_parameter_count
-        record: MeetingFileRecord?, live: LiveMeetingState?, audio: AudioOnDisk?, retention: RecordingRetention,
-        bundleID: String?, now: Date, calendar: Calendar, locale: Locale,
+        record: MeetingFileRecord?, live: LiveMeetingState?, audio: AudioOnDisk?, retention: RecordingRetentionSettings,
+        retained: RetainedRecording?, now: Date, calendar: Calendar, locale: Locale,
     ) -> Self {
         guard let record, let audio else { return Self(text: nil, showsKeepBadge: false, incompleteText: nil) }
         let inputs = Inputs(
-            record: record, live: live, audio: audio, retention: retention, bundleID: bundleID, now: now, calendar: calendar,
+            record: record, live: live, audio: audio, retention: retention, retained: retained, now: now, calendar: calendar,
             locale: locale,
         )
         return Self(
@@ -69,8 +70,8 @@ struct RecordingAudioLine: Equatable, Sendable {
         let record: MeetingFileRecord
         let live: LiveMeetingState?
         let audio: AudioOnDisk
-        let retention: RecordingRetention
-        let bundleID: String?
+        let retention: RecordingRetentionSettings
+        let retained: RetainedRecording?
         let now: Date
         let calendar: Calendar
         let locale: Locale
@@ -126,7 +127,9 @@ struct RecordingAudioLine: Equatable, Sendable {
 
         /// What happens to audio on disk, or nil when the line has nothing to promise.
         /// Keep is true in every state, and the setting only reaches a finished meeting
-        /// it can ever delete: none of another build or from before this feature.
+        /// this build's retention registry lists, as the pass deletes nothing else:
+        /// no import, no record-only recording, none of another build or from before
+        /// the registry. Days count as the pass counts them, in 24-hour steps.
         func next(_ standing: Standing) -> String? {
             if record.keep { return "kept, never deleted automatically" }
             switch standing {
@@ -139,12 +142,11 @@ struct RecordingAudioLine: Equatable, Sendable {
             case .leftUnfinished:
                 return nil
 
-            case let .finished(protocolExpected):
-                guard retention != .never, RecordingRetentionRule.reaches(record, bundleID: bundleID) else { return nil }
-                if live?.notionExportRunning == true { return "kept until the Notion export ends" }
-                if !RecordingRetentionRule.hasSavedNotes(record, protocolExpected: protocolExpected) { return "kept, no notes were saved" }
-                return RecordingRetentionRule.dueDate(record: record, retention: retention, calendar: calendar, bundleID: bundleID)
-                    .map { due in "deleted automatically \(due <= now ? "at the next check" : "on \(day(due))")" }
+            case .finished:
+                guard retention.enabled, let retained, !record.isHeldFromRetention else { return nil }
+                guard retained.eligibleAt != nil else { return "kept, no notes were saved" }
+                let due = retained.recordedAt.addingTimeInterval(TimeInterval(max(0, retention.days)) * 86400)
+                return "deleted automatically \(due <= now ? "at the next check" : "on \(day(due))")"
             }
         }
 

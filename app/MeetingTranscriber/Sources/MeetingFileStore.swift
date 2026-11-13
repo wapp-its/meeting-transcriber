@@ -37,9 +37,8 @@ final class MeetingFileStore {
     private static let lockRetryInterval: useconds_t = 10000
 
     @ObservationIgnored private let path: URL
-    /// The running build's bundle identifier: the build a record created here is
-    /// stamped with, and the only build whose records the automatic deletion acts on
-    /// (`RecordingRetentionRule`). Injected, so a test can run two builds over one file.
+    /// The running build's bundle identifier, which a record created here is
+    /// stamped with (`createdBy`). Injected, so a test can run two builds over one file.
     @ObservationIgnored let bundleID: String?
     private(set) var records: [MeetingFileRecord] = []
     /// When the file was first created: what a recovered recording's audio is
@@ -155,7 +154,7 @@ final class MeetingFileStore {
     /// an old additional report the regenerator kept, or a report a failed rename
     /// left under the new name. Listed under `previousProtocol`, as no report rule
     /// may find it any more and Move Meeting to Trash has to; that role also keeps
-    /// it out of the "right after the notes" check, which counts only `.protocol`.
+    /// it from counting as the meeting's notes, which only `.protocol` does.
     func noteKeptFile(jobID: UUID, url: URL) {
         guard let origin = record(for: jobID)?.origin else { return }
         let kept = MeetingFile(role: .previousProtocol, url: url, owned: origin.owns(.previousProtocol))
@@ -366,9 +365,7 @@ extension MeetingFileStore {
     /// Mark one file as being deleted, the last step before it is touched. A path
     /// another record lists is left alone: that meeting still needs the file. So is a
     /// report of a meeting another record lists by its transcript or notes. An
-    /// entry the other record knows is gone holds nothing back. An automatic deletion
-    /// also stops here when the record no longer allows it: not every write of another
-    /// build looks at the mark, and what has not gone yet can still stay.
+    /// entry the other record knows is gone holds nothing back.
     func startRemoving(path: String, jobID: UUID) -> RemovalStart {
         var answer = RemovalStart.notSaved
         let marked = transact { document in
@@ -377,11 +374,6 @@ extension MeetingFileStore {
             } || MeetingReportScan.isReportOfASharedMeeting(path, jobID: jobID, in: document.records)
             if listedElsewhere { answer = .listedByAnotherMeeting }
             guard !listedElsewhere, let index = document.records.firstIndex(where: { $0.jobID == jobID }) else {
-                return false
-            }
-            if document.records[index].pending?.kind == .automatic,
-               !RecordingRetentionRule.recordAllowsDeletion(document.records[index], bundleID: bundleID) {
-                answer = .meetingChanged
                 return false
             }
             document.records[index].setState(.deleting, ofFileAt: path)

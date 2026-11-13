@@ -1,34 +1,59 @@
-import Foundation
 @testable import MeetingTranscriber
 import XCTest
 
-/// The recording retention setting. Its own file because `AppSettingsTests`
-/// sits at the 600-line cap.
+/// The two recording retention settings: defaults, clamping and persistence,
+/// against a throwaway defaults suite.
 final class AppSettingsRecordingRetentionTests: XCTestCase {
-    private func makeDefaults() throws -> UserDefaults {
-        let suiteName = "AppSettingsRecordingRetentionTests.\(UUID().uuidString)"
-        addTeardownBlock { DefaultsSuite.remove(suiteName) }
-        return try XCTUnwrap(DefaultsSuite.open(suiteName))
+    // swiftlint:disable implicitly_unwrapped_optional
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+    private var apiKeyAccount: String!
+    // swiftlint:enable implicitly_unwrapped_optional
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "AppSettingsRecordingRetentionTests-\(getpid())-\(UUID().uuidString)"
+        apiKeyAccount = "\(suiteName ?? "")-openAI"
+        defaults = DefaultsSuite.open(suiteName)
     }
 
-    /// Stored by name: a renamed case would read as Never for everyone who chose it.
-    func testRecordingRetentionRawValuesArePinned() {
-        XCTAssertEqual(RecordingRetention.allCases.map(\.rawValue), ["never", "afterProtocol", "days7", "days30", "days90"])
+    override func tearDown() {
+        DefaultsSuite.remove(suiteName)
+        KeychainHelper.delete(key: apiKeyAccount)
+        defaults = nil
+        super.tearDown()
     }
 
-    func testRecordingRetentionDefaultsToNeverAndSurvivesARestart() throws {
-        let defaults = try makeDefaults()
-        let settings = AppSettings(defaults: defaults)
-        XCTAssertEqual(settings.recordingRetention, .never)
-        for retention in RecordingRetention.allCases {
-            settings.recordingRetention = retention
-            XCTAssertEqual(AppSettings(defaults: defaults).recordingRetention, retention)
-        }
+    private func makeSettings() -> AppSettings {
+        AppSettings(defaults: defaults, apiKeyAccount: apiKeyAccount)
     }
 
-    func testAnUnknownStoredRecordingRetentionReadsAsNever() throws {
-        let defaults = try makeDefaults()
-        defaults.set("days14", forKey: "recordingRetention")
-        XCTAssertEqual(AppSettings(defaults: defaults).recordingRetention, .never)
+    /// Off by default, so nothing changes for anyone who does not opt in.
+    func testDefaultsToOffAndThirtyDays() {
+        let settings = makeSettings()
+        XCTAssertFalse(settings.recordingRetentionEnabled)
+        XCTAssertEqual(settings.recordingRetentionDays, 30)
+    }
+
+    func testDaysAreClampedToZero() {
+        let settings = makeSettings()
+        settings.recordingRetentionDays = -3
+        XCTAssertEqual(settings.recordingRetentionDays, 0)
+    }
+
+    /// A negative count written outside the app reads as zero too.
+    func testAStoredNegativeCountReadsAsZero() {
+        defaults.set(-3, forKey: "recordingRetentionDays")
+        XCTAssertEqual(makeSettings().recordingRetentionDays, 0)
+    }
+
+    func testBothPersistAcrossInstances() {
+        let settings = makeSettings()
+        settings.recordingRetentionEnabled = true
+        settings.recordingRetentionDays = 7
+
+        let reloaded = makeSettings()
+        XCTAssertTrue(reloaded.recordingRetentionEnabled)
+        XCTAssertEqual(reloaded.recordingRetentionDays, 7)
     }
 }

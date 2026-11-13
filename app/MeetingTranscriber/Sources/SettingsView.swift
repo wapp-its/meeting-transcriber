@@ -38,9 +38,6 @@ struct SettingsView: View {
     /// The old-models row's state, built once by `EngineController`. Nil leaves the row
     /// out, which is what tests and the App Store build get.
     var legacyWhisperModels: LegacyWhisperModelsState?
-    /// Forwarded to the Output tab's Recordings section. Nil leaves the section out,
-    /// which is what tests get.
-    var retentionActions: RetentionSettingsActions?
     /// Where a tab another part of the app asks for arrives.
     var navigation: SettingsNavigation = .shared
 
@@ -117,10 +114,7 @@ struct SettingsView: View {
             )
 
         case .output:
-            OutputSettingsView(
-                settings: settings,
-                retentionChoice: retentionActions.map { RetentionChoice(settings: settings, actions: $0) },
-            )
+            OutputSettingsView(settings: settings)
 
         case .advanced:
             AdvancedSettingsView(settings: settings)

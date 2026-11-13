@@ -667,12 +667,6 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         didSet { defaults.set(diarizerMode.rawValue, forKey: "diarizerMode") }
     }
 
-    /// When a recorded meeting's audio is deleted automatically (Settings → Output).
-    /// One value for the whole app.
-    var recordingRetention: RecordingRetention {
-        didSet { defaults.set(recordingRetention.rawValue, forKey: "recordingRetention") }
-    }
-
     /// Open the "Name Speakers" window by itself when a meeting is ready to be
     /// named, after processing and again on launch for meetings still waiting.
     /// On by default, which is how the app has always behaved. Off, the
@@ -809,6 +803,22 @@ final class AppSettings { // swiftlint:disable:this type_body_length
     /// Only for a job that ran the built-in template (`ProtocolGenerator.fileTitleSlug`).
     var useAITitleForFilenames: Bool {
         didSet { defaults.set(useAITitleForFilenames, forKey: "useAITitleForFilenames") }
+    }
+
+    /// Delete the audio the app recorded and moved into the output folder once
+    /// its outputs are written and `recordingRetentionDays` have passed since
+    /// the recording date. Off by default; imports are never touched.
+    var recordingRetentionEnabled: Bool {
+        didSet { defaults.set(recordingRetentionEnabled, forKey: "recordingRetentionEnabled") }
+    }
+
+    /// Days a recording is kept after its recording date; 0 deletes it as soon
+    /// as its outputs are written. Never negative.
+    var recordingRetentionDays: Int {
+        didSet {
+            if recordingRetentionDays < 0 { recordingRetentionDays = 0 }
+            defaults.set(recordingRetentionDays, forKey: "recordingRetentionDays")
+        }
     }
 
     static let protocolLanguages = [
@@ -1131,8 +1141,6 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         echoDedupEnabled = defaults.bool(forKey: "echoDedupEnabled", default: false)
         diarizerMode = (defaults.string(forKey: "diarizerMode")
             .flatMap(DiarizerMode.init(rawValue:))) ?? .offline
-        recordingRetention = (defaults.string(forKey: "recordingRetention")
-            .flatMap(RecordingRetention.init(rawValue:))) ?? .never
         autoOpenSpeakerNaming = defaults.bool(forKey: "autoOpenSpeakerNaming", default: true)
         numSpeakers = defaults.object(forKey: "numSpeakers") as? Int ?? 0
 
@@ -1159,6 +1167,8 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         includeFullTranscriptInProtocol = defaults.bool(forKey: "includeFullTranscriptInProtocol", default: true)
         saveRawTranscriptSeparately = defaults.bool(forKey: "saveRawTranscriptSeparately", default: true)
         useAITitleForFilenames = defaults.bool(forKey: "useAITitleForFilenames", default: false)
+        recordingRetentionEnabled = defaults.bool(forKey: "recordingRetentionEnabled", default: false)
+        recordingRetentionDays = max(0, defaults.object(forKey: "recordingRetentionDays") as? Int ?? 30)
 
         openAIEndpoint = defaults.object(forKey: "openAIEndpoint") as? String
             ?? Self.defaultOpenAIEndpoint

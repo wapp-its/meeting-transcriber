@@ -52,16 +52,24 @@ extension TranscriptionsViewTests {
         return Meeting(record: record, notionExportRunning: exporting, audio: audio)
     }
 
-    /// A window whose rows have these meetings, the rest no record.
+    /// A window whose rows have these meetings, the rest no record. Every meeting
+    /// with a record is in this build's retention registry, its notes written.
     private func actions(
-        _ meetings: [(entry: TranscriptionEntry, meeting: Meeting)], retention: RecordingRetention = .never, base: AllRecordingsActions = .noop,
+        _ meetings: [(entry: TranscriptionEntry, meeting: Meeting)], retention: RecordingRetentionSettings = .init(enabled: false, days: 30),
+        base: AllRecordingsActions = .noop,
     ) -> AllRecordingsActions {
         var actions = base
         actions.filesOnDisk = { Self.recordedFilesOnDisk($0) }
         actions.meetingFiles = { id in meetings.first { $0.entry.id == id }?.meeting.record }
         actions.audioOnDisk = { entry in meetings.first { $0.entry.id == entry.id }?.meeting.audio }
         actions.retention = { retention }
-        actions.bundleID = RetentionFixture.thisBuild
+        actions.retainedRecording = { id in
+            guard meetings.contains(where: { $0.entry.id == id }) else { return nil }
+            let recorded = Date(timeIntervalSinceReferenceDate: 780_000_000)
+            return RetainedRecording(
+                jobID: id, paths: [], root: URL(fileURLWithPath: "/rec"), recordedAt: recorded, eligibleAt: recorded, outputPath: nil,
+            )
+        }
         return actions
     }
 
@@ -102,7 +110,7 @@ extension TranscriptionsViewTests {
             (entry: kept, meeting: meeting(kept) { $0.keep = true }),
             (entry: unplugged, meeting: meeting(unplugged, audio: Self.unpluggedAudio)),
         ]
-        let sut = makeView([plain, due, kept, unplugged, noRecord], actions: actions(withLine, retention: .days30))
+        let sut = makeView([plain, due, kept, unplugged, noRecord], actions: actions(withLine, retention: .init(enabled: true, days: 30)))
 
         let shown = try texts(in: sut).filter { $0.hasPrefix("Audio") }
         XCTAssertEqual(shown, [
@@ -142,10 +150,10 @@ extension TranscriptionsViewTests {
             (entry: exporting, meeting: meeting(exporting)),
             (entry: naming, meeting: meeting(naming)),
         ]
-        let sut = makeView([exporting, naming], actions: actions(meetings, retention: .days30))
+        let sut = makeView([exporting, naming], actions: actions(meetings, retention: .init(enabled: true, days: 30)))
 
         XCTAssertEqual(try texts(in: sut).filter { $0.hasPrefix("Audio") }, [
-            "Audio · 48 MB · kept until the Notion export ends",
+            "Audio · 48 MB · deleted automatically at the next check",
             "Audio · 48 MB · kept until the speakers are named",
         ])
         for index in 0 ... 1 {

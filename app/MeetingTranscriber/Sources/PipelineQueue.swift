@@ -100,7 +100,10 @@ class PipelineQueue {
     /// wrong URL. A rebuilt queue opens its own; the queue it replaces keeps
     /// its scope until it is deallocated, which a running job delays, since
     /// the processing task holds the queue until the job returns.
-    private let scopedOutputDir: URL?
+    ///
+    /// Internal (not private) because a retention pass opens its own nested
+    /// scope on it, and deletes only under a folder whose scope is held.
+    let scopedOutputDir: URL?
     /// Where `DualSourceRecorder` writes, i.e. the audio this app produced and
     /// may therefore relocate. Injectable so a test can exercise the hand-off
     /// without writing into the real user directory; see `AudioPersistencePolicy`.
@@ -209,6 +212,18 @@ class PipelineQueue {
     /// wiring as `terminalJobStore`: nil disables it, production injects one
     /// that outlives queue rebuilds.
     let meetingFileStore: MeetingFileStore?
+    /// Records the audio stage 3 relocates and deletes it once the retention
+    /// setting says it is due; see `PipelineQueue+Retention.swift`. Shared
+    /// across queue rebuilds. nil (default) disables it; production injects
+    /// one, tests opt in.
+    let recordingRetention: RecordingRetention?
+
+    /// Moves one artifact during the AI-title rename. Injectable so a test can
+    /// make a move, or the move undoing it, fail; production moves the file.
+    let moveArtifact: (URL, URL) throws -> Void
+
+    /// The production `moveArtifact`.
+    static let liveMoveArtifact: (URL, URL) throws -> Void = { try FileManager.default.moveItem(at: $0, to: $1) }
 
     /// Cached FluidVAD instance — reused across jobs to avoid model reload.
     /// Internal (not private) because `preprocessWithVAD` in
@@ -476,6 +491,8 @@ class PipelineQueue {
         self.notionExportConfigurationProvider = notionExportConfigurationProvider
         self.terminalJobStore = terminalJobStore
         self.meetingFileStore = meetingFileStore
+        recordingRetention = nil
+        moveArtifact = Self.liveMoveArtifact
         self.inFlightRuns = inFlightRuns ?? .shared
         naming = SpeakerNamingSession(
             namingStore: SpeakerNamingStore(outputDir: nil),
@@ -607,6 +624,8 @@ class PipelineQueue {
         meetingFileStore: MeetingFileStore? = nil,
         inFlightRuns: InFlightRunRegistry? = nil,
         securityScope: SecurityScopeAccess = .live,
+        recordingRetention: RecordingRetention? = nil,
+        moveArtifact: @escaping (URL, URL) throws -> Void = PipelineQueue.liveMoveArtifact,
     ) {
         self.logDir = logDir
         self.processedLedger = ProcessedRecordingsLedger(logDir: self.logDir)
@@ -655,6 +674,8 @@ class PipelineQueue {
         self.notionExportConfigurationProvider = notionExportConfigurationProvider
         self.terminalJobStore = terminalJobStore
         self.meetingFileStore = meetingFileStore
+        self.recordingRetention = recordingRetention
+        self.moveArtifact = moveArtifact
         self.inFlightRuns = inFlightRuns ?? .shared
         naming = SpeakerNamingSession(
             namingStore: SpeakerNamingStore(outputDir: outputDir),
@@ -992,6 +1013,9 @@ class PipelineQueue {
         if newState == .done {
             startPendingNotionExport(jobID: id)
             scheduleCompletedJobRemoval(id: id)
+            if recordingRetention != nil {
+                Task { [weak self] in await self?.sweepRetainedRecordings() }
+            }
             // A held export retries from its Markdown, never from the audio
             // sidecars, and it may be held for as long as the user leaves it.
             if jobs[index].hasPendingNotionExport {
@@ -1501,6 +1525,14 @@ extension PipelineQueue: SpeakerNamingSessionDelegate {
     /// A value copy of the tracked job, addressed by id (never by a stale index).
     func job(withID id: UUID) -> PipelineJob? {
         jobs.first { $0.id == id }
+    }
+
+    /// The naming session accepted the auto-names (a skip, or the wait running
+    /// out) and there is no protocol to generate: the transcript carrying them
+    /// is the output.
+    func finishWithAcceptedAutoNames(jobID: UUID) {
+        markOutputWritten(jobID: jobID, output: job(withID: jobID)?.transcriptPath)
+        updateJobState(id: jobID, to: .done)
     }
 
     /// Persist the per-job naming metadata on the (queue-owned) job. `nil` for
