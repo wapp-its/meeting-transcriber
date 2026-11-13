@@ -1,21 +1,9 @@
 import AppKit
-import OSLog
 import SwiftUI
-import UniformTypeIdentifiers
-
-private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "OutputSettingsView")
 
 /// Pure derivations used by `OutputSettingsView`. Extracted so the wrapping
 /// logic can be unit-tested without instantiating a SwiftUI host.
 enum OutputSettingsLogic {
-    /// Install `source` as the custom prompt at `dest`, replacing any prompt
-    /// already there. The picked file is the user's and must survive.
-    static func importPrompt(from source: URL, to dest: URL) throws {
-        // Read and write rather than `replaceItemAt`, which moves the
-        // replacement into place and so removed the file the user picked.
-        try Data(contentsOf: source).write(to: dest, options: .atomic)
-    }
-
     /// Abbreviate `url` for display by replacing the home-directory prefix
     /// with `~` so paths inside the user's home stay compact. Falls back to
     /// the full path when `url` is outside `home`. Matches at the path-
@@ -67,15 +55,22 @@ struct OutputSettingsView: View {
     @State private var connectionTestResult: ConnectionTestResult?
     @State private var availableModels: [String] = []
     @State private var didAttemptConnectionTest = false
-    @State private var showResetPromptConfirmation = false
-    @State private var hasCustomPrompt = false
+    /// What the Meeting Notes Templates section shows, over the templates
+    /// folder this view was handed.
+    @State private var templatesModel: ProtocolTemplatesModel
     static let fieldWidth: CGFloat = 260
     /// The API key fields type into these, not into the Keychain.
     @StateObject private var apiKeyDrafts: ProtocolAPIKeyDrafts
 
-    // swiftlint:disable:next unneeded_escaping
-    init(settings: AppSettings, apiKeyDrafts: @autoclosure @escaping () -> ProtocolAPIKeyDrafts? = nil) {
+    /// `templateStore` is the templates folder; tests hand in a temp folder.
+    init(
+        settings: AppSettings,
+        templateStore: ProtocolTemplateStore = .production,
+        // swiftlint:disable:next unneeded_escaping
+        apiKeyDrafts: @autoclosure @escaping () -> ProtocolAPIKeyDrafts? = nil,
+    ) {
         self.settings = settings
+        _templatesModel = State(initialValue: ProtocolTemplatesModel(store: templateStore, settings: settings))
         _apiKeyDrafts = StateObject(wrappedValue: apiKeyDrafts() ?? ProtocolAPIKeyDrafts(settings: settings))
     }
 
@@ -115,21 +110,13 @@ struct OutputSettingsView: View {
             // output itself is never recorded, so the setting cannot reach it.
             recordingRetentionSection
 
-            meetingNotesSection
-            providerSection
-
-            if settings.protocolProvider == .openAICompatible {
-                OpenAIConnectionSection(settings: settings, apiKeyDrafts: apiKeyDrafts)
-                    .accessibilityIdentifier(A11yID.openAIConnectionSection)
-                    .recordOnlyDisabled(settings.recordOnly)
-            }
+            protocolSections
         }
         .formStyle(.grouped)
         .onAppear {
             #if !APPSTORE
                 claudeBinaries = ClaudeCLIProtocolGenerator.availableClaudeBinaries()
             #endif
-            refreshCustomPromptState()
         }
         // A hidden Settings window and a quit reach neither a focus change nor
         // `onDisappear`, so an edited key is handed over here as well.
@@ -141,16 +128,33 @@ struct OutputSettingsView: View {
         }
     }
 
+    /// The sections record-only mode dims. Without a provider no notes are
+    /// made, so the templates hide as well.
+    @ViewBuilder
+    private var protocolSections: some View { // swiftlint:disable:this attributes
+        meetingNotesSection
+
+        if settings.protocolProvider != .none {
+            ProtocolTemplatesSettingsView(model: templatesModel)
+                .accessibilityIdentifier(A11yID.protocolTemplatesSection)
+                .recordOnlyDisabled(settings.recordOnly)
+        }
+
+        providerSection
+
+        if settings.protocolProvider == .openAICompatible {
+            OpenAIConnectionSection(settings: settings, apiKeyDrafts: apiKeyDrafts)
+                .accessibilityIdentifier(A11yID.openAIConnectionSection)
+                .recordOnlyDisabled(settings.recordOnly)
+        }
+    }
+
     private var meetingNotesSection: some View {
         Section("Meeting Notes") {
             Picker("Notes Language", selection: $settings.protocolLanguage) {
                 ForEach(languagePickerOptions, id: \.self) { lang in
                     Text(lang).tag(lang)
                 }
-            }
-
-            if settings.protocolProvider != .none {
-                promptControls
             }
 
             Toggle("Include full transcript", isOn: $settings.includeFullTranscriptInProtocol)
@@ -326,52 +330,6 @@ struct OutputSettingsView: View {
         }
     }
 
-    private var promptControls: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Prompt")
-                Text(hasCustomPrompt ? "Using custom prompt" : "Using default prompt")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Button("Edit\u{2026}") {
-                openCustomPrompt()
-                refreshCustomPromptState()
-            }
-
-            Menu {
-                Button("Import Prompt\u{2026}") {
-                    importCustomPrompt()
-                    refreshCustomPromptState()
-                }
-                Button("Reset to Default\u{2026}") {
-                    showResetPromptConfirmation = true
-                }
-                .disabled(!hasCustomPrompt)
-            } label: {
-                Image(systemName: "ellipsis.circle")
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .help("More prompt actions")
-            .accessibilityLabel("More prompt actions")
-        }
-        .confirmationDialog(
-            "Reset meeting notes prompt to the built-in default?",
-            isPresented: $showResetPromptConfirmation,
-            titleVisibility: .visible,
-        ) {
-            Button("Reset", role: .destructive) {
-                try? FileManager.default.removeItem(at: AppPaths.customPromptFile)
-                refreshCustomPromptState()
-            }
-        }
-    }
-
     // MARK: - Helpers
 
     /// A typed key is handed to the connection being left before the change,
@@ -383,10 +341,6 @@ struct OutputSettingsView: View {
         availableModels = []
         connectionTestResult = nil
         testingConnection = false
-    }
-
-    private func refreshCustomPromptState() {
-        hasCustomPrompt = FileManager.default.fileExists(atPath: AppPaths.customPromptFile.path)
     }
 
     func testConnection() {
@@ -432,37 +386,6 @@ struct OutputSettingsView: View {
 
     private var modelPickerOptions: [String] {
         OutputSettingsLogic.mergePickerOptions(available: availableModels, selected: settings.openAIModel)
-    }
-
-    private func ensurePromptDirectory() {
-        try? FileManager.default.createDirectory(
-            at: AppPaths.customPromptFile.deletingLastPathComponent(),
-            withIntermediateDirectories: true,
-        )
-    }
-
-    private func openCustomPrompt() {
-        let url = AppPaths.customPromptFile
-        if !FileManager.default.fileExists(atPath: url.path) {
-            ensurePromptDirectory()
-            try? ProtocolGenerator.protocolPrompt.write(to: url, atomically: true, encoding: .utf8)
-        }
-        NSWorkspace.shared.open(url)
-    }
-
-    private func importCustomPrompt() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.plainText, .init(filenameExtension: "md")].compactMap(\.self)
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.message = "Select a prompt file to import"
-        guard panel.runModal() == .OK, let source = panel.url else { return }
-        ensurePromptDirectory()
-        do {
-            try OutputSettingsLogic.importPrompt(from: source, to: AppPaths.customPromptFile)
-        } catch {
-            logger.error("prompt_import_failed error=\(error.localizedDescription, privacy: .public)")
-        }
     }
 
     private var outputDirDisplay: String {

@@ -477,24 +477,20 @@ final class SettingsViewTests: XCTestCase { // swiftlint:disable:this type_body_
         XCTAssertTrue(button.isDisabled())
     }
 
-    func testEditPromptButtonExists() throws {
-        let body = try makeOutput().inspect()
-        XCTAssertNoThrow(try body.find(button: "Edit\u{2026}"))
-    }
-
-    func testImportPromptButtonExists() throws {
-        let body = try makeOutput().inspect()
-        XCTAssertNoThrow(try body.find(button: "Import Prompt\u{2026}"))
-    }
-
-    func testResetToDefaultButtonExists() throws {
-        let body = try makeOutput().inspect()
-        XCTAssertNoThrow(try body.find(button: "Reset to Default\u{2026}"))
-    }
-
-    func testDefaultPromptStatusShown() throws {
-        let body = try makeOutput().inspect()
-        XCTAssertNoThrow(try body.find(text: "Using default prompt"))
+    /// The single custom prompt's controls gave way to the templates section.
+    func testOutputShowsMeetingNotesTemplatesInsteadOfThePromptControls() throws {
+        let store = try ProtocolTemplateStore(directory: makeTempDirectory(prefix: "settings-templates"))
+        let body = try OutputSettingsView(settings: makeSettings(), templateStore: store).inspect()
+        for identifier in [A11yID.protocolTemplateDefaultPicker, A11yID.protocolTemplatesOpenFolderButton] {
+            XCTAssertNoThrow(try body.find(viewWithAccessibilityIdentifier: identifier), identifier)
+        }
+        XCTAssertNoThrow(try body.find(text: "Meeting Notes Templates"))
+        for label in ["Edit\u{2026}", "Import Prompt\u{2026}", "Reset to Default\u{2026}"] {
+            XCTAssertThrowsError(try body.find(button: label), label)
+        }
+        for label in ["Using custom prompt", "Using default prompt"] {
+            XCTAssertThrowsError(try body.find(text: label), label)
+        }
     }
 
     // MARK: - Advanced tab
@@ -559,7 +555,10 @@ final class SettingsViewTests: XCTestCase { // swiftlint:disable:this type_body_
         settings.recordOnly = true
         settings.protocolProvider = .openAICompatible
         let body = try makeOutput(settings: settings).inspect()
-        for id in [A11yID.protocolSection, A11yID.protocolProviderSection, A11yID.openAIConnectionSection] {
+        for id in [
+            A11yID.protocolSection, A11yID.protocolTemplatesSection, A11yID.protocolProviderSection,
+            A11yID.openAIConnectionSection,
+        ] {
             XCTAssertTrue(try body.find(viewWithAccessibilityIdentifier: id).isDisabled(), id)
         }
     }
