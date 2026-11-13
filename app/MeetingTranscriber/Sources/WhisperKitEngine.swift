@@ -211,10 +211,8 @@ final class WhisperKitEngine: TranscribingEngine, StreamingTranscribingEngine {
             // Same reason as the local branch above: since the download path now
             // also ends in `adoptPipe`, this can carry WhisperKit's path-bearing
             // `modelsUnavailable` message, not only a path-free URLError.
-            // Fork diagnostic: the whole error, public, so a failed download can be
-            // read from the log. Not for the original (see its comment above).
             logger.error(
-                "WhisperKit model load failed (\(String(describing: type(of: error)), privacy: .public): \(String(reflecting: error), privacy: .public))",
+                "WhisperKit model load failed (\(String(describing: type(of: error)), privacy: .public): \(error.localizedDescription, privacy: .private))",
             )
             // The redacted line above is for the log; the user gets a path-free
             // sentence in Settings and in the job error (see `ensureModel`). Only

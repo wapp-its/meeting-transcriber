@@ -32,6 +32,8 @@ struct ProtocolInstructions: Equatable {
 enum ProtocolGenerator {
     struct MeetingPromptMetadata: Equatable {
         let date: String
+        /// The date's weekday in English, like the rest of the metadata block.
+        let weekday: String
         let time: String
     }
 
@@ -123,7 +125,8 @@ enum ProtocolGenerator {
     /// append or attach it as they see fit.
     ///
     /// With the built-in template and no background this is byte-identical to
-    /// the prompt from before templates existed.
+    /// the prompt from before templates existed, apart from the weekday beside
+    /// the meeting date.
     static func buildSystemPrompt(
         diarized: Bool,
         language: String,
@@ -159,10 +162,13 @@ enum ProtocolGenerator {
     ) -> MeetingPromptMetadata {
         let dateFormatter = DateFormatter.filenameStamp("yyyy-MM-dd")
         dateFormatter.timeZone = timeZone
+        let weekdayFormatter = DateFormatter.filenameStamp("EEEE")
+        weekdayFormatter.timeZone = timeZone
         let timeFormatter = DateFormatter.filenameStamp("HH:mm")
         timeFormatter.timeZone = timeZone
         return MeetingPromptMetadata(
             date: dateFormatter.string(from: meetingStartTime),
+            weekday: weekdayFormatter.string(from: meetingStartTime),
             time: timeFormatter.string(from: meetingStartTime),
         )
     }
@@ -171,7 +177,9 @@ enum ProtocolGenerator {
         guard let metadata else { return "" }
         return [
             "Meeting metadata:",
-            "Date: \(metadata.date)",
+            // With the date alone, a model that does not reason first resolved
+            // "next Friday" to the wrong day.
+            "Date: \(metadata.date) (\(metadata.weekday))",
             "Time: \(metadata.time)",
             "The date and time above are authoritative. Interpret relative time expressions",
             "in the transcript relative to this meeting date. Do not rely on the model's",
