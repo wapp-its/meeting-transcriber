@@ -2,22 +2,14 @@
 import ViewInspector
 import XCTest
 
-/// Settings → Output → Meeting Notes Templates: what editing, deleting, the
-/// default picker and the folder do to the folder and the default setting,
-/// then one wiring test per control. Every test runs on
-/// `ProtocolTemplatesFixture`.
+/// Settings → Output → Meeting Notes Templates: what deleting, the default picker
+/// and the folder do to the folder and the default setting, then one wiring test
+/// per control. The New Template window's behaviour is pinned in
+/// `ProtocolTemplatesNewTemplateTests`, opening a template in
+/// `ProtocolTemplatesOpeningTests`. Every test runs on `ProtocolTemplatesFixture`.
 @MainActor
 final class ProtocolTemplatesSettingsTests: XCTestCase {
     // MARK: - Model
-
-    func testEditOpensTheTemplateFile() throws {
-        let fixture = try ProtocolTemplatesFixture(self, templates: ["Board"])
-        let model = fixture.makeModel()
-
-        model.edit("Board")
-
-        XCTAssertEqual(fixture.opened, [fixture.store.fileURL(named: "Board")])
-    }
 
     func testDeleteTrashesThroughTheInjectedTrashAndResetsADeletedDefault() throws {
         let fixture = try ProtocolTemplatesFixture(self, templates: ["Board", "Retro"])
@@ -35,7 +27,7 @@ final class ProtocolTemplatesSettingsTests: XCTestCase {
         XCTAssertEqual(fixture.trashed, [fixture.store.fileURL(named: "Board"), fixture.store.fileURL(named: "Retro")])
         XCTAssertEqual(fixture.settings.defaultProtocolTemplate, .builtIn)
         XCTAssertEqual(model.names, [])
-        XCTAssertNil(model.message)
+        XCTAssertNil(model.notice)
     }
 
     func testAFailedDeleteShowsTheErrorAndKeepsTheTemplateAndTheDefault() throws {
@@ -47,7 +39,10 @@ final class ProtocolTemplatesSettingsTests: XCTestCase {
 
         model.confirmDelete("Board")
 
-        XCTAssertNotNil(model.message)
+        guard case .error = model.notice else {
+            XCTFail("a failed delete shows a red line, got \(String(describing: model.notice))")
+            return
+        }
         XCTAssertEqual(fixture.files, ["Board.md"])
         XCTAssertEqual(model.names, ["Board"])
         XCTAssertEqual(fixture.settings.defaultProtocolTemplate, .file(name: "Board"))
@@ -99,8 +94,8 @@ final class ProtocolTemplatesSettingsTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.store.directory.path, isDirectory: &isDirectory))
         XCTAssertTrue(isDirectory.boolValue)
         XCTAssertEqual(fixture.files, [], "the migration marker is the migration's to write")
-        XCTAssertEqual(fixture.opened, [fixture.store.directory])
-        XCTAssertNil(model.message)
+        XCTAssertEqual(fixture.openedFolders, [fixture.store.directory])
+        XCTAssertNil(model.notice)
     }
 
     /// A file where the folder should be: the folder cannot be created, the
@@ -113,13 +108,16 @@ final class ProtocolTemplatesSettingsTests: XCTestCase {
 
         model.openFolder()
 
-        XCTAssertNotNil(model.message)
-        XCTAssertEqual(fixture.opened, [])
+        guard case .error = model.notice else {
+            XCTFail("a folder that cannot be made shows a red line, got \(String(describing: model.notice))")
+            return
+        }
+        XCTAssertEqual(fixture.openedFolders, [])
 
         try FileManager.default.removeItem(at: fixture.store.directory)
         model.openFolder()
 
-        XCTAssertNil(model.message)
+        XCTAssertNil(model.notice)
     }
 
     func testReloadPicksUpAFileAddedOnDisk() throws {
@@ -146,6 +144,12 @@ final class ProtocolTemplatesSettingsTests: XCTestCase {
         try view.inspect().find(viewWithAccessibilityIdentifier: identifier).button()
     }
 
+    /// The New Template window, opened with its button.
+    private func newTemplateSheet(in view: ProtocolTemplatesSettingsView) throws -> InspectableView<ViewType.Sheet> {
+        try button(A11yID.protocolTemplateNewButton, in: view).tap()
+        return try view.inspect().find(ViewType.Sheet.self)
+    }
+
     func testDefaultPickerWritesTheSetting() throws {
         let (view, _, fixture) = try makeView()
 
@@ -157,12 +161,110 @@ final class ProtocolTemplatesSettingsTests: XCTestCase {
         XCTAssertEqual(fixture.settings.defaultProtocolTemplate, .file(name: "Retro"))
     }
 
-    func testEditOfRowOneOpensItsFile() throws {
+    func testNewTemplatePresentsTheWindow() throws {
+        let (view, model, _) = try makeView()
+        XCTAssertThrowsError(try view.inspect().find(ViewType.Sheet.self), "no window before the click")
+
+        let sheet = try newTemplateSheet(in: view)
+
+        XCTAssertTrue(model.isNewTemplateShown)
+        XCTAssertNoThrow(try sheet.find(text: "New Template"))
+    }
+
+    func testTheWindowsNameFieldWritesTheModel() throws {
+        let (view, model, _) = try makeView()
+
+        try newTemplateSheet(in: view)
+            .find(ViewType.TextField.self) { try $0.accessibilityIdentifier() == A11yID.protocolTemplateNewNameField }
+            .setInput("Workshop")
+
+        XCTAssertEqual(model.newTemplateName, "Workshop")
+    }
+
+    func testTheWindowsCancelClosesItWithoutWriting() throws {
+        let (view, model, fixture) = try makeView()
+        let sheet = try newTemplateSheet(in: view)
+        model.newTemplateName = "Workshop"
+
+        try sheet.find(viewWithAccessibilityIdentifier: A11yID.protocolTemplateNewCancelButton).button().tap()
+
+        XCTAssertFalse(model.isNewTemplateShown)
+        XCTAssertEqual(fixture.files, ["Board.md", "Retro.md"])
+    }
+
+    func testTheWindowsCreateCreatesTheTypedTemplateAndOpensNothing() throws {
+        let (view, model, fixture) = try makeView()
+        let sheet = try newTemplateSheet(in: view)
+        model.newTemplateName = "Workshop"
+
+        try sheet.find(viewWithAccessibilityIdentifier: A11yID.protocolTemplateNewCreateButton).button().tap()
+
+        XCTAssertEqual(model.names, ["Board", "Retro", "Workshop"])
+        XCTAssertNil(model.openTask)
+        XCTAssertEqual(fixture.apps.opened, [])
+    }
+
+    /// The window shows the note, which names no app; the help text names
+    /// the editor app, here the Mac's default.
+    func testTheWindowShowsTheNoteAndTheHelpTextNamesTheEditorApp() throws {
+        let (view, _, _) = try makeView()
+        let sheet = try newTemplateSheet(in: view)
+
+        XCTAssertNoThrow(try sheet.find(text: ProtocolTemplatesModel.newTemplateNote(name: "")))
+        XCTAssertNoThrow(try view.inspect().find(text: TemplateEditor.app(FakeTemplateOpener.textEdit).helpText))
+    }
+
+    func testEditOfRowZeroOpensItInTheEditorApp() async throws {
+        let (view, model, fixture) = try makeView()
+
+        try view.inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.protocolTemplateEdit(0))
+            .find(ViewType.Menu.self)
+            .callPrimaryAction()
+        await model.openTask?.value
+
+        XCTAssertEqual(fixture.apps.opened, [.init(file: fixture.store.fileURL(named: "Board"), app: "com.apple.TextEdit")])
+    }
+
+    func testOpenInTheEditorAppOfRowOneOpensIt() async throws {
+        let (view, model, fixture) = try makeView()
+
+        let item = try button(A11yID.protocolTemplateOpenInEditor(1), in: view)
+        XCTAssertEqual(try item.labelView().text().string(), "Open in TextEdit")
+        try item.tap()
+        await model.openTask?.value
+
+        XCTAssertEqual(fixture.apps.opened, [.init(file: fixture.store.fileURL(named: "Retro"), app: "com.apple.TextEdit")])
+    }
+
+    /// Open With lists the default app first, then Visual Studio Code.
+    func testAnOpenWithAppOfRowZeroOpensItAndBecomesTheEditor() async throws {
+        let (view, model, fixture) = try makeView()
+
+        try button(A11yID.protocolTemplateOpenWithApp(0, 1), in: view).tap()
+        await model.openTask?.value
+
+        XCTAssertEqual(fixture.apps.opened, [.init(file: fixture.store.fileURL(named: "Board"), app: "com.microsoft.VSCode")])
+        XCTAssertEqual(fixture.settings.templateEditorBundleIdentifier, "com.microsoft.VSCode")
+    }
+
+    func testOtherOfRowZeroAsksForAnApp() async throws {
+        let (view, model, fixture) = try makeView()
+        fixture.apps.chosen = FakeTemplateOpener.typora
+
+        try button(A11yID.protocolTemplateOpenWithOther(0), in: view).tap()
+        await model.openTask?.value
+
+        XCTAssertEqual(fixture.apps.pickerShown, 1)
+        XCTAssertEqual(fixture.apps.opened, [.init(file: fixture.store.fileURL(named: "Board"), app: "abnerworks.Typora")])
+    }
+
+    func testShowInFinderOfRowZeroRevealsIt() throws {
         let (view, _, fixture) = try makeView()
 
-        try button(A11yID.protocolTemplateEdit(1), in: view).tap()
+        try button(A11yID.protocolTemplateShowInFinder(0), in: view).tap()
 
-        XCTAssertEqual(fixture.opened, [fixture.store.fileURL(named: "Retro")])
+        XCTAssertEqual(fixture.apps.revealed, [fixture.store.fileURL(named: "Board")])
     }
 
     func testDeleteOfRowZeroAsksForConfirmation() throws {
@@ -179,6 +281,6 @@ final class ProtocolTemplatesSettingsTests: XCTestCase {
 
         try button(A11yID.protocolTemplatesOpenFolderButton, in: view).tap()
 
-        XCTAssertEqual(fixture.opened, [fixture.store.directory])
+        XCTAssertEqual(fixture.openedFolders, [fixture.store.directory])
     }
 }

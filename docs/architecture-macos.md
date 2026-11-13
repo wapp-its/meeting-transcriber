@@ -105,7 +105,10 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `Settings/TranscriptionSettingsView.swift` | ASR engine picker · engine-specific options · model status · Vocabulary section · Live transcription (PoC) toggle |
 | `Settings/SpeakersSettingsView.swift` | Diarization · Speaker Naming (open the naming window automatically, how long unnamed meetings wait) · Mic Speaker Name · Known Voices · Recognition Stats · Experimental: Diarization Tuning |
 | `Settings/OutputSettingsView.swift` | LLM provider · notes language · output folder · recording retention · Meeting Notes Templates section |
-| `Settings/ProtocolTemplatesSettingsView.swift` | Meeting Notes Templates section: default template picker, per template file Edit and Delete (to the Trash, confirmed), Open Templates Folder; its state and writes live in the `@Observable` `ProtocolTemplatesModel` |
+| `Settings/ProtocolTemplatesSettingsView.swift` | Meeting Notes Templates section: default template picker, per template file the split button Edit (Open in the editor app, Open With, Show in Finder) and Delete (to the Trash, confirmed), New Template…, Open Templates Folder; its state and writes live in the `@Observable` `ProtocolTemplatesModel`, also for the New Template window |
+| `Settings/NewProtocolTemplateSheet.swift` | The New Template window: Name field, a note on what Create does, Cancel and Create. Create only writes the file from the built-in template and closes the window; it opens nothing |
+| `Settings/TemplateEditor.swift` | Which app a template opens in (the one chosen last under Open With, remembered by bundle identifier in `AppSettings.templateEditorBundleIdentifier`, else the default app for Markdown files), the Open With list, and the help text and Finder lines that name it |
+| `Settings/TemplateOpener.swift` | The templates section's only way to the Mac: Markdown app lookups by content type, opening a file in an app, Finder and the app picker; tests inject a fake |
 | `Settings/AdvancedSettingsView.swift` | Permissions · Diagnostics |
 | `Settings/AboutSettingsView.swift` | Version · bundle identifier · build date · ffmpeg status · project link · Updates |
 | `Settings/HelpBadge.swift` / `Settings/SettingsHelp.swift` | Reusable "?" help-popover badge + its shared copy, used across Settings sections |

@@ -664,6 +664,14 @@ final class AppSettings { // swiftlint:disable:this type_body_length
     /// `ProtocolTemplateMigration`, which sets it when it is absent.
     static let defaultProtocolTemplateKey = "defaultProtocolTemplate"
 
+    /// The app meeting-notes templates open in, by bundle identifier: the one
+    /// last chosen under Open With or Other… in Settings → Output. Absent until
+    /// one is chosen, which means the Mac's default app for Markdown files
+    /// (`TemplateEditor.resolve`).
+    var templateEditorBundleIdentifier: String? {
+        didSet { defaults.set(templateEditorBundleIdentifier, forKey: "templateEditorBundleIdentifier") }
+    }
+
     /// Append the verbatim transcript to generated Markdown meeting minutes.
     /// Defaults to `true` to preserve the output format used before this option
     /// was introduced.
@@ -974,6 +982,7 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         #endif
         protocolLanguage = defaults.string(forKey: "protocolLanguage") ?? "German"
         defaultProtocolTemplate = ProtocolTemplateID(storedValue: defaults.string(forKey: Self.defaultProtocolTemplateKey) ?? "")
+        templateEditorBundleIdentifier = defaults.string(forKey: "templateEditorBundleIdentifier")
         includeFullTranscriptInProtocol = defaults.bool(forKey: "includeFullTranscriptInProtocol", default: true)
         saveRawTranscriptSeparately = defaults.bool(forKey: "saveRawTranscriptSeparately", default: true)
         useAITitleForFilenames = defaults.bool(forKey: "useAITitleForFilenames", default: false)

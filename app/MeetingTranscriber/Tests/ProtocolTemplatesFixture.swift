@@ -2,16 +2,17 @@ import Foundation
 @testable import MeetingTranscriber
 import XCTest
 
-/// A templates folder in a temp directory and settings over a scratch defaults
-/// suite, for the tests of Settings → Output → Meeting Notes Templates. Opened
-/// files and folders and trashed files are recorded instead of reaching Finder
-/// or the real Trash.
+/// A templates folder in a temp directory, settings over a throwaway defaults
+/// suite and a fake opener, for the tests of Settings → Output → Meeting Notes
+/// Templates. Opened folders and trashed files are recorded instead of reaching
+/// Finder or the real Trash.
 @MainActor
 final class ProtocolTemplatesFixture {
     let store: ProtocolTemplateStore
     let defaults: UserDefaults
     let settings: AppSettings
-    private(set) var opened: [URL] = []
+    let apps = FakeTemplateOpener()
+    private(set) var openedFolders: [URL] = []
     private(set) var trashed: [URL] = []
 
     init(_ testCase: XCTestCase, templates: [String] = []) throws {
@@ -43,7 +44,8 @@ final class ProtocolTemplatesFixture {
         let model = ProtocolTemplatesModel(
             store: store,
             settings: settings ?? self.settings,
-            openFile: { self.opened.append($0) },
+            opener: apps.opener,
+            openFile: { self.openedFolders.append($0) },
             trashItem: trashItem ?? { url in
                 self.trashed.append(url)
                 try FileManager.default.removeItem(at: url)
