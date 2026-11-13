@@ -146,6 +146,11 @@ extension PipelineQueue {
             } else {
                 notionExportTasks[jobID]?.unfinishedDatabases.removeValue(forKey: token)
             }
+            // The fork's addition: a retention pass waits for a running export,
+            // so the last one of a job to end starts one, not the next day's.
+            if recordingRetention != nil, notionExportTasks[jobID] == nil, !isRetired {
+                Task { [weak self] in await self?.sweepRetainedRecordings() }
+            }
         }
         var unfinished = previousRun?.unfinishedDatabases ?? [:]
         unfinished[token] = export.configuration.databaseID

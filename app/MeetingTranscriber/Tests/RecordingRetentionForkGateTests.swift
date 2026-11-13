@@ -127,8 +127,8 @@ final class RecordingRetentionForkGateTests: XCTestCase {
         XCTAssertEqual(onDisk(tracks(of: job)), [true, true, true])
     }
 
-    /// The export uploads the notes but owns the job until it ends, and a failed
-    /// one may still need a retry: the audio waits, as the fork's rules had it.
+    /// The export owns the job until it ends, so the audio waits for it, as the
+    /// fork's rules had it.
     func testAJobWhoseNotionExportRunsKeepsItsAudio() async throws {
         let harness = try makeHarness()
         let queue = harness.makeQueue()
@@ -144,6 +144,28 @@ final class RecordingRetentionForkGateTests: XCTestCase {
 
         XCTAssertEqual(onDisk(tracks(of: exporting)), [true, true, true])
         XCTAssertEqual(onDisk(tracks(of: settled)), [false, false, false], "done, and its export is not running")
+    }
+
+    /// Once the export ends a pass starts by itself, instead of the audio waiting
+    /// for the next hourly check.
+    func testTheEndOfAnExportStartsAPass() async throws {
+        let harness = try makeHarness()
+        let pipeline = harness.controller()
+        try PipelineSnapshot.save([], to: harness.logDir)
+        pipeline.activate { MockEngine() }
+        pipeline.rebuild()
+        let job = try dueMeeting(harness, pipeline)
+        let exporter = GatedNotionExporter()
+        _ = pipeline.queue.seedFinishedJobWithRunningExport(exporter: exporter, job: job)
+
+        await pipeline.queue.sweepRetainedRecordings()
+        XCTAssertEqual(onDisk(tracks(of: job)), [true, true, true], "test premise: the export holds it")
+
+        await exporter.release()
+        await pipeline.queue.awaitNotionExports()
+
+        await waitFor { self.onDisk(self.tracks(of: job)) == [false, false, false] }
+        XCTAssertEqual(onDisk(tracks(of: job)), [false, false, false])
     }
 
     /// A queue that tried its snapshot and could not read it holds none of the
