@@ -1092,6 +1092,25 @@ extension PipelineQueue {
         )
     }
 
+    /// The template `job`'s protocol is asked for with, the instructions it
+    /// becomes and the template they came from, with a warning on the job when
+    /// it fell back to the built-in one. A job from a snapshot written before
+    /// templates takes the current default.
+    private func protocolTemplate(
+        for job: PipelineJob,
+    ) -> (id: ProtocolTemplateID, instructions: ProtocolInstructions, used: ProtocolTemplateID) {
+        let templateID = job.protocolTemplate ?? defaultProtocolTemplateProvider()
+        let (instructions, usedTemplate, templateWarning) = protocolTemplateStore.instructions(
+            for: templateID, background: job.protocolBackground,
+        )
+        if let templateWarning { addWarning(id: job.id, templateWarning) }
+        let backgroundPresence = instructions.background == nil ? "absent" : "present"
+        logger.info(
+            "[\(job.shortID, privacy: .public)] protocol_template template=\(templateID.storedValue, privacy: .private) fallback=\(templateWarning != nil, privacy: .public) background=\(backgroundPresence, privacy: .public)",
+        )
+        return (templateID, instructions, usedTemplate)
+    }
+
     /// `transcriptIsTheOutputWithoutAProvider: false` for a run that was
     /// started with a provider: resumed after the provider was switched off,
     /// it still owes a protocol, so its transcript does not stand in for one.
@@ -1111,7 +1130,6 @@ extension PipelineQueue {
             return
         }
         protocolGenerationOn[jobID] = true
-        let shortID = PipelineJob.shortID(for: jobID)
         // Reuse the basename fixed when the transcript was saved (persisted as
         // namingSlug), so the .md shares the .txt/audio stem exactly. This runs
         // only after a transcript exists, so namingSlug is set on every real
@@ -1119,17 +1137,7 @@ extension PipelineQueue {
         let initialBasename = job.namingSlug
             ?? Self.namingSlug(title: title, jobID: jobID, startTime: Date())
         let meetingStartTime = job.meetingStartTime
-        // A job from a snapshot written before templates takes the current
-        // default.
-        let templateID = job.protocolTemplate ?? defaultProtocolTemplateProvider()
-        let (instructions, usedTemplate, templateWarning) = protocolTemplateStore.instructions(
-            for: templateID, background: job.protocolBackground,
-        )
-        if let templateWarning { addWarning(id: jobID, templateWarning) }
-        let backgroundPresence = instructions.background == nil ? "absent" : "present"
-        logger.info(
-            "[\(shortID, privacy: .public)] protocol_template template=\(templateID.storedValue, privacy: .private) fallback=\(templateWarning != nil, privacy: .public) background=\(backgroundPresence, privacy: .public)",
-        )
+        let (templateID, instructions, usedTemplate) = protocolTemplate(for: job)
         updateJobState(id: jobID, to: .generatingProtocol)
         guard let protocolMD = try await protocolText(
             from: generator, jobID: jobID,
