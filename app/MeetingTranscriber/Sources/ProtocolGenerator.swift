@@ -5,7 +5,20 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Protoco
 
 /// Abstraction for protocol generation, enabling mock injection in tests.
 protocol ProtocolGenerating {
-    func generate(transcript: String, title: String, diarized: Bool, meetingStartTime: Date?) async throws -> String
+    func generate(
+        transcript: String, title: String, diarized: Bool, meetingStartTime: Date?, instructions: ProtocolInstructions,
+    ) async throws -> String
+}
+
+/// What a job asks the provider for beyond the transcript: the text of its
+/// meeting-notes template.
+///
+/// The text still carries its `{LANGUAGE}` / `{MEETING_DATE}` /
+/// `{MEETING_TIME}` placeholders; `ProtocolGenerator.buildSystemPrompt` fills
+/// them in. A type of its own rather than a bare string, so a provider is
+/// handed what to ask for instead of reading a prompt file itself.
+struct ProtocolInstructions: Equatable {
+    let template: String
 }
 
 /// Shared protocol utilities: prompts, file operations, and error types.
@@ -95,39 +108,24 @@ enum ProtocolGenerator {
             .replacingOccurrences(of: "{MEETING_TIME}", with: metadata?.time ?? unknownMeetingMetadata)
     }
 
-    /// Load the protocol generation prompt. Reads from `url` (default
-    /// `AppPaths.customPromptFile`) when present and non-empty; falls back
-    /// to the built-in `protocolPrompt`. The `url` parameter exists so tests
-    /// can use unique per-test paths instead of racing on the shared one.
-    static func loadPrompt(from url: URL = AppPaths.customPromptFile) -> String {
-        if let custom = try? String(contentsOf: url, encoding: .utf8),
-           !custom.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            logger.info("Using custom protocol prompt from \(url.path)")
-            return custom
-        }
-        return protocolPrompt
-    }
-
     /// Build the system prompt from an optional authoritative meeting-time context,
-    /// loaded prompt with variables replaced, and optional `diarizationNote`.
+    /// the job's template with variables replaced, and optional `diarizationNote`.
     /// Imports and recovery jobs have no reliable meeting start and therefore
     /// receive no authoritative time anchor. Excludes the transcript itself —
     /// callers append or attach it as they see fit.
     ///
-    /// `promptURL` is forwarded to `loadPrompt` and exists for the same reason:
-    /// without it tests fall through to the shared `AppPaths.customPromptFile`,
-    /// so their result depends on whether the developer has customised their own
-    /// prompt through the app.
+    /// With the built-in template this is byte-identical to the prompt from
+    /// before templates existed.
     static func buildSystemPrompt(
         diarized: Bool,
         language: String,
         meetingStartTime: Date?,
-        promptURL: URL = AppPaths.customPromptFile,
+        instructions: ProtocolInstructions,
         timeZone: TimeZone = .autoupdatingCurrent,
     ) -> String {
         let metadata = meetingStartTime.map { meetingMetadata(for: $0, timeZone: timeZone) }
         var prompt = meetingTimeContext(metadata: metadata) + applyVariables(
-            loadPrompt(from: promptURL),
+            instructions.template,
             language: language,
             metadata: metadata,
         )

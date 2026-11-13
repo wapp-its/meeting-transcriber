@@ -652,6 +652,18 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         didSet { defaults.set(protocolLanguage, forKey: "protocolLanguage") }
     }
 
+    /// The template a job is stamped with when it enters the queue. May name a
+    /// file that is gone: readers that need a usable value go through
+    /// `ProtocolTemplateStore.effectiveDefault`, which leaves this alone, so
+    /// restoring the file restores the default.
+    var defaultProtocolTemplate: ProtocolTemplateID {
+        didSet { defaults.set(defaultProtocolTemplate.storedValue, forKey: Self.defaultProtocolTemplateKey) }
+    }
+
+    /// Stored as `ProtocolTemplateID.storedValue`. Shared with
+    /// `ProtocolTemplateMigration`, which sets it when it is absent.
+    static let defaultProtocolTemplateKey = "defaultProtocolTemplate"
+
     /// Append the verbatim transcript to generated Markdown meeting minutes.
     /// Defaults to `true` to preserve the output format used before this option
     /// was introduced.
@@ -961,6 +973,7 @@ final class AppSettings { // swiftlint:disable:this type_body_length
             claudeBin = defaults.object(forKey: "claudeBin") as? String ?? "claude"
         #endif
         protocolLanguage = defaults.string(forKey: "protocolLanguage") ?? "German"
+        defaultProtocolTemplate = ProtocolTemplateID(storedValue: defaults.string(forKey: Self.defaultProtocolTemplateKey) ?? "")
         includeFullTranscriptInProtocol = defaults.bool(forKey: "includeFullTranscriptInProtocol", default: true)
         saveRawTranscriptSeparately = defaults.bool(forKey: "saveRawTranscriptSeparately", default: true)
         useAITitleForFilenames = defaults.bool(forKey: "useAITitleForFilenames", default: false)
