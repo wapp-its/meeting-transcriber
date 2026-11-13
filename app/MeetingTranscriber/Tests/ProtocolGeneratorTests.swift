@@ -228,7 +228,7 @@ final class ProtocolGeneratorTests: XCTestCase {
             prompt,
             """
             Meeting metadata:
-            Date: 2026-08-21
+            Date: 2026-08-21 (Friday)
             Time: 13:28
             The date and time above are authoritative. Interpret relative time expressions
             in the transcript relative to this meeting date. Do not rely on the model's

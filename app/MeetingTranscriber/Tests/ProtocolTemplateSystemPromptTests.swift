@@ -4,7 +4,7 @@ import XCTest
 /// The system prompt a protocol provider receives. The four expected strings
 /// below were recorded from the code before protocol templates existed, so a
 /// job using the built-in template and no background still sends exactly what
-/// it sent then.
+/// it sent then, apart from the weekday added beside the meeting date since.
 final class ProtocolTemplateSystemPromptTests: XCTestCase {
     private static let zurich = TimeZone(identifier: "Europe/Zurich") ?? .gmt
 
@@ -13,7 +13,7 @@ final class ProtocolTemplateSystemPromptTests: XCTestCase {
 
     private static let meetingContext = """
     Meeting metadata:
-    Date: 2026-08-21
+    Date: 2026-08-21 (Friday)
     Time: 13:28
     The date and time above are authoritative. Interpret relative time expressions
     in the transcript relative to this meeting date. Do not rely on the model's
