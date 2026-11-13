@@ -100,6 +100,12 @@ struct TranscriptionSettingsView: View {
             whisperKitPickers
             parakeetLanguagePicker
             engineStatusView
+            Toggle("Unload models when idle", isOn: $settings.unloadModelsWhenIdle)
+                .accessibilityIdentifier(A11yID.unloadModelsWhenIdleToggle)
+                .help(
+                    "Free transcription model memory while waiting for meetings. "
+                        + "Models load automatically for processing; live captions keep the models they need.",
+                )
         }
         .accessibilityIdentifier(A11yID.transcriptionSection)
         .recordOnlyDisabled(settings.recordOnly)
@@ -444,6 +450,11 @@ struct TranscriptionSettingsView: View {
                 .font(.caption)
 
         case .unloaded:
+            if settings.unloadModelsWhenIdle {
+                Text("Loads when needed")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Button("Load Model") {
                 // The drafts first: `loadSelectedModel` reads the selection from the
                 // settings, and clicking need not take focus from the field.

@@ -1068,7 +1068,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 |---|---|---|---|
 | **General** | Startup · Mode · Apps to Watch · Record Without Asking · Detection · Long Silence | `settings` | — |
 | **Audio** | Microphone · Recording Levels · VAD · Echo · Per-Channel Indicator | `settings` | `audioDevices` |
-| **Transcription** | Engine + per-engine options + vocabulary source + status | `settings`, three engines, `remoteVocabulary?` | — |
+| **Transcription** | Engine + per-engine options + vocabulary source + status + idle-model retention | `settings`, three engines, `remoteVocabulary?` | — |
 | **Speakers** | Diarization · Speaker Naming · Speaker Identity · Known Voices · Recognition Stats · Experimental: Diarization Tuning | `settings`, `recognitionStatsLog`, `enrollmentDiarizerFactory` | `knownVoicesSheet` |
 | **Output** | LLM Provider (with the local model's folder and Check Model) · Notes Language · Output Folder · Notion Export · Recording Retention · Meeting Notes Templates · Template Rules | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel`, the rules section in `TemplateRulesModel` |
 | **Advanced** | Permissions · Diagnostics | — | `micPermission`, `screenRecordingOK`, `accessibilityOK` |
@@ -1081,6 +1081,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 - `transcriptionEngine` switches between WhisperKit / Parakeet option panels
 - `customVocabularyEnabled` hides the vocabulary source picker, the vocabulary file row and the URL controls
 - `vocabularySource` switches between the local vocabulary file row and the URL controls (address, token, "Update now", status)
+- `unloadModelsWhenIdle` (default on) skips the launch ASR load (a missing model is still downloaded at launch) and releases in-memory ASR and batch VAD models at a safe pipeline drain; the toggle sits beside model status and "Load Model". Turning it off restores launch preload and retains models across drains and engine switches. With the setting on, unloaded status reads "Loads when needed" while `/state` continues to report `"unloaded"`.
 - `protocolProvider` switches between Claude CLI / Codex CLI / Custom Command / OpenAI-compatible / Local model / None panels
 - `#if APPSTORE` removes the Claude CLI, Codex CLI, Custom Command and Local model provider options entirely
 - `updateChecker == nil` hides the entire Updates section in About
