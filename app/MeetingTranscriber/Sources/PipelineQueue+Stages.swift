@@ -1118,6 +1118,7 @@ extension PipelineQueue {
         let initialBasename = job.notesBasename ?? job.namingSlug
             ?? Self.namingSlug(title: title, jobID: jobID, startTime: Date())
         let meetingStartTime = job.meetingStartTime
+        let instructions = protocolInstructions(for: job)
         updateJobState(id: jobID, to: .generatingProtocol)
         let protocolMD: String
         do {
@@ -1129,6 +1130,7 @@ extension PipelineQueue {
                 title: title,
                 diarized: diarized,
                 meetingStartTime: meetingStartTime,
+                instructions: instructions,
             )
         } catch {
             // Cancelled while the model was writing. A generator stopped this
@@ -1207,6 +1209,19 @@ extension PipelineQueue {
                 jobID: jobID,
             )
         }
+    }
+
+    /// What `job`'s meeting notes are asked for with: its template, or the
+    /// current default for a job from a snapshot written before templates, with
+    /// a warning on the job when the template fell back to the built-in one.
+    private func protocolInstructions(for job: PipelineJob) -> ProtocolInstructions {
+        let templateID = job.protocolTemplate ?? defaultProtocolTemplateProvider()
+        let (instructions, templateWarning) = protocolTemplateStore.instructions(for: templateID)
+        if let templateWarning { addWarning(id: job.id, templateWarning) }
+        logger.info(
+            "[\(job.shortID, privacy: .public)] protocol_template template=\(templateID.storedValue, privacy: .private) fallback=\(templateWarning != nil, privacy: .public)",
+        )
+        return instructions
     }
 
     /// Reads the export configuration and, when the export is on but cannot run
