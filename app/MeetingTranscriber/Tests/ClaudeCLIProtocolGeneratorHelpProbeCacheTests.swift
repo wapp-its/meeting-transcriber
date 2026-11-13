@@ -2,10 +2,10 @@
     @testable import MeetingTranscriber
     import XCTest
 
-    /// The yes `--help` gave about `--no-session-persistence` is kept across
-    /// runs, so a CLI replaced by an older one that rejects the flag must be
-    /// asked again, without ever starting a run without the flag for a CLI
-    /// that has it.
+    /// The yes `--help` gave about `--no-session-persistence` and the
+    /// isolation options is kept across runs, so a CLI replaced by an older
+    /// one that rejects the flag must be asked again, without ever starting a
+    /// run without the flag for a CLI that has it.
     final class ClaudeCLIProtocolGeneratorHelpProbeCacheTests: XCTestCase {
         /// Each test runs on its own instance, so on its own folder, and the
         /// CLIs in it are paths no other test has cached an answer for.
@@ -91,20 +91,21 @@
         /// appearing, in an echo of the arguments or a usage text after
         /// some other error, is not a refusal.
         func testRejectionNeedsTheFlagAndAnOptionParserWording() {
-            let rejected = { (stderr: String, arguments: [String]) in
-                ClaudeCLIProtocolGenerator.rejectedNoSessionPersistence(stderr: stderr, message: "", arguments: arguments)
+            let refused = { (stderr: String, arguments: [String]) in
+                ClaudeCLIProtocolGenerator.refusedOptions(stderr: stderr, message: "", arguments: arguments)
             }
             let withFlag = ["-p", Self.flag]
 
-            XCTAssertTrue(rejected(Self.rejection, withFlag))
-            XCTAssertTrue(rejected("Error: Unrecognized option: \(Self.flag)", withFlag))
-            XCTAssertTrue(rejected("invalid option \(Self.flag)\n(Did you mean --print?)", withFlag))
-            XCTAssertFalse(rejected(Self.rejection, ["-p"]))
-            XCTAssertFalse(rejected("error: authentication failed\nargv: -p \(Self.flag)", withFlag))
-            XCTAssertFalse(rejected("error: unknown option '--foo'\nUsage:\n  \(Self.flag)  Disable", withFlag))
-            XCTAssertTrue(ClaudeCLIProtocolGenerator.rejectedNoSessionPersistence(
-                stderr: "", message: Self.rejection, arguments: withFlag,
-            ))
+            XCTAssertEqual(refused(Self.rejection, withFlag), [Self.flag])
+            XCTAssertEqual(refused("Error: Unrecognized option: \(Self.flag)", withFlag), [Self.flag])
+            XCTAssertEqual(refused("invalid option \(Self.flag)\n(Did you mean --print?)", withFlag), [Self.flag])
+            XCTAssertEqual(refused(Self.rejection, ["-p"]), [])
+            XCTAssertEqual(refused("error: authentication failed\nargv: -p \(Self.flag)", withFlag), [])
+            XCTAssertEqual(refused("error: unknown option '--foo'\nUsage:\n  \(Self.flag)  Disable", withFlag), [])
+            XCTAssertEqual(
+                ClaudeCLIProtocolGenerator.refusedOptions(stderr: "", message: Self.rejection, arguments: withFlag),
+                [Self.flag],
+            )
         }
 
         // MARK: - Helpers
@@ -114,6 +115,7 @@
         private static let rejection = "error: unknown option '\(flag)'"
 
         private enum Help {
+            /// The flag and every isolation option: a complete yes.
             case lists
             case doesNotList
             /// Not valid UTF-8, so the help text cannot be read.
@@ -173,8 +175,9 @@
         /// drains stdin, fails as `failure` says, and otherwise replies with
         /// its arguments as one stream-json text.
         private func makeCLI(help: Help, failure: Failure? = nil) throws -> String {
+            let listed = [Self.flag] + ClaudeCLIProtocolGenerator.isolationOptions.map(\.name)
             let helpOutput = switch help {
-            case .lists: "printf '%s\\n' '  \(Self.flag)  Disable session persistence'"
+            case .lists: listed.map { "printf '%s\\n' '  \($0)  Option'" }.joined(separator: "\n")
             case .doesNotList: "printf '%s\\n' '  -p, --print  Print response'"
             case .unreadable: "printf '\\377\\n'"
             }

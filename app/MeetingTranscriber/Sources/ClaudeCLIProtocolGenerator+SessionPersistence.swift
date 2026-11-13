@@ -29,21 +29,24 @@
         static let disableAutoMemoryVariable = "CLAUDE_CODE_DISABLE_AUTO_MEMORY"
 
         /// How long `--help` may take before the CLI is treated as one
-        /// without the flag.
+        /// without the options it would list.
         static let helpProbeTimeoutSeconds: TimeInterval = 10
 
-        /// Binaries seen to accept the flag, keyed by resolved path and name.
-        /// A yes is remembered so that a later `--help` that times out cannot
-        /// start a meeting without the flag; a no is asked again on the next
-        /// run. A run refused the flag drops the yes.
-        private static let binariesAcceptingNoSessionPersistence = OSAllocatedUnfairLock<Set<String>>(initialState: [])
+        /// The `optionalFlags` each binary's `--help` was last seen to list,
+        /// keyed by resolved path and name. A yes is remembered so that a
+        /// later `--help` that times out cannot start a meeting without an
+        /// option the CLI has. The probe is skipped only once every option
+        /// was seen, so a no is asked again on the next run. A run refused
+        /// an option drops what was remembered.
+        private static let optionsListedByBinary = OSAllocatedUnfairLock<[String: Set<String>]>(initialState: [:])
 
         typealias LaunchConfiguration = (resolvedBin: String, arguments: [String], environment: [String: String])
 
-        /// Executable, arguments and environment for one run. The flag goes
-        /// in only when `--help` lists it, since a CLI older than the flag
-        /// rejects it; a help text that cannot be read counts as no, which
-        /// keeps the behaviour from before the flag existed.
+        /// Executable, arguments and environment for one run. The session
+        /// flag and each isolation option go in only when `--help` lists
+        /// them, since a CLI older than an option rejects it; a help text
+        /// that cannot be read lists only what was remembered, which keeps
+        /// the behaviour from before the options existed.
         func launchConfiguration() async -> LaunchConfiguration {
             let resolvedBin = Self.resolveClaudePath(claudeBin)
             let environment = Self.buildEnvironment(
@@ -51,33 +54,33 @@
                 searchPaths: Self.searchPaths,
                 anthropicAPIKey: anthropicAPIKey,
             )
-            let answer = await askNoSessionPersistence(resolvedBin: resolvedBin, environment: environment)
-            if answer != .listed, !Task.isCancelled {
+            let answer = await askHelp(resolvedBin: resolvedBin, environment: environment)
+            if !answer.listed.contains(Self.noSessionPersistenceFlag), !Task.isCancelled {
                 logger.warning(
-                    "claude_cli_session_persistence_on helpRead=\(answer != .unread, privacy: .public) — the CLI keeps this run's session, transcript included",
+                    "claude_cli_session_persistence_on helpRead=\(answer.helpRead, privacy: .public) — the CLI keeps this run's session, transcript included",
                 )
             }
-            let arguments = Self.buildSubprocessArgs(
-                claudeBin: claudeBin, resolvedBin: resolvedBin, noSessionPersistence: answer == .listed,
-            )
+            Self.warnAboutMissingIsolation(answer)
+            let arguments = Self.buildSubprocessArgs(claudeBin: claudeBin, resolvedBin: resolvedBin, options: answer.listed)
             return (resolvedBin, arguments, environment)
         }
 
-        /// The launch for one more run after `failed` was refused the flag,
-        /// or nil for none. Drops the remembered yes and asks `--help` again:
-        /// only a help text that was read and does not list the flag earns a
-        /// run without it, with the same executable and environment.
-        func launchWithoutRejectedFlag(after failed: LaunchConfiguration) async -> LaunchConfiguration? {
+        /// The launch for one more run after `failed` was refused `refused`,
+        /// or nil for none. Drops what was remembered and asks `--help`
+        /// again: only a help text that was read and lists none of the
+        /// refused options earns a second run, with what that help lists and
+        /// the same executable and environment.
+        func launchWithoutRefusedOptions(_ refused: Set<String>, after failed: LaunchConfiguration) async -> LaunchConfiguration? {
             let key = Self.cacheKey(resolvedBin: failed.resolvedBin, claudeBin: claudeBin)
-            _ = Self.binariesAcceptingNoSessionPersistence.withLock { $0.remove(key) }
-            let answer = await askNoSessionPersistence(resolvedBin: failed.resolvedBin, environment: failed.environment)
+            _ = Self.optionsListedByBinary.withLock { $0.removeValue(forKey: key) }
+            let answer = await askHelp(resolvedBin: failed.resolvedBin, environment: failed.environment)
+            let retry = answer.helpRead && answer.listed.isDisjoint(with: refused)
             logger.warning(
-                "claude_cli_rejected_no_session_persistence help=\(String(describing: answer), privacy: .public) retry=\(answer == .notListed, privacy: .public)",
+                "claude_cli_rejected_option options=\(refused.sorted().joined(separator: ","), privacy: .public) helpRead=\(answer.helpRead, privacy: .public) retry=\(retry, privacy: .public)",
             )
-            guard answer == .notListed else { return nil }
-            let arguments = Self.buildSubprocessArgs(
-                claudeBin: claudeBin, resolvedBin: failed.resolvedBin, noSessionPersistence: false,
-            )
+            guard retry else { return nil }
+            Self.warnAboutMissingIsolation(answer)
+            let arguments = Self.buildSubprocessArgs(claudeBin: claudeBin, resolvedBin: failed.resolvedBin, options: answer.listed)
             return (failed.resolvedBin, arguments, failed.environment)
         }
 
@@ -85,47 +88,60 @@
             "\(resolvedBin)\u{0}\(claudeBin)"
         }
 
-        /// What `--help` says about the flag.
-        enum HelpAnswer {
-            case listed
-            case notListed
-            /// The help could not be read, so it says nothing either way.
-            case unread
+        /// What `--help` says about `optionalFlags`.
+        struct HelpAnswer {
+            /// The options the help lists; when it could not be read, those
+            /// remembered from an earlier help.
+            let listed: Set<String>
+            /// Whether `listed` comes from a help text that was read.
+            let helpRead: Bool
         }
 
-        /// What the CLI's `--help` says about the flag, or the remembered yes.
-        /// The probe is bounded like a run: `helpProbeTimeout` on the
-        /// generator's clock, then its termination grace.
-        private func askNoSessionPersistence(resolvedBin: String, environment: [String: String]) async -> HelpAnswer {
+        /// One content-free warning naming the isolation options `answer`
+        /// leaves out, if any.
+        private static func warnAboutMissingIsolation(_ answer: HelpAnswer) {
+            let missing = missingIsolationOptions(listed: answer.listed)
+            guard !missing.isEmpty, !Task.isCancelled else { return }
+            logger.warning(
+                "claude_cli_isolation_incomplete missing=\(missing.joined(separator: ","), privacy: .public) helpRead=\(answer.helpRead, privacy: .public) — the run keeps that part of the user's Claude Code setup",
+            )
+        }
+
+        /// What the CLI's `--help` says about `optionalFlags`, or what was
+        /// remembered when that is all of them. The probe is bounded like a
+        /// run: `helpProbeTimeout` on the generator's clock, then its
+        /// termination grace.
+        private func askHelp(resolvedBin: String, environment: [String: String]) async -> HelpAnswer {
             let key = Self.cacheKey(resolvedBin: resolvedBin, claudeBin: claudeBin)
-            if Self.binariesAcceptingNoSessionPersistence.withLock({ $0.contains(key) }) { return .listed }
+            let remembered = Self.optionsListedByBinary.withLock { $0[key] } ?? []
+            if remembered == Self.optionalFlags { return HelpAnswer(listed: remembered, helpRead: true) }
             let help = await readHelp(resolvedBin: resolvedBin, environment: environment)
             // A probe ended by a cancelled job says nothing about the CLI;
             // the job ends right after.
-            guard let help, !Task.isCancelled else { return .unread }
-            guard Self.helpListsNoSessionPersistence(help) else { return .notListed }
-            _ = Self.binariesAcceptingNoSessionPersistence.withLock { $0.insert(key) }
-            return .listed
+            guard let help, !Task.isCancelled else { return HelpAnswer(listed: remembered, helpRead: false) }
+            let listed = Self.optionsListed(inHelp: help)
+            _ = Self.optionsListedByBinary.withLock { $0.updateValue(listed, forKey: key) }
+            return HelpAnswer(listed: listed, helpRead: true)
         }
 
-        /// A failed run whose CLI refused the flag. `error` is what the run
+        /// A failed run whose CLI refused `options`. `error` is what the run
         /// reports when there is no second run.
-        struct NoSessionPersistenceRejected: Error {
+        struct OptionsRefused: Error {
+            let options: Set<String>
             let error: ProtocolError
         }
 
-        /// Whether a run given the flag was refused it: a line of its stderr
-        /// or reported message names the flag together with unknown-option
-        /// wording, ignoring case. Both are read because the message prefers
-        /// a result event's reason over stderr.
-        static func rejectedNoSessionPersistence(stderr: String, message: String, arguments: [String]) -> Bool {
-            guard arguments.contains(noSessionPersistenceFlag) else { return false }
+        /// The `optionalFlags` a run given them was refused: those that a
+        /// line of its stderr or reported message names together with
+        /// unknown-option wording, ignoring case. Both are read because the
+        /// message prefers a result event's reason over stderr.
+        static func refusedOptions(stderr: String, message: String, arguments: [String]) -> Set<String> {
             let wordings = ["unknown option", "unrecognized option", "unrecognised option", "invalid option"]
-            return [stderr, message].contains { text in
-                text.split(whereSeparator: \.isNewline).contains { line in
-                    let line = line.lowercased()
-                    return line.contains(noSessionPersistenceFlag) && wordings.contains { line.contains($0) }
-                }
+            let refusals = [stderr, message].flatMap { $0.split(whereSeparator: \.isNewline) }
+                .map { $0.lowercased() }
+                .filter { line in wordings.contains { line.contains($0) } }
+            return optionalFlags.filter { option in
+                arguments.contains(option) && refusals.contains { names(option, in: $0) }
             }
         }
 
@@ -134,10 +150,6 @@
         static func removeRunFolders(workingDirectory: URL, projectFolder: URL?) {
             try? FileManager.default.removeItem(at: workingDirectory)
             if let projectFolder { removeIfOnlyEmptyFolders(projectFolder) }
-        }
-
-        static func helpListsNoSessionPersistence(_ help: String) -> Bool {
-            help.contains(noSessionPersistenceFlag)
         }
 
         /// The CLI's `--help` output, or nil when it could not be started or

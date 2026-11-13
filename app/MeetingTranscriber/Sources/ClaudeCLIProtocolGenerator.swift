@@ -86,11 +86,15 @@
             try Task.checkCancellation()
             do {
                 return try await run(prompt: prompt, launch: launch)
-            } catch let rejection as NoSessionPersistenceRejected {
-                let retry = await launchWithoutRejectedFlag(after: launch)
+            } catch let refusal as OptionsRefused {
+                let retry = await launchWithoutRefusedOptions(refusal.options, after: launch)
                 try Task.checkCancellation()
-                guard let retry else { throw rejection.error }
-                return try await run(prompt: prompt, launch: retry)
+                guard let retry else { throw refusal.error }
+                do {
+                    return try await run(prompt: prompt, launch: retry)
+                } catch let again as OptionsRefused {
+                    throw again.error
+                }
             }
         }
 
@@ -126,9 +130,8 @@
         /// Decodes `stderrData`, logs the exit and the sizes of what the CLI
         /// wrote, and builds the error `generate()` throws on a nonzero exit —
         /// pulled out of `generate()` itself to keep that function's body
-        /// short. A run with `arguments` that the CLI refused
-        /// `noSessionPersistenceFlag` gets its error wrapped as
-        /// `NoSessionPersistenceRejected`.
+        /// short. A run with `arguments` that the CLI refused one of
+        /// `optionalFlags` gets its error wrapped as `OptionsRefused`.
         ///
         /// Nothing the subprocess wrote reaches the log: the prompt carries
         /// the meeting's background info, and a CLI that echoes its input on
@@ -147,8 +150,8 @@
                 "claude_cli_failed exit=\(exitCode, privacy: .public) stderr_bytes=\(stderrData.count, privacy: .public) text_bytes=\(text.utf8.count, privacy: .public) reason_source=\(reasonSource, privacy: .public)",
             )
             let error = makeFailureError(exitCode: exitCode, stderrText: publicMessage)
-            let rejected = rejectedNoSessionPersistence(stderr: stderrText, message: publicMessage, arguments: arguments)
-            return rejected ? NoSessionPersistenceRejected(error: error) : error
+            let refused = refusedOptions(stderr: stderrText, message: publicMessage, arguments: arguments)
+            return refused.isEmpty ? error : OptionsRefused(options: refused, error: error)
         }
 
         /// Where `publicFailureMessage` took its text from, for the log line
@@ -383,13 +386,16 @@
 
         /// Build the CLI argument vector. When `resolvedBin` is the
         /// `/usr/bin/env` fallback, prepend `claudeBin` so env can resolve
-        /// it from PATH. `noSessionPersistence` adds
-        /// `noSessionPersistenceFlag`; pass what
-        /// the CLI's `--help` lists it (see `launchConfiguration`).
-        static func buildSubprocessArgs(claudeBin: String, resolvedBin: String, noSessionPersistence: Bool) -> [String] {
+        /// it from PATH. `noSessionPersistenceFlag` and each of
+        /// `isolationOptions` go in when `options` holds its name; pass
+        /// what the CLI's `--help` lists (see `launchConfiguration`).
+        static func buildSubprocessArgs(claudeBin: String, resolvedBin: String, options: Set<String>) -> [String] {
             var args = ["-p", "-", "--output-format", "stream-json", "--verbose", "--model", "sonnet"]
-            if noSessionPersistence {
+            if options.contains(noSessionPersistenceFlag) {
                 args.append(noSessionPersistenceFlag)
+            }
+            for option in isolationOptions where options.contains(option.name) {
+                args += option.arguments
             }
             if resolvedBin == "/usr/bin/env" {
                 args.insert(claudeBin, at: 0)
@@ -398,7 +404,9 @@
         }
 
         /// Strip `CLAUDECODE` (avoid nested-session detection by the child
-        /// CLI), force `disableAutoMemoryVariable` to `1` (see there), and
+        /// CLI), force `disableAutoMemoryVariable` and
+        /// `disableNonessentialTrafficVariable` to `1` and
+        /// `claudeAIMCPServersVariable` to `false` (see there), and
         /// prepend `searchPaths` to `PATH` (app bundles inherit
         /// a minimal `PATH`). `anthropicAPIKey`, when non-empty and not
         /// already set in `baseEnvironment`, is injected so the subprocess
@@ -416,6 +424,8 @@
             var env = baseEnvironment
             env.removeValue(forKey: "CLAUDECODE")
             env[disableAutoMemoryVariable] = "1"
+            env[disableNonessentialTrafficVariable] = "1"
+            env[claudeAIMCPServersVariable] = "false"
             let extraPaths = searchPaths.joined(separator: ":")
             env["PATH"] = "\(extraPaths):\(env["PATH"] ?? "/usr/bin:/bin")"
             if env["ANTHROPIC_API_KEY"]?.isEmpty ?? true,

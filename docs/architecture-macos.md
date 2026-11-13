@@ -760,7 +760,7 @@ retention keep using the main notes (`ProtocolRegenerator.regenerate`).
 
 ### CLI Runner
 
-The Codex CLI and custom command providers share one runner, `CLIProcessRunner`, which the local model's Check Model in Settings also uses. Every run works in a fresh owner-only folder under the per-user temporary directory, removed when the run ends; the runner starts the program there directly from an argument vector, never through a shell, stops it after 10 minutes of wall-clock time even when it prints nothing (SIGTERM, then SIGKILL one second later), and caps stdout at 32 MiB. The Codex preset runs `codex exec --json --ephemeral --skip-git-repo-check --sandbox read-only --output-last-message {output_file} -` with the prompt on stdin; `--ephemeral` keeps the run out of Codex's session store.
+The Codex CLI and custom command providers share one runner, `CLIProcessRunner`, which the local model's Check Model in Settings also uses. Every run works in a fresh owner-only folder under the per-user temporary directory, removed when the run ends; the runner starts the program there directly from an argument vector, never through a shell, stops it after 10 minutes of wall-clock time even when it prints nothing (SIGTERM, then SIGKILL one second later), and caps stdout at 32 MiB. The Codex preset runs `codex exec -c mcp_servers={…} --json --ephemeral --skip-git-repo-check --sandbox read-only --disable apps --disable plugins -c notify=[] --output-last-message {output_file} -` with the prompt on stdin; `--ephemeral` keeps the run out of Codex's session store, and the rest keeps the user's MCP servers, connectors, plugins and notify command out of the run (the server table is built per run from `codex mcp list --json`; see `docs/architecture/pipeline.md`, protocol generation).
 
 The Claude CLI provider runs on `BoundedProcess` instead (see [Claude CLI Invocation](#claude-cli-invocation)), also with a 10-minute limit, in an owner-only working folder of its own per run, and stopped through the process group it leads (SIGTERM, then SIGKILL one second later).
 
@@ -833,12 +833,14 @@ always use the default handler.
 ### Claude CLI Invocation
 
 ```bash
-/usr/bin/env claude -p - --output-format stream-json --verbose --model sonnet
+/usr/bin/env claude -p - --output-format stream-json --verbose --model sonnet \
+  --no-session-persistence --tools "" --strict-mcp-config --setting-sources ""
 ```
 
 - **Input:** Meeting metadata + protocol prompt (with variables substituted) + transcript piped to stdin
 - **Output:** Stream-json parsed line-by-line (content_block_delta + assistant message)
-- **Environment:** `CLAUDECODE` env var stripped to allow nested invocation
+- **Options:** the last four only when the CLI's `--help` lists them; they keep the run out of the CLI's session store and the user's tools, MCP servers and settings files (see `docs/architecture/pipeline.md`, protocol generation)
+- **Environment:** `CLAUDECODE` env var stripped to allow nested invocation; `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` and `ENABLE_CLAUDEAI_MCP_SERVERS=false` set
 - **Timeout:** 10 minutes
 
 ### Output Structure
