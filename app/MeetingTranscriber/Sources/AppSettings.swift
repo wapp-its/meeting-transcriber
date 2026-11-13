@@ -686,6 +686,7 @@ final class AppSettings { // swiftlint:disable:this type_body_length
     }
 
     /// Format output filenames using the AI-generated meeting title in snake_case without timestamps.
+    /// Only for a job that ran the built-in template (`ProtocolGenerator.fileTitleSlug`).
     var useAITitleForFilenames: Bool {
         didSet { defaults.set(useAITitleForFilenames, forKey: "useAITitleForFilenames") }
     }

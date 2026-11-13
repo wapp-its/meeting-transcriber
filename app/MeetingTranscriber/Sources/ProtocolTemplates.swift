@@ -92,6 +92,9 @@ struct ProtocolTemplateStore {
     /// What a template resolves to when meeting notes are made.
     struct Resolution: Equatable {
         let text: String
+        /// The template the text came from: the one asked for, or `.builtIn`
+        /// after a fallback.
+        let used: ProtocolTemplateID
         /// Set when the asked-for template could not be used and the built-in
         /// one stood in.
         let warning: String?
@@ -136,21 +139,25 @@ struct ProtocolTemplateStore {
     /// names the template when its file is missing, unreadable or blank.
     func resolve(_ id: ProtocolTemplateID) -> Resolution {
         if let text = text(for: id) {
-            return Resolution(text: text, warning: nil)
+            return Resolution(text: text, used: id, warning: nil)
         }
         return Resolution(
             text: ProtocolGenerator.protocolPrompt,
+            used: .builtIn,
             // Matched by /v1 clients and persisted jobs; keep the text stable.
             warning: "Meeting notes template \"\(id.storedValue)\" was not found or is empty, so the built-in template was used",
         )
     }
 
-    /// The instructions a run sends for a template, and the warning to add to
-    /// the job when the template fell back. The one place a job's choice
-    /// becomes what the provider is asked.
-    func instructions(for id: ProtocolTemplateID) -> (instructions: ProtocolInstructions, warning: String?) {
+    /// The instructions a run sends for a template, the template they came
+    /// from (`.builtIn` after a fallback), and the warning to add to the job
+    /// when the template fell back. The one place a job's choice becomes what
+    /// the provider is asked.
+    func instructions(
+        for id: ProtocolTemplateID,
+    ) -> (instructions: ProtocolInstructions, used: ProtocolTemplateID, warning: String?) {
         let resolution = resolve(id)
-        return (ProtocolInstructions(template: resolution.text), resolution.warning)
+        return (ProtocolInstructions(template: resolution.text), resolution.used, resolution.warning)
     }
 
     /// Creates a template under a name `ProtocolTemplateName.validate` accepts,

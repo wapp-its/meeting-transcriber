@@ -636,6 +636,11 @@ prefix scan, because a bare-title stem is a prefix of other jobs' stems. A title
 is taken only if none of its artifacts exist, otherwise `_<shortID>` is
 appended, and nothing is overwritten. If any move fails, the ones already done
 are undone and the job keeps its old stem and paths.
+The title is taken only for a job that ran the built-in template (after a
+fallback too): a custom template's first heading is whatever it writes, a
+section such as "Action items" as often as a title, so its files keep the
+timestamped names (`ProtocolGenerator.fileTitleSlug`, over
+`ProtocolGenerator.aiTitle`).
 
 The prompt is the job's meeting-notes template: the built-in one or a Markdown file in `~/Library/Application Support/MeetingTranscriber/Protocol Templates/`, named after the file and managed in Settings → Output. A job captures the default template's name when it enters the queue, and the file is read when the notes are made; a file that is missing or blank by then falls back to the built-in template with a warning on the job. A custom prompt from an earlier version (`protocol_prompt.md`) is copied in once as the template "Custom Prompt" and made the default; the old file is left in place. The rules and the reasons are in [pipeline.md](architecture/pipeline.md).
 
@@ -651,7 +656,10 @@ job and a quit costs no second LLM call. The local copy is kept by default;
 retry. Export failures add a job warning with a short cause and keep the local copy.
 `notionSpeakerTagsEnabled` separately opts in to sending confirmed speaker names as
 tags and defaults off. Date and Tags are written only when the selected database
-has recognized columns.
+has recognized columns. The page title follows the file-name rule
+(`ProtocolGenerator.aiTitle`): the title the model wrote for notes from the
+built-in template, otherwise the job's title. A retry reads the notes from the
+backup and decides by the template the job asked for.
 
 The job records its Notion page and database IDs as soon as the page is created,
 so retries and protocol re-exports can use the same destination. Re-export after

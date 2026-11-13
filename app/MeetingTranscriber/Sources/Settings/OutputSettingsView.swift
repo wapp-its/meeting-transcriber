@@ -115,8 +115,12 @@ struct OutputSettingsView: View {
                     .accessibilityIdentifier(A11yID.includeFullTranscriptToggle)
                 Toggle("Save raw transcript separately", isOn: $settings.saveRawTranscriptSeparately)
                     .accessibilityIdentifier(A11yID.saveRawTranscriptToggle)
-                Toggle("Use AI meeting title for filenames", isOn: $settings.useAITitleForFilenames)
-                    .accessibilityIdentifier(A11yID.useAITitleForFilenamesToggle)
+                HelpfulToggle(
+                    title: "Use AI meeting title for filenames",
+                    help: SettingsHelp.aiTitleForFilenames,
+                    isOn: $settings.useAITitleForFilenames,
+                )
+                .accessibilityIdentifier(A11yID.useAITitleForFilenamesToggle)
 
                 Picker("LLM Provider", selection: $settings.protocolProvider) {
                     ForEach(ProtocolProvider.allCases, id: \.self) { provider in
