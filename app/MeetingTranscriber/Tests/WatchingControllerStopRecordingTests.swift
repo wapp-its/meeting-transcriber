@@ -293,7 +293,7 @@ final class WatchingControllerStopRecordingTests: XCTestCase {
             recordOnlyOutputDir: { outputDir ?? AppPaths.recordingsDir },
             notifier: RecordingNotifier(consentAnswer: .granted),
         )
-        loop.onStateChange = { _, newState in
+        loop.onStateChange = { _, newState, _ in
             if newState == .recording { _ = recordings.increment() }
         }
         controller.watchLoop = loop

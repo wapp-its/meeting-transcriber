@@ -355,7 +355,7 @@ struct UIPress: AsyncParsableCommand {
         commandName: "ui-press",
         abstract: "Press a control (by accessibility identifier) in an allowed app window. "
             + "Drives a real in-process UI action — assert the effect via `state`, "
-            + "not the returned `pressed` flag.",
+            + "not the returned `dispatched` flag.",
     )
 
     @Argument(help: "Accessibility identifier of the control to press.")
@@ -383,7 +383,7 @@ struct UIPress: AsyncParsableCommand {
 
 struct Screenshot: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        abstract: "Save a PNG of the app's frontmost window.",
+        abstract: "Save a PNG of the app's largest visible window (Settings only).",
     )
 
     @Argument(help: "Output PNG path. Defaults to ./screenshot.png.")

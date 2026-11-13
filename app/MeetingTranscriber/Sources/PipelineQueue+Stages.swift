@@ -591,7 +591,7 @@ extension PipelineQueue {
                 ctx, engine: engine, workDir: workDir,
                 appAudioPath: appAudioPath, micAudioPath: micAudioPath,
             )
-            let normalizedSegments = normalize(segments, with: normalizer)
+            let normalizedSegments = normalizer.normalize(segments)
             cachedSegments = normalizedSegments
             transcript = normalizedSegments.transcriptText(
                 note: transcriptNote(ctx.jobID), pauses: transcriptPauses(ctx.jobID),
@@ -618,7 +618,7 @@ extension PipelineQueue {
 
             // Use transcribeSegments to cache results for diarization
             let rawSegments = try await engine.transcribeSegments(audioPath: transcriptionPath)
-            var segments = normalize(rawSegments, with: normalizer)
+            var segments = normalizer.normalize(rawSegments)
 
             // Remap timestamps back to original timeline if VAD was used
             if let map = vadMap {
@@ -649,21 +649,6 @@ extension PipelineQueue {
             isDualSource: isDualSource,
             terminologyNormalizer: normalizer,
         )
-    }
-
-    private func normalize(
-        _ segments: [TimestampedSegment],
-        with normalizer: TerminologyNormalizer,
-    ) -> [TimestampedSegment] {
-        guard !normalizer.isEmpty else { return segments }
-        return segments.map { segment in
-            TimestampedSegment(
-                start: segment.start,
-                end: segment.end,
-                text: normalizer.normalize(segment.text),
-                speaker: segment.speaker,
-            )
-        }
     }
 
     /// Stage 2 — optional speaker diarization. Returns the labeled transcript
@@ -928,7 +913,7 @@ extension PipelineQueue {
             return nil
         } else {
             let rawSegments = try await engine.transcribeSegments(audioPath: mix16k)
-            cachedSegments = normalize(rawSegments, with: transcription.terminologyNormalizer)
+            cachedSegments = transcription.terminologyNormalizer.normalize(rawSegments)
         }
         return renderLabeledTranscript(
             run: run, cachedSegments: cachedSegments,
@@ -1012,17 +997,21 @@ extension PipelineQueue {
         // writes already names the new locations. That ordering is the whole
         // fix: a quit during the protocol call must leave a snapshot the restore
         // can still find the audio by.
-        recordRelocatedAudio(
-            jobID: ctx.jobID,
-            Self.persistAudioToOutput(ctx: ctx, outputDir: recordingsDir, stagingDir: stagingDir),
-        )
+        let (relocated, moved) = Self.persistAudioToOutput(ctx: ctx, outputDir: recordingsDir, stagingDir: stagingDir)
+        recordRelocatedAudio(jobID: ctx.jobID, relocated)
+        registerRelocatedAudio(jobID: ctx.jobID, moved: moved, root: outputDir)
 
         // --- Persist 16kHz audio for re-diarization (move instead of copy to avoid double I/O) ---
-        // Reported only when the copy is there: the move may fail, and a stage
-        // that never produced one has nothing to move.
+        // Replacing, because a job run a second time keeps its stem and the
+        // first run's copies are already there; a plain move fails on them.
+        // Only when this run has a copy, so a missing one never costs the old.
+        // Reported only when a copy is there afterwards: the move may fail.
         func moveCopy(_ name: String, suffix: String, as role: MeetingFile.Role) -> (role: MeetingFile.Role, path: URL?) {
+            let source = workDir.appendingPathComponent(name)
             let copy = recordingsDir.appendingPathComponent("\(ctx.slug)\(suffix)")
-            try? FileManager.default.moveItem(at: workDir.appendingPathComponent(name), to: copy)
+            if FileManager.default.fileExists(atPath: source.path) {
+                try? Self.moveIntoPlace(source, to: copy)
+            }
             return (role, FileIdentity.of(copy.path) == nil ? nil : copy)
         }
         var copies = [moveCopy("mix_16k.wav", suffix: "_16k.wav", as: .mix16k)]
@@ -1060,8 +1049,14 @@ extension PipelineQueue {
             // Auto-pop the dialog now that the job is in the right state.
             // The window's onAppear guard reads pendingSpeakerNamingJobs,
             // which only includes .speakerNamingPending jobs, so the
-            // notification has to come after the transition above.
-            NotificationCenter.default.post(name: .showSpeakerNaming, object: nil)
+            // notification has to come after the transition above. With
+            // auto-open off the job waits for the menu bar, and a user
+            // notification says so instead.
+            if autoOpensSpeakerNaming {
+                NotificationCenter.default.post(name: .showSpeakerNaming, object: nil)
+            } else if let job = job(withID: ctx.jobID) {
+                onSpeakerNamesWaiting?([job])
+            }
             // Tests drive naming through an injected handler instead of the UI.
             // Re-invoke it here, after the `.speakerNamingPending` transition,
             // mirroring the late-rerun re-invocation, so the test path runs the
@@ -1091,6 +1086,38 @@ extension PipelineQueue {
         jobID: UUID, transcript: String, title: String, protocolsDir: URL,
         speakerNames: [String] = [],
     ) async throws(CancellationError) {
+        try await generateProtocol(
+            jobID: jobID, transcript: transcript, title: title, protocolsDir: protocolsDir,
+            speakerNames: speakerNames, transcriptIsTheOutputWithoutAProvider: true,
+        )
+    }
+
+    /// The template `job`'s protocol is asked for with, the instructions it
+    /// becomes and the template they came from, with a warning on the job when
+    /// it fell back to the built-in one. A job from a snapshot written before
+    /// templates takes the current default.
+    private func protocolTemplate(
+        for job: PipelineJob,
+    ) -> (id: ProtocolTemplateID, instructions: ProtocolInstructions, used: ProtocolTemplateID) {
+        let templateID = job.protocolTemplate ?? defaultProtocolTemplateProvider()
+        let (instructions, usedTemplate, templateWarning) = protocolTemplateStore.instructions(
+            for: templateID, background: job.protocolBackground,
+        )
+        if let templateWarning { addWarning(id: job.id, templateWarning) }
+        let backgroundPresence = instructions.background == nil ? "absent" : "present"
+        logger.info(
+            "[\(job.shortID, privacy: .public)] protocol_template template=\(templateID.storedValue, privacy: .private) fallback=\(templateWarning != nil, privacy: .public) background=\(backgroundPresence, privacy: .public)",
+        )
+        return (templateID, instructions, usedTemplate)
+    }
+
+    /// `transcriptIsTheOutputWithoutAProvider: false` for a run that was
+    /// started with a provider: resumed after the provider was switched off,
+    /// it still owes a protocol, so its transcript does not stand in for one.
+    func generateProtocol( // swiftlint:disable:this function_parameter_count
+        jobID: UUID, transcript: String, title: String, protocolsDir: URL,
+        speakerNames: [String], transcriptIsTheOutputWithoutAProvider: Bool,
+    ) async throws(CancellationError) {
         // No generator and no LLM call for a job that is already gone.
         try ensureStillQueued(jobID)
         guard let job = job(withID: jobID) else { return }
@@ -1099,10 +1126,10 @@ extension PipelineQueue {
             // No protocol, so no export, but an export that is switched on and
             // cannot run is still worth a reason on the job.
             resolveNotionExport(jobID: jobID)
+            if transcriptIsTheOutputWithoutAProvider { markOutputWritten(jobID: jobID, output: job.transcriptPath) }
             return
         }
         protocolGenerationOn[jobID] = true
-        let shortID = PipelineJob.shortID(for: jobID)
         // Reuse the basename fixed when the transcript was saved (persisted as
         // namingSlug), so the .md shares the .txt/audio stem exactly. This runs
         // only after a transcript exists, so namingSlug is set on every real
@@ -1110,17 +1137,7 @@ extension PipelineQueue {
         let initialBasename = job.namingSlug
             ?? Self.namingSlug(title: title, jobID: jobID, startTime: Date())
         let meetingStartTime = job.meetingStartTime
-        // A job from a snapshot written before templates takes the current
-        // default.
-        let templateID = job.protocolTemplate ?? defaultProtocolTemplateProvider()
-        let (instructions, usedTemplate, templateWarning) = protocolTemplateStore.instructions(
-            for: templateID, background: job.protocolBackground,
-        )
-        if let templateWarning { addWarning(id: jobID, templateWarning) }
-        let backgroundPresence = instructions.background == nil ? "absent" : "present"
-        logger.info(
-            "[\(shortID, privacy: .public)] protocol_template template=\(templateID.storedValue, privacy: .private) fallback=\(templateWarning != nil, privacy: .public) background=\(backgroundPresence, privacy: .public)",
-        )
+        let (templateID, instructions, usedTemplate) = protocolTemplate(for: job)
         updateJobState(id: jobID, to: .generatingProtocol)
         guard let protocolMD = try await protocolText(
             from: generator, jobID: jobID,
@@ -1160,6 +1177,7 @@ extension PipelineQueue {
         // the queue moves on while the export runs, so this is what a quit or a
         // failed export falls back on. A successful Notion-only export removes it.
         let savedLocally = saveProtocolLocally(markdown, basename: basename, jobID: jobID, protocolsDir: protocolsDir)
+        if savedLocally { markOutputWritten(jobID: jobID, output: self.job(withID: jobID)?.protocolPath) }
         if let configuration {
             queueNotionExport(
                 PendingNotionExport(
@@ -1304,8 +1322,10 @@ extension PipelineQueue {
         from oldStem: String,
         titleSlug: String,
         protocolsDir: URL,
-        moveItem: (_ source: URL, _ destination: URL) throws -> Void = { try FileManager.default.moveItem(at: $0, to: $1) },
+        moveItem: ((_ source: URL, _ destination: URL) throws -> Void)? = nil,
     ) -> String {
+        // The queue's own move unless a test hands one in.
+        let moveItem = moveItem ?? moveArtifact
         let shortID = PipelineJob.shortID(for: jobID)
         let dirs = ArtifactRenamePlan.Directories(
             protocols: protocolsDir,
@@ -1331,6 +1351,9 @@ extension PipelineQueue {
             // is under the new name: the record says where it really is, so a
             // deletion finds it and does not count it as gone.
             let stayed = undoRenames(done, shortID: shortID, moveItem: moveItem)
+            // The retention registry follows exactly those files too, or it
+            // would forget them.
+            recordingRetention?.registry.repoint(jobID: jobID, moves: stayed.map { ($0.from, $0.to) })
             logger.warning("[\(shortID, privacy: .public)] ai_title_rename_failed error=\(error.localizedDescription, privacy: .private)")
             report(stayed)
             // No record lists a report, and under the new name no rule finds it for
@@ -1360,6 +1383,7 @@ extension PipelineQueue {
             jobs[idx].recordRelocatedAudio(RelocatedAudioPaths(
                 mix: moved(jobs[idx].mixPath), app: moved(jobs[idx].appPath), mic: moved(jobs[idx].micPath),
             ))
+            recordingRetention?.registry.repoint(jobID: jobID, moves: done.map { (from: $0.from, to: $0.to) })
             saveSnapshot()
         }
         return newStem
@@ -1472,7 +1496,9 @@ extension PipelineQueue {
         let staging = stagingDir
         lastRecordingRelocation = Task.detached(priority: .utility) { [self] in
             let moved = withExtendedLifetime(self) {
-                let paths = Self.persistAudioToOutput(ctx: ctx, outputDir: destination, stagingDir: staging)
+                // Not registered for retention: a cancelled job writes no
+                // outputs, so its recording is the only copy and stays.
+                let (paths, _) = Self.persistAudioToOutput(ctx: ctx, outputDir: destination, stagingDir: staging)
                 if staged.contains(where: { FileManager.default.fileExists(atPath: $0.path) }) {
                     logger.warning("[\(ctx.shortID, privacy: .public)] cancelled_recording_left_in_staging")
                 }
@@ -1525,9 +1551,13 @@ extension PipelineQueue {
     /// without a `_mix.wav` source) → mix slot is skipped, no persistent mix is
     /// written. `outputDir` here is `<root>/recordings`, reachable because the
     /// queue holds the security scope on the root.
+    ///
+    /// `moved` lists the destinations this run moved this job's audio to; the
+    /// retention registry records exactly these. Imports, files already in the output
+    /// folder and failed moves are never in it.
     nonisolated private static func persistAudioToOutput(
         ctx: JobContext, outputDir: URL, stagingDir: URL,
-    ) -> RelocatedAudioPaths {
+    ) -> (paths: RelocatedAudioPaths, moved: [URL]) {
         let (mixPath, appPath, micPath) = (ctx.mixPath, ctx.appPath, ctx.micPath)
         // Each move below renames-in-place — if two of the three URLs point at
         // the same file, the first move destroys the source for the next one.
@@ -1546,6 +1576,7 @@ extension PipelineQueue {
         let fm = FileManager.default
         try? fm.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
+        var moved: [URL] = []
         // Reuse the job's single basename so the audio copies match the
         // transcript/protocol stems exactly (same meeting-start stamp + shortID).
         func persist(_ src: URL?, _ suffix: String) -> URL? {
@@ -1577,11 +1608,15 @@ extension PipelineQueue {
             // rather than copied, no copy would remain anywhere.
             guard fm.fileExists(atPath: src.path) else {
                 logger.info("Audio already relocated, skipping: \(name, privacy: .private)")
+                // Not reported as moved: the file there may be one the user or
+                // a sync tool put there, and this run cannot show it moved it.
+                // The run that did move it recorded it at the time.
                 return fm.fileExists(atPath: dst.path) ? dst : src
             }
             do {
                 try moveIntoPlace(src, to: dst)
                 logger.info("Audio moved: \(name, privacy: .private)")
+                moved.append(dst)
                 return dst
             } catch {
                 // Error left redacted: a file-move CocoaError embeds the
@@ -1592,11 +1627,12 @@ extension PipelineQueue {
             }
         }
 
-        return RelocatedAudioPaths(
+        let paths = RelocatedAudioPaths(
             mix: persist(mixPath, RecordingFileSuffix.mix),
             app: persist(appPath, RecordingFileSuffix.app),
             mic: persist(micPath, RecordingFileSuffix.mic),
         )
+        return (paths, moved)
     }
 }
 

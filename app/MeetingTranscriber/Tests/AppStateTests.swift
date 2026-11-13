@@ -276,7 +276,7 @@ final class AppStateTests: XCTestCase { // swiftlint:disable:this type_body_leng
 
     // MARK: - toggleWatching: start path (async)
 
-    // toggleWatching() spawns a Task { @MainActor }. We yield once to let it run.
+    // toggleWatching() spawns a Task { @MainActor }; the tests poll with waitFor until it ran.
     // In CI, Permissions.ensureMicrophoneAccess() returns false immediately (no bundle),
     // but toggleWatching() ignores the return value so WatchLoop is always created.
 
@@ -708,22 +708,25 @@ final class AppStateTests: XCTestCase { // swiftlint:disable:this type_body_leng
 
     // MARK: - pipeline.makeQueue
 
-    func testMakeQueueHasDiarizationFactory() throws {
+    // `makeQueue` always passes both factories, so what is worth pinning is
+    // what they produce. The output folder is pinned in
+    // `PipelineControllerOutputFolderTests`.
+
+    func testMakeQueueDiarizesInTheConfiguredMode() throws {
         let (state, _) = makeState()
         let queue = try XCTUnwrap(state.pipeline.makeQueue())
-        XCTAssertNotNil(queue.diarizationFactory)
+        settings.diarizerMode = .sortformer
+        XCTAssertEqual(try XCTUnwrap(queue.diarizationFactory)().mode, .sortformer)
     }
 
-    func testMakeQueueHasProtocolGeneratorFactory() throws {
+    func testMakeQueueBuildsTheConfiguredProtocolGenerator() throws {
         let (state, _) = makeState()
         let queue = try XCTUnwrap(state.pipeline.makeQueue())
-        XCTAssertNotNil(queue.protocolGeneratorFactory)
-    }
-
-    func testMakeQueueSetsOutputDir() throws {
-        let (state, _) = makeState()
-        let queue = try XCTUnwrap(state.pipeline.makeQueue())
-        XCTAssertNotNil(queue.outputDir)
+        let factory = try XCTUnwrap(queue.protocolGeneratorFactory)
+        settings.protocolProvider = .openAICompatible
+        XCTAssertTrue(factory() is OpenAIProtocolGenerator)
+        settings.protocolProvider = .none
+        XCTAssertNil(factory(), "no provider must mean no protocol generation")
     }
 
     // MARK: - makeProtocolGenerator
@@ -817,6 +820,25 @@ final class AppStateTests: XCTestCase { // swiftlint:disable:this type_body_leng
         XCTAssertEqual(notifier.calls.count, 1)
         XCTAssertEqual(notifier.calls[0].title, "Meeting Notes Ready")
         XCTAssertEqual(notifier.calls[0].body, "Sprint Review")
+    }
+
+    /// With auto-open off this notification is the only prompt for a meeting
+    /// waiting for names.
+    func testConfigureCallbacksSpeakerNamesWaitingFiresNotification() throws {
+        let tmpDir = try makeTempDirectory(prefix: "appstate_names_waiting")
+        let (state, notifier) = makeIsolatedState(logDir: tmpDir)
+        state.pipeline.configureCallbacks()
+
+        state.pipeline.queue.onSpeakerNamesWaiting?([makeJob(title: "Sprint Review")])
+        state.pipeline.queue.onSpeakerNamesWaiting?([makeJob(title: "Sprint Review"), makeJob(title: "Standup")])
+
+        XCTAssertEqual(notifier.calls.map(\.title), ["Name Speakers", "Name Speakers"])
+        guard notifier.calls.count == 2 else { return }
+        XCTAssertEqual(
+            notifier.calls[0].body,
+            "\"Sprint Review\" is waiting for speaker names. Open Name Speakers... in the menu bar.",
+        )
+        XCTAssertEqual(notifier.calls[1].body, "2 meetings are waiting for speaker names. Open Name Speakers... in the menu bar.")
     }
 
     func testConfigureCallbacksNotionOnlyProtocolFiresProtocolNotification() throws {
@@ -942,17 +964,8 @@ final class AppStateTests: XCTestCase { // swiftlint:disable:this type_body_leng
         let (state, notifier) = makeIsolatedState(logDir: tmpDir)
         state.pipeline.configureCallbacks()
 
-        var job = makeJob()
-        job = PipelineJob(
-            meetingTitle: job.meetingTitle,
-            appName: job.appName,
-            mixPath: job.mixPath,
-            appPath: nil,
-            micPath: nil,
-            micDelay: 0,
-        )
         // Simulate a job with an error string
-        let errorJob = jobWithError(job, message: "Transcription failed")
+        let errorJob = jobWithError(makeJob(), message: "Transcription failed")
         state.pipeline.queue.onJobStateChange?(errorJob, .transcribing, .error)
 
         XCTAssertEqual(notifier.calls.count, 1)
@@ -1031,6 +1044,14 @@ final class AppStateTests: XCTestCase { // swiftlint:disable:this type_body_leng
         XCTAssertTrue(queue.diarizeEnabled)
     }
 
+    /// Off, the value other than the default: with the default this would pass
+    /// even if `makeQueue()` dropped the setting.
+    func testMakeQueueUsesAutoOpenSpeakerNamingFromSettings() throws {
+        let (state, _) = makeState()
+        state.settings.autoOpenSpeakerNaming = false
+        XCTAssertFalse(try XCTUnwrap(state.pipeline.makeQueue()).autoOpensSpeakerNaming)
+    }
+
     func testMakeQueueUsesMicLabelFromSettings() throws {
         let (state, _) = makeState()
         state.settings.micName = "Speaker A"
@@ -1044,16 +1065,25 @@ final class AppStateTests: XCTestCase { // swiftlint:disable:this type_body_leng
         let queue = try XCTUnwrap(state.pipeline.makeQueue())
         XCTAssertEqual(queue.numSpeakers, 4)
     }
+
+    /// Values other than the one-day default: with the default this would pass
+    /// even if `makeQueue()` dropped the setting and the queue fell back to it.
+    func testMakeQueueUsesStaleNamingTimeoutFromSettings() throws {
+        let (state, _) = makeState()
+        state.settings.staleNamingTimeout = .never
+        XCTAssertNil(try XCTUnwrap(state.pipeline.makeQueue()).staleNamingMaxAge)
+
+        state.settings.staleNamingTimeout = .sevenDays
+        XCTAssertEqual(try XCTUnwrap(state.pipeline.makeQueue()).staleNamingMaxAge, 7 * 86400)
+    }
 }
 
 // MARK: - Private helpers
 
-/// Returns a copy of `job` with the error field set via updateJobState simulation.
-/// Since PipelineJob is a struct and error is set by PipelineQueue internally,
-/// we construct a new job and set the error via the queue's updateJobState.
+/// Returns a copy of `job` with its error set, as the queue sets it on a
+/// failed job.
 @MainActor
 private func jobWithError(_ job: PipelineJob, message: String) -> PipelineJob {
-    // PipelineJob.error is var but directly settable since it's internal
     var copy = job
     copy.error = message
     return copy

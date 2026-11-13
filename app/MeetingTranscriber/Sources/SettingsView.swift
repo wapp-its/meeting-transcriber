@@ -12,6 +12,8 @@ struct SettingsView: View {
     /// The URL vocabulary source's controller, forwarded to the Transcription
     /// tab. Nil hides its status line and disables "Update now".
     var remoteVocabulary: RemoteVocabularyController?
+    /// Backs the Launch at Login toggle. Nil hides the row, which is what tests get.
+    var loginItem: LoginItemController?
 
     /// Notification visibility from `PermissionsController`, forwarded to the
     /// General tab so it can warn when browser-meeting consent cannot reach the
@@ -36,9 +38,6 @@ struct SettingsView: View {
     /// The old-models row's state, built once by `EngineController`. Nil leaves the row
     /// out, which is what tests and the App Store build get.
     var legacyWhisperModels: LegacyWhisperModelsState?
-    /// Forwarded to the Output tab's Recordings section. Nil leaves the section out,
-    /// which is what tests get.
-    var retentionActions: RetentionSettingsActions?
     /// Where a tab another part of the app asks for arrives.
     var navigation: SettingsNavigation = .shared
 
@@ -86,6 +85,7 @@ struct SettingsView: View {
             GeneralSettingsView(
                 settings: settings,
                 notificationVisibility: notificationVisibility,
+                loginItem: loginItem,
             )
 
         case .audio:
@@ -114,10 +114,7 @@ struct SettingsView: View {
             )
 
         case .output:
-            OutputSettingsView(
-                settings: settings,
-                retentionChoice: retentionActions.map { RetentionChoice(settings: settings, actions: $0) },
-            )
+            OutputSettingsView(settings: settings)
 
         case .advanced:
             AdvancedSettingsView(settings: settings)

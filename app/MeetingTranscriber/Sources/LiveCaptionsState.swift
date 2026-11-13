@@ -49,9 +49,10 @@ final class LiveCaptionsState {
     /// matching doesn't return a confident name (unknown remote speaker).
     let appLabel: String
 
-    init(micLabel: String = "Me", appLabel: String = "Remote") {
+    init(micLabel: String = "Me", appLabel: String = "Remote", clock: any Clock<Duration> = ContinuousClock()) {
         self.micLabel = micLabel
         self.appLabel = appLabel
+        self.clock = clock
     }
 
     private(set) var hypothesisMic: String = ""
@@ -60,10 +61,6 @@ final class LiveCaptionsState {
     /// Last few finalised utterances across both channels, oldest first.
     /// Capped at `maxFinalsKept`.
     private(set) var recentFinals: [LiveCaptionLine] = []
-
-    /// Timestamp of the last event (partial or final). Drives fade-out on
-    /// silence — the overlay can compare against `Date()` to dim or hide.
-    private(set) var lastEventAt: Date = .distantPast
 
     /// Human label of the resolved live-caption backend, set by the controller
     /// once it builds the pipelines (e.g. "Nemotron · DE", "Parakeet EOU · EN",
@@ -92,23 +89,32 @@ final class LiveCaptionsState {
     /// plus the two live hypothesis rows on top.
     static let maxFinalsKept = 2
 
-    /// Seconds after the last event before the overlay starts fading out.
-    static let fadeStartSeconds: TimeInterval = 2.0
-    /// Seconds after the last event at which the overlay is fully transparent.
-    static let fadeEndSeconds: TimeInterval = 4.0
-    /// Seconds after the last event at which content is auto-cleared so the
-    /// overlay collapses to nothing (panel itself stays mounted, just empty).
-    static let autoClearSeconds: TimeInterval = 5.0
+    /// Shortest time a finalized line stays fully visible.
+    static let minimumReadingHold: TimeInterval = 4.0
+    /// Reading time per word of a finalized line, above `minimumReadingHold`.
+    static let readingSecondsPerWord: TimeInterval = 0.3
+    /// Longest hold: 20 words at 0.3 s, about what two lines show. EOU can finalize 100+ words at once,
+    /// and holding for words already clipped off the row kept the bar up 30 s after speech.
+    static let maximumReadingHold: TimeInterval = 6.0
+    /// A hypothesis unchanged this long no longer holds the fade: a backend can
+    /// drop a final (empty or failed decode) without sending any event.
+    static let abandonedHypothesisSeconds: TimeInterval = 5.0
+    /// Length of the fade, after which the bar clears.
+    static let fadeDuration: TimeInterval = 2.0
 
-    private var autoClearTask: Task<Void, Never>?
+    private let clock: any Clock<Duration>
+    /// Target opacity: the overlay animates to transparent when true.
+    private(set) var faded = false
+
+    private var silenceTask: Task<Void, Never>?
+    private var remainingReadingTime: (() -> Duration)?
 
     func applyPartial(_ text: String, channel: LiveCaptionChannel) {
         switch channel {
         case .mic: hypothesisMic = text
         case .app: hypothesisApp = text
         }
-        lastEventAt = Date()
-        scheduleAutoClear()
+        scheduleSilence()
     }
 
     func applyFinalized(_ text: String, channel: LiveCaptionChannel, speaker: String) {
@@ -120,8 +126,8 @@ final class LiveCaptionsState {
         if recentFinals.count > Self.maxFinalsKept {
             recentFinals.removeFirst(recentFinals.count - Self.maxFinalsKept)
         }
-        lastEventAt = Date()
-        scheduleAutoClear()
+        setReadingDeadline(for: text)
+        scheduleSilence()
     }
 
     /// Convenience: speaker defaults to the channel label. Used by tests
@@ -138,38 +144,52 @@ final class LiveCaptionsState {
     }
 
     func clear() {
-        autoClearTask?.cancel()
-        autoClearTask = nil
+        silenceTask?.cancel()
+        silenceTask = nil
+        faded = false
         hypothesisMic = ""
         hypothesisApp = ""
         recentFinals.removeAll()
-        lastEventAt = .distantPast
+        remainingReadingTime = nil
     }
 
-    /// Compute current opacity from a render-time date. Returns 1.0 within
-    /// the active window, linearly fades to 0 between `fadeStartSeconds` and
-    /// `fadeEndSeconds`, then stays at 0. Pure function so the overlay can
-    /// call it from a `TimelineView` body without touching state.
-    func opacity(at date: Date) -> Double {
-        let elapsed = date.timeIntervalSince(lastEventAt)
-        if elapsed < Self.fadeStartSeconds { return 1.0 }
-        if elapsed >= Self.fadeEndSeconds { return 0.0 }
-        let progress = (elapsed - Self.fadeStartSeconds)
-            / (Self.fadeEndSeconds - Self.fadeStartSeconds)
-        return max(0.0, 1.0 - progress)
+    private func setReadingDeadline(for text: String) {
+        let words = Double(text.split(whereSeparator: \.isWhitespace).count)
+        let seconds = min(Self.maximumReadingHold, max(Self.minimumReadingHold, words * Self.readingSecondsPerWord))
+        func remember(on clock: some Clock<Duration>) {
+            let deadline = clock.now.advanced(by: .seconds(seconds))
+            remainingReadingTime = { max(.zero, clock.now.duration(to: deadline)) }
+        }
+        // The copy is needed: `remember(on: clock)` does not compile on the @Observable property.
+        let readingClock = clock
+        remember(on: readingClock)
     }
 
-    private func scheduleAutoClear() {
-        autoClearTask?.cancel()
-        autoClearTask = Task { @MainActor [weak self] in
-            let delay = UInt64(Self.autoClearSeconds * 1_000_000_000)
-            try? await Task.sleep(nanoseconds: delay)
-            guard let self, !Task.isCancelled else { return }
-            // Recheck — a newer event may have arrived during sleep.
-            if Date().timeIntervalSince(self.lastEventAt) >= Self.autoClearSeconds {
-                self.clear()
+    private func scheduleSilence() {
+        silenceTask?.cancel()
+        silenceTask = nil
+        faded = false
+        guard hasContent else { return }
+        let reading = remainingReadingTime?() ?? .zero
+        // Every partial reschedules, so this hold only elapses once the hypothesis stops updating.
+        let hold = hypothesisMic.isEmpty && hypothesisApp.isEmpty
+            ? reading
+            : max(reading, .seconds(Self.abandonedHypothesisSeconds))
+        func schedule(on clock: some Clock<Duration>) {
+            let fadeDeadline = clock.now.advanced(by: hold)
+            silenceTask = Task { @MainActor [weak self] in
+                try? await clock.sleep(until: fadeDeadline, tolerance: nil)
+                guard !Task.isCancelled else { return }
+                self?.faded = true
+                let clearDeadline = clock.now.advanced(by: .seconds(Self.fadeDuration))
+                try? await clock.sleep(until: clearDeadline, tolerance: nil)
+                guard !Task.isCancelled else { return }
+                self?.clear()
             }
         }
+        // The copy is needed: `schedule(on: clock)` does not compile on the @Observable property.
+        let silenceClock = clock
+        schedule(on: silenceClock)
     }
 
     /// True when there's anything to show.

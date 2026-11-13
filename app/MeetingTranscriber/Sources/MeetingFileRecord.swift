@@ -85,8 +85,8 @@ struct MeetingFileRecord: Codable, Equatable, Sendable {
     var savedToNotion = false
     /// The bundle identifier of the build that created the record, written once when
     /// it is created and never changed. The development and the release build share
-    /// the record file but each has its own retention setting, so the automatic
-    /// deletion acts only on the records of its own build. Nil in a record from before
+    /// the record file but each has its own retention setting, so recording
+    /// retention acts only on the records of its own build. Nil in a record from before
     /// this field, or from a build without an identifier: never deleted automatically.
     var createdBy: String?
 }
@@ -195,7 +195,10 @@ extension MeetingFileRecord {
             audioDeletion = AudioDeletion(kind: .automatic, at: now)
 
         case (.automatic, false):
-            break // The next check tries again; "incomplete" is for manual deletions.
+            // Left by the fork's earlier automatic deletion, which no longer runs:
+            // the files stay, as recording retention deletes only what its own
+            // registry lists. "incomplete" is for manual deletions.
+            break
 
         case (.audioToTrash, false), (.meetingToTrash, false):
             incomplete = DeletionFailure(reason: Self.interruptedReason, paths: left, kind: pending.kind)

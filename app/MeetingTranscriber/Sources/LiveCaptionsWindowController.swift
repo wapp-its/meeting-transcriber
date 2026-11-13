@@ -1,5 +1,8 @@
 import AppKit
+import os
 import SwiftUI
+
+private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "LiveCaptionsWindowController")
 
 /// Borderless, click-through, status-bar-level NSPanel that hosts the live
 /// caption-bar overlay. By default sits above regular app windows and
@@ -7,8 +10,10 @@ import SwiftUI
 /// below (Teams / Zoom / browser).
 ///
 /// To reposition: hold ⌥ (Option) and drag — the modifier monitor below
-/// flips `ignoresMouseEvents` off and `isMovableByWindowBackground` on,
-/// then back when the key is released. Only the user's drag is saved
+/// flips `ignoresMouseEvents` off, then back when the key is released.
+/// The local mouse monitor moves the panel by the screen-coordinate mouse
+/// delta with `setFrameOrigin`; AppKit background dragging stays disabled.
+/// Only the user's drag is saved
 /// (`originDefaultsKey`, see `CaptionDragSession`), and every `show()` puts
 /// the bar back there, moving it only when it could not be reached (see
 /// `CaptionBarPlacement`).
@@ -16,11 +21,14 @@ import SwiftUI
 /// Uses a fixed-size panel (no `sizingOptions = .preferredContentSize`)
 /// because auto-sizing produced an infinite layout-feedback loop with the
 /// caption-bar content — the SwiftUI hierarchy's ideal size republished on
-/// every layout pass, NSHostingController called `setFrame`, which fired
-/// another layout, recursing until the stack overflowed. The fixed-size
-/// trade-off: very long captions clip vertically once they exceed the
-/// preset's panel height; that's acceptable for the PoC and the surrounding
-/// overlay only renders a few lines anyway. The dimensions come from
+/// every layout pass, the panel's frame was set again, which fired another
+/// layout, recursing until the stack overflowed. The hosting view gets no
+/// `sizingOptions` either: its default min-size constraint made the
+/// `fixedSize` caption text the window's minimum height, so the bar grew to
+/// thousands of points, off the top of the screen. The fixed-size
+/// trade-off: captions taller than the preset's panel height clip, the
+/// oldest lines at the top, while the newest stays visible (the overlay
+/// anchors its content to the bottom). The dimensions come from
 /// `LiveCaptionsSize` (Settings → Transcription → Caption size), which pairs
 /// each panel size with the font it was measured for; `apply(size:)` swaps
 /// both together.
@@ -34,7 +42,12 @@ final class LiveCaptionsWindowController {
     private var localModifierMonitor: Any?
     private var mouseMonitor: Any?
     private var dragSession = CaptionDragSession()
-    /// Set while the controller moves the panel itself, so the move observer
+    private var dragTranslation: CaptionDragTranslation?
+    /// Where the last drag left the panel, for `dropRelocationWindow` after
+    /// mouse-up; a move by the system in that time is undone.
+    private var droppedOrigin: CGPoint?
+    private var dropGeneration = 0
+    /// Set while the controller restores or resizes the panel, so the move observer
     /// never saves that, whatever AppKit posts for it.
     private var isPlacing = false
     private var moveObserver: (any NSObjectProtocol)?
@@ -46,6 +59,10 @@ final class LiveCaptionsWindowController {
 
     private static let bottomMargin: CGFloat = 60
 
+    /// macOS relocates a panel dropped with the pointer on a screen edge,
+    /// 2 to 190 ms after mouse-up (measured on 27.2; not reproduced on 27.3).
+    static let dropRelocationWindow: TimeInterval = 0.5
+
     /// UserDefaults key for the bottom-left origin of the panel. Stored as
     /// `{"x": Double, "y": Double}`; absence means "first run, use default
     /// bottom-centre of main screen".
@@ -54,11 +71,9 @@ final class LiveCaptionsWindowController {
     /// The caption panel's window identifier.
     static let panelIdentifier = NSUserInterfaceItemIdentifier("live-captions")
 
-    /// Whether the left mouse button is physically down, and the monotonic
-    /// clock the drag session runs on. Production passes nothing; tests
-    /// drive both, since events they inject change neither.
+    /// Injected events do not change the physical mouse state.
     private let buttonPressed: () -> Bool
-    private let now: () -> TimeInterval
+    private let mouseLocation: () -> CGPoint
 
     /// The attached screens and the main one, read on every placement.
     /// Production passes nothing and gets the real displays; tests pin a
@@ -72,7 +87,7 @@ final class LiveCaptionsWindowController {
         size: LiveCaptionsSize = .medium,
         defaults: UserDefaults = .standard,
         buttonPressed: @escaping () -> Bool = { NSEvent.pressedMouseButtons & 1 != 0 },
-        now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        mouseLocation: @escaping () -> CGPoint = { NSEvent.mouseLocation },
         screens: @escaping () -> [CaptionScreen] = { NSScreen.screens.map(CaptionScreen.init) },
         mainScreen: @escaping () -> CaptionScreen? = { NSScreen.main.map(CaptionScreen.init) },
     ) {
@@ -80,7 +95,7 @@ final class LiveCaptionsWindowController {
         self.size = size
         self.defaults = defaults
         self.buttonPressed = buttonPressed
-        self.now = now
+        self.mouseLocation = mouseLocation
         self.screens = screens
         self.mainScreen = mainScreen
         state.setSize(size)
@@ -100,6 +115,8 @@ final class LiveCaptionsWindowController {
     func show() {
         let panel = ensurePanel()
         dragSession.reset()
+        dragTranslation = nil
+        droppedOrigin = nil
         positionAtSavedOrDefault(panel)
         panel.orderFrontRegardless()
     }
@@ -130,6 +147,9 @@ final class LiveCaptionsWindowController {
         guard size != self.size else { return }
         let previous = self.size
         self.size = size
+        dragSession.reset()
+        dragTranslation = nil
+        droppedOrigin = nil
         state.setSize(size)
         if let saved = storedOrigin() {
             persistOrigin(Self.resizedFrame(NSRect(origin: saved, size: previous.panelSize), to: size).origin)
@@ -160,6 +180,8 @@ final class LiveCaptionsWindowController {
     /// cheap and the underlying SwiftUI host stays bound to the same state.
     func hide() {
         dragSession.reset()
+        dragTranslation = nil
+        droppedOrigin = nil
         panel?.orderOut(nil)
     }
 
@@ -168,6 +190,7 @@ final class LiveCaptionsWindowController {
 
         let host = NSHostingView(rootView: LiveCaptionsOverlay(state: state))
         host.autoresizingMask = [.width, .height]
+        host.sizingOptions = []
 
         let panel = NSPanel(
             contentRect: NSRect(origin: .zero, size: size.panelSize),
@@ -186,6 +209,7 @@ final class LiveCaptionsWindowController {
         panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         panel.ignoresMouseEvents = true
+        panel.isMovableByWindowBackground = false
         panel.hidesOnDeactivate = false
         panel.isFloatingPanel = true
         panel.becomesKeyOnlyIfNeeded = true
@@ -273,24 +297,38 @@ final class LiveCaptionsWindowController {
     private func applyModifierState(to panel: NSPanel, flags: NSEvent.ModifierFlags) {
         let dragMode = flags.contains(.option)
         panel.ignoresMouseEvents = !dragMode
-        panel.isMovableByWindowBackground = dragMode
     }
 
-    /// Feeds the left button's down and up on the panel to `dragSession`. In
-    /// drag mode the panel accepts mouse events, and a local monitor sees the
-    /// down and up of every drag on it (measured). Only a down on the panel
-    /// starts a session; an up without one is ignored by the session.
+    /// Feeds the left button's down and up to `dragSession`, and moves the
+    /// panel explicitly for a drag begun on it in Option mode. Screen-space
+    /// deltas keep the grab point fixed as the panel moves beneath the mouse.
+    /// An up ends movement even when delivered to another window.
     private func installMouseMonitor(for panel: NSPanel) {
         guard mouseMonitor == nil else { return }
         mouseMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.leftMouseDown, .leftMouseUp],
+            matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp],
         ) { [weak self, weak panel] event in
             MainActor.assumeIsolated {
                 guard let self, let panel else { return }
                 if event.type == .leftMouseDown {
-                    if event.window === panel { self.dragSession.mouseDown() }
+                    self.dragTranslation = nil
+                    self.droppedOrigin = nil
+                    guard event.window === panel else {
+                        self.dragSession.reset()
+                        return
+                    }
+                    self.dragSession.mouseDown()
+                    if !panel.ignoresMouseEvents {
+                        self.dragTranslation = CaptionDragTranslation(
+                            startMouseLocation: self.mouseLocation(),
+                            startOrigin: panel.frame.origin,
+                        )
+                        logger.notice("Live caption panel drag started")
+                    }
+                } else if event.type == .leftMouseDragged {
+                    self.followDrag(panel)
                 } else {
-                    self.dragSession.mouseUp(at: self.now())
+                    self.endDrag(panel)
                 }
             }
             return event
@@ -304,9 +342,6 @@ final class LiveCaptionsWindowController {
     /// AppKit posts the notification on the main thread from inside the call
     /// that moved the panel, and a `.main` queue observer runs synchronously
     /// there (measured), so each move is judged at the time it was made.
-    /// Mouse-up and move times are both taken when the main thread handles
-    /// them, so a stall delays them together; the up's own event timestamp
-    /// would only pull the settle deadline earlier.
     private func installMoveObserver(for panel: NSPanel) {
         guard moveObserver == nil else { return }
         moveObserver = NotificationCenter.default.addObserver(
@@ -315,13 +350,60 @@ final class LiveCaptionsWindowController {
             queue: .main,
         ) { [weak self, weak panel] _ in
             MainActor.assumeIsolated {
-                guard let self, let panel, !self.isPlacing,
-                      self.dragSession.shouldSaveMove(
-                          at: self.now(),
-                          buttonPressed: self.buttonPressed(),
-                      )
-                else { return }
-                self.persistOrigin(panel.frame.origin)
+                guard let self, let panel, !self.isPlacing else { return }
+                if self.dragSession.shouldSaveMove(buttonPressed: self.buttonPressed()) {
+                    self.persistOrigin(panel.frame.origin)
+                } else if let dropped = self.droppedOrigin {
+                    self.undoRelocation(of: panel, to: dropped)
+                }
+            }
+        }
+    }
+
+    private func followDrag(_ panel: NSPanel) {
+        // A dragged event queued behind a main-thread stall arrives after mouse-up.
+        guard let drag = dragTranslation, buttonPressed() else { return }
+        let origin = drag.origin(at: mouseLocation())
+        let screens = screens()
+        let proposed = CGRect(origin: origin, size: panel.frame.size)
+        guard let screen = CaptionBarPlacement.screenOwning(proposed, among: screens)
+            ?? CaptionBarPlacement.screenOwning(panel.frame, among: screens) else { return }
+        panel.setFrameOrigin(CaptionBarPlacement.clampedOrigin(origin, size: panel.frame.size, visibleFrame: screen.visibleFrame))
+        dragTranslation?.lastOrigin = panel.frame.origin
+    }
+
+    /// Holds where the drag left the panel and, when the system already moved
+    /// it before this mouse-up was handled, puts it back at once.
+    private func endDrag(_ panel: NSPanel) {
+        dragSession.mouseUp()
+        if let dropped = dragTranslation?.lastOrigin {
+            holdDroppedOrigin(dropped)
+            if panel.frame.origin != dropped { undoRelocation(of: panel, to: dropped) }
+        }
+        dragTranslation = nil
+    }
+
+    /// Puts a panel the system moved after a drop back where the drag left
+    /// it, through `restoredOrigin` so a screen that has gone is not reused,
+    /// and saves the drop itself: a system move handled while the button
+    /// still read down was saved as the drag's. The drop, not the restored
+    /// origin, so a screen that is smaller for a moment does not overwrite
+    /// the user's choice; `show()` clamps it again if it still has to.
+    private func undoRelocation(of panel: NSPanel, to dropped: CGPoint) {
+        guard let origin = CaptionBarPlacement.restoredOrigin(dropped, size: size, screens: screens()),
+              origin != panel.frame.origin else { return }
+        place(panel, at: origin)
+        persistOrigin(dropped)
+    }
+
+    private func holdDroppedOrigin(_ origin: CGPoint) {
+        droppedOrigin = origin
+        dropGeneration += 1
+        let generation = dropGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.dropRelocationWindow) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.dropGeneration == generation else { return }
+                self.droppedOrigin = nil
             }
         }
     }

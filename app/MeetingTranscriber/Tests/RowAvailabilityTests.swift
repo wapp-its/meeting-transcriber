@@ -187,7 +187,8 @@ final class RowAvailabilityTests: XCTestCase {
 
     private func line(_ record: MeetingFileRecord, _ audio: RecordingAudioLine.AudioOnDisk) -> RecordingAudioLine {
         RecordingAudioLine.resolve(
-            record: record, live: nil, audio: audio, retention: .never, bundleID: nil, now: Date(), calendar: .current, locale: .current,
+            record: record, live: nil, audio: audio, retention: .init(enabled: false, days: 30), retained: nil, bundleID: nil, now: Date(),
+            calendar: .current, locale: .current,
         )
     }
 

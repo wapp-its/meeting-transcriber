@@ -105,7 +105,8 @@ fi
 RUN_MARKER="/tmp/e2e-browser-marker.$$"
 # Isolated Chrome profile so the fixture instance is distinct from any user
 # Chrome and can be quit by argv match without touching the user's windows.
-CHROME_PROFILE="$(mktemp -d /tmp/e2e-browser-chrome.XXXXXX)"
+# Created once the cleanup trap that removes it is armed; empty until then.
+CHROME_PROFILE=""
 
 # shellcheck source=lib/bundle-ids.sh
 source "$ROOT/scripts/lib/bundle-ids.sh"
@@ -145,7 +146,8 @@ RPC_TOKEN=""
 
 # Quit only the fixture Chrome instance (its argv carries our profile dir) —
 # never the user's own Chrome windows.
-quit_chrome() { pkill -f "$CHROME_PROFILE" 2>/dev/null || true; }
+# Never with an empty profile path, which would match every process.
+quit_chrome() { [ -z "$CHROME_PROFILE" ] || pkill -f "$CHROME_PROFILE" 2>/dev/null || true; }
 
 # Bind the bundle id for the shared both-domain writer. Which domains a dev
 # default has to be written to, and why a bare `defaults write <bundle-id>`
@@ -156,11 +158,10 @@ _set_dev_bool() {
     write_dev_default "$BUNDLE_ID" "$key" "$value" bool
 }
 
-# Per-domain snapshots of the behaviour toggles this lane flips, so cleanup
-# restores EACH domain to exactly its own prior value (empty → delete).
-_PRE_BROWSER_STD=""; _PRE_BROWSER_CTR=""
-_PRE_RECORDONLY_STD=""; _PRE_RECORDONLY_CTR=""
-_PRE_NOMIC_STD=""; _PRE_NOMIC_CTR=""
+# The record of the behaviour toggles this lane flips, taken under "settings"
+# below, so cleanup restores each plist to exactly its own prior value. Empty
+# until then, and cleanup restores only a record that exists.
+DEFAULTS_RECORD=""
 
 # --- preflight ------------------------------------------------------------
 
@@ -184,13 +185,29 @@ if [ "$MODE" = fixture ]; then
 else
     # --jitsi: drive Chrome via CDP with puppeteer-core (node). Install it on
     # demand into scripts/fixtures (node_modules is gitignored).
+    #
+    # `npm ci` from the committed lockfile, never `npm install`: this runs on
+    # the runner that holds the signing keychain, so what gets installed must
+    # be the reviewed, integrity-pinned tree and not whatever the registry
+    # resolves a version range to that day. `--ignore-scripts` because nothing
+    # in the tree needs an install script, and none should get to run there.
+    # The stamp records which lockfile node_modules was built from, so a
+    # lockfile change reinstalls instead of silently keeping the old tree.
     require_command node
     require_command npm
     [ -f "$KEEPER" ] || fail "jitsi keeper not found: $KEEPER"
-    if [ ! -d "$FIXTURES_DIR/node_modules/puppeteer-core" ]; then
+    KEEPER_LOCK="$FIXTURES_DIR/package-lock.json"
+    KEEPER_STAMP="$FIXTURES_DIR/node_modules/.lock-sha256"
+    [ -f "$KEEPER_LOCK" ] || fail "jitsi keeper lockfile not found: $KEEPER_LOCK"
+    KEEPER_LOCK_SUM="$(shasum -a 256 "$KEEPER_LOCK" | cut -d' ' -f1)"
+    if [ ! -d "$FIXTURES_DIR/node_modules/puppeteer-core" ] \
+        || [ "$(cat "$KEEPER_STAMP" 2>/dev/null)" != "$KEEPER_LOCK_SUM" ]; then
         log "Installing puppeteer-core for the jitsi keeper"
-        ( cd "$FIXTURES_DIR" && npm install --no-audit --no-fund >/dev/null 2>&1 ) \
-            || fail "npm install puppeteer-core failed"
+        # Quiet on success, but a refused package (integrity mismatch) has to
+        # be readable in the log, so npm's output is kept for the failure.
+        KEEPER_INSTALL_LOG="$(cd "$FIXTURES_DIR" && npm ci --ignore-scripts --no-audit --no-fund 2>&1)" \
+            || { printf '%s\n' "$KEEPER_INSTALL_LOG" >&2; fail "npm ci for the jitsi keeper failed"; }
+        printf '%s\n' "$KEEPER_LOCK_SUM" > "$KEEPER_STAMP"
     fi
 fi
 
@@ -223,15 +240,36 @@ fi
 
 # --- settings -------------------------------------------------------------
 
-# Snapshot the behaviour toggles per domain before flipping them.
-_PRE_BROWSER_STD="$(snapshot_default "$_STANDARD_PLIST" watchBrowserMeetings)"
-_PRE_RECORDONLY_STD="$(snapshot_default "$_STANDARD_PLIST" recordOnly)"
-_PRE_NOMIC_STD="$(snapshot_default "$_STANDARD_PLIST" noMic)"
-if [ -f "$_CONTAINER_PLIST" ]; then
-    _PRE_BROWSER_CTR="$(snapshot_default "$_CONTAINER_PLIST" watchBrowserMeetings)"
-    _PRE_RECORDONLY_CTR="$(snapshot_default "$_CONTAINER_PLIST" recordOnly)"
-    _PRE_NOMIC_CTR="$(snapshot_default "$_CONTAINER_PLIST" noMic)"
-fi
+# Record the behaviour toggles from both plists before flipping them (see
+# dev_defaults_record in scripts/lib/e2e-helpers.sh).
+DEFAULTS_RECORD="$(mktemp "${TMPDIR:-/tmp}/e2e-browser-defaults.XXXXXX")"
+dev_defaults_record "$DEFAULTS_RECORD" "$BUNDLE_ID" watchBrowserMeetings recordOnly noMic \
+    || fail "could not record the dev bundle's settings; nothing was changed"
+
+# --- cleanup trap ---------------------------------------------------------
+
+# Armed before the first write below, so a failure from here on (the launch
+# included) restores the toggles.
+_ON_EXIT_RAN=""
+on_exit() {
+    [ -n "$_ON_EXIT_RAN" ] && return 0
+    _ON_EXIT_RAN=1
+    [ -n "$KEEPER_PID" ] && kill "$KEEPER_PID" 2>/dev/null || true
+    [ "$KEEP_CHROME" = false ] && quit_chrome
+    [ "$KEEP_APP" = false ] && quit_running_app || true
+    # Restore the behaviour toggles, each plist to its own prior value.
+    [ -z "$DEFAULTS_RECORD" ] || defaults_restore_record "$DEFAULTS_RECORD" || true
+    # Marker-bounded artifact cleanup, CI only: on a developer machine the dev
+    # and installed apps share the recordings dir, so a local sweep could
+    # delete a real recording (see sweep_run_artifacts).
+    sweep_run_artifacts "$RECORDINGS_DIR" "$RUN_MARKER"
+    rm -f "$RUN_MARKER"
+    [ -z "$CHROME_PROFILE" ] || rm -rf "$CHROME_PROFILE"
+}
+trap on_exit EXIT
+trap 'on_exit; exit 130' INT
+trap 'on_exit; exit 143' TERM
+CHROME_PROFILE="$(mktemp -d /tmp/e2e-browser-chrome.XXXXXX)"
 
 # debugRPCEnabled + autoWatch are set-and-leave (like e2e-app.sh — harmless on).
 _set_dev_bool debugRPCEnabled true
@@ -248,36 +286,10 @@ touch "$RUN_MARKER"
 # previous run's WAV as this run's evidence.
 rm -f "/tmp/e2e-browser-$BROWSER-app.wav" "/tmp/e2e-browser-$BROWSER-meta.json"
 
-# --- launch + cleanup trap ------------------------------------------------
+# --- launch ---------------------------------------------------------------
 
 log "Launching $DEV_BUNDLE_DEPLOY"
 open "$DEV_BUNDLE_DEPLOY"
-
-_ON_EXIT_RAN=""
-on_exit() {
-    [ -n "$_ON_EXIT_RAN" ] && return 0
-    _ON_EXIT_RAN=1
-    [ -n "$KEEPER_PID" ] && kill "$KEEPER_PID" 2>/dev/null || true
-    [ "$KEEP_CHROME" = false ] && quit_chrome
-    [ "$KEEP_APP" = false ] && quit_running_app || true
-    # Restore the behaviour toggles per domain (empty snapshot → delete).
-    restore_bool_default "$_STANDARD_PLIST" watchBrowserMeetings "$_PRE_BROWSER_STD"
-    restore_bool_default "$_STANDARD_PLIST" recordOnly "$_PRE_RECORDONLY_STD"
-    restore_bool_default "$_STANDARD_PLIST" noMic "$_PRE_NOMIC_STD"
-    if [ -f "$_CONTAINER_PLIST" ]; then
-        restore_bool_default "$_CONTAINER_PLIST" watchBrowserMeetings "$_PRE_BROWSER_CTR"
-        restore_bool_default "$_CONTAINER_PLIST" recordOnly "$_PRE_RECORDONLY_CTR"
-        restore_bool_default "$_CONTAINER_PLIST" noMic "$_PRE_NOMIC_CTR"
-    fi
-    # Marker-bounded artifact cleanup — CI only (dev + prod share the recordings
-    # dir locally; see feedback memory no_destructive_fs_on_real_dirs).
-    sweep_run_artifacts "$RECORDINGS_DIR" "$RUN_MARKER"
-    rm -f "$RUN_MARKER"
-    rm -rf "$CHROME_PROFILE"
-}
-trap on_exit EXIT
-trap 'on_exit; exit 130' INT
-trap 'on_exit; exit 143' TERM
 
 log "Waiting up to ${RPC_READY_TIMEOUT_S}s for RPC /healthz"
 poll_until "$RPC_READY_TIMEOUT_S" 1 rpc_ready || fail "RPC /healthz did not respond within ${RPC_READY_TIMEOUT_S}s"

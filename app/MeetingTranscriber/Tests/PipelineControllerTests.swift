@@ -399,35 +399,6 @@ final class PipelineControllerTests: XCTestCase {
         XCTAssertEqual(job.meetingTitle, "Weekly Sync")
     }
 
-    /// A paused record-only recording imported later carries its pauses into
-    /// the job, which renders them as markers in the transcript. A sidecar
-    /// without pauses reads as a recording without any.
-    func testPairedReimportCarriesTheSidecarsPauses() throws {
-        let start = try localDate(2026, 3, 4, 9, 15)
-        let paused = [
-            RecordingPause(startedAt: start + 600, endedAt: start + 900, offsetSeconds: 600),
-            RecordingPause(startedAt: start + 1200, endedAt: start + 1260, offsetSeconds: 899.5),
-        ]
-        let rows: [(stem: String, pauses: [RecordingPause])] = [("paused", paused), ("unpaused", [])]
-        let pc = makeWiredController()
-        for (stem, pauses) in rows {
-            let files = ["app", "mic"].map { tmpDir.appendingPathComponent("\(stem)_\($0).wav") }
-            for url in files {
-                FileManager.default.createFile(atPath: url.path, contents: Data("RIFF".utf8))
-            }
-            try RecordingSidecar(
-                title: "Weekly Sync", appName: "Teams", startedAt: start, stoppedAt: start + 1800,
-                participants: [], micDelaySeconds: 0, trigger: .auto,
-                mixFilename: "\(stem)_mix.wav", appFilename: "\(stem)_app.wav", micFilename: "\(stem)_mic.wav",
-                pauses: pauses,
-            ).write(toDirectory: tmpDir, basename: stem)
-
-            let id = try XCTUnwrap(pc.enqueueFiles(files).first)
-
-            XCTAssertEqual(try XCTUnwrap(pc.queue.jobs.first { $0.id == id }).pauses, pauses.isEmpty ? nil : pauses, stem)
-        }
-    }
-
     // MARK: - jobStatus
 
     func testJobStatusReturnsLiveJob() {
@@ -573,6 +544,24 @@ final class PipelineControllerTests: XCTestCase {
 
         guard case let .timedOut(dto) = result else { XCTFail("expected .timedOut, got \(result)"); return }
         XCTAssertNotEqual(dto?.state, .done)
+    }
+
+    /// The RPC layer records an Idempotency-Key from this callback, so it must
+    /// carry the created job's id, and only when a job was created.
+    func testTranscribeAndWaitHandsTheJobIDOverOnEnqueue() async throws {
+        let pc = makeWiredController()
+        let file = tmpDir.appendingPathComponent("blocking-enqueued.wav")
+        FileManager.default.createFile(atPath: file.path, contents: Data("RIFF".utf8))
+        var handedOver: [UUID] = []
+
+        let result = await pc.transcribeAndWait(path: file, maxWaitSeconds: 0) { handedOver.append($0) }
+        guard case let .timedOut(dto) = result else { XCTFail("expected .timedOut, got \(result)"); return }
+        XCTAssertEqual(handedOver.map(\.uuidString), try [XCTUnwrap(dto).jobID])
+        handedOver = []
+        _ = await pc.transcribeAndWait(
+            path: URL(fileURLWithPath: "/tmp/missing-\(UUID().uuidString).wav"), maxWaitSeconds: 0,
+        ) { handedOver.append($0) }
+        XCTAssertEqual(handedOver, [], "no job, nothing to remember")
     }
 
     func testTranscribeAndWaitFallsBackToTerminalStoreWhenJobReaped() async {

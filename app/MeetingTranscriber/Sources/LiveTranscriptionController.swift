@@ -19,11 +19,11 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "LiveTra
 ///   - one engine instance shared by both channels (Parakeet today —
 ///     other engines fall back to `TranscriptionError.streamingNotSupported`).
 ///
-/// Dataflow: each channel is a bounded `AsyncStream<LiveAudioBuffer>` feed.
+/// Dataflow: each channel has a duration-bounded audio feed.
 /// The sink closure yields into the stream synchronously on the audio
 /// callback thread; a single detached consumer task per channel ingests into
 /// that channel's `LiveCaptionPipeline`. Ordering (single consumer → FIFO)
-/// and backpressure (bounded buffer, newest win) are properties of the
+/// and overflow handling (newest audio wins, with a reset after gaps) belong to the
 /// channel — pipelines never see interleaved `ingest` calls.
 ///
 /// Lifecycle:
@@ -54,8 +54,8 @@ final class LiveTranscriptionController {
     private let captions: LiveCaptionsState
     private let speakerMatcher: any LiveSpeakerMatching
     /// The active engine's EXPLICITLY-configured language (`de`/`en`/nil), which
-    /// picks the streaming backend via `LiveCaptionsGate` (`de` → Nemotron, `en`
-    /// → EOU, else → re-transcribe). On a streaming-model load failure
+    /// picks the streaming backend via `LiveCaptionsGate` (`en` → EOU, a Nemotron-trained
+    /// language such as `de` → Nemotron, else → re-transcribe). On a streaming-model load failure
     /// `prepare()` degrades to re-transcribe (if supported) or to no captions.
     private let engineLanguage: String?
 
@@ -95,8 +95,8 @@ final class LiveTranscriptionController {
     /// One bounded feed per channel (see `CaptionChannelFeed`). The feeds
     /// are (re)armed per recording via `bindFeeds()` and retired by
     /// `flush()`/`retireFeeds()`.
-    private let micFeed = CaptionChannelFeed()
-    private let appFeed = CaptionChannelFeed()
+    private let micFeed: CaptionChannelFeed
+    private let appFeed: CaptionChannelFeed
     /// True once `prepare()` resolved to a kept streaming session (German/English),
     /// which `prepareForNextRecording()` keeps instead of rebuilding.
     private var usingStreamingSession = false
@@ -146,8 +146,12 @@ final class LiveTranscriptionController {
                 languageCode: language, vad: vad, makeSink: makeSink,
             )
         },
+        // Must exceed the slowest single decode plus the 0.8 s partial gate; see transcription.md.
+        maxQueuedSeconds: TimeInterval = 10,
         verboseDiagnostics: @escaping () -> Bool = { false },
     ) {
+        micFeed = CaptionChannelFeed(maxQueuedSeconds: maxQueuedSeconds)
+        appFeed = CaptionChannelFeed(maxQueuedSeconds: maxQueuedSeconds)
         self.engine = engine
         self.vad = vad
         self.captions = captions
@@ -310,7 +314,7 @@ final class LiveTranscriptionController {
     func flush() async {
         let task = Task { [weak self] in
             guard let self else { return }
-            await self.retireFeeds()
+            await self.retireFeeds(logDrops: true)
             async let mic: Void? = self.micPipeline?.flush()
             async let app: Void? = self.appPipeline?.flush()
             _ = await (mic, app)
@@ -367,9 +371,16 @@ final class LiveTranscriptionController {
     /// the consumers so every buffer already delivered is ingested. This is
     /// the deterministic "all pre-stop audio is in the pipelines" barrier
     /// that `flush()` and a rebind rely on.
-    private func retireFeeds() async {
-        await micFeed.retire()
-        await appFeed.retire()
+    private func retireFeeds(logDrops: Bool = false) async {
+        let micDrops = await micFeed.retire()
+        let appDrops = await appFeed.retire()
+        guard logDrops, verboseDiagnostics() else { return }
+        for (channel, drops) in [("mic", micDrops), ("app", appDrops)] {
+            guard let drops else { continue }
+            logger.info(
+                "[\(channel, privacy: .public)] caption queue dropped \(drops.seconds, format: .fixed(precision: 1), privacy: .public) s in \(drops.gaps, privacy: .public) gaps",
+            )
+        }
     }
 
     /// (Re)arm one bounded feed per built pipeline, retiring any previous
@@ -459,120 +470,6 @@ final class LiveTranscriptionController {
                 }
             }
         }
-    }
-}
-
-/// One channel's bounded sink → pipeline feed: an `AsyncStream` whose
-/// continuation lives in a lock-guarded slot (the audio callback yields into
-/// it synchronously) plus a single detached consumer task that ingests into
-/// the channel's `LiveCaptionPipeline` in arrival order. Owning slot and
-/// consumer in one type keeps the invariant "exactly one consumer per slot;
-/// retire before rebind" in one place instead of mirrored per channel.
-///
-/// A nil slot — before the first `bind`, or after `retire` — drops yielded
-/// buffers, which is correct in every such window: there is either no
-/// recording, no pipeline yet (EOU models still loading), or the recording
-/// just stopped.
-@MainActor
-private final class CaptionChannelFeed {
-    /// Per-buffer normalization run inside the consumer task. Returning nil
-    /// drops the buffer.
-    typealias Transform = (LiveAudioBuffer) -> LiveAudioBuffer?
-
-    /// Bounded feed capacity, in buffers. Capture delivers roughly 10–50
-    /// buffers/s per channel, so this is tens of seconds of headroom — far
-    /// more than a healthy pipeline ever queues in real time, but a hard
-    /// bound when inference stalls: the stream then drops the OLDEST buffers
-    /// (captions degrade toward the newest audio instead of memory growing
-    /// without limit). Sized to hold the ENTIRE 49.8 s E2E fixture (623 ×
-    /// 80 ms chunks, burst at ~40× real time by `LiveTranscriptionE2ETests`)
-    /// even if the consumer is parked in a slow first inference on the
-    /// CPU-only CI runner — those tests rely on lossless delivery.
-    private static let capacity = 1024
-
-    /// Cross-thread continuation slot the sink closure yields into. The
-    /// audio callback thread yields under the lock; the main actor swaps the
-    /// continuation per recording (`bind` / `retire`).
-    private let slot = OSAllocatedUnfairLock<AsyncStream<LiveAudioBuffer>.Continuation?>(initialState: nil)
-    /// Single consumer task — the serialization that makes
-    /// `LiveCaptionPipeline.ingest` calls ordered by construction.
-    /// Lock-boxed (not a plain var) for two reasons: `deinit` is nonisolated
-    /// and must be able to cancel it, and `retire()` must take exactly the
-    /// task it will await so a concurrent rebind's fresh consumer can never
-    /// be clobbered by `retire()`'s post-await cleanup.
-    private let consumerBox = OSAllocatedUnfairLock<Task<Void, Never>?>(initialState: nil)
-
-    /// The owner can be dropped mid-recording (`LiveTranscriptionCoordinator`
-    /// nils the controller on a settings change) while the recorder still
-    /// holds the sink closure — which captures only the slot storage, not the
-    /// feed. Without this, the armed stream and its consumer would keep
-    /// running inference for the rest of the recording with every result
-    /// discarded (the event sink's weak controller is gone). Cancel stops the
-    /// consumer at the next buffer boundary; finishing the slot stops new
-    /// deliveries immediately.
-    deinit {
-        consumerBox.withLock { task in
-            task?.cancel()
-            task = nil
-        }
-        slot.withLock { continuation in
-            continuation?.finish()
-            continuation = nil
-        }
-    }
-
-    /// Sink closure for the recorder: yields into the currently-armed stream
-    /// and returns immediately — no task spawn, no actor hop on the audio
-    /// thread. Captures only the slot, never the feed or its owner.
-    var sink: LiveAudioSink {
-        let slot = slot
-        return { buffer in
-            slot.withLock { continuation in
-                _ = continuation?.yield(buffer)
-            }
-        }
-    }
-
-    /// Arm a fresh feed into `pipeline`, retiring any previous one first so
-    /// exactly one consumer exists. `makeTransform` is invoked inside the
-    /// consumer task, so a stateful non-Sendable transform (the app channel's
-    /// `LiveAudioResampler`) stays confined to it — and is fresh per feed ==
-    /// per recording.
-    func bind(
-        to pipeline: any LiveCaptionPipeline,
-        makeTransform: @escaping @Sendable () -> Transform = { \.self },
-    ) async {
-        await retire()
-        let (stream, continuation) = AsyncStream.makeStream(
-            of: LiveAudioBuffer.self,
-            bufferingPolicy: .bufferingNewest(Self.capacity),
-        )
-        slot.withLock { $0 = continuation }
-        let consumer = Task.detached(priority: .userInitiated) {
-            let transform = makeTransform()
-            for await buffer in stream {
-                guard let normalized = transform(buffer) else { continue }
-                await pipeline.ingest(normalized)
-            }
-        }
-        consumerBox.withLock { $0 = consumer }
-    }
-
-    /// Stop accepting sink deliveries, then await the consumer so every
-    /// buffer already delivered is ingested. Idempotent. Takes the task out
-    /// of the box BEFORE awaiting — a rebind that interleaves at the await
-    /// installs its fresh consumer into the (now empty) box, untouched by
-    /// this call's cleanup.
-    func retire() async {
-        slot.withLock { continuation in
-            continuation?.finish()
-            continuation = nil
-        }
-        let retiring = consumerBox.withLock { task -> Task<Void, Never>? in
-            defer { task = nil }
-            return task
-        }
-        if let retiring { await retiring.value }
     }
 }
 

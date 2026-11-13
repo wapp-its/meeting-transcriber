@@ -181,23 +181,26 @@ final class TranscriptionsSelectionTests: XCTestCase {
     // MARK: - Footer
 
     func testTheFooterSaysTheCountTheSizeAndWhatTheSettingDoes() {
-        let rows: [(counts: (shown: Int, selected: Int), bytes: Int64, retention: RecordingRetention, text: String)] = [
-            ((8, 0), 700_000_000, .never, "8 recordings · audio 700 MB"),
-            ((1, 0), 700_000_000, .never, "1 recording · audio 700 MB"),
+        let off = RecordingRetentionSettings(enabled: false, days: 30)
+        let on = { (days: Int) in RecordingRetentionSettings(enabled: true, days: days) }
+        let rows: [(counts: (shown: Int, selected: Int), bytes: Int64, retention: RecordingRetentionSettings, text: String)] = [
+            ((8, 0), 700_000_000, off, "8 recordings · audio 700 MB"),
+            ((1, 0), 700_000_000, off, "1 recording · audio 700 MB"),
             (
                 (8, 0),
                 700_000_000,
-                .afterProtocol,
+                on(0),
                 "8 recordings · audio 700 MB · recordings are deleted automatically right after the notes (Settings → Output)",
             ),
-            ((8, 0), 700_000_000, .days7, "8 recordings · audio 700 MB · recordings are deleted automatically after 7 days (Settings → Output)"),
-            ((8, 0), 700_000_000, .days30, "8 recordings · audio 700 MB · recordings are deleted automatically after 30 days (Settings → Output)"),
-            ((8, 0), 700_000_000, .days90, "8 recordings · audio 700 MB · recordings are deleted automatically after 90 days (Settings → Output)"),
-            ((8, 3), 700_000_000, .never, "3 of 8 selected · audio 700 MB"),
-            ((8, 3), 700_000_000, .days30, "3 of 8 selected · audio 700 MB · recordings are deleted automatically after 30 days (Settings → Output)"),
-            ((8, 1), 700_000_000, .never, "1 of 8 selected · audio 700 MB"),
-            ((2, 0), 0, .never, "2 recordings · no audio"),
-            ((0, 0), 0, .days7, "0 recordings · no audio · recordings are deleted automatically after 7 days (Settings → Output)"),
+            ((8, 0), 700_000_000, on(7), "8 recordings · audio 700 MB · recordings are deleted automatically after 7 days (Settings → Output)"),
+            ((8, 0), 700_000_000, on(30), "8 recordings · audio 700 MB · recordings are deleted automatically after 30 days (Settings → Output)"),
+            ((8, 0), 700_000_000, on(90), "8 recordings · audio 700 MB · recordings are deleted automatically after 90 days (Settings → Output)"),
+            ((8, 3), 700_000_000, off, "3 of 8 selected · audio 700 MB"),
+            ((8, 3), 700_000_000, on(30), "3 of 8 selected · audio 700 MB · recordings are deleted automatically after 30 days (Settings → Output)"),
+            ((8, 1), 700_000_000, off, "1 of 8 selected · audio 700 MB"),
+            ((2, 0), 0, off, "2 recordings · no audio"),
+            ((0, 0), 0, on(7), "0 recordings · no audio · recordings are deleted automatically after 7 days (Settings → Output)"),
+            ((8, 0), 700_000_000, on(1), "8 recordings · audio 700 MB · recordings are deleted automatically after 1 day (Settings → Output)"),
         ]
         for row in rows {
             XCTAssertEqual(

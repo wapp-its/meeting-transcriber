@@ -209,7 +209,7 @@ final class SpeakerNamingSession {
                 await self.generateProtocolForExistingJob(jobID: jobID, delegate: delegate, speakerNames: speakerNames)
             }
         } else if delegate?.job(withID: jobID)?.state == .speakerNamingPending {
-            delegate?.updateJobState(id: jobID, to: .done)
+            delegate?.finishWithAcceptedAutoNames(jobID: jobID)
         }
     }
 
@@ -255,6 +255,32 @@ final class SpeakerNamingSession {
         let autoMatched = matched.count { $0.key != $0.value }
         logger.info("[recognition] \(matched.count) speakers, \(autoMatched) auto, \(matched.count - autoMatched) unknown")
 
+        // Stash recognition forensics so the late-confirm path can write the
+        // JSONL row when the user actually confirms (possibly later, via the
+        // re-openable dialog). The headless row below reads them too.
+        stashedSuggestedAtDialog[jobID] = suggestedAtDialog
+        stashedTopCandidates[jobID] = topCandidates
+
+        if delegate?.job(withID: jobID)?.autoSkipNaming == true {
+            // Headless blocking-transcribe: accept the auto-assigned names
+            // (exactly like a `.skipped` dialog result) so the job finishes on
+            // its own. No naming data, kept or written: nobody will resolve it,
+            // parking would wedge the job until the stale cleanup (never with
+            // "Forever", `AppSettings.staleNamingTimeout`), and a file on disk
+            // makes a quit during the protocol call re-run the whole job
+            // (`ProtocolResumePolicy`). The mode is for stage timings.
+            delegate?.setNamingMetadata(jobID: jobID, slug: slug, usedDiarizerMode: diarizeProcess.mode, wroteSidecarsIn: nil)
+            // Log it as a resolution like every other path, tagged `.headless`:
+            // the names still land in the transcript, so leaving no row would
+            // hide an auto-accept nobody reviewed.
+            recordRecognition(
+                jobID: jobID, title: title,
+                userMapping: nil, fallback: autoNames,
+                source: .headless,
+            )
+            return autoNames
+        }
+
         // Use persisted 16kHz path (survives workDir cleanup).
         let recordingsDir = outputDir.appendingPathComponent("recordings")
         let persistedAudioPath = recordingsDir.appendingPathComponent("\(slug)_16k.wav")
@@ -288,29 +314,6 @@ final class SpeakerNamingSession {
             wroteSidecarsIn: saved ? outputDir : nil,
         )
 
-        // Stash recognition forensics so the late-confirm path can write the
-        // JSONL row when the user actually confirms (possibly later, via the
-        // re-openable dialog).
-        stashedSuggestedAtDialog[jobID] = suggestedAtDialog
-        stashedTopCandidates[jobID] = topCandidates
-
-        if delegate?.job(withID: jobID)?.autoSkipNaming == true {
-            // Headless blocking-transcribe: accept the auto-assigned names
-            // (exactly like a `.skipped` dialog result) so the job finishes on
-            // its own. Don't stash naming data: there is no interactive client
-            // to resolve it, and parking would wedge the job until the next
-            // launch's 24h stale-cleanup.
-            //
-            // Log it as a resolution like every other path, tagged `.headless`:
-            // the names still land in the transcript, so leaving no row would
-            // hide an auto-accept nobody reviewed.
-            recordRecognition(
-                jobID: jobID, title: title,
-                userMapping: nil, fallback: autoNames,
-                source: .headless,
-            )
-            return autoNames
-        }
         // Production/interactive: stash the naming data so the queue parks the
         // job at `.speakerNamingPending` and pops the (re-openable) dialog. The
         // pipeline continues with the auto-names; the dialog confirms later via
@@ -498,7 +501,7 @@ final class SpeakerNamingSession {
     /// Auto-resolve pending naming items older than maxAge. Generates the
     /// protocol with auto-names, transitions them to .done, deletes sidecars.
     /// `pendingJobs` is the queue's already-filtered `.speakerNamingPending` list.
-    func cleanupStalePending(pendingJobs: [PipelineJob], maxAge: TimeInterval = 86400) {
+    func cleanupStalePending(pendingJobs: [PipelineJob], maxAge: TimeInterval = StaleNamingTimeout.oneDayInterval) {
         let now = Date()
         for job in pendingJobs where now.timeIntervalSince(job.namingDeadlineStart) > maxAge {
             logger.info("Auto-resolving stale pending naming for \(job.meetingTitle, privacy: .private)")

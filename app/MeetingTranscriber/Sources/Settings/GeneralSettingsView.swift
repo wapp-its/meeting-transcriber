@@ -12,6 +12,9 @@ struct GeneralSettingsView: View {
     /// can say so without using the channel that is broken.
     var notificationVisibility: NotificationVisibility?
 
+    /// Backs the Launch at Login toggle. Nil hides the row.
+    var loginItem: LoginItemController?
+
     @State private var addAppRefusals: [String] = []
 
     /// Nil until the first permission check. The case, not just the message:
@@ -24,16 +27,17 @@ struct GeneralSettingsView: View {
         )
     }
 
-    /// Without it watching is off after every launch, an update included,
-    /// and nothing is detected until someone notices and turns it back on.
-    private var watchAtLaunchToggle: some View {
-        Toggle("Watch for meetings when the app starts", isOn: $settings.autoWatch)
-            .accessibilityIdentifier(A11yID.watchAtLaunchToggle)
-    }
-
     var body: some View {
         // swiftlint:disable:next closure_body_length
         Form {
+            Section("Startup") {
+                if let loginItem {
+                    launchAtLogin(loginItem)
+                }
+                Toggle("Start watching when the app opens", isOn: $settings.autoWatch)
+                    .accessibilityIdentifier(A11yID.autoWatchToggle)
+            }
+
             Section("Mode") {
                 Toggle("Record-only mode", isOn: $settings.recordOnly)
                     .accessibilityIdentifier(A11yID.recordOnlyToggle)
@@ -99,8 +103,6 @@ struct GeneralSettingsView: View {
             }
 
             Section("Detection") {
-                watchAtLaunchToggle
-
                 HStack {
                     Text("Poll Interval")
                     Spacer()
@@ -127,6 +129,30 @@ struct GeneralSettingsView: View {
             SilencePromptSection(settings: settings)
         }
         .formStyle(.grouped)
+        // macOS owns the login-item status and the user can change it in System
+        // Settings at any time, including while this window stays open (the
+        // approval hint sends them there), so re-read it on appear and whenever
+        // the app comes back to the front.
+        .onAppear { loginItem?.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            loginItem?.refresh()
+        }
+    }
+
+    private func launchAtLogin(_ loginItem: LoginItemController) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle("Launch at login", isOn: Binding(
+                get: { loginItem.isOn },
+                set: { loginItem.setEnabled($0) },
+            ))
+            .accessibilityIdentifier(A11yID.launchAtLoginToggle)
+            if let hint = loginItem.hint {
+                Text(hint)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier(A11yID.launchAtLoginHint)
+            }
+        }
     }
 
     @ViewBuilder private var customApps: some View {

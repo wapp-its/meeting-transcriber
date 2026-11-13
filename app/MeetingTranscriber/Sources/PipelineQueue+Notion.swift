@@ -146,6 +146,11 @@ extension PipelineQueue {
             } else {
                 notionExportTasks[jobID]?.unfinishedDatabases.removeValue(forKey: token)
             }
+            // The fork's addition: a retention pass waits for a running export,
+            // so the last one of a job to end starts one, not the next day's.
+            if recordingRetention != nil, notionExportTasks[jobID] == nil, !isRetired {
+                Task { [weak self] in await self?.sweepRetainedRecordings() }
+            }
         }
         var unfinished = previousRun?.unfinishedDatabases ?? [:]
         unfinished[token] = export.configuration.databaseID
@@ -228,6 +233,9 @@ extension PipelineQueue {
         do {
             try FileManager.default.removeItem(at: path)
             jobs[index].protocolPath = nil
+            // Only after a successful export: the page is the output now, so
+            // the missing local file must not keep the audio for good.
+            recordingRetention?.registry.markOutputExported(jobID: jobID)
             persistNotionExportChange(jobID: jobID)
         } catch {
             let shortID = PipelineJob.shortID(for: jobID)

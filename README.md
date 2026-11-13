@@ -81,7 +81,7 @@ flowchart TD
 
 ## Features
 
-- **Automatic meeting detection** — Recognizes Teams, Zoom, and Webex meetings via window title polling, opt-in browser meeting detection (Google Meet, Whereby, web Zoom/Teams in any Chromium browser) gated behind a recording-consent prompt, and opt-in mic-input detection for call apps without a reliable meeting signal (WeChat, Tencent Meeting, FaceTime, WhatsApp, Slack Huddles) — per app, off by default. Every detected meeting asks before it records unless its app is set to record without asking in Settings → General; browser meetings always ask
+- **Automatic meeting detection** — Recognizes Teams, Zoom, and Webex meetings via the power assertions they hold during a call (no window titles, so no Screen Recording needed), opt-in browser meeting detection (Google Meet, Whereby, web Zoom/Teams in any Chromium browser) gated behind a recording-consent prompt, and opt-in mic-input detection for call apps without a reliable meeting signal (WeChat, Tencent Meeting, FaceTime, WhatsApp, Slack Huddles) — per app, off by default. Every detected meeting asks before it records unless its app is set to record without asking in Settings → General; browser meetings always ask
 - **Dual audio recording** — App audio ([CATapDescription](https://developer.apple.com/documentation/coreaudio/catap)) + microphone simultaneously
 - **On-device transcription** — Two engines, selectable in Settings:
   - [WhisperKit](https://github.com/argmaxinc/WhisperKit) — 99+ languages, ~1 GB model; besides the stock models, a custom WhisperKit model can be loaded from another Hugging Face repository or a local folder (see [Custom WhisperKit models](#custom-whisperkit-models))
@@ -198,8 +198,8 @@ The first must report `Status: installed`. The App Store build (`build_release.s
 |------------|-------------|-------|
 | Screen Recording | Optional — sharpens the meeting *title* and acts as a fallback for the audio tap. Detection itself works without it | System Settings → Privacy & Security |
 | Microphone | Mic recording | Prompted on first use |
-| Accessibility | Mute detection, participant reading (Teams) | System Settings → Privacy & Security |
-| App audio capture | — | No permission needed (purple dot indicator only) |
+| Accessibility | Optional — reads Teams participant names | System Settings → Privacy & Security |
+| Audio Recording | App audio capture (the meeting app's own audio). Screen Recording is accepted as a fallback; with neither, the app track is silent | System Settings → Privacy & Security |
 
 ---
 
@@ -227,7 +227,7 @@ A red exclamation mark in the bottom-right corner is overlaid on top of the curr
 
 - **Microphone** — denied, or granted but the capture engine can't open the device
 - **Screen Recording** — denied, or granted but `CGWindowListCopyWindowInfo` returns no window titles (TCC state out of sync)
-- **Accessibility** — denied, or granted but the AX API refuses to read Teams participant/mute info
+- **Accessibility** — denied, or granted but the AX API refuses to read Teams participant info
 
 The health check distinguishes *denied* from *broken*. "Broken" usually means the permission is toggled on in System Settings but macOS hasn't actually wired it through — the fix is to toggle the permission off and on again for Meeting Transcriber under **System Settings → Privacy & Security**. Open the menu bar dropdown to see which specific permission is affected; a notification is also posted when the state changes.
 
@@ -276,16 +276,26 @@ Open Settings via the menu bar item or ⌘,.
 
 | Tab | What's in it |
 |---|---|
-| **General** | Record-only mode, apps to watch (Teams/Zoom/Webex/Browser/WeChat/Tencent Meeting/FaceTime/WhatsApp/Slack), detection timing, update checks |
+| **General** | Startup (launch at login, start watching on open), record-only mode, apps to watch (Teams/Zoom/Webex/Browser/WeChat/Tencent Meeting/FaceTime/WhatsApp/Slack), detection timing |
 | **Audio** | Microphone device, voice activity detection (VAD), per-channel silence indicator, echo cancellation (off by default) |
-| **Transcribe** | ASR engine (WhisperKit / Parakeet) and per-engine options (model incl. a custom WhisperKit model, language, custom vocabulary from a file or a URL), terminology normalization rules, live caption overlay (PoC) |
-| **Speakers** | Diarization, mic speaker name, known voices, recognition stats |
-| **Output** | LLM provider (Claude CLI / Codex CLI / custom command / OpenAI-compatible / local model / none), the local model's folder, transcript-retention options, notes language, output folder, recordings (delete audio automatically: never, right after the notes, after 7, 30 or 90 days), meeting notes templates (default, create, edit, delete, open folder) |
-| **Advanced** | Permissions status, diagnostics, version info |
+| **Transcription** | ASR engine (WhisperKit / Parakeet) and per-engine options (model incl. a custom WhisperKit model, language, custom vocabulary from a file or a URL), terminology normalization rules, live caption overlay (PoC) |
+| **Speakers** | Diarization, whether the naming window opens by itself, how long unnamed meetings wait before they get the automatic names, mic speaker name, known voices, recognition stats |
+| **Output** | LLM provider (Claude CLI / Codex CLI / custom command / OpenAI-compatible / local model / none), the local model's folder, transcript-retention options, notes language, output folder, recording retention (delete recorded audio a set number of days after the recording, 0 meaning right after the notes; off by default), meeting notes templates (default, create, edit, delete, open folder) |
+| **Advanced** | Permissions status, diagnostics, Local Automation API |
+| **About** | Version and build info, ffmpeg status, update checks |
+
+### Start at login
+
+Settings → General → Startup has two independent switches:
+
+- **Launch at login** registers the app as a macOS login item. The switch shows what macOS reports, read again whenever the app comes to the front. While macOS reports the item as waiting for your approval, which can also be what it reports after you switch the app off under System Settings → General → Login Items, the switch stays on and points you to Login Items. Turning it off here removes the item.
+- **Start watching when the app opens** begins meeting detection a few seconds after launch, the same as pressing Start in the menu. It is only read when the app launches, so switching it in a running app changes nothing until the next launch.
+
+With both on, the app starts when you log in and watches for meetings without a click. It only starts silently once its permissions are granted: on a fresh install, macOS asks for microphone and Screen Recording access when watching starts, a few seconds after that first launch.
 
 ### Custom WhisperKit models
 
-Settings → Transcribe → Model → **Custom model…** loads a fine-tuned WhisperKit model instead of a stock one, for example a Swiss German fine-tune. Enter a Hugging Face repository laid out like [`argmaxinc/whisperkit-coreml`](https://huggingface.co/argmaxinc/whisperkit-coreml) (one folder per variant) plus the exact variant folder name, e.g. `spert/flix-swissgerman-whisperkit` and `flix-swissgerman-large-v3_8bit`; it downloads on first use and loads offline afterwards. A variant that is only the tail of the real folder name is refused with the real name, because it would load once and then never offline. Alternatively choose a model folder on disk with **Choose…** (in the App Store build only a chosen folder is accessible; a typed path works outside the sandbox). It must contain `AudioEncoder.mlmodelc`, `TextDecoder.mlmodelc`, `MelSpectrogram.mlmodelc`, `tokenizer.json` and `tokenizer_config.json`. The folder itself is never downloaded; for the tokenizer, WhisperKit prefers a stock tokenizer it has already cached and reads the folder's own tokenizer otherwise, so a folder that carries one loads without a network. Each field takes effect on Return, when you leave it or when you close the Settings window, so while you change the repository and then the variant, the new repository is briefly paired with the old variant; until a custom model is filled in, the previously selected stock model is used, and a load that fails says why under the model status.
+Settings → Transcription → Model → **Custom model…** loads a fine-tuned WhisperKit model instead of a stock one, for example a Swiss German fine-tune. Enter a Hugging Face repository laid out like [`argmaxinc/whisperkit-coreml`](https://huggingface.co/argmaxinc/whisperkit-coreml) (one folder per variant) plus the exact variant folder name, e.g. `spert/flix-swissgerman-whisperkit` and `flix-swissgerman-large-v3_8bit`; it downloads on first use and loads offline afterwards. A variant that is only the tail of the real folder name is refused with the real name, because it would load once and then never offline. Alternatively choose a model folder on disk with **Choose…** (in the App Store build only a chosen folder is accessible; a typed path works outside the sandbox). It must contain `AudioEncoder.mlmodelc`, `TextDecoder.mlmodelc`, `MelSpectrogram.mlmodelc`, `tokenizer.json` and `tokenizer_config.json`. The folder itself is never downloaded; for the tokenizer, WhisperKit prefers a stock tokenizer it has already cached and reads the folder's own tokenizer otherwise, so a folder that carries one loads without a network. Each field takes effect on Return, when you leave it or when you close the Settings window, so while you change the repository and then the variant, the new repository is briefly paired with the old variant; until a custom model is filled in, the previously selected stock model is used, and a load that fails says why under the model status.
 
 To find a model without typing its name, choose **From Hugging Face…** in the same picker. It searches Hugging Face for repositories tagged `whisperkit` and lists each variant this app can load, with its download size, the license (a non-commercial license is marked) and a notice when the repository is gated. A gated repository needs accepted terms on huggingface.co and the token below. **Use** fills in the repository and variant; a stock variant of `argmaxinc/whisperkit-coreml` selects its stock entry instead. After you pick a new model there or in the picker, the app asks whether to load it now; with **Later** it downloads on the first transcription.
 
@@ -295,7 +305,7 @@ A private or gated model needs a Hugging Face token: save it in the optional **H
 
 ## Output
 
-Files are saved to `~/Library/Application Support/MeetingTranscriber/protocols/`:
+Files are saved to `~/Downloads/MeetingTranscriber/`, or to the folder chosen under Settings → Output → Output Folder:
 
 | File | Content |
 |------|---------|
@@ -307,9 +317,9 @@ In **Settings → Output**, both transcript options default to enabled for backw
 - **Include full transcript in meeting notes** appends the verbatim transcript to generated Markdown.
 - **Save raw transcript separately** retains the standalone `.txt` file.
 
-Disable both to retain only the generated meeting notes. Neither setting deletes the recording: its audio follows the **Recordings** section of Settings → Output, which deletes nothing by default (Never). To avoid data loss, a raw transcript is retained if meeting notes generation is disabled, fails, or the job ends with an error.
+Disable both to retain only the generated meeting notes. Neither setting deletes the recording: its audio follows the **Recording Retention** section of Settings → Output, which is off by default. To avoid data loss, a raw transcript is retained if meeting notes generation is disabled, fails, or the job ends with an error.
 
-**Deleting recordings.** With **Delete recordings automatically** set in that section, the audio of a finished meeting the app recorded is deleted for good once its notes are saved (or its transcript, when meeting notes generation is off), right away or after 7, 30 or 90 days counted from the recording date, unless it is marked Keep. Transcripts and meeting notes stay, and imported files are never deleted. Each installed build deletes only the recordings it made itself, by its own setting: a development build beside the release build leaves the other's recordings alone. In the All Recordings window, a meeting's menu has **Keep (Never Delete Automatically)**, **Move Audio to Trash…** and **Move Meeting to Trash…**; select several rows with Shift or Command to move them at once. Each move asks first and goes to the Trash, and a meeting moved to the Trash leaves the list.
+**Deleting recordings.** With **Delete recordings after processing** switched on in that section, the audio the app recorded and moved into the output folder is deleted for good once its notes are saved (or its transcript, when no LLM provider is set) and the chosen number of days since the recording date has passed (0 deletes it right away), unless the meeting is marked Keep. Transcripts and meeting notes stay; imported files, record-only recordings and recordings processed by earlier versions are never deleted. Each installed build deletes only the recordings it moved itself, by its own setting: a development build beside the release build leaves the other's recordings alone. In the All Recordings window, a meeting's menu has **Keep (Never Delete Automatically)**, **Move Audio to Trash…** and **Move Meeting to Trash…**; select several rows with Shift or Command to move them at once. Each move asks first and goes to the Trash, and a meeting moved to the Trash leaves the list.
 
 **Meeting notes structure:** Summary, Participants, Topics Discussed, Decisions, Tasks (with responsible person, deadline, priority), Open Questions, and optionally the Full Transcript.
 
@@ -333,7 +343,7 @@ Disable both to retain only the generated meeting notes. Neither setting deletes
 
 If a recording's `_app.wav` is silent or unexpectedly quiet, enable verbose audio logging to capture forensic detail during the next attempt:
 
-1. Open **Settings → Diagnostics** and turn on **Verbose Audio Logging**.
+1. Open **Settings → Advanced → Diagnostics** and turn on **Verbose Diagnostic Logging**.
 2. Reproduce the failing recording.
 3. Open **Console.app**, filter by subsystem `com.meetingtranscriber.audiotap`, and look for `[debug]` lines:
    - `[debug] Tap target: pid=… exe=… bundle=… audioObjectID=…` — which process the tap targeted
@@ -381,7 +391,7 @@ Meeting Transcriber is built with help from many people: code, bug reports, test
 <a href="https://github.com/DevUrandomFoo"><img src="https://avatars.githubusercontent.com/u/15967780?v=4&amp;s=80" width="40" height="40" alt="Manuel J." title="Manuel J."/></a>
 <a href="https://github.com/nsanitas"><img src="https://avatars.githubusercontent.com/u/909637?v=4&amp;s=80" width="40" height="40" alt="Nicolas Sanitas" title="Nicolas Sanitas"/></a>
 
-And [37 more](<CONTRIBUTORS.md>), credited in full there.
+And [38 more](<CONTRIBUTORS.md>), credited in full there.
 <!-- CONTRIBUTORS-PREVIEW:END -->
 
 [CONTRIBUTING.md](CONTRIBUTING.md) explains how to join them.

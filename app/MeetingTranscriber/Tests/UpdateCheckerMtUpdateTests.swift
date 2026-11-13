@@ -42,7 +42,7 @@ final class UpdateCheckerMtUpdateTests: XCTestCase {
             await waitFor(!fixture.checker.isChecking, timeout: .seconds(2))
 
             XCTAssertEqual(fixture.installer.checkCalls, 1, label)
-            XCTAssertFalse(fixture.provider.latestReleaseCalled || fixture.provider.allReleasesCalled, label)
+            XCTAssertFalse(fixture.provider.latestReleaseCallCount > 0 || fixture.provider.allReleasesCalled, label)
             XCTAssertEqual(fixture.checker.availableBuildSummary, row.summary, label)
             XCTAssertEqual(fixture.checker.hasAvailableUpdate, row.summary != nil, label)
             XCTAssertEqual(fixture.checker.lastError, row.error, label)

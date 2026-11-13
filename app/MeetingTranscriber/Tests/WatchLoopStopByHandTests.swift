@@ -333,7 +333,7 @@ final class WatchLoopStopByHandTests: XCTestCase { // swiftlint:disable:this bal
         let queue = PipelineQueue(logDir: tmpDir)
         let loop = harness.makeLoop(queue: queue)
         var phases: [WatchLoop.State] = []
-        loop.onStateChange = { _, next in phases.append(next) }
+        loop.onStateChange = { _, next, _ in phases.append(next) }
         harness.detector.call(teams)
         loop.start()
 

@@ -78,11 +78,12 @@ DEFAULT_FIXTURE="$ROOT/app/MeetingTranscriber/Tests/Fixtures/two_speakers_de.wav
 # shellcheck disable=SC2034 # read by the RPC helpers in lib/e2e-helpers.sh
 RPC_TOKEN_FILE="$HOME/Library/Application Support/MeetingTranscriber/.rpc-token"
 REC_DIR="$HOME/Library/Application Support/MeetingTranscriber/recordings"
+# Session A runs record-only, which writes its WAVs and sidecar to
+# `<effectiveOutputDir>/recordings`, by default under Downloads, not to the
+# staging dir above (same distinction as in e2e-soak.sh).
+RECORD_ONLY_DIR="$HOME/Downloads/MeetingTranscriber/recordings"
 # shellcheck disable=SC2034 # read by the RPC helpers in lib/e2e-helpers.sh
 RPC_BASE="http://127.0.0.1:9876"
-# shellcheck source=lib/bundle-ids.sh
-source "$ROOT/scripts/lib/bundle-ids.sh"
-BUNDLE_ID="$DEV_BUNDLE_ID"
 
 [ -n "$SIMULATOR_FIXTURE" ] || SIMULATOR_FIXTURE="$DEFAULT_FIXTURE"
 
@@ -150,20 +151,8 @@ if ! system_profiler SPAudioDataType 2>/dev/null | grep -A4 "Default Input" | gr
     fail "no default audio input device — install BlackHole 2ch and set it as the default Input"
 fi
 
-# Address the standard-domain plist directly, and write through
-# `write_dev_default`. `defaults <bundle-id>` is redirected into the app's
-# container once containermanagerd has registered one, while the dev .app is not
-# sandboxed and
-# resolves the standard domain, so the two disagree and a lane can configure
-# nothing at all without any error. See write_dev_default in
-# scripts/lib/e2e-helpers.sh.
-_STANDARD_PLIST="$(dev_standard_plist "$BUNDLE_ID")"
-SAVED_LIVE_TRANS=$(snapshot_default "$_STANDARD_PLIST" liveTranscriptionEnabled)
-SAVED_TRANS_ENGINE=$(snapshot_default "$_STANDARD_PLIST" transcriptionEngine)
-SAVED_DEBUG_RPC=$(snapshot_default "$_STANDARD_PLIST" debugRPCEnabled)
-SAVED_AUTO_WATCH=$(snapshot_default "$_STANDARD_PLIST" autoWatch)
-SAVED_RECORD_ONLY=$(snapshot_default "$_STANDARD_PLIST" recordOnly)
-
+# The app must not be running when a session launches it: `open` would only
+# activate it and drop the launch arguments.
 quit_running_app
 
 # A stale persisted pipeline job (e.g. session B's post-processing from the
@@ -223,13 +212,16 @@ if [ "$fg_user" != "$my_user" ]; then
     fail "Aqua foreground user is '$fg_user', not '$my_user' — Fast User Switching is active."
 fi
 
+# launch_app_and_wait <key>=<value>... — launch with the session's settings as
+# launch arguments and the RPC server forced on, and require the app to report
+# them (see launch_dev_app). Nothing is written to the host's preferences, so
+# there is nothing to restore after either session, and a killed run leaves
+# none of them behind.
 launch_app_and_wait() {
-    log "Launching $DEV_BUNDLE_DEPLOY"
-    open "$DEV_BUNDLE_DEPLOY"
-    log "Waiting up to ${RPC_READY_TIMEOUT_S}s for RPC /healthz"
-    poll_until "$RPC_READY_TIMEOUT_S" 1 rpc_ready \
-        || fail "RPC /healthz did not respond within ${RPC_READY_TIMEOUT_S}s"
-    log "RPC up"
+    log "Launching $DEV_BUNDLE_DEPLOY with $* (waiting up to ${RPC_READY_TIMEOUT_S}s for RPC /healthz)"
+    launch_dev_app "$DEV_BUNDLE_DEPLOY" --env MEETINGTRANSCRIBER_DEBUG_RPC=1 -- "$@" \
+        || fail "$E2E_LAUNCH_ERR"
+    log "RPC up; the app reports the session's settings"
 }
 
 # Timestamp anchor for on_exit cleanup: every recording artifact this run
@@ -239,15 +231,6 @@ RUN_START_MARKER="$(mktemp "${TMPDIR:-/tmp}/e2e-cpu-load-start.XXXXXX")"
 SIM_PID=""
 on_exit() {
     [ -n "${SIM_PID:-}" ] && kill "$SIM_PID" 2>/dev/null || true
-    restore_bool_default "$_STANDARD_PLIST" liveTranscriptionEnabled "$SAVED_LIVE_TRANS"
-    if [ -n "$SAVED_TRANS_ENGINE" ]; then
-        write_dev_default "$BUNDLE_ID" transcriptionEngine "$SAVED_TRANS_ENGINE" string
-    else
-        delete_dev_default "$BUNDLE_ID" transcriptionEngine
-    fi
-    restore_bool_default "$_STANDARD_PLIST" debugRPCEnabled "$SAVED_DEBUG_RPC"
-    restore_bool_default "$_STANDARD_PLIST" autoWatch       "$SAVED_AUTO_WATCH"
-    restore_bool_default "$_STANDARD_PLIST" recordOnly      "$SAVED_RECORD_ONLY"
     if [ "$APP_AFTER" = quit ]; then
         # `|| true`: under set -e a wedged app (quit ladder exhausted) must not
         # abort the trap before the artifact sweep below runs.
@@ -257,6 +240,7 @@ on_exit() {
         # run's app doesn't crash-recover a stale temp into a garbage job (the
         # rationale + the CI guard live in sweep_run_artifacts).
         sweep_run_artifacts "$REC_DIR" "$RUN_START_MARKER"
+        sweep_run_artifacts "$RECORD_ONLY_DIR" "$RUN_START_MARKER"
     fi
     rm -f "${RUN_START_MARKER:-}" 2>/dev/null || true
 }
@@ -303,13 +287,7 @@ contamination_flag() {
 # (file move instead of batch transcription) so session B starts quiet; the
 # recording path itself is byte-identical to a normal meeting while it runs.
 
-write_dev_default "$BUNDLE_ID" liveTranscriptionEnabled false bool
-write_dev_default "$BUNDLE_ID" recordOnly true bool
-write_dev_default "$BUNDLE_ID" transcriptionEngine parakeet string
-write_dev_default "$BUNDLE_ID" debugRPCEnabled true bool
-write_dev_default "$BUNDLE_ID" autoWatch true bool
-
-launch_app_and_wait
+launch_app_and_wait liveTranscriptionEnabled=false recordOnly=true transcriptionEngine=parakeet autoWatch=true
 
 log "Session A settle: waiting up to ${SETTLE_TIMEOUT_S}s for pipeline to drain"
 poll_state "$SETTLE_TIMEOUT_S" 5 state_is "$_PIPELINE_DRAINED" \
@@ -347,10 +325,7 @@ quit_running_app
 # a user with the feature enabled — and so session A's idle window stayed
 # free of preload memory/CPU.
 
-write_dev_default "$BUNDLE_ID" liveTranscriptionEnabled true bool
-write_dev_default "$BUNDLE_ID" recordOnly false bool
-
-launch_app_and_wait
+launch_app_and_wait liveTranscriptionEnabled=true recordOnly=false transcriptionEngine=parakeet autoWatch=true
 
 log "Session B settle: waiting up to ${SETTLE_TIMEOUT_S}s for pipeline drain + Parakeet preload"
 poll_state "$SETTLE_TIMEOUT_S" 5 state_is "$_PIPELINE_DRAINED" \

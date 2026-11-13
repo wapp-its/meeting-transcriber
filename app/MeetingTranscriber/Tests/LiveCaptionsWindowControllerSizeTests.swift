@@ -1,4 +1,5 @@
 @testable import MeetingTranscriber
+import SwiftUI
 import XCTest
 
 /// The invariant the preset design exists for: the font and the panel can
@@ -55,4 +56,81 @@ final class LiveCaptionsWindowControllerSizeTests: XCTestCase {
         controller.apply(size: .large)
         XCTAssertNil(defaults.dictionary(forKey: LiveCaptionsWindowController.originDefaultsKey))
     }
+
+    /// The panel keeps its preset size however much text the overlay holds.
+    /// The text rows are `fixedSize` vertically, so with the hosting view's
+    /// default sizing options their height became the window's minimum and
+    /// the bar grew to thousands of points, off the top of the screen.
+    func testCaptionTextDoesNotResizeThePanel() throws {
+        guard let screen = (NSScreen.main ?? NSScreen.screens.first).map(CaptionScreen.init) else {
+            throw XCTSkip("no screen to show the panel on")
+        }
+        let state = LiveCaptionsState()
+        let controller = try LiveCaptionsWindowController(
+            state: state, size: .medium, defaults: makeDefaults(),
+            screens: { [screen] }, mainScreen: { screen },
+        )
+        let before = Set(NSApplication.shared.windows.map(ObjectIdentifier.init))
+        controller.show()
+        addTeardownBlock { @MainActor in controller.hide() }
+        let panel = try XCTUnwrap(NSApplication.shared.windows.first { window in
+            !before.contains(ObjectIdentifier(window)) && window.identifier == LiveCaptionsWindowController.panelIdentifier
+        })
+
+        let long = String(repeating: "a caption line that wraps across the bar several times over ", count: 6)
+        for index in 0 ..< LiveCaptionsState.maxFinalsKept {
+            state.applyFinalized("final \(index): " + long, channel: .app)
+        }
+        state.applyPartial(long, channel: .mic)
+        panel.contentView?.layoutSubtreeIfNeeded()
+        panel.layoutIfNeeded()
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.3))
+
+        XCTAssertEqual(panel.frame.size, LiveCaptionsSize.medium.panelSize)
+    }
+
+    /// Content taller than the bar clips the oldest lines at the top; the
+    /// newest line, the one being read, stays inside. Ordinary speech gets
+    /// there: two finals plus a hypothesis that wraps once more than the
+    /// preset budgets for.
+    func testOverflowKeepsTheNewestLineInsideTheBar() throws {
+        let state = LiveCaptionsState()
+        state.applyFinalized(
+            "We moved the release to Thursday because the signing certificate expires on Friday morning.",
+            channel: .app,
+        )
+        state.applyFinalized(
+            "That leaves Wednesday for the last round of manual checks on the caption bar and the importer.",
+            channel: .app,
+        )
+        state.applyPartial(
+            "Then the beta goes out on Wednesday night and the stable build follows a day later, once the crash reports look quiet",
+            channel: .app,
+        )
+        state.applyPartial("and I will write the notes for it tonight", channel: .mic)
+
+        let reported = ContentFrameBox()
+        let size = LiveCaptionsSize.medium.panelSize
+        let host = NSHostingView(rootView: LiveCaptionsOverlay(state: state)
+            .onPreferenceChange(LiveCaptionsContentFrameKey.self) { frame in
+                MainActor.assumeIsolated { reported.frame = frame }
+            })
+        host.sizingOptions = []
+        let window = NSWindow(
+            contentRect: NSRect(origin: .zero, size: size),
+            styleMask: [.borderless], backing: .buffered, defer: false,
+        )
+        window.contentView = host
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.3))
+
+        let frame = try XCTUnwrap(reported.frame)
+        XCTAssertGreaterThan(frame.height, size.height, "the text must overflow the bar for this test to mean anything")
+        XCTAssertLessThanOrEqual(frame.maxY, size.height + 0.5, "content \(frame) ends below the \(size.height) pt bar")
+    }
+}
+
+@MainActor
+private final class ContentFrameBox {
+    var frame: CGRect?
 }

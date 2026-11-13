@@ -57,8 +57,9 @@ flags:
   # AudioTapLib SPM library uploaded by the audiotap CI step. Lives in
   # its own flag because the test suite is in `tools/audiotap/Tests/`,
   # not the app's xctest bundle. Same library binary regardless of the
-  # homebrew/appstore variant, so we upload it once (homebrew leg only)
-  # and rely on `carryforward` for non-CI events.
+  # homebrew/appstore variant, so we upload it once (from the separate
+  # `audiotap-coverage` job in ci.yml) and rely on `carryforward` for non-CI
+  # events.
   audiotap:
     paths:
       - tools/audiotap/Sources/
@@ -73,8 +74,6 @@ ignore:
   # @main SwiftUI scene shell — NSOpenPanel / NSWorkspace bindings, no
   # mock-point, exercised end-to-end by e2e-app.yml (live recording).
   - "app/MeetingTranscriber/Sources/MeetingTranscriberApp.swift"
-  # Pure AVAudioEngine wrapper — hardware-bound, exercised by e2e-app.yml.
-  - "app/MeetingTranscriber/Sources/MicRecorder.swift"
   # AudioTapLib hardware-bound paths — exercised by e2e-app.yml (live
   # recording with BlackHole), not by xctest. The rest of `tools/audiotap/`
   # is covered by its own test suite and uploaded under the `audiotap` flag.

@@ -60,9 +60,7 @@ DEFAULT_FIXTURE="$ROOT/app/MeetingTranscriber/Tests/Fixtures/two_speakers_de.wav
 RPC_TOKEN_FILE="$HOME/Library/Application Support/MeetingTranscriber/.rpc-token"
 # shellcheck disable=SC2034 # read by the RPC helpers in lib/e2e-helpers.sh
 RPC_BASE="http://127.0.0.1:9876"
-# shellcheck source=lib/bundle-ids.sh
-source "$ROOT/scripts/lib/bundle-ids.sh"
-BUNDLE_ID="$DEV_BUNDLE_ID"
+REC_DIR="$HOME/Library/Application Support/MeetingTranscriber/recordings"
 
 [ -n "$SIMULATOR_FIXTURE" ] || SIMULATOR_FIXTURE="$DEFAULT_FIXTURE"
 
@@ -107,22 +105,35 @@ if ! system_profiler SPAudioDataType 2>/dev/null | grep -A4 "Default Input" | gr
     fail "no default audio input device — install BlackHole 2ch and set it as the default Input"
 fi
 
-# Snapshot toggles we'll mutate so cleanup can restore them. Captures the
-# state from a previous run on the same host (which might have left
-# anything behind).
-# Address the standard-domain plist directly, and write through
-# `write_dev_default`. `defaults <bundle-id>` is redirected into the app's
-# container once containermanagerd has registered one, while the dev .app is not
-# sandboxed and
-# resolves the standard domain, so the two disagree and a lane can configure
-# nothing at all without any error. See write_dev_default in
-# scripts/lib/e2e-helpers.sh.
-_STANDARD_PLIST="$(dev_standard_plist "$BUNDLE_ID")"
-SAVED_LIVE_TRANS=$(snapshot_default "$_STANDARD_PLIST" liveTranscriptionEnabled)
-SAVED_TRANS_ENGINE=$(snapshot_default "$_STANDARD_PLIST" transcriptionEngine)
-SAVED_DEBUG_RPC=$(snapshot_default "$_STANDARD_PLIST" debugRPCEnabled)
-SAVED_AUTO_WATCH=$(snapshot_default "$_STANDARD_PLIST" autoWatch)
+# Cleanup trap, armed before anything below changes the host: a build or
+# launch failure must still kill the simulator and quit the app.
+SIM_PID=""
+# Every recording artifact this run creates is newer than this marker; created
+# before the app launches, so before anything can record.
+RUN_START_MARKER=""
+on_exit() {
+    [ -n "${SIM_PID:-}" ] && kill "$SIM_PID" 2>/dev/null || true
+    if [ "$APP_AFTER" = quit ]; then
+        # A no-op after the quit at the end of a passing run. `|| true`: under
+        # set -e a wedged app (quit ladder exhausted) must not abort the trap
+        # before the sweep and the restore below run.
+        quit_running_app || true
+        # The quit stops the recording mid-meeting and leaves its audio in the
+        # staging dir, where the next lane's launch would recover it as a job
+        # (the rationale + the CI guard live in sweep_run_artifacts).
+        sweep_run_artifacts "$REC_DIR" "${RUN_START_MARKER:-}"
+    fi
+    rm -f "${RUN_START_MARKER:-}" 2>/dev/null || true
+}
+# INT/TERM exit (and so run on_exit once, from EXIT): a trap that only ran
+# on_exit would return into the interrupted command and let the lane carry on
+# after its cleanup, which a reaper SIGTERM relies on not happening.
+trap on_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
+# The app must not be running when it is launched below: `open` would only
+# activate it and drop the launch arguments.
 quit_running_app
 
 # --- build + deploy + sign ------------------------------------------------
@@ -164,16 +175,6 @@ if [ ! -x "$SIMULATOR_BIN" ]; then
     (cd "$SIMULATOR_PKG" && swift build -c release)
 fi
 
-# --- preset live-transcription on, engine Parakeet ------------------------
-
-# These four defaults are the actual production seams the toggle uses.
-# Crucially we do NOT set any debug env var that bypasses the real chain
-# — the test must catch a regression in the wiring, not in a debug shim.
-write_dev_default "$BUNDLE_ID" liveTranscriptionEnabled true bool
-write_dev_default "$BUNDLE_ID" transcriptionEngine parakeet string
-write_dev_default "$BUNDLE_ID" debugRPCEnabled true bool
-write_dev_default "$BUNDLE_ID" autoWatch true bool
-
 # --- launch + wait for RPC ------------------------------------------------
 
 fg_user=$(stat -f "%Su" /dev/console)
@@ -182,33 +183,18 @@ if [ "$fg_user" != "$my_user" ]; then
     fail "Aqua foreground user is '$fg_user', not '$my_user' — Fast User Switching is active."
 fi
 
-log "Launching $DEV_BUNDLE_DEPLOY"
-open "$DEV_BUNDLE_DEPLOY"
-
-log "Waiting up to ${RPC_READY_TIMEOUT_S}s for RPC /healthz"
-poll_until "$RPC_READY_TIMEOUT_S" 1 rpc_ready \
-    || fail "RPC /healthz did not respond within ${RPC_READY_TIMEOUT_S}s"
-log "RPC up"
-
-# Cleanup trap — kill simulator + restore defaults.
-SIM_PID=""
-on_exit() {
-    [ -n "${SIM_PID:-}" ] && kill "$SIM_PID" 2>/dev/null || true
-    restore_bool_default  "$_STANDARD_PLIST" liveTranscriptionEnabled "$SAVED_LIVE_TRANS"
-    if [ -n "$SAVED_TRANS_ENGINE" ]; then
-        write_dev_default "$BUNDLE_ID" transcriptionEngine "$SAVED_TRANS_ENGINE" string
-    else
-        delete_dev_default "$BUNDLE_ID" transcriptionEngine
-    fi
-    restore_bool_default "$_STANDARD_PLIST" debugRPCEnabled "$SAVED_DEBUG_RPC"
-    restore_bool_default "$_STANDARD_PLIST" autoWatch       "$SAVED_AUTO_WATCH"
-}
-# INT/TERM exit (and so run on_exit once, from EXIT): a trap that only ran
-# on_exit would return into the interrupted command and let the lane carry on
-# after its cleanup, which a reaper SIGTERM relies on not happening.
-trap on_exit EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
+RUN_START_MARKER="$(mktemp "${TMPDIR:-/tmp}/e2e-live-captions-start.XXXXXX")"
+# Live transcription on with the Parakeet engine, and watching, as launch
+# arguments: the settings the production toggle writes, so the chain under
+# test is the real one, but in the argument domain for this process only, so
+# the lane leaves the host's preferences as it found them (see
+# launch_dev_app). Crucially no debug env var that bypasses the real chain:
+# the one env var brings up the RPC server the lane reads, nothing else.
+log "Launching $DEV_BUNDLE_DEPLOY (waiting up to ${RPC_READY_TIMEOUT_S}s for RPC /healthz)"
+launch_dev_app "$DEV_BUNDLE_DEPLOY" --env MEETINGTRANSCRIBER_DEBUG_RPC=1 -- \
+    liveTranscriptionEnabled=true transcriptionEngine=parakeet autoWatch=true \
+    || fail "$E2E_LAUNCH_ERR"
+log "RPC up; the app reports the launch settings (live transcription on, Parakeet, auto-watch)"
 
 # --- trigger meeting + poll captions --------------------------------------
 
@@ -255,6 +241,10 @@ IFS=$'\t' read -r has_nonempty bad_channel < <(
 
 log "PASS — live transcription chain produced finalised captions through the production seam"
 
+# The simulator before the quit, so the app is not quit in the middle of a
+# meeting; the trap then sweeps what the recording left.
+kill "$SIM_PID" 2>/dev/null || true
+SIM_PID=""
 if [ "$APP_AFTER" = quit ]; then
     quit_running_app
 fi

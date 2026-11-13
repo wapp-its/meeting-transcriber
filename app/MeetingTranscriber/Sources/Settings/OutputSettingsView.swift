@@ -28,6 +28,16 @@ enum OutputSettingsLogic {
         guard !selected.isEmpty, !available.contains(selected) else { return available }
         return [selected] + available
     }
+
+    /// The retention period as the Settings row shows it. Zero is spelled out,
+    /// since "0 days" alone reads like "never".
+    static func retentionDaysLabel(_ days: Int) -> String {
+        switch days {
+        case ...0: "0 days (right away)"
+        case 1: "1 day"
+        default: "\(days) days"
+        }
+    }
 }
 
 enum ConnectionTestResult {
@@ -38,9 +48,6 @@ enum ConnectionTestResult {
 struct OutputSettingsView: View {
     @Bindable var settings: AppSettings
     var templateStore: ProtocolTemplateStore = .production
-    /// The Recordings section's state. Nil leaves the section out, as without the
-    /// check nothing can tell what a value would delete.
-    @State private var retentionChoice: RetentionChoice?
     /// The templates section's state, which the rules section lists templates
     /// and reads the default through.
     @State private var templatesModel: ProtocolTemplatesModel
@@ -53,14 +60,21 @@ struct OutputSettingsView: View {
     @State private var connectionTestResult: ConnectionTestResult?
     @State private var availableModels: [String] = []
     @State private var didAttemptConnectionTest = false
+    /// The API key fields type into these, not into the Keychain.
+    @StateObject private var apiKeyDrafts: ProtocolAPIKeyDrafts
 
-    init(settings: AppSettings, templateStore: ProtocolTemplateStore = .production, retentionChoice: RetentionChoice? = nil) {
+    init(
+        settings: AppSettings,
+        templateStore: ProtocolTemplateStore = .production,
+        // swiftlint:disable:next unneeded_escaping
+        apiKeyDrafts: @autoclosure @escaping () -> ProtocolAPIKeyDrafts? = nil,
+    ) {
         self.settings = settings
         self.templateStore = templateStore
-        _retentionChoice = State(initialValue: retentionChoice)
         let templatesModel = ProtocolTemplatesModel(store: templateStore, settings: settings)
         _templatesModel = State(initialValue: templatesModel)
         _templateRulesModel = State(initialValue: TemplateRulesModel(templates: templatesModel, settings: settings))
+        _apiKeyDrafts = StateObject(wrappedValue: apiKeyDrafts() ?? ProtocolAPIKeyDrafts(settings: settings))
     }
 
     var body: some View {
@@ -93,11 +107,12 @@ struct OutputSettingsView: View {
             }
             .accessibilityIdentifier(A11yID.outputFolderSection)
 
-            if let retentionChoice {
-                RecordingsSettingsSection(choice: retentionChoice)
-            }
-
             NotionExportSettingsView(settings: settings)
+
+            // Outside the record-only block as well: entries recorded before
+            // record-only was switched on are still swept, and record-only
+            // output itself is never recorded, so the setting cannot reach it.
+            recordingRetentionSection
 
             Section("Meeting Notes") {
                 Toggle("Include full transcript in meeting notes", isOn: $settings.includeFullTranscriptInProtocol)
@@ -140,6 +155,44 @@ struct OutputSettingsView: View {
                 claudeBinaries = ClaudeCLIProtocolGenerator.availableClaudeBinaries()
             #endif
         }
+        // A hidden Settings window and a quit reach neither a focus change nor
+        // `onDisappear`, so an edited key is handed over here as well.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { notification in
+            apiKeyDrafts.settingsWindowWillClose(notification, settings: settings)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            apiKeyDrafts.commitPending(to: settings)
+        }
+    }
+
+    private var recordingRetentionSection: some View {
+        Section("Recording Retention") {
+            Toggle("Delete recordings after processing", isOn: $settings.recordingRetentionEnabled)
+                .accessibilityIdentifier(A11yID.recordingRetentionToggle)
+
+            HStack {
+                Text("Keep recordings for")
+                Spacer()
+                Text(OutputSettingsLogic.retentionDaysLabel(settings.recordingRetentionDays))
+                    .foregroundStyle(.secondary)
+                Stepper("", value: $settings.recordingRetentionDays, in: 0 ... 3650)
+                    .labelsHidden()
+            }
+            .disabled(!settings.recordingRetentionEnabled)
+
+            Text(
+                "Counted from the recording date. A recording is deleted only after its meeting notes were saved, "
+                    + "or its transcript when no LLM provider is set. A recording waiting for speaker names is kept "
+                    + "until they are given or skipped, or the naming wait set under Speakers runs out. "
+                    + "Only audio this app recorded and moved into "
+                    + "the output folder is affected: imported files, record-only recordings and recordings "
+                    + "processed by earlier versions are never deleted, and neither are meetings marked Keep in "
+                    + "All Recordings. Switching this on, or shortening the period, deletes the recordings already "
+                    + "past it. Deleted for good, not moved to the Trash.",
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
     }
 
     @ViewBuilder
@@ -159,8 +212,11 @@ struct OutputSettingsView: View {
                 HStack {
                     Text("API Key")
                     Spacer()
-                    SecureField("", text: $settings.claudeAPIKey)
-                        .frame(width: 200)
+                    DraftTextField("", value: apiKeyDrafts.savedClaude, draft: $apiKeyDrafts.claude, secure: true) { key in
+                        apiKeyDrafts.commitClaude(key, to: settings)
+                    }
+                    .frame(width: 200)
+                    .accessibilityIdentifier(A11yID.claudeAPIKeyField)
                 }
                 Text("Optional. Leave empty to use your \"claude login\" session.")
                     .font(.caption)
@@ -238,8 +294,11 @@ struct OutputSettingsView: View {
         HStack {
             Text("API Key")
             Spacer()
-            SecureField("", text: $settings.openAIAPIKey)
-                .frame(width: 200)
+            DraftTextField("", value: apiKeyDrafts.savedOpenAI, draft: $apiKeyDrafts.openAI, secure: true) { key in
+                apiKeyDrafts.commitOpenAI(key, to: settings)
+            }
+            .frame(width: 200)
+            .accessibilityIdentifier(A11yID.openAIAPIKeyField)
         }
         Text("Leave empty if your local server doesn't require authentication")
             .font(.caption)
@@ -368,72 +427,6 @@ struct OutputSettingsView: View {
         panel.message = "Choose a folder for recordings, transcripts and meeting notes"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         settings.setCustomOutputDir(url)
-    }
-}
-
-/// "Delete recordings automatically" and what it means. Stays enabled in record-only
-/// mode, as it still applies to meetings recorded earlier. `RetentionChoice` decides
-/// when a value is saved.
-struct RecordingsSettingsSection: View {
-    let choice: RetentionChoice
-
-    var body: some View {
-        Section("Recordings") {
-            Picker("Delete recordings automatically", selection: Binding(get: { choice.shown }, set: { choice.choose($0) })) {
-                ForEach(RecordingRetention.allCases, id: \.self) { value in
-                    Text(value.title).tag(value)
-                }
-            }
-            .accessibilityIdentifier(A11yID.recordingRetentionPicker)
-            // `presenting`, so the buttons hold their preview whether SwiftUI clears
-            // the binding before or after running them.
-            .alert(choice.preview?.title ?? "", isPresented: previewShown, presenting: choice.preview) { preview in
-                previewButtons(preview)
-            } message: { preview in
-                Text(preview.message)
-            }
-
-            if choice.isChecking {
-                helpLine("Checking which meetings this would delete…")
-            }
-            if let value = choice.notChecked {
-                helpLine("Could not read which meetings “\(value.title)” would delete, so the setting did not change. Try again later.")
-            }
-            helpLine("Counts from the recording date. Only audio this app recorded is deleted; imported files never are.")
-            helpLine(
-                "Audio stays until the meeting notes are saved and the speakers are named. "
-                    + "Failed meetings, meetings marked Keep and record-only recordings keep their audio.",
-            )
-            helpLine("Deleted for good, not moved to the Trash. Copies in Time Machine backups or synced folders are not deleted.")
-        }
-    }
-
-    /// Return answers Cancel, as this deletes for good. A SwiftUI alert has no default
-    /// button of its own: measured on macOS 26, Return does nothing without this. A
-    /// button takes one key, so Cancel gives up Escape for it.
-    @ViewBuilder
-    func previewButtons(_ preview: RetentionPreview) -> some View {
-        Button("Cancel", role: .cancel) { choice.cancel() }
-            .keyboardShortcut(.defaultAction)
-            .accessibilityIdentifier(A11yID.retentionPreviewCancelButton)
-        Button(preview.confirmButton, role: .destructive) { choice.confirm(preview) }
-            .accessibilityIdentifier(A11yID.retentionPreviewConfirmButton)
-    }
-
-    private var previewShown: Binding<Bool> {
-        Binding(
-            get: { choice.preview != nil },
-            set: { shown in
-                if !shown { choice.cancel() }
-            },
-        )
-    }
-
-    private func helpLine(_ text: String) -> some View {
-        Text(text)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
     }
 }
 

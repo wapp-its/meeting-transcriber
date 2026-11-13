@@ -63,8 +63,8 @@ final class AppState {
     /// `pipeline.queue` by the menu-bar UI + RPC snapshot. `AppState` supplies
     /// the active engine via `activate(engineProvider:)` post-init.
     let pipeline: PipelineController
-    /// Deletes finished meetings' audio as the setting says, from the launch `.task` on.
-    let recordingRetention: RecordingRetentionController
+    /// Removes the record of a meeting nothing is left of, from the launch `.task` on.
+    let meetingRecordPruner: MeetingRecordPruner
 
     /// Live TCC permission-health concern, extracted into its own controller.
     /// `currentBadge` composes its `health` into the `.error` state.
@@ -212,7 +212,7 @@ final class AppState {
         self.permissions = PermissionsController(notifier: notifier)
         self.updateChecker = updateChecker ?? Self.makeUpdateChecker(notifier: notifier)
         self.pipeline = PipelineController(settings: settings, notifier: notifier, queueEnvironment: pipelineEnvironment)
-        self.recordingRetention = RecordingRetentionController(pipeline: pipeline)
+        self.meetingRecordPruner = MeetingRecordPruner(pipeline: pipeline)
         self.protocolRegenerator = Self.makeProtocolRegenerator(settings: settings, notifier: notifier, pipeline: pipeline)
         self.channelHealth = ChannelHealthController(
             notifier: notifier,
@@ -395,9 +395,9 @@ final class AppState {
             let naming = namingRPCClosures()
             // Blocking one-call: enqueue + wait until terminal (auto-skipping
             // the headless naming pause), returning the final status inline.
-            let transcribe: (URL, Double) async -> BlockingTranscribeResult = { [weak self] url, maxWait in
+            let transcribe: BlockingTranscribe = { [weak self] url, maxWait, onEnqueued in
                 guard let self else { return .noFile }
-                return await pipeline.transcribeAndWait(path: url, maxWaitSeconds: maxWait)
+                return await pipeline.transcribeAndWait(path: url, maxWaitSeconds: maxWait, onEnqueued: onEnqueued)
             }
             let watch = watchRPCClosures()
             let record = recordRPCClosures()

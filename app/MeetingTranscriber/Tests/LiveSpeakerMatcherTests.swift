@@ -1,3 +1,4 @@
+import CoreML
 @testable import MeetingTranscriber
 import XCTest
 
@@ -14,13 +15,9 @@ final class LiveSpeakerMatcherTests: XCTestCase {
     /// (e.g. returning `__live__` to the caller) or where the matcher
     /// returns a hallucinated name from an empty DB.
     func testMatchReturnsNilWithEmptyDB() async {
-        let tempDB = FileManager.default.temporaryDirectory
-            .appendingPathComponent("test-empty-speakers-\(UUID()).json")
-        defer { try? FileManager.default.removeItem(at: tempDB) }
         // Empty DB: a fresh SpeakerMatcher with no entries falls through
         // every threshold check.
-        let sm = SpeakerMatcher(dbPath: tempDB)
-        let matcher = LiveSpeakerMatcher(speakerMatcher: sm)
+        let (matcher, _) = makeMatcher(slug: "empty-speakers")
 
         // `match` calls into the actor, which lazy-loads the WeSpeaker
         // model. Pre-warm fails fast in xctest's sandbox if the model
@@ -33,14 +30,46 @@ final class LiveSpeakerMatcherTests: XCTestCase {
         )
     }
 
+    /// The live matcher loads the same WeSpeaker embedding model as the
+    /// offline pipeline, so it must use the same compute units. `.all` lets
+    /// Core ML route that model through the GPU, the path the offline
+    /// pipeline was moved off; the choice must also not differ between CI
+    /// and a user's machine, or CI tests a configuration nobody ships.
+    func testEmbeddingComputeUnitsMatchOfflinePipeline() {
+        XCTAssertEqual(
+            LiveSpeakerMatcher.embeddingComputeUnits,
+            FluidOfflineProcessor.makeModelConfiguration().computeUnits,
+            "live and offline WeSpeaker loads must use the same compute units",
+        )
+        XCTAssertEqual(LiveSpeakerMatcher.embeddingComputeUnits, .cpuAndNeuralEngine)
+    }
+
+    /// Cache-hit path: the embedding-only load must ask for the shared
+    /// compute units, and the full load must not run.
+    func testCacheHitLoadsEmbeddingWithSharedComputeUnits() async {
+        let loads = RecordingModelLoaders()
+        let (matcher, _) = makeMatcher(slug: "units-hit", prepopulate: 589, modelLoaders: loads.loaders)
+        _ = try? await matcher.prepare()
+        XCTAssertEqual(loads.embeddingUnits, [FluidOfflineProcessor.computeUnits])
+        XCTAssertEqual(loads.diarizerUnits, [], "cache hit must not load the full diarizer models")
+    }
+
+    /// Cache-miss (first-launch) path: the full load, whose embedding model
+    /// the matcher keeps for the session, must ask for the shared compute
+    /// units too. FluidAudio's own default would pick `.all` outside CI.
+    func testCacheMissLoadsDiarizerModelsWithSharedComputeUnits() async {
+        let loads = RecordingModelLoaders()
+        let (matcher, _) = makeMatcher(slug: "units-miss", modelLoaders: loads.loaders)
+        _ = try? await matcher.prepare()
+        XCTAssertEqual(loads.diarizerUnits, [FluidOfflineProcessor.computeUnits])
+        XCTAssertEqual(loads.embeddingUnits, [], "cache miss must not take the embedding-only path")
+    }
+
     /// Pre-warm errors must not propagate — the controller relies on
     /// `match` returning nil on any model-load failure so a transient
     /// network blip during the WeSpeaker download doesn't break captions.
     func testMatchReturnsNilWhenAudioIsEmpty() async {
-        let tempDB = FileManager.default.temporaryDirectory
-            .appendingPathComponent("test-empty-audio-\(UUID()).json")
-        defer { try? FileManager.default.removeItem(at: tempDB) }
-        let matcher = LiveSpeakerMatcher(speakerMatcher: SpeakerMatcher(dbPath: tempDB))
+        let (matcher, _) = makeMatcher(slug: "empty-audio")
         let name = await matcher.match(audio: [])
         XCTAssertNil(name, "empty audio must resolve to nil")
     }
@@ -96,13 +125,15 @@ final class LiveSpeakerMatcherTests: XCTestCase {
         )
     }
 
-    /// Build a matcher backed by an isolated temp DB + in-memory cache.
+    /// Build a matcher backed by an isolated temp DB + in-memory cache, so no
+    /// test reads or writes the frame-count cache in `UserDefaults.standard`.
     /// Returns the cache so the test can inspect read/write activity.
     /// Cleanup of the temp DB is registered via `addTeardownBlock` so the
     /// helper composes with async setUp/tearDown.
     private func makeMatcher(
         slug: String,
         prepopulate: Int? = nil,
+        modelLoaders: LiveSpeakerMatcher.ModelLoaders = .fluidAudio,
     ) -> (LiveSpeakerMatcher, TestFrameCountCache) {
         let tempDB = FileManager.default.temporaryDirectory
             .appendingPathComponent("test-cache-\(slug)-\(UUID()).json")
@@ -115,6 +146,7 @@ final class LiveSpeakerMatcherTests: XCTestCase {
             speakerMatcher: SpeakerMatcher(dbPath: tempDB),
             readCachedFrameCount: { cache.read() },
             writeCachedFrameCount: { cache.write($0) },
+            modelLoaders: modelLoaders,
         )
         return (matcher, cache)
     }
@@ -143,5 +175,44 @@ private final class TestFrameCountCache: @unchecked Sendable {
     var writeCount: Int {
         lock.lock(); defer { lock.unlock() }
         return writes
+    }
+}
+
+/// Model loaders that record the compute units each launch path asks for
+/// and then fail, so no model is loaded. Locked for the same reason as
+/// `TestFrameCountCache`.
+private final class RecordingModelLoaders: @unchecked Sendable {
+    private struct LoadNotAttempted: Error {}
+
+    private let lock = NSLock()
+    private var embedding: [MLComputeUnits] = []
+    private var diarizer: [MLComputeUnits] = []
+
+    var embeddingUnits: [MLComputeUnits] {
+        lock.lock(); defer { lock.unlock() }
+        return embedding
+    }
+
+    var diarizerUnits: [MLComputeUnits] {
+        lock.lock(); defer { lock.unlock() }
+        return diarizer
+    }
+
+    var loaders: LiveSpeakerMatcher.ModelLoaders {
+        LiveSpeakerMatcher.ModelLoaders(
+            embeddingModel: { units in
+                self.record { $0.embedding.append(units) }
+                throw LoadNotAttempted()
+            },
+            diarizerModels: { units in
+                self.record { $0.diarizer.append(units) }
+                throw LoadNotAttempted()
+            },
+        )
+    }
+
+    private func record(_ change: (RecordingModelLoaders) -> Void) {
+        lock.lock(); defer { lock.unlock() }
+        change(self)
     }
 }

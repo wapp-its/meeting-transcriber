@@ -251,8 +251,8 @@ struct TranscriptionSettingsView: View {
             // The toggle stays enabled even for engines without the
             // re-transcribe hook, because the language-driven streaming
             // backends route captions through an engine-independent session.
-            // Enabling it for a Nemotron language whose model isn't downloaded
-            // yet defers to a consent alert (the ~0.6 GB first-use download).
+            // Enabling it for a language that routes to Nemotron, whose model isn't
+            // downloaded yet, defers to a consent alert (the ~0.6 GB first-use download).
             Toggle("Enable live transcription during recording", isOn: Binding(
                 get: { settings.liveTranscriptionEnabled },
                 set: { enabled in
@@ -315,12 +315,25 @@ struct TranscriptionSettingsView: View {
         .accessibilityIdentifier(A11yID.liveCaptionsSizePicker)
     }
 
+    /// The backend live captions would use if enabled, from the one routing rule.
+    static func captionStrategy(for settings: AppSettings) -> LiveCaptionsGate.Strategy {
+        LiveCaptionsGate.strategy(
+            liveEnabled: true,
+            engineLanguage: settings.activeEngineLanguageOrNil,
+            engineSupportsLive: settings.transcriptionEngine.supportsLiveTranscription,
+        )
+    }
+
     /// True when enabling captions would trigger the first-use Nemotron download:
-    /// the active language routes to Nemotron (set + non-English) and no model
-    /// variant is on disk yet.
+    /// the active language routes to Nemotron and no model variant is on disk yet.
+    static func needsCaptionModelConsent(strategy: LiveCaptionsGate.Strategy, modelDownloaded: Bool) -> Bool {
+        strategy == .nemotronStreaming && !modelDownloaded
+    }
+
     private var needsCaptionModelConsent: Bool {
-        guard let language = settings.activeEngineLanguageOrNil, language != "en" else { return false }
-        return !nemotronModelDownloaded
+        Self.needsCaptionModelConsent(
+            strategy: Self.captionStrategy(for: settings), modelDownloaded: nemotronModelDownloaded,
+        )
     }
 
     /// Engine-specific terminology behaviour is deliberately explained next to
@@ -350,24 +363,34 @@ struct TranscriptionSettingsView: View {
         return FileManager.default.fileExists(atPath: dir.path)
     }
 
-    /// Describes which low-latency backend the current transcription language
-    /// selects. The backend follows the active engine's configured language (no
-    /// toggle): English → Parakeet EOU, any other set language → Nemotron
-    /// multilingual streaming, auto-detect → the standard re-transcribe engine.
     private var captionBackendFootnote: String {
-        switch settings.activeEngineLanguageOrNil {
-        case .none:
-            "Caption backend follows your transcription language. Auto-detect uses the "
-                + "standard re-transcribe engine; set a specific language for low-latency "
-                + "streaming captions."
+        Self.captionBackendFootnote(
+            strategy: Self.captionStrategy(for: settings),
+            languageIsSet: settings.activeEngineLanguageOrNil != nil,
+        )
+    }
 
-        case "en":
+    /// Describes the backend `LiveCaptionsGate` selects for the current transcription
+    /// language: English → Parakeet EOU, a language Nemotron was trained on → Nemotron
+    /// streaming, auto-detect or any other language → the standard re-transcribe engine.
+    static func captionBackendFootnote(strategy: LiveCaptionsGate.Strategy, languageIsSet: Bool) -> String {
+        switch strategy {
+        case .englishStreaming:
             "Caption backend follows your transcription language. English uses the "
                 + "low-latency Parakeet streaming model."
 
-        default:
+        case .nemotronStreaming:
             "Caption backend follows your transcription language. It uses the low-latency "
                 + "Nemotron multilingual streaming model (~0.6-0.7 GB, downloads on first use)."
+
+        // `.none` cannot be reached with a language set: both engines support re-transcribe.
+        case .reTranscribe, .none:
+            languageIsSet
+                ? "Caption backend follows your transcription language. This language has no "
+                + "low-latency streaming model, so captions use the standard re-transcribe engine."
+                : "Caption backend follows your transcription language. Auto-detect uses the "
+                + "standard re-transcribe engine; set a specific language for low-latency "
+                + "streaming captions."
         }
     }
 
@@ -467,54 +490,6 @@ extension TranscriptionSettingsView {
             isOn: $settings.customVocabularyEnabled,
         )
         .accessibilityIdentifier(A11yID.customVocabularyToggle)
-    }
-
-    /// Where the vocabulary comes from: the local file or a URL. Hidden while the
-    /// switch is off, which turns off both sources.
-    @ViewBuilder private var vocabularySourceRows: some View {
-        if settings.customVocabularyEnabled {
-            VocabularySourceSettingsView(settings: settings, remoteVocabulary: remoteVocabulary)
-        }
-    }
-
-    /// Hidden while the switch is off, since no engine reads the file then, and
-    /// for the URL source; the selection is kept for switching back.
-    @ViewBuilder private var customVocabularyFileRows: some View {
-        if settings.customVocabularyEnabled, settings.vocabularySource == .file {
-            customVocabularyRow
-            customVocabularyValidation
-        }
-    }
-
-    private var customVocabularyRow: some View {
-        HStack {
-            TextField("Custom vocabulary file", text: Binding(
-                get: { settings.customVocabularyPath },
-                set: { settings.setCustomVocabularyPath($0) },
-            ))
-            .textFieldStyle(.roundedBorder)
-            .accessibilityIdentifier(A11yID.customVocabularyPathField)
-            Button("Choose\u{2026}") {
-                let panel = NSOpenPanel()
-                panel.allowedContentTypes = [.plainText]
-                panel.allowsMultipleSelection = false
-                if panel.runModal() == .OK, let url = panel.url {
-                    settings.setCustomVocabularyFile(url)
-                }
-            }
-        }
-        .help(Self.vocabularyHelpText(for: settings.transcriptionEngine))
-        .accessibilityIdentifier(A11yID.customVocabularyFileRow)
-    }
-
-    private var customVocabularyValidation: some View {
-        Text(settings.customVocabularyValidation.message)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .onAppear { settings.refreshCustomVocabularyValidation() }
-            .onChange(of: settings.customVocabularyPath) { _, _ in
-                settings.refreshCustomVocabularyValidation()
-            }
     }
 }
 

@@ -13,8 +13,7 @@ final class ConsentPromptCoordinatorTests: XCTestCase {
 
     func testResolvesToGrantedAnswer() async {
         let coord = ConsentPromptCoordinator(timeout: 60, sleep: neverSleep)
-        let task = Task { await coord.awaitDecision(id: "a") {} }
-        await yieldUntilParked()
+        let task = await parkedDecision(coord, id: "a")
         coord.resolve(id: "a", granted: true)
         let result = await task.value
         XCTAssertEqual(result, .granted)
@@ -22,8 +21,7 @@ final class ConsentPromptCoordinatorTests: XCTestCase {
 
     func testResolvesToDeniedAnswer() async {
         let coord = ConsentPromptCoordinator(timeout: 60, sleep: neverSleep)
-        let task = Task { await coord.awaitDecision(id: "b") {} }
-        await yieldUntilParked()
+        let task = await parkedDecision(coord, id: "b")
         coord.resolve(id: "b", granted: false)
         let result = await task.value
         XCTAssertFalse(result.isGranted)
@@ -126,18 +124,22 @@ final class ConsentPromptCoordinatorTests: XCTestCase {
         // timeout firing just after an answer) must not double-resume the
         // continuation — that would crash.
         let coord = ConsentPromptCoordinator(timeout: 60, sleep: neverSleep)
-        let task = Task { await coord.awaitDecision(id: "d") {} }
-        await yieldUntilParked()
+        let task = await parkedDecision(coord, id: "d")
         coord.resolve(id: "d", granted: true)
         coord.resolve(id: "d", granted: false)
         let result = await task.value
         XCTAssertEqual(result, .granted)
     }
 
-    func testResolveForUnknownIdIsNoOp() {
-        // Resolving an id that was never awaited must not crash.
+    func testResolveForUnknownIdIsNoOp() async {
+        // Resolving an id that was never awaited must not crash, and must not
+        // answer a prompt that is waiting under another id.
         let coord = ConsentPromptCoordinator(timeout: 60, sleep: neverSleep)
+        let task = await parkedDecision(coord, id: "a")
         coord.resolve(id: "never-awaited", granted: true)
+        XCTAssertTrue(coord.resolvePending(granted: false), "the waiting prompt was resolved by another id")
+        let result = await task.value
+        XCTAssertEqual(result, .declined)
     }
 
     /// The menu answers by id and must be able to tell that its prompt was
@@ -145,8 +147,7 @@ final class ConsentPromptCoordinatorTests: XCTestCase {
     func testResolveByIdReportsWhetherThePromptWasWaiting() async {
         let coord = ConsentPromptCoordinator(timeout: 60, sleep: neverSleep)
         XCTAssertFalse(coord.resolve(id: "a", answer: .granted), "an id that was never parked")
-        let task = Task { await coord.awaitDecision(id: "a") {} }
-        await yieldUntilParked()
+        let task = await parkedDecision(coord, id: "a")
         XCTAssertTrue(coord.resolve(id: "a", answer: .granted), "a waiting id")
         XCTAssertFalse(coord.resolve(id: "a", answer: .declined), "an id already resolved")
         let result = await task.value
@@ -164,8 +165,7 @@ final class ConsentPromptCoordinatorTests: XCTestCase {
 
     func testResolvePendingResolvesSingleParkedPrompt() async {
         let coord = ConsentPromptCoordinator(timeout: 60, sleep: neverSleep)
-        let task = Task { await coord.awaitDecision(id: "a") {} }
-        await yieldUntilParked()
+        let task = await parkedDecision(coord, id: "a")
         let resolved = coord.resolvePending(granted: true)
         XCTAssertTrue(resolved)
         let result = await task.value
@@ -176,9 +176,8 @@ final class ConsentPromptCoordinatorTests: XCTestCase {
         // Defensive n>1 case: with no ids to target, "resolve everything waiting"
         // is the only sane semantics — no zombie continuations left to time out.
         let coord = ConsentPromptCoordinator(timeout: 60, sleep: neverSleep)
-        let t1 = Task { await coord.awaitDecision(id: "a") {} }
-        let t2 = Task { await coord.awaitDecision(id: "b") {} }
-        await yieldUntilParked()
+        let t1 = await parkedDecision(coord, id: "a")
+        let t2 = await parkedDecision(coord, id: "b")
         let resolved = coord.resolvePending(granted: false)
         XCTAssertTrue(resolved)
         let r1 = await t1.value
@@ -190,8 +189,7 @@ final class ConsentPromptCoordinatorTests: XCTestCase {
     func testResolvePendingAfterResolveByIdIsNoOp() async {
         // A prompt already answered by id leaves nothing pending.
         let coord = ConsentPromptCoordinator(timeout: 60, sleep: neverSleep)
-        let task = Task { await coord.awaitDecision(id: "a") {} }
-        await yieldUntilParked()
+        let task = await parkedDecision(coord, id: "a")
         coord.resolve(id: "a", granted: true)
         let result = await task.value
         XCTAssertEqual(result, .granted)
@@ -202,8 +200,7 @@ final class ConsentPromptCoordinatorTests: XCTestCase {
         // Two racing resolvePending calls must not double-resume a continuation
         // (that would crash) — the drain-under-lock lets exactly one see it.
         let coord = ConsentPromptCoordinator(timeout: 60, sleep: neverSleep)
-        let task = Task { await coord.awaitDecision(id: "a") {} }
-        await yieldUntilParked()
+        let task = await parkedDecision(coord, id: "a")
         async let a = Task.detached { coord.resolvePending(granted: true) }.value
         async let b = Task.detached { coord.resolvePending(granted: true) }.value
         let (ra, rb) = await (a, b)
@@ -212,10 +209,17 @@ final class ConsentPromptCoordinatorTests: XCTestCase {
         XCTAssertEqual(result, .granted)
     }
 
-    /// Sleep briefly so the awaiting task registers its continuation inside
-    /// `withCheckedContinuation` before the test resolves it.
-    private func yieldUntilParked() async {
-        try? await Task.sleep(nanoseconds: 30_000_000)
+    /// Starts awaiting a decision for `id` and returns once the coordinator
+    /// has registered it, as reported by its `onParked` hook. A fixed sleep
+    /// could resolve before registration, leaving the task waiting on a
+    /// timeout that never fires; a prompt that never parks fails here instead.
+    private func parkedDecision(
+        _ coord: ConsentPromptCoordinator, id: String,
+    ) async -> Task<ConsentAnswer, Never> {
+        let parked = XCTestExpectation(description: "prompt \(id) parked")
+        let task = Task { await coord.awaitDecision(id: id) { parked.fulfill() } }
+        await fulfillment(of: [parked], timeout: 10)
+        return task
     }
 }
 

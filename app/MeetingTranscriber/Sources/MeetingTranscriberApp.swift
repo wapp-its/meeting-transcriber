@@ -11,52 +11,6 @@ extension Notification.Name {
     static let closeSettings = Notification.Name("closeSettings")
 }
 
-/// Renders the menu-bar icon and ticks the animation frame in its own
-/// view body. Keeping the timer + frame @State scoped here means the
-/// surrounding `MeetingTranscriberApp` scene body never re-evaluates on
-/// each tick — only this view does. Without this isolation, animating
-/// badges (recording, transcribing, …) would cascade re-renders through
-/// every open Window.
-private struct AnimatedMenuBarIcon: View {
-    let badge: BadgeKind
-    let pausedOverlay: Bool
-    let watchingOverlay: Bool
-    let questionOverlay: Bool
-    let meetingEndCountdownOverlay: Bool
-    let permissionOverlay: Bool
-    let recordOnlyOverlay: Bool
-    let micSilentOverlay: Bool
-    let appSilentOverlay: Bool
-
-    @State private var animationFrame = 0
-    // `.default` (not `.common`) so the timer never fires inside the status-bar
-    // menu's tracking loop — see MenuBarIcon.animationRunLoopMode for why.
-    private let iconTimer = Timer.publish(
-        every: 0.4, on: .main, in: MenuBarIcon.animationRunLoopMode,
-    ).autoconnect()
-
-    var body: some View {
-        Image(nsImage: MenuBarIcon.image(
-            badge: badge,
-            animationFrame: animationFrame,
-            pausedOverlay: pausedOverlay,
-            watchingOverlay: watchingOverlay,
-            questionOverlay: questionOverlay,
-            meetingEndCountdownOverlay: meetingEndCountdownOverlay,
-            permissionOverlay: permissionOverlay,
-            recordOnlyOverlay: recordOnlyOverlay,
-            micSilentOverlay: micSilentOverlay,
-            appSilentOverlay: appSilentOverlay,
-        ))
-        .onReceive(iconTimer) { _ in
-            let next = MenuBarIcon.nextFrame(animationFrame, badge: badge)
-            if next != animationFrame {
-                animationFrame = next
-            }
-        }
-    }
-}
-
 /// Bridges a SwiftUI `Window` scene down to its hosting `NSWindow` so
 /// window-level AppKit properties can be configured. macOS 14 (our deployment
 /// target) has no scene-level `.windowLevel` / collection-behavior modifiers
@@ -98,6 +52,9 @@ struct MeetingTranscriberApp: App {
     // swiftlint:disable:next unused_declaration
     @State private var transcriptionsQuery = ""
     @State private var regenerateSheet = RegenerateSheetState()
+    // Launch at Login. Here rather than on `AppState` because only the Settings
+    // scene uses it; building it reads nothing from the system.
+    @State private var loginItem = LoginItemController()
     @Environment(\.openWindow)
     private var openWindow
 
@@ -250,7 +207,12 @@ struct MeetingTranscriberApp: App {
             meetingReports: { appState.pipeline.meetingReportPaths(of: $0) },
             retryDeletion: { appState.pipeline.retryDeletion(jobID: $0) },
             setKeep: { appState.pipeline.setKeep(jobID: $0, $1) },
-            retention: { appState.settings.recordingRetention },
+            retention: {
+                RecordingRetentionSettings(
+                    enabled: appState.settings.recordingRetentionEnabled, days: appState.settings.recordingRetentionDays,
+                )
+            },
+            retainedRecording: { id in appState.pipeline.recordingRetention.registry.entries.first { $0.jobID == id } },
             bundleID: appState.pipeline.meetingFileStore.bundleID,
             templateChoices: { appState.protocolTemplateChoices() },
             optionsUse: { appState.protocolOptionsUse() },
@@ -306,7 +268,7 @@ struct MeetingTranscriberApp: App {
         .task {
             appState.remoteVocabulary.start()
         }
-        .task { appState.recordingRetention.start() }
+        .task { appState.meetingRecordPruner.start() }
         .task {
             await appState.startPermissionChecks()
         }
@@ -372,6 +334,7 @@ struct MeetingTranscriberApp: App {
                 updateInstallBlockedReason: appState.updateInstallBlockedReason,
                 onInstallUpdate: { appState.installUpdate() },
                 remoteVocabulary: appState.remoteVocabulary,
+                loginItem: loginItem,
                 notificationVisibility: appState.permissions.notificationVisibility,
                 // Share the pipeline's actor instance so both writers serialise on
                 // the same `recognition_log.jsonl` file. Fallback only fires in the
@@ -391,10 +354,6 @@ struct MeetingTranscriberApp: App {
                     dbPath: appState.pipeline.speakersDB, notifier: appState.notifier,
                 ),
                 legacyWhisperModels: appState.engines.legacyWhisperModels,
-                retentionActions: RetentionSettingsActions(
-                    preview: { await appState.recordingRetention.preview(for: $0) },
-                    apply: { appState.recordingRetention.apply($0) },
-                ),
             )
         }
         .windowResizability(.contentSize)

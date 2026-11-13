@@ -548,7 +548,7 @@ enum ProtocolError: LocalizedError {
             case let .commandNotConfigured(message): message
         #endif
 
-        case .emptyProtocol: "Meeting notes are empty. Tip: Test manually: echo Hello | claude --print"
+        case .emptyProtocol: "Meeting notes are empty: the provider returned no text."
 
         case let .httpError(code, body): "HTTP \(code)\(body.isEmpty ? "" : ": \(body)")"
 

@@ -43,7 +43,6 @@ on:
       - 'app/MeetingTranscriber/Package.swift'
       - 'app/MeetingTranscriber/Package.resolved'
       - 'app/MeetingTranscriber/Entitlements/AppStore.entitlements'
-      - 'app/MeetingTranscriber/Sources/Info.plist'
       - 'tools/audiotap/**'
       - 'scripts/build_release.sh'
       - 'scripts/appstore-bundle-check.sh'
@@ -72,7 +71,7 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - uses: ./.github/actions/verify-xcode
         with:
@@ -87,9 +86,10 @@ jobs:
           cache-restore-fallback: "false"
           cache-models: "false"
 
-      # `--no-notarize` keeps the signing path on the ad-hoc fallback so we
-      # don't need a Developer ID secret for a smoke run. `build_release.sh`
-      # detects an empty DEVELOPER_ID and falls back automatically.
+      # `--no-notarize` keeps the signing path off Developer ID so we don't
+      # need that secret for a smoke run: `build_release.sh` then signs with
+      # the first codesigning identity the keychain offers, or ad hoc when
+      # there is none.
       - name: Build App Store variant
         run: ./scripts/build_release.sh --appstore --no-notarize
 
@@ -107,7 +107,7 @@ jobs:
 
       - name: Upload crash reports on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: crash-reports
           path: ~/Library/Logs/DiagnosticReports/MeetingTranscriber-*.ips

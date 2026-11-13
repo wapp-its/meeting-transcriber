@@ -58,6 +58,10 @@ resign_deployed_bundle "$APP_BUNDLE" "$CHOSEN_IDENTITY" \
     || fail "codesign failed for $APP_BUNDLE (identity $CHOSEN_IDENTITY)"
 ok "signed"
 
+# Cleanup on exit. Armed before the launch, so an app that never binds the
+# port is stopped too.
+trap 'pkill -f MeetingTranscriber-Dev 2>/dev/null || true' EXIT
+
 # --- Launch with env var. ---
 step "Launching with MEETINGTRANSCRIBER_DEBUG_RPC=1"
 MEETINGTRANSCRIBER_DEBUG_RPC=1 open -gj "$APP_BUNDLE"
@@ -68,9 +72,6 @@ for _ in $(seq 1 30); do
 done
 lsof -i :9876 >/dev/null 2>&1 || fail "server did not bind to :9876 within 6s"
 ok "listening on :9876"
-
-# Cleanup on exit.
-trap 'pkill -f MeetingTranscriber-Dev 2>/dev/null || true' EXIT
 
 [ -s "$TOKEN_FILE" ] || fail "token file not created"
 TOKEN=$(cat "$TOKEN_FILE")
@@ -164,7 +165,7 @@ step "UI press (accessibility action) — the PoC verification"
 # Read record-only, press the toggle, assert /state flips. This is the whole
 # point of the slice: does an in-process accessibilityPerformPress() actually
 # fire the SwiftUI action behind the AppKit-bridged toggle? The assertion is the
-# effect in /state, not the returned `pressed` flag.
+# effect in /state, not the returned `dispatched` flag.
 read_record_only() {
     "$MT_CLI_BIN" state \
         | python3 -c "import json,sys; print(json.load(sys.stdin)['settings']['recording']['recordOnly'])"

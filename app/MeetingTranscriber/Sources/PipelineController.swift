@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 import Observation
 import os.log
@@ -43,6 +44,8 @@ final class PipelineController {
     /// Durable finished-job record store, shared across queue rebuilds and read
     /// by `jobStatus(forID:)` for the automation API. Test-injectable.
     let terminalJobStore: TerminalJobStore
+    /// Shared across queue rebuilds; see `PipelineController+Retention.swift`.
+    let recordingRetention: RecordingRetention
 
     /// Durable record of each meeting's files, shared across queue rebuilds like
     /// the finished-job records beside it. Test-injectable.
@@ -96,6 +99,11 @@ final class PipelineController {
         /// The one gate every local-model protocol goes through (spec R10).
         let localModelGate = LocalModelGate()
     #endif
+    /// How the queues this controller builds open the output folder's scope,
+    /// for a retention pass that runs before any of them is built.
+    var queueSecurityScope: SecurityScopeAccess {
+        queueEnvironment.securityScope
+    }
 
     /// Called with the new queue whenever `rebuild()` replaces it, so a holder
     /// of the old one can follow. The active `WatchLoop` is one: it enqueues
@@ -103,11 +111,6 @@ final class PipelineController {
     /// following a folder change its recordings would land in the old folder
     /// through a queue nothing else shows.
     @ObservationIgnored var onQueueReplaced: ((PipelineQueue) -> Void)?
-
-    /// Called when a meeting reaches `.done`, when a Notion export ends and after a
-    /// rebuild, whose restore can finish a job before the queue has its callbacks. It is
-    /// what the automatic deletion waits for. Read at each call, so it reaches every queue.
-    @ObservationIgnored var onMeetingSettled: (() -> Void)?
 
     /// The output-folder bookmark the current queue was built from, so a change
     /// of folder can be noticed without resolving the bookmark again.
@@ -151,6 +154,9 @@ final class PipelineController {
             ?? PipelineQueue(
                 logDir: queueEnvironment.logDir, stagingDir: queueEnvironment.stagingDir,
             )
+        recordingRetention = Self.makeRecordingRetention(
+            logDir: queueEnvironment.logDir, settings: settings, bundleID: self.meetingFileStore.bundleID,
+        )
     }
 
     /// Wire the active-engine source. Called once from `AppState.init` after its
@@ -159,6 +165,8 @@ final class PipelineController {
         self.engineProvider = engineProvider
         reconcileInterruptedDeletions()
         observeOutputFolder()
+        connectRetentionToMeetingRecords()
+        startRecordingRetention()
     }
 
     // MARK: - Queue lifecycle
@@ -208,6 +216,8 @@ final class PipelineController {
         // says what reading the identity afterwards would cost.
         let replaced = queueWasBuiltHere ? queue : nil
         guard let built = makeQueue() else { return }
+        // Before the restore, which at once announces a job waiting for names and reports one it finishes.
+        configureCallbacks(on: built)
         if let replaced {
             built.adoptJobs(of: replaced)
             replaced.retire()
@@ -222,9 +232,8 @@ final class PipelineController {
         // `testAQueueBuiltWithoutBeingInstalledDoesNotDisarmTheFolderChange`.
         queueBuiltFromBookmark = settings.customOutputDirBookmark
         builtQueue = built
-        configureCallbacks()
         onQueueReplaced?(queue)
-        onMeetingSettled?()
+        Task { [weak self] in await self?.sweepRetainedRecordings() }
     }
 
     /// Whether the installed queue is one this controller built, as opposed to
@@ -314,9 +323,8 @@ final class PipelineController {
     ///
     /// Wiring only; `rebuild` owns the steps that make a queue live.
     ///
-    /// Not free of effect even so: a `PipelineQueue` takes the output folder's
-    /// security scope in its initialiser and holds it for its lifetime, so a
-    /// queue built and dropped takes and releases one.
+    /// Not free of effect even so: a `PipelineQueue` takes the output folder's security scope
+    /// in its initialiser and holds it for its lifetime, so a queue built and dropped takes and releases one.
     func makeQueue() -> PipelineQueue? {
         guard let engine = engineProvider?() else { return nil }
         return PipelineQueue(
@@ -324,15 +332,16 @@ final class PipelineController {
             diarizationFactory: { [self] in makeFluidDiarizer(mode: settings.diarizerMode) },
             diarizationFactoryWithMode: { [self] mode in makeFluidDiarizer(mode: mode) },
             protocolGeneratorFactory: { [self] in makeProtocolGenerator() },
-            // Captured by value: this is the moment the destination of every job
-            // this queue will run is decided, so a fallback is reported here and
-            // not from `effectiveOutputDir`, which `body` reads on every render.
+            // Captured by value: this is the moment the destination of every job this queue will run is
+            // decided, so a fallback is reported here and not from `effectiveOutputDir`, which `body` reads on every render.
             outputDir: queueEnvironment.resolveOutputDir(outputDirectory),
             logDir: queueEnvironment.logDir,
             stagingDir: queueEnvironment.stagingDir,
             diarizeEnabled: settings.diarize,
+            staleNamingMaxAge: { [settings] in settings.staleNamingTimeout.maxAge },
             echoDedupEnabled: settings.echoDedupEnabled,
             echoCancellationEnabled: { [settings] in settings.echoCancellationEnabled },
+            autoOpenSpeakerNaming: { [settings] in settings.autoOpenSpeakerNaming },
             numSpeakers: settings.numSpeakers,
             micLabel: settings.micName,
             includeFullTranscriptInProtocol: settings.includeFullTranscriptInProtocol,
@@ -361,6 +370,7 @@ final class PipelineController {
             terminalJobStore: terminalJobStore,
             meetingFileStore: meetingFileStore,
             securityScope: queueEnvironment.securityScope,
+            recordingRetention: recordingRetention,
         )
     }
 
@@ -427,7 +437,8 @@ final class PipelineController {
         }
     }
 
-    func configureCallbacks() {
+    func configureCallbacks(on target: PipelineQueue? = nil) {
+        let queue = target ?? queue
         queue.onNotionExportFinished = { [notifier] in notifier.notifyNotionExport(job: $0, failureReason: $1) }
         queue.onJobStateChange = { [notifier] job, _, newState in
             switch newState {
@@ -443,13 +454,13 @@ final class PipelineController {
                 break
             }
         }
+        queue.onSpeakerNamesWaiting = { [notifier] in notifier.notify(title: "Name Speakers", body: PipelineQueue.speakerNamesWaitingMessage($0)) }
         queue.onUnusableVoices = { [notifier] job, names in
             notifier.notify(title: "Voice not saved", body: PipelineQueue.unusableVoicesMessage(names, in: job))
         }
         #if !APPSTORE
             LocalModelJobNotices(notifier: notifier, settings: settings).install(on: queue)
         #endif
-        chainRetentionTriggers() // Last: the notices above can end a job's callback early.
     }
 
     // MARK: - File enqueue
@@ -555,13 +566,16 @@ final class PipelineController {
     /// the in-flight status once `maxWaitSeconds` elapses (the job keeps running
     /// and will still finish on its own), else `.completed` with the terminal
     /// status. A Notion export is not waited for: `export` says if it is pending.
+    /// `onEnqueued` gets the job id as soon as the job exists, before the wait.
     func transcribeAndWait(
         path: URL,
         maxWaitSeconds: Double,
         pollInterval: Duration = .milliseconds(200),
+        onEnqueued: @MainActor (UUID) -> Void = { _ in },
     ) async -> BlockingTranscribeResult {
         guard let jobID = enqueueExistingFilesReturningIDs([path], autoSkipNaming: true).first
         else { return .noFile }
+        onEnqueued(jobID)
         let deadline = ContinuousClock.now.advanced(by: .seconds(maxWaitSeconds))
         while ContinuousClock.now < deadline {
             if let job = queue.jobs.first(where: { $0.id == jobID }) {
@@ -579,20 +593,14 @@ final class PipelineController {
     }
 }
 
+/// The blocking-transcribe seam behind `POST /v1/transcribe`: file, wait in
+/// seconds, and a callback the job id is handed to once the job exists.
+typealias BlockingTranscribe = (URL, Double, @MainActor (UUID) -> Void) async -> BlockingTranscribeResult
+
 /// Outcome of a blocking `transcribeAndWait`. The RPC layer maps `noFile` → 400,
 /// `completed` → 200, `timedOut` → 202.
 enum BlockingTranscribeResult {
     case noFile
     case completed(JobStatusDTO)
     case timedOut(JobStatusDTO?)
-
-    /// The job this result refers to, if any (nil only for `.noFile`). Lets the
-    /// RPC layer record the created job under an Idempotency-Key.
-    var jobID: UUID? {
-        switch self {
-        case .noFile: nil
-        case let .completed(dto): UUID(uuidString: dto.jobID)
-        case let .timedOut(dto): dto.flatMap { UUID(uuidString: $0.jobID) }
-        }
-    }
 }

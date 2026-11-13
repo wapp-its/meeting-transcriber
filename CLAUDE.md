@@ -18,9 +18,9 @@ app/MeetingTranscriber/    # Swift macOS menu-bar app (SPM)
                            #   (SettingsView + Settings/). Protocol generation:
                            #   ClaudeCLIProtocolGenerator (#if !APPSTORE) / OpenAIProtocolGenerator.
                            #   DebugRPCServer + /v1 automation API (#if !APPSTORE).
+                           #   Info.plist: bundle metadata and permission usage strings.
   Tests/                   # XCTest + ViewInspector; Fixtures/ test audio (two_speakers_de.wav, ...)
-  Entitlements/            # Homebrew.entitlements (mic only) + AppStore.entitlements (sandbox)
-  Info.plist               # Bundle metadata
+  Entitlements/            # Homebrew.entitlements (mic only) + AppStore.entitlements (sandbox + app-scoped bookmarks)
 tools/audiotap/            # AudioTapLib: CATapDescription app-audio + AVAudioEngine mic capture (SPM lib)
 tools/meeting-simulator/   # Meeting simulator for testing
 tools/mt-cli/              # Thin Swift client for DebugRPCServer (+ skill.md)
@@ -86,6 +86,9 @@ gh workflow run quality-and-safety.yml -f run-sanitizer=true -f run-quality=fals
 
 # Lint & format auto-fix (SwiftFormat + SwiftLint --fix)
 ./scripts/lint.sh --fix
+
+# SwiftLint analyzer rules, as CI's analyze job runs them (clean build, slow)
+./scripts/lint.sh --analyze
 
 # Pre-push parity check (release build — catches Sendable diagnostics
 # that debug-mode tolerates; flags App Store variant when --with-appstore)
@@ -162,6 +165,7 @@ Read the matching doc before changing or debugging that area. Each holds the are
 ## Cross-Cutting Rules
 
 - Test each behaviour at the cheapest layer that can falsify it: pure logic first, then one ViewInspector wiring test per control, then live `/state`. For a GUI bug, write the failing test first at the lowest layer that reproduces it.
+- A test must fail without the change; for something new, check that at the line that wires it into production, not by a full revert. See `CONTRIBUTING.md`, Tests.
 
 ## Critical Notes
 
@@ -188,12 +192,12 @@ Two build variants controlled by compile-time flag `APPSTORE` (`-Xswiftc -DAPPST
 |---|---|---|
 | **Claude CLI** | Yes (Process subprocess) | No (sandbox forbids Process) |
 | **OpenAI API** | Yes | Yes (only LLM option) |
-| **Debug RPC server** | Yes (env-gated) | No (`#if !APPSTORE`) |
+| **Debug RPC server** | Yes (off by default; Settings toggle or env flag) | No (`#if !APPSTORE`) |
 | **Safari call audio** | Yes (`ProcessResponsibility` via `dlsym`) | No (private symbol unavailable; bundle-derived PIDs only) |
 | **Chromium helper selection** | Yes (`ChromiumHelperFilter` reads argv via `KERN_PROCARGS2`) | Not measured: if the sandbox refuses the sysctl for other processes, every argv reads empty and the tap keeps all helpers (the issue #791 stall); the refusal is logged with its errno |
-| **Entitlements** | Mic only | Sandbox + mic + network + file picker |
+| **Entitlements** | Mic only | Sandbox + mic + network + file picker + app-scoped bookmarks |
 | **Build** | `./scripts/build_release.sh` | `./scripts/build_release.sh --appstore` |
-| **Tests** | ~4,100 | ~3,600 (CLI + RPC tests excluded via `#if !APPSTORE`) |
+| **Tests** | ~4,500 | ~4,100 (CLI + RPC tests excluded via `#if !APPSTORE`) |
 
 - CLI-specific code lives in `ClaudeCLIProtocolGenerator.swift` and `DebugRPCServer.swift` (each entire file `#if !APPSTORE`)
 - `ProtocolProvider` enum uses `CaseIterable` — `.claudeCLI` case excluded at compile time, picker adapts automatically

@@ -61,7 +61,7 @@ let picker = try view.inspect()
 try picker.select(value: LiveCaptionsSize.small)
 ```
 
-Measured under the pinned ViewInspector 0.10.3, and pinned by
+Measured under the pinned ViewInspector 0.10.5, and pinned by
 `ViewInspectorIdentifierTests`: a `Picker` and a `Stepper` each carrying an
 identifier are found and driven, and an unknown identifier throws, so the lookup
 is not matching whatever it is handed. The label and document-order locators still in `SettingsInteractionTests` work, and they are not the shape to copy. `find(text:)` for a bare
@@ -70,9 +70,12 @@ tree-visible;
 press-drivable *additionally* requires a `/ui/press` allowlist entry — never allowlist
 a control whose action opens a menu/popover/sheet/panel (a nested runloop wedges the
 app, see `DebugRPCServer+UIPress.swift`). Never widen the window allowlist to PII
-windows or expose control values (`DebugRPCServer+UITree.swift`).
+windows or expose control values (`DebugRPCServer+UITree.swift`). The launch-at-login
+toggle stays off the allowlist too, for a different reason: a live press (or any test
+that reaches `SMAppService`) registers a real login item for whatever binary hosts it,
+so its tests go through the `LoginItemRegistering` fake.
 
-**Live assertions:** assert the `/state` effect, never the returned `pressed` flag or
+**Live assertions:** assert the `/state` effect, never the returned `dispatched` flag or
 tree structure (depth/frames/child counts). Assert the env-stable, load-bearing pin
 subset (`isVisible`, `floating`, `canJoinAllSpaces`) — `fullScreenAuxiliary` proved
 env-unstable on the CI mini (#511). `e2e-ui-smoke` is a harness-liveness canary only —
@@ -80,7 +83,8 @@ feature-level live assertions go in `test_rpc.sh` or the `e2e-app` lanes.
 
 **GUI bug found:** failing test first, at the lowest layer that reproduces it. If only
 the live scene reproduces, drive the real scene window (a minimal probe window does not
-reproduce — #504). Acceptance: revert the fix, test goes red.
+reproduce, #504). Acceptance: the test goes red without the fix, checked as `CONTRIBUTING.md`, Tests,
+describes.
 
 **Don't:** chase snapshot coverage; use `/ui/press` to arrange state (it's for testing
 the pressed control); test SwiftUI framework behavior (e.g. that `.keyboardShortcut`

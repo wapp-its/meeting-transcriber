@@ -138,7 +138,7 @@ struct TrashSelectionPlan {
 /// The line under the All Recordings list: how many rows it shows, or how many of them
 /// are selected, their audio on disk, and what the retention setting does.
 enum TranscriptionsFooter {
-    static func text(shown: Int, selected: Int, audioBytes: Int64, retention: RecordingRetention) -> String {
+    static func text(shown: Int, selected: Int, audioBytes: Int64, retention: RecordingRetentionSettings) -> String {
         let count = selected > 0 ? "\(selected) of \(shown) selected" : "\(shown) \(shown == 1 ? "recording" : "recordings")"
         let audio = audioBytes > 0 ? "audio \(size(audioBytes))" : "no audio"
         return [count, audio, deletion(retention)].compactMap(\.self).joined(separator: " · ")
@@ -148,12 +148,13 @@ enum TranscriptionsFooter {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
 
-    private static func deletion(_ retention: RecordingRetention) -> String? {
-        let when: String? = switch retention {
-        case .never: nil
-        case .afterProtocol: "right after the notes"
-        case .days7, .days30, .days90: retention.days.map { "after \($0) days" }
+    private static func deletion(_ retention: RecordingRetentionSettings) -> String? {
+        guard retention.enabled else { return nil }
+        let when = switch retention.days {
+        case ...0: "right after the notes"
+        case 1: "after 1 day"
+        default: "after \(retention.days) days"
         }
-        return when.map { "recordings are deleted automatically \($0) (Settings → Output)" }
+        return "recordings are deleted automatically \(when) (Settings → Output)"
     }
 }

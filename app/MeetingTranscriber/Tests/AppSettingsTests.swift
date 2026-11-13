@@ -109,8 +109,8 @@ final class AppSettingsTests: XCTestCase {
     }
 
     func testEndGraceBoundaryValue() {
-        settings.endGrace = 5.0
-        XCTAssertEqual(settings.endGrace, 5.0)
+        settings.endGrace = 1.0
+        XCTAssertEqual(settings.endGrace, 1.0)
     }
 
     func testNumSpeakersClampedToMinimum() {
@@ -133,7 +133,7 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(settings.asymmetricSilenceWarningSeconds, 120)
     }
 
-    func testNumSpeakersClampedToMinimumZero() {
+    func testNumSpeakersAcceptsTheMinimumZero() {
         settings.numSpeakers = 0
         XCTAssertEqual(settings.numSpeakers, 0)
     }
@@ -415,9 +415,12 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertFalse(settings.includePreReleases)
     }
 
+    /// Read back through a fresh instance: the default is `true`, so only a
+    /// reload can tell a persisted `false` from a key that was never written.
     func testCheckForUpdatesPersistence() {
         settings.checkForUpdates = false
-        XCTAssertFalse(defaults.bool(forKey: "checkForUpdates"))
+        let reloaded = AppSettings(defaults: defaults, apiKeyAccount: apiKeyAccount)
+        XCTAssertFalse(reloaded.checkForUpdates)
     }
 
     func testIncludePreReleasesPersistence() {
@@ -566,24 +569,6 @@ final class AppSettingsTests: XCTestCase {
 
         let roundTrip = try JSONDecoder().decode([DiarizerMode].self, from: json)
         XCTAssertEqual(roundTrip, [.offline, .sortformer, .nemotron])
-    }
-
-    /// Stored by name: a renamed case would read as Never for everyone who chose it.
-    func testRecordingRetentionRawValuesArePinned() {
-        XCTAssertEqual(RecordingRetention.allCases.map(\.rawValue), ["never", "afterProtocol", "days7", "days30", "days90"])
-    }
-
-    func testRecordingRetentionDefaultsToNeverAndSurvivesARestart() {
-        XCTAssertEqual(settings.recordingRetention, .never)
-        for retention in RecordingRetention.allCases {
-            settings.recordingRetention = retention
-            XCTAssertEqual(AppSettings(defaults: defaults, apiKeyAccount: apiKeyAccount).recordingRetention, retention)
-        }
-    }
-
-    func testAnUnknownStoredRecordingRetentionReadsAsNever() {
-        defaults.set("days14", forKey: "recordingRetention")
-        XCTAssertEqual(AppSettings(defaults: defaults, apiKeyAccount: apiKeyAccount).recordingRetention, .never)
     }
 
     /// `DiarizerMode.speakerCap` is the single source of truth for the

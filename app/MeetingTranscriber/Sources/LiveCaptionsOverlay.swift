@@ -1,12 +1,14 @@
+import AppKit
 import SwiftUI
 
 /// Caption-bar content rendered inside `LiveCaptionsWindow` (a borderless,
 /// status-bar-level NSPanel pinned to the bottom of the main screen).
 ///
-/// Layout (top to bottom): up to `maxFinalsKept` recent finalised utterances
-/// at full opacity, then the per-channel hypotheses at 60 % opacity. Finals
+/// Layout (top to bottom): up to `maxFinalsKept` recent finalised utterances,
+/// the older at 60 % opacity and the newest at full opacity, then the
+/// per-channel hypotheses at full opacity. Finals
 /// carry their own per-line `LiveCaptionLine.speaker` (resolved by
-/// `LiveSpeakerMatcher` at commit time) so a `speakers.json` rename after
+/// `LiveSpeakerMatcher` for that line) so a `speakers.json` rename after
 /// the line is committed doesn't retroactively re-label it. Live hypothesis
 /// rows fall back to the channel-default `LiveCaptionsState.micLabel` /
 /// `.appLabel` because the partial transcript hasn't reached its end-of-
@@ -16,45 +18,49 @@ import SwiftUI
 ///
 /// The content is bottom-anchored inside the fixed-size NSPanel (see
 /// `LiveCaptionsWindowController`) so the bar visually grows upward as new
-/// captions arrive instead of jittering top-down.
+/// captions arrive instead of jittering top-down; past the panel's height
+/// the oldest lines clip at the top.
 struct LiveCaptionsOverlay: View {
     @Bindable var state: LiveCaptionsState
 
     var body: some View {
-        // TimelineView re-evaluates the opacity expression every 200 ms while
-        // visible so the >2 s-silence fade is smooth without a manual timer.
-        // It's gated behind `state.hasContent` so the timeline stops when the
-        // bar is empty (idle bar → zero recurring work).
-        VStack {
-            Spacer(minLength: 0)
-            if state.hasContent {
-                TimelineView(.periodic(from: .now, by: 0.2)) { context in
-                    content.opacity(state.opacity(at: context.date))
+        // An overlay doesn't pass its content's height up, so overflow clips
+        // the oldest lines at the top instead of centring and cutting off the newest.
+        Color.clear
+            .overlay(alignment: .bottom) {
+                if state.hasContent {
+                    content
+                        .opacity(state.faded ? 0 : 1)
+                        .animation(
+                            state.faded
+                                ? .linear(duration: LiveCaptionsState.fadeDuration)
+                                : nil,
+                            value: state.faded,
+                        )
                 }
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .animation(.easeInOut(duration: 0.15), value: state.hypothesisMic)
-        .animation(.easeInOut(duration: 0.15), value: state.hypothesisApp)
-        .animation(.easeInOut(duration: 0.15), value: state.recentFinals)
+            // Not keyed on the hypotheses: a cross-fade on each partial overlaid old and new words.
+            .animation(.easeInOut(duration: 0.15), value: state.recentFinals)
     }
 
     private var content: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        let finals = state.recentFinals.suffix(LiveCaptionsState.maxFinalsKept)
+        return VStack(alignment: .leading, spacing: 4) {
             if let backend = state.activeBackend {
                 Text(backend)
                     .font(.system(size: state.size.labelFontSize, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.45))
                     .accessibilityIdentifier(A11yID.liveCaptionBackend)
             }
-            ForEach(state.recentFinals.suffix(LiveCaptionsState.maxFinalsKept), id: \.self) { line in
-                row(speaker: line.speaker, text: line.text, opacity: 1.0)
+            ForEach(Array(finals.enumerated()), id: \.element) { index, line in
+                // The newest final is often still being read, so only older ones dim.
+                row(speaker: line.speaker, text: line.text, opacity: index == finals.count - 1 ? 1.0 : 0.6)
             }
             if !state.hypothesisApp.isEmpty {
-                row(speaker: state.appLabel, text: state.hypothesisApp, opacity: 0.6)
+                row(speaker: state.appLabel, text: state.hypothesisApp, opacity: 1.0)
             }
             if !state.hypothesisMic.isEmpty {
-                row(speaker: state.micLabel, text: state.hypothesisMic, opacity: 0.6)
+                row(speaker: state.micLabel, text: state.hypothesisMic, opacity: 1.0)
             }
         }
         .font(.system(size: state.size.fontSize, weight: .medium, design: .rounded))
@@ -64,16 +70,66 @@ struct LiveCaptionsOverlay: View {
         .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 4)
+        .background(GeometryReader { proxy in
+            Color.clear.preference(key: LiveCaptionsContentFrameKey.self, value: proxy.frame(in: .global))
+        })
     }
 
     private func row(speaker: String, text: String, opacity: Double) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .top, spacing: 8) {
             Text(speaker + ":")
                 .foregroundStyle(.white.opacity(min(opacity, 0.85)))
                 .fontWeight(.semibold)
-            Text(text)
-                .foregroundStyle(.white.opacity(opacity))
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(1)
+                .layoutPriority(1)
+            // Bound each channel too, so a long mic row cannot push the app row out of the bar.
+            LiveCaptionTextClip(maxHeight: 2 * Self.lineHeight(fontSize: state.size.fontSize)) {
+                Text(text)
+                    .foregroundStyle(.white)
+                    .opacity(opacity)
+                    // New words swap in at once; only the position eases, so a full line slides out the top.
+                    .contentTransition(.identity)
+            }
+            .clipped()
+            .animation(.easeOut(duration: 0.2), value: text)
         }
+    }
+
+    /// Line pitch of the row font, which SwiftUI rounds up to whole points (19 / 26 / 33 pt at
+    /// small / medium / large). A clip off this pitch shows a strip of the hidden line's descenders.
+    static func lineHeight(fontSize: CGFloat) -> CGFloat {
+        let medium = NSFont.systemFont(ofSize: fontSize, weight: .medium)
+        let font = medium.fontDescriptor.withDesign(.rounded)
+            .flatMap { NSFont(descriptor: $0, size: fontSize) } ?? medium
+        return (font.ascender - font.descender + font.leading).rounded(.up)
+    }
+}
+
+/// Takes its content's height up to `maxHeight`, never more, and keeps the
+/// content's bottom edge, so overflow leaves at the top.
+struct LiveCaptionTextClip: Layout {
+    let maxHeight: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
+        guard let content = subviews.first else { return .zero }
+        let size = content.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        return CGSize(width: size.width, height: min(size.height, maxHeight))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout ()) {
+        subviews.first?.place(
+            at: CGPoint(x: bounds.minX, y: bounds.maxY),
+            anchor: .bottomLeading,
+            proposal: ProposedViewSize(width: bounds.width, height: nil),
+        )
+    }
+}
+
+/// The caption box's frame in the hosting view, so tests can see which end clips.
+struct LiveCaptionsContentFrameKey: PreferenceKey {
+    static let defaultValue: CGRect? = nil
+
+    static func reduce(value: inout CGRect?, nextValue: () -> CGRect?) {
+        value = nextValue() ?? value
     }
 }

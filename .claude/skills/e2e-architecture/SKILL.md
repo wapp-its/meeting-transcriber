@@ -58,8 +58,11 @@ PRs are excluded from the self-hosted runner.
 - The `--naming-confirm` lane additionally drives the speaker-naming CONFIRM
   path end-to-end (enqueue a 2-speaker fixture, park at naming instead of
   auto-skipping, `POST /v1/jobs/<id>/naming` an anonymous mapping, then assert
-  the confirmed names replace the raw diarization labels in the transcript and
-  the speaker DB learns the voices); it snapshots + restores the runner's real
+  the confirmed names replace the raw diarization labels in the transcript, the
+  speaker DB learns the voices, and a second copy of the fixture, enqueued
+  afterwards, is suggested exactly those names: a recognised job still parks at
+  naming, so the suggestions are read off its naming choice and the job is then
+  skipped); it snapshots + restores the runner's real
   `speakers.json`/`recognition_log.jsonl` (`$GITHUB_ACTIONS`-gated) so the
   confirm never pollutes the persistent speaker DB.
 - The `--naming-switch` lane covers issue #700: the dialog switches to the next
@@ -308,6 +311,24 @@ PRs are excluded from the self-hosted runner.
   sibling's leftover into every later step. Hand-run rule on the mini, all three
   before touching it: no `Runner.Worker`, no `e2e-app.sh`, no
   `MeetingTranscriber-Dev` process.
+- **A red lane does not stop the job.** `e2e-app.yml` builds, deploys and
+  signs the bundle in a step of its own (`e2e-app.sh --redeploy-only`), and
+  every lane after it runs `--no-build` when the run is not cancelled and that
+  step succeeded, so one broken feature no longer hides the verdicts of the
+  lanes behind it, while a failed build still skips them all (`--no-build`
+  would otherwise test whatever bundle an earlier run left). The job still
+  ends red. The re-import lane also needs the record-only step it reuses the
+  WAV of, and the upgrade lane the step that prepares its model.
+- **A failed `e2e-app.sh` lane leaves a diagnostics bundle** in CI, written by
+  its exit handler before any cleanup: `$RUNNER_TEMP/e2e-diag/<lane>/` with the
+  app's `/state`, queue snapshot and pipeline-log tail, the lane's own
+  simulator log (`/tmp/e2e-app-sim-<lane>.log`) and the app's crash reports
+  since the run started, uploaded once as the `e2e-diagnostics` artifact. The
+  artifact is public, so the structured files are rebuilt from an allowlist of
+  fields that leaves out names, titles, spoken text, paths and endpoints;
+  `e2e_write_diagnostics` in `scripts/lib/e2e-helpers.sh` lists what is kept,
+  and `scripts/tests/test_e2e_diagnostics.sh` feeds it samples full of names.
+  A field added to `/state` stays out of the bundle until it is added there.
 - Limitations: needs one-time runner setup (see below); can't run on
   GitHub-hosted runners — only on a self-hosted Mac with an interactive
   GUI session and a stable code-signing identity.
@@ -355,7 +376,7 @@ PRs are excluded from the self-hosted runner.
   (best-effort, depends on a third-party public instance being up — an outage is
   not our regression). Chrome must be installed; `~/Applications` works for a
   runner user without `/Applications` write access, and `node`/`npm` are needed
-  (puppeteer-core is `npm i`-installed on demand into `scripts/fixtures`).
+  (puppeteer-core is installed on demand into `scripts/fixtures` with `npm ci` from the committed lockfile).
 
 **Why the live-recording variant exists** (history that's easy to lose):
 - An earlier attempt at xctest-framed live recording (PR #100,

@@ -22,7 +22,7 @@ Native SwiftUI menu bar application that orchestrates meeting detection, recordi
                 └────────┬─────────────────────────────────┬───────┘
                          │                                 │ optional
                          │                                 │ (#if !APPSTORE
-                         │                                 │  + env flag)
+                         │                                 │  + toggle/env)
                          │                                 ▼
                          │                  ┌──────────────────────────┐
                          │                  │  DebugRPCServer          │
@@ -110,15 +110,14 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `RecordingAudioLine.swift` | Pure wording of a row's audio line, its Keep badge and why a deletion stopped |
 | `RowAvailability.swift` | The rows' files and audio on disk, read once per row and refresh, so a redraw never reads the disk |
 | `AllRecordingsActions.swift` | What the window's controls do, handed to `TranscriptionsView` as one value |
-| `RetentionPreview.swift` | What a retention value would delete now, shown before it is saved, and `RetentionChoice`, the picker's value on its way to the setting |
 | `MicrophoneMenuState.swift` | Pure decision for the menu bar's Microphone entry: its title (the device a recording reports, otherwise the chosen device or `System Default (<name>)`, a chosen device that is not connected, no microphone available, the "No Microphone" off line), the items (`System Default (<name>)` then the Settings list) and the checked choice, and every string the entry shows |
 | `ProtocolOpener.swift` | Opens local protocols with the default handler and prefers an already-running Notion desktop app for Notion pages, falling back to the default handler |
 | `MenuBarIcon.swift` | Renders the animated waveform icon + badge overlays (watching dot, question mark while a recording prompt is open, pulse while a meeting-end countdown runs, permission, record-only, channel-silent) |
 | `AppPickerView.swift` | App picker sheet for manual recording of any running app |
 | `AudioImportTypes.swift` | File types offered by the batch-import and voice-enrollment `NSOpenPanel`s — single source of truth so the ffmpeg-gated vs. natively-decoded format lists stay pinned and testable |
 | `A11yID.swift` | Shared accessibility-identifier namespace — one constant per control, referenced by the view modifier, ViewInspector tests, and the `/ui/press` allowlist |
-| `SettingsView.swift` | Settings window — `TabView` shell hosting seven topic-grouped sub-views in `Sources/Settings/` |
-| `Settings/GeneralSettingsView.swift` | Mode (Record-only) · Apps to Watch (Teams/Zoom/Webex/Browser/WeChat/Tencent Meeting/FaceTime/WhatsApp/Slack) · Record Without Asking (per native/mic-input app) · Detection (Poll Interval, Grace Period) |
+| `SettingsView.swift` | Settings window — `NavigationSplitView` shell (sidebar of tabs) hosting seven topic-grouped sub-views in `Sources/Settings/` |
+| `Settings/GeneralSettingsView.swift` | Startup (Launch at login, Start watching when the app opens = `AppSettings.autoWatch`) · Mode (Record-only) · Apps to Watch (Teams/Zoom/Webex/Browser/WeChat/Tencent Meeting/FaceTime/WhatsApp/Slack) · Record Without Asking (per native/mic-input app) · Detection (Poll Interval, Grace Period) |
 | `Settings/AudioSettingsView.swift` | Microphone device (the `MicrophoneDevices` list the menu bar's Microphone entry also shows) · VAD (enabled + threshold) · Per-Channel Indicator |
 | `Settings/TranscriptionSettingsView.swift` | ASR engine picker · engine-specific options · model status · Vocabulary section · Live transcription (PoC) toggle |
 | `Settings/TranscriptionSettingsView+HuggingFaceToken.swift` | The optional Hugging Face token row below the WhisperKit model picker: a write-only field with Save and Remove that shows whether a token is saved, never the token; the token itself lives in the Keychain (`AppSettings+HuggingFaceToken.swift`) |
@@ -128,8 +127,8 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `WhisperKitModelChoice.swift` | `@Observable` state of the WhisperKit model choice, owned by `SettingsView`: the open Hugging Face sheet and the "Load the new model now?" offer after a pick. "Use" writes the pick through `AppSettings.useHubModel` and holds the offer back until the sheet has closed; "Later" defers the model on the engine. `Settings/TranscriptionSettingsView+ModelChoice.swift` presents both |
 | `WhisperKitStockModel.swift` | The six stock WhisperKit variants in picker order, each with its label and approximate download size (measured 2026-10-06) for the load offer |
 | `Settings/VocabularySourceSettingsView.swift` | "Vocabulary source" picker (Local file / URL), shown in the Vocabulary section while "Use custom vocabulary" is on; for URL the address, the Keychain-backed access token, "Update now" and the status line from `RemoteVocabularyController` |
-| `Settings/SpeakersSettingsView.swift` | Diarization · Mic Speaker Name · Known Voices · Recognition Stats · Experimental Diarization Tuning |
-| `Settings/OutputSettingsView.swift` | Output folder · Notion export · Meeting Notes (transcript options, AI-title file names, LLM provider, notes language) · Meeting Notes Templates and Template Rules sections |
+| `Settings/SpeakersSettingsView.swift` | Diarization · Speaker Naming (open the naming window automatically, how long unnamed meetings wait) · Mic Speaker Name · Known Voices · Recognition Stats · Experimental: Diarization Tuning |
+| `Settings/OutputSettingsView.swift` | Output folder · Notion export · Recording Retention · Meeting Notes (transcript options, AI-title file names, LLM provider, notes language) · Meeting Notes Templates and Template Rules sections |
 | `Settings/LocalModelSettingsView.swift` | The local model provider's panel in Settings → Output: the model folder with Choose…, the status line with Check Model (runs the helper's `check` mode, no weights loaded), and the memory and recording notes (`#if !APPSTORE`) |
 | `Settings/ProtocolTemplatesSettingsView.swift` | Meeting Notes Templates section: default template picker, per template file the split button Edit (Open in the editor app, Open With, Show in Finder) and Delete, New Template…, Open Templates Folder; its state and writes live in the `@Observable` `ProtocolTemplatesModel`, also for the New Template window |
 | `Settings/NewProtocolTemplateSheet.swift` | The New Template window: Name field, a note on what Create does, Cancel and Create |
@@ -156,13 +155,14 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `AppSettings+TerminologyRules.swift` | Optional terminology-rules file: selection, bookmark, per-job read and the Settings status; the text area remains the default source |
 | `RemoteVocabularyController.swift` | Keeps the URL source's cached copy current (launch, 2 s after a change, "Update now", hourly), adopts only valid downloads, and publishes the `RemoteVocabularyStatus` Settings shows; owned by `AppState` as `remoteVocabulary` |
 | `LegacyDefaultsMigration.swift` | One-shot carry-over of settings from the pre-rename bundle identifier, since `UserDefaults` is scoped per identifier |
+| `LoginItemController.swift` | Launch at login via `SMAppService.mainApp`, behind `LoginItemRegistering` so tests use a fake; the status is read from macOS and never stored in `AppSettings` |
 | `UpdateChecker.swift` | Checks GitHub releases for newer versions, drives the menu bar update badge |
 | `Settings/PickerLanguages.swift` | Language picker entries for WhisperKit and Parakeet language selectors |
 | `LiveCaptionsState.swift` | `@Observable` live-captions state (per-channel hypotheses + finalised utterances) + RPC-wire types |
 | `LiveCaptionsOverlay.swift` | SwiftUI caption-bar content (recent finals + per-channel hypotheses) hosted in `LiveCaptionsWindow` |
-| `LiveCaptionsWindowController.swift` | Borderless click-through NSPanel hosting the caption overlay (⌥-drag to reposition; origin persisted) |
+| `LiveCaptionsWindowController.swift` | Borderless click-through NSPanel hosting the caption overlay; Option-drag moves it by screen-coordinate deltas, clamped to the screen visible frame (see `architecture/transcription.md`) |
 | `LiveCaptionsSize.swift` | Caption-bar size presets (Small/Medium/Large): font size paired with the fixed panel dimensions that fit it; `AppSettings.liveCaptionsSize` |
-| `ProcessingStatsView.swift` | Read-only average per-stage processing durations from `stage_timing.jsonl` (Settings → Advanced) |
+| `ProcessingStatsView.swift` | Read-only average per-stage processing durations from `stage_timing.jsonl` (Settings → Speakers) |
 
 ### Core Pipeline
 
@@ -179,7 +179,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `WatchLoopState.swift` | Value-type snapshot of `WatchLoop`'s observable fields (for tests and RPC) |
 | `ManualRecordingMonitorPolicy.swift` | Pure decision logic for manual recording stop conditions (process-died vs max-duration) |
 | `MeetingDetecting.swift` | `MeetingDetecting` protocol + `DetectedMeeting` model |
-| `MeetingDetector.swift` | Window title polling, pattern matching, confirmation counting, cooldown |
+| `MeetingDetector.swift` | Window title polling, pattern matching, confirmation counting, cooldown. Not the production detector (that is `CompositeMeetingDetector` over `PowerAssertionDetector` + `MicInputDetector`); production uses only its `systemWindowList` to look up meeting titles |
 | `MeetingTitleMatcher.swift` | Compiled idle/meeting title regex semantics for one `AppMeetingPattern` |
 | `PowerAssertionDetector.swift` | IOKit power assertion–based meeting detection (sandbox-safe); carries the Chrome WebRTC pattern for browser meetings (issue #503) |
 | `PowerAssertionDetector+Diagnostics.swift` | "Saw something that looks like a meeting and did not act on it" diagnostic, split out of `PowerAssertionDetector` (line-cap) |
@@ -217,7 +217,13 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `JobOpenTarget.swift` | Decides what a finished job's Open action opens: the Notion page or a local file |
 | `ProtocolOpener.swift` | Opens a job's target, preferring a running Notion desktop app |
 | `Settings/NotionExportSettingsView.swift`, `Settings/NotionExportSettingsModel.swift` | Notion settings UI and its connection and schema state |
-| `PipelineQueue+Recovery.swift` | Snapshot restore and orphaned-recording recovery for `PipelineQueue` |
+| `PipelineQueue+Recovery.swift` | Snapshot restore for `PipelineQueue` |
+| `PipelineQueue+Retention.swift` | The queue's side of recording retention: records what stage 3 moved, marks a recording due once its output is written, runs passes with the tracks its unfinished jobs hold |
+| `PipelineController+Retention.swift` | When retention passes run (launch, hourly, after a rebuild, once the settings settle), and the pass before a queue is built |
+| `RecordingRetention.swift` | Runs retention passes: decides on the main actor, deletes off it via `RecordingFileDeleter`, rechecks each delete |
+| `RecordingRetentionPolicy.swift` | Pure decision per registry entry: delete, keep (with the reason) or drop |
+| `RecordingRetentionRegistry.swift` | The list of relocated recordings retention may delete (`retained_recordings.<bundle id>.json` in the fork, one per build), the only thing the cleaner acts on |
+| `PipelineQueue+OrphanRecovery.swift` | Orphaned-recording recovery for `PipelineQueue`: the staging scan and the jobs it creates |
 | `RecoveredCut.swift` | Applies a stored meeting-end cut when launch recovery brings back a recording the app died with while asking: collects the stored cuts before headers are repaired, places the cut by the live cut's rule (or applies one already resolved), refuses a recording that ran on past the countdown's deadline, and logs one line per stored cut it settles; the orphan scan passes over a recording whose cut is not settled yet (its stem held by a live stop of this process, or a stored cut beside it that recovery could still apply), so it is never queued before it is cut |
 | `PipelineQueue+EchoBleed.swift` | Warns when a dual-source recording carries the same speech on both tracks (loudspeaker bleeding into the microphone) — measurement half of the echo mitigation (issue #581) |
 | `PipelineQueue+EchoCancellation.swift` | Removes the far end from the microphone track before anything reads it — cancellation half of the echo mitigation, the other branch of `EchoRemedy` |
@@ -242,6 +248,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `SpeakerNamingSession.swift` | Collaborator `PipelineQueue` calls for the speaker-naming work still owned by the queue, split out for size |
 | `SpeakerNamingSession+Late.swift` | Late-confirm and late re-diarization paths for speaker naming |
 | `SpeakerNamingData.swift` | `PipelineQueue.SpeakerNamingData`/`.Segment`/`SpeakerNamingResult` value types, nested under `PipelineQueue` for source compat |
+| `StaleNamingTimeout.swift` | How long a meeting may wait for speaker names before the launch-time cleanup accepts the automatic names (1 day · 7 days · never) |
 | `SpeakerNamingStore.swift` | Disk persistence for a job's speaker-naming sidecars, keyed by per-job slug; pure I/O, no queue state |
 | `SpeakerKey.swift` | Speaker identity in the dual-track pipeline: raw diarizer id + track; single home for the `R_`/`M_` prefix convention |
 | `NamingWindowPolicy.swift` | Pins the "Name Speakers" window so it stays available while the user works in other apps (issue #504) |
@@ -249,7 +256,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `LiveTranscriptionController+Nemotron.swift` | Nemotron streaming-pipeline construction, split out for size; injectable factory for testing the build + model-load-failure fallback |
 | `LiveTranscriptionCoordinator.swift` | `@Observable` coordinator: builds + arms `LiveTranscriptionController`, feeds `LiveCaptionsState` |
 | `LiveCaptionPipeline.swift` | Per-channel live captioning strategy protocol (English EOU streaming \| Nemotron streaming \| WhisperKit/Parakeet re-transcribe) |
-| `LiveCaptionsGate.swift` | Pure decision logic for live captions routing: master toggle + explicit engine language (`en` → English EOU streaming, other → Nemotron streaming, auto-detect → re-transcribe or none) — shared by `AppState`, coordinator, and controller. Overlay visibility is a separate UI AND (`overlayVisible`); it is not a strategy input |
+| `LiveCaptionsGate.swift` | Pure decision logic for live captions routing: master toggle + explicit engine language (`en` → English EOU streaming, a language in `LiveCaptionLanguages` → Nemotron streaming, auto-detect or any other language → re-transcribe or none) — shared by `AppState`, coordinator, and controller. Overlay visibility is a separate UI AND (`overlayVisible`); it is not a strategy input |
 | `EouStreamingCaptionSession.swift` | English low-latency streaming caption session via FluidAudio Parakeet EOU, backed by `UtteranceRingBuffer` |
 | `NemotronStreamingCaptionSession.swift` | Multilingual (non-English) low-latency streaming caption session via FluidAudio Nemotron |
 | `NemotronAsrManager.swift` | Production seam wrapping FluidAudio's Nemotron model + Silero VAD for `NemotronStreamingCaptionSession` |
@@ -323,7 +330,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 
 | File | Role |
 |------|------|
-| `AudioMixer.swift` | Resampling, mixing, echo suppression, mute masking, WAV I/O |
+| `AudioMixer.swift` | Resampling, mixing, echo suppression, WAV I/O |
 | `AudioConstants.swift` | Shared audio pipeline constants (target sample rate) |
 | `FFmpegHelper.swift` | ffmpeg CLI detection + 16 kHz mono WAV conversion fallback for file-import formats AVAsset can't decode |
 | `FluidVAD.swift` | VAD preprocessing via FluidAudio Silero v6 — silence trimming + `VadSegmentMap` timeline remapping |
@@ -378,7 +385,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 |------|------|
 | `TranscriberStatus.swift` | Status + state enum models |
 | `AppPaths.swift` | Centralized path constants (ipcDir, dataDir, logSubsystem, speakersDB) |
-| `AXHelper.swift` | Shared accessibility API helper (MuteDetector + ParticipantReader) |
+| `AXHelper.swift` | Shared accessibility API helper (used by ParticipantReader) |
 | `NotificationManager.swift` | macOS notifications |
 | `NotificationUrgency.swift` | How urgently a notification must reach the user — two cases (vs. the five `UNNotificationInterruptionLevel` offers) mapped to whether a given notification should pierce Focus |
 | `NotificationScheduling.swift` | Port over the `UNUserNotificationCenter` slice `NotificationManager` uses, so posting/registration is testable against a fake scheduler |
@@ -392,7 +399,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `PermissionHealthCheck.swift` | TCC verdict + live probe → `PermissionStatus`; drives exclamation badge overlay |
 | `NotificationVisibility.swift` | What the notification centre will actually *do* with a posted notification (alert style, Time Sensitive, scheduled delivery) — authorisation alone can read `.authorized` while the prompt never shows |
 | `ParticipantReader.swift` | Teams participant extraction via Accessibility API |
-| `DebugRPCServer.swift` | Embedded HTTP RPC server core (routing, auth) for shell-driven inspection. `#if !APPSTORE`, opt-in via `MEETINGTRANSCRIBER_DEBUG_RPC=1`. Bearer-token + Origin reject; binds 127.0.0.1 only. Endpoint handlers split into companion files below (line-cap) |
+| `DebugRPCServer.swift` | Embedded HTTP RPC server core (routing, auth) for shell-driven inspection. `#if !APPSTORE`, opt-in via Settings → Advanced → Local Automation API or `MEETINGTRANSCRIBER_DEBUG_RPC=1`. Bearer-token + Origin reject; binds 127.0.0.1 only. Endpoint handlers split into companion files below (line-cap) |
 | `DebugRPCServer+V1.swift` | `/v1` versioned automation API routing + response envelopes (`POST /v1/transcribe`, `/v1/jobs`, naming, `/v1/watch`, `/v1/record`) |
 | `DebugRPCServer+Metrics.swift` | `GET /metrics` handler — cumulative CPU/RAM/instruction counters via `proc_pid_rusage` |
 | `DebugRPCServer+Screenshot.swift` | `GET /screenshot` handler (PNG of the largest visible window via ScreenCaptureKit) |
@@ -413,8 +420,9 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `MeetingFileStore.swift` | `meeting_files.json`: every meeting's record, lock-guarded writes shared with a second running build |
 | `MeetingFilePresence.swift` | The one probe of a meeting's file: present, gone, or out of reach |
 | `MeetingFileRemover.swift` | Moves a meeting's files to the Trash or deletes them for good, after the pending mark is on disk |
-| `RecordingRetention.swift` | The retention setting's values and `RecordingRetentionRule`, which decides from the record alone whether a meeting's audio is due |
-| `RecordingRetentionController.swift` | The automatic deletion check: when it runs, and what it asks the disk and the queue right before it deletes |
+| `PipelineController+RetentionRecords.swift` | The fork's link from recording retention to the records: the meetings a pass must leave (Keep, a deletion of the user's, a recording from before the records), and marking what a pass deleted |
+| `PipelineController+LiveMeetingState.swift` | What the queue knows of a meeting (`LiveMeetingState`), which the window's actions ask before they act |
+| `MeetingRecordPruner.swift` | Removes the record of a meeting nothing is left of, at launch and once a day |
 | `AppSettings+RPC.swift` | Builds the read-only settings projection for the debug RPC `/state` endpoint |
 | `AppState+RPC.swift` | Builds `RPCStateSnapshot` from live `AppState` for the `/state` endpoint (`#if !APPSTORE`) |
 | `RPCStateSnapshot.swift` | JSON-serializable RPC state snapshot type (`#if !APPSTORE`) |
@@ -431,7 +439,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 
 | Path | Role |
 |------|------|
-| `tools/mt-cli/` | Thin Swift client for `DebugRPCServer`. Subcommands: `state`, `healthz`, `screenshot`, `open-settings`, `close-settings`, `confirm-browser-consent`, `wav-verdict`, `seed-speaker`, `rename-speaker`, `delete-speaker`, `merge-speakers`, `ui-tree`, `ui-press`. Reads token from `~/Library/Application Support/MeetingTranscriber/.rpc-token`. Skill doc at `tools/mt-cli/skill.md`. |
+| `tools/mt-cli/` | Thin Swift client for `DebugRPCServer`. Subcommands: `state`, `healthz`, `screenshot`, `open-settings`, `close-settings`, `confirm-browser-consent`, `wav-verdict`, `seed-speaker`, `rename-speaker`, `delete-speaker`, `merge-speakers`, `ui-tree`, `ui-press`, `watch`, `record`. Reads token from `~/Library/Application Support/MeetingTranscriber/.rpc-token`. Skill doc at `tools/mt-cli/skill.md`. |
 | `tools/meeting-simulator/` | Test fixture: spawns a fake meeting window for E2E detection tests |
 | `tools/local-llm-helper/` | The program the app starts to write one protocol with a local MLX model (`run`, `check <folder>`, `selftest`). Its own SwiftPM package, so the app's package never depends on MLX; bundled in the Homebrew build only. Process contract and exit statuses in its `README.md`; see [Local Model](#local-model) |
 
@@ -451,13 +459,13 @@ PipelineQueue: waiting → transcribing → [diarizing] → generatingProtocol �
 
 ### Menu Bar Icon Animations
 
-`BadgeKind.compute(watchState:queueState:permissionUnhealthy:updateAvailable:)` is the pure function that maps the combined `WatchLoop` + `PipelineQueue` state into one of `BadgeKind.inactive | .recording | .transcribing | .diarizing | .processing | .userAction | .done | .error | .updateAvailable`. `MenuBarIcon.image(badge:permissionOverlay:recordOnlyOverlay:)` then renders the matching animation frame.
+`BadgeKind.compute(watchLoopActive:watchLoopState:transcriberState:activeJobState:updateAvailable:permissionProblem:consentPending:)` is the pure function that maps the combined `WatchLoop` + pipeline state into one of `BadgeKind.inactive | .recording | .transcribing | .diarizing | .processing | .userAction | .done | .error | .updateAvailable`. `MenuBarIcon.image(badge:permissionOverlay:recordOnlyOverlay:)` then renders the matching animation frame.
 
 | State | GIF | Triggered by | Code path |
 |-------|-----|--------------|-----------|
 | **Idle** | <img src="menu-bar-idle.gif" width="60"> | `WatchLoop.state == .idle / .watching` and `PipelineQueue` empty | `BadgeKind.inactive` |
 | **Recording** | <img src="menu-bar-recording.gif" width="60"> | `WatchLoop.state == .recording` (waveform bars bounce) | `BadgeKind.recording` |
-| **Transcribing** | <img src="menu-bar-transcribing.gif" width="60"> | `PipelineJob.state == .transcribing / .recordingDone` (bars morph into text glyphs) | `BadgeKind.transcribing` |
+| **Transcribing** | <img src="menu-bar-transcribing.gif" width="60"> | `PipelineJob.state == .transcribing` or `TranscriberState.recordingDone` (bars morph into text glyphs) | `BadgeKind.transcribing` |
 | **Diarizing** | <img src="menu-bar-diarizing.gif" width="60"> | `PipelineJob.state == .diarizing` (bars split into colored speaker groups) | `BadgeKind.diarizing` |
 | **Protocol** | <img src="menu-bar-protocol.gif" width="60"> | `PipelineJob.state == .generatingProtocol` (lines appear sequentially) | `BadgeKind.processing` |
 
@@ -514,7 +522,7 @@ AudioTapLib (CATapDescription)
 └─ Metadata: micDelay, actualSampleRate, actualChannels via AudioCaptureResult
 ```
 
-**Key:** CATapDescription requires NO Screen Recording permission (purple dot indicator only). Handles output device changes by recreating tap automatically.
+**Key:** CATapDescription is TCC-gated: it needs the "Audio Recording" grant (`NSAudioCaptureUsageDescription`) or, as a fallback, Screen Recording. With neither, the tap starts without an error and captures silence. Handles output device changes by recreating tap automatically.
 
 **Start order (issue #693):** `AudioCaptureSession.start()` opens the microphone first and the app tap second, and the order is load-bearing. Opening the input takes a Bluetooth headset out of A2DP into its call profile; with the tap opened first, the disturbance landed underneath an aggregate device that had been created and started but had not yet run its first IO cycle, and the tap then delivered nothing for the rest of the recording (no IO callback, zero bytes, no error). Measured with a throwaway probe that is not in this repository: 9 failures in 30 starts with the tap first, 0 in 30 with the microphone first, which bounds what is left rather than proving it gone. **The full argument, including what the order does and does not guarantee and the three accepted costs, is the doc comment on `AudioCaptureSession.start()`; it is kept in one place on purpose.** Downstream, the measured `micDelay` is now normally negative (the microphone leads), which `MicDelayNormalisation` turns into a padded app track and a reported delay of 0; two cases it does not cover are a dual-source recording whose `_mic.wav` turns out unreadable, where the raw negative value is still what gets reported, and a crash-recovered recording, which `DualSourceRecorder.recoverCrashedRecording` rebuilds with a hard-coded `micDelay: 0` and therefore does not realign at all.
 
@@ -528,7 +536,6 @@ AudioTapLib (CATapDescription)
 App temp: already 16kHz mono float32 (resampled in-IOProc at capture time)
   → Save app.wav (16kHz mono)
   → Load mic.wav (already 16kHz from MicCaptureHandler)
-  → Apply mute mask (zero mic during muted periods)
   → Echo suppression (RMS-based gate, 20ms windows)
   → Delay alignment (prepend zeros by MIC_DELAY)
   → Mix (average tracks)
@@ -602,7 +609,7 @@ Full design rationale (why the two remedies can't compose, the model provisionin
 ## Live Captions (PoC)
 
 Optional in-meeting caption overlay, "Enable live transcription during recording" in Settings →
-Transcribe (`AppSettings.liveTranscriptionEnabled`, off by default; enabling downloads a ~0.6 GB
+Transcription (`AppSettings.liveTranscriptionEnabled`, off by default; enabling downloads a ~0.6 GB
 model on first use behind a consent alert). Nested "Show caption overlay"
 (`AppSettings.liveCaptionsOverlayEnabled`, default on) hides `LiveCaptionsOverlay` without
 stopping the pipeline; `LiveCaptionsState` and `/state.liveCaptions` keep updating.
@@ -615,9 +622,9 @@ function — shared by `AppState`, `LiveTranscriptionCoordinator`, and `LiveTran
 | Engine language | Strategy | Backend |
 |---|---|---|
 | `en` | English streaming | `EouStreamingCaptionSession` (FluidAudio Parakeet EOU) |
-| any other explicit language | Nemotron streaming | `NemotronStreamingCaptionSession` / `NemotronAsrManager` (FluidAudio Nemotron multilingual) |
-| auto-detect (`nil`) | re-transcribe | `StreamingTranscriber` via the active engine's `transcribeSamples`, if supported |
-| auto-detect + engine doesn't support live re-transcribe | none | captions off |
+| a language Nemotron was trained on (`LiveCaptionLanguages`) | Nemotron streaming | `NemotronStreamingCaptionSession` / `NemotronAsrManager` (FluidAudio Nemotron multilingual) |
+| auto-detect (`nil`) or any other language | re-transcribe | `StreamingTranscriber` via the active engine's `transcribeSamples`, if supported |
+| auto-detect or any other language + engine doesn't support live re-transcribe | none | captions off |
 
 Both streaming sessions are engine-independent (they drive their own FluidAudio models directly),
 so they're available even when the active `TranscribingEngine` has no live re-transcribe hook.
@@ -641,7 +648,7 @@ Three modes selected via `AppSettings.diarizerMode`:
 
 Flow: `FluidDiarizer.run(audioPath, numSpeakers)` → selected diarizer → `DiarizationResult` with segments, speaking times, and speaker embeddings.
 
-**Experimental tuning:** Five `OfflineDiarizerConfig` parameters are exposed in `AppSettings` and editable in Settings → Speakers → Experimental Diarization Tuning: `clusterThreshold` (0.6), `warmStartFa` (0.07), `warmStartFb` (0.8), `minSegmentDurationSeconds` (1.0), `excludeOverlap` (true). All default to FluidAudio community values.
+**Experimental tuning:** Five `OfflineDiarizerConfig` parameters are exposed in `AppSettings` and editable in Settings → Speakers → Experimental: Diarization Tuning: `clusterThreshold` (0.6), `warmStartFa` (0.07), `warmStartFb` (0.8), `minSegmentDurationSeconds` (1.0), `excludeOverlap` (true). All default to FluidAudio community values.
 
 ### Speaker Matching
 
@@ -669,7 +676,7 @@ When dual-source recording (app + mic) is available:
 
 ### Speaker Naming UI
 
-`SpeakerNamingView` shown when diarization finds speakers. Each row shows label, auto-matched name, speaking time, and audio playback. All rows are editable. Supports re-run with different speaker count.
+`SpeakerNamingView` shown when diarization finds speakers: by itself while "Open naming window automatically" (`AppSettings.autoOpenSpeakerNaming`) is on, otherwise when the user opens it from "Name Speakers…" in the menu bar. Each row shows label, auto-matched name, speaking time, and audio playback. All rows are editable. Supports re-run with different speaker count.
 
 ---
 
@@ -753,8 +760,8 @@ lines follow what the run wrote.
 Nothing lists a report while its meeting lives, so a report renamed or deleted
 in Finder drops out of the row menu. A report run never tells the job its
 template and never lists its file as the meeting's notes, so Open Notes, the
-automation API, a retried Notion export and the "right after the notes"
-retention keep using the main notes (`ProtocolRegenerator.regenerate`).
+automation API, a retried Notion export and recording retention keep using
+the main notes (`ProtocolRegenerator.regenerate`).
 
 `AppSettings.protocolLanguage` (default `"German"`) is substituted into the prompt as `{LANGUAGE}`. Every template can also use `{MEETING_DATE}` (`YYYY-MM-DD`) and `{MEETING_TIME}` (`HH:mm`), derived from the captured recording start time. Imports and recovery jobs resolve those time placeholders to `Unknown` rather than their enqueue or processing time. Only recordings with a captured start receive the authoritative meeting-metadata block, so templates receive reliable temporal context without needing to add the placeholders.
 
@@ -931,50 +938,47 @@ Only rows the search shows count as selected. The footer counts those rows (or
 says "N of M selected"), adds the audio on disk of the ones with a record, and
 says what the retention setting deletes.
 
-**Automatically.** Settings → Output → Recordings, "Delete recordings
-automatically": Never (the default), Right after the notes, After 7 days, After
-30 days or After 90 days. `RecordingRetentionRule` selects, from the record
-alone, the audio of meetings this build recorded, whose outcome is finished (notes
-saved, or with notes generation off a transcript the record lists as present;
-speakers named), that
-are not marked Keep and whose recording date plus the chosen days has passed. `RecordingRetentionController` deletes that audio
-for good, not to the Trash; the transcript, the notes and all other files stay.
-It never touches imports, failed meetings, kept meetings, meetings without a
-record, recordings from before this feature or meetings another build recorded.
-A row the setting never reaches shows only its audio size. It skips a meeting whose state
-changed since the check began or whose Notion export is running. Right before it
-deletes, it asks the disk and the queue again, and it keeps the audio in cases
-the rule cannot see: a folder, a link or an unreadable file at the notes path,
-notes switched off with the transcript removed by hand, or saved jobs it cannot
-read (the meeting then counts as not through). A file out of reach or one that
-refuses to go stays listed and is tried again at the next check. The check runs
-at launch, once a day, when a meeting finishes, when a Notion export ends, when
-the pipeline builds or rebuilds its queue (the first time it is needed and each
-time watching starts) and 5 seconds after a confirmed setting change, and never
-two at once.
+**Automatically.** The original's recording retention does it (Settings →
+Output → Recording Retention, see `docs/architecture/pipeline.md`): it deletes
+only what its registry lists, the audio this build's stage 3 relocated, once the
+notes are saved and the days since the recording have passed. The fork adds four
+things on top of it (`PipelineController+RetentionRecords.swift`):
 
-Choosing a value that would delete audio now first shows what it deletes
-(`RetentionPreview`). Cancel is that alert's default button, so Return cancels.
-A confirmed value is saved and starts a check 5 seconds later; the check reads
-the setting when it runs, so going back to Never in between keeps the audio.
-When nothing would be deleted, and for Never or a longer time, the value is
-saved without asking. When what the value deletes cannot be told, because the
-records or the queue's saved jobs do not read, the value is not saved.
+- **Only what the record and the queue allow goes.** A pass reads the record
+  file fresh, at its start and again right before each delete, and deletes the
+  audio of a listed job only when its record allows it
+  (`MeetingFileRecord.allowsRetention`): a recording, not an import, that this
+  build created (`createdBy`), that finished, and that is neither marked Keep,
+  nor in a deletion of the user's under way or left incomplete, nor a recovered
+  recording from before the records existed. A job without a record is never
+  deleted, and a record file that does not read skips the pass. The queue has
+  to be through with the job as well (`LiveMeetingState.isSettled`): a running
+  Notion export holds the audio, and so do saved jobs the queue could not read.
+  Before each file the notes are checked again too, so notes removed during a
+  pass stop it.
+- **One registry per build.** The development and the release build share the
+  data folder but not their settings, so each keeps its own registry,
+  `retained_recordings.<bundle id>.json`: a build's setting reaches only what
+  that build relocated.
+- **The row says what happened.** The files a pass found gone are marked gone
+  in the meeting's record, and once no audio is left the deletion is dated, so
+  the row reads "Audio deleted automatically on …"; audio that was already gone
+  when the pass reached it gets no date. Before that, the row's audio line and
+  the window's footer say what the setting will do, the row only for a meeting
+  this build's registry lists and its record allows.
+- **Records do not pile up.** `MeetingRecordPruner` removes, at launch and once
+  a day, the record of a meeting the window no longer lists and of which the disk
+  answers gone for every file.
+
+The fork's own automatic deletion (a five-value setting with a preview of what
+it deletes) was removed when the original's arrived; its stored
+`recordingRetention` value is not read and not carried over.
 
 The development and the release build share the data folder. Every write to
 `meeting_files.json` takes a lock and changes only its one record, and a
 deletion found pending is left alone while the process that started it still
-runs. Each build keeps its own retention setting, so a build's setting reaches
-only the records it created: the record names that build's bundle identifier
-(`createdBy`, written once), and the rule, the row's audio line, the preview and
-the store's last look before each file all take the running build's identifier
-(`MeetingFileStore.bundleID`). A record without the field is never deleted
-automatically. A build that does not know a field of the record drops it from
-every record when it saves the file, so a field the automatic deletion depends
-on has to keep the audio when it is missing, as `createdBy` does. The record
-file and `createdBy` arrive in the same change, so no build that writes the file
-deletes automatically without asking the field. The manual actions act on any
-meeting the window lists.
+runs. A record names the build that created it (`createdBy`, written once). The
+manual actions act on any meeting the window lists.
 
 ---
 
@@ -998,11 +1002,11 @@ AppSettings (UserDefaults)
 | Content | Path |
 |---------|------|
 | Recordings | `~/Library/Application Support/MeetingTranscriber/recordings/` |
-| Protocols | `~/Library/Application Support/MeetingTranscriber/protocols/` |
-| IPC | `~/.meeting-transcriber/` |
+| Protocols | `~/Downloads/MeetingTranscriber/` by default, or the folder chosen in Settings → Output |
+| IPC | `~/Library/Application Support/MeetingTranscriber/ipc/` (`~/.meeting-transcriber/` is only read once, as a migration source) |
 | Speaker DB | `~/Library/Application Support/MeetingTranscriber/speakers.json` |
 | WhisperKit models | `~/Library/Application Support/MeetingTranscriber/huggingface/` |
-| Pipeline logs | `~/.meeting-transcriber/pipeline_queue.json`, `pipeline_log.jsonl` |
+| Pipeline logs | `~/Library/Application Support/MeetingTranscriber/ipc/pipeline_queue.json`, `pipeline_log.jsonl` |
 | Meeting file records | `~/Library/Application Support/MeetingTranscriber/ipc/meeting_files.json`, beside `terminal_jobs.json` |
 | AudioTapLib | Linked as SPM library (no separate binary) |
 
@@ -1025,7 +1029,7 @@ AppSettings (UserDefaults)
 | LiveCaptionsGate.strategy | Pure static function — call directly with any input combination, no controller needed |
 | AppNotifying | `notifier` parameter in `AppState.init` (`SilentNotifier` default, `RecordingNotifier` in tests) |
 | BadgeKind.compute | Pure static function — call directly with any input combination, no WatchLoop needed |
-| DebugRPCServer | Out-of-process inspection via HTTP. Debug endpoints: `GET /state /healthz /metrics /screenshot`, `POST /action/openSettings /action/closeSettings`. Versioned automation API under `/v1` (`POST /v1/transcribe`, `POST /v1/jobs`, `GET /v1/jobs/<id>`, `GET`/`POST /v1/jobs/<id>/naming`, `POST /v1/jobs/<id>/naming/skip`, `GET`/`POST /v1/watch`, `GET`/`POST /v1/record`); see `docs/automation-api.md`. `#if !APPSTORE` + env-gated. `boundPort` exposes OS-assigned port for in-process integration tests. `tools/mt-cli/` is the matching inspection CLI. `scripts/test_rpc.sh` is a live smoketest (build + launch + drive + assert). |
+| DebugRPCServer | Out-of-process inspection via HTTP. Debug endpoints: `GET /state /healthz /metrics /screenshot`, `POST /action/openSettings /action/closeSettings`. Versioned automation API under `/v1` (`POST /v1/transcribe`, `POST /v1/jobs`, `GET /v1/jobs/<id>`, `GET`/`POST /v1/jobs/<id>/naming`, `POST /v1/jobs/<id>/naming/skip`, `GET`/`POST /v1/watch`, `GET`/`POST /v1/record`); see `docs/automation-api.md`. `#if !APPSTORE`; started by the Settings toggle or the env flag. `boundPort` exposes OS-assigned port for in-process integration tests. `tools/mt-cli/` is the matching inspection CLI. `scripts/test_rpc.sh` is a live smoketest (build + launch + drive + assert). |
 
 ---
 
@@ -1033,10 +1037,10 @@ AppSettings (UserDefaults)
 
 | Permission | Required For | Notes |
 |------------|-------------|-------|
-| Screen Recording | Meeting detection (window titles) | CGWindowListCopyWindowInfo |
+| Screen Recording | Real meeting titles; fallback grant for the app-audio tap. Detection does not need it | CGWindowListCopyWindowInfo |
 | Microphone | Mic recording | AVAudioEngine |
-| Accessibility | Mute detection, participant reading | Teams AX tree |
-| None | App audio capture | CATapDescription (purple dot only) |
+| Accessibility | Participant reading (optional) | Teams AX tree |
+| Audio Recording | App audio capture | CATapDescription (Screen Recording also accepted) |
 
 ### Permission health check + badge overlay
 
@@ -1058,15 +1062,15 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 
 ## Settings UI
 
-`SettingsView` is a thin `TabView` shell. Each tab is a self-contained `View` in `Sources/Settings/` owning only the bindings it needs and its own local `@State`. The settings window is resizable (`minWidth: 620, idealWidth: 720, maxWidth: 900`).
+`SettingsView` is a thin `NavigationSplitView` shell: a sidebar lists the tabs, the detail pane shows the selected one. Each tab is a self-contained `View` in `Sources/Settings/` owning only the bindings it needs and its own local `@State`. The settings window is resizable (`minWidth: 760, idealWidth: 860, maxWidth: 1000`).
 
 | Tab | Sections | Bindings | Local state |
 |---|---|---|---|
-| **General** | Apps to Watch · Detection | `settings` | — |
-| **Audio** | Microphone · VAD | `settings` | `audioDevices` |
+| **General** | Startup · Mode · Apps to Watch · Record Without Asking · Detection · Long Silence | `settings` | — |
+| **Audio** | Microphone · Recording Levels · VAD · Echo · Per-Channel Indicator | `settings` | `audioDevices` |
 | **Transcription** | Engine + per-engine options + vocabulary source + status | `settings`, three engines, `remoteVocabulary?` | — |
-| **Speakers** | Diarization · Speaker Identity · Known Voices · Recognition Stats · Experimental Diarization Tuning | `settings`, `recognitionStatsLog`, `enrollmentDiarizerFactory` | `knownVoicesSheet` |
-| **Output** | LLM Provider (with the local model's folder and Check Model) · Notes Language · Output Folder · Recordings (automatic deletion, with its preview) · Notion Export · Meeting Notes Templates · Template Rules | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel`, the rules section in `TemplateRulesModel` |
+| **Speakers** | Diarization · Speaker Naming · Speaker Identity · Known Voices · Recognition Stats · Experimental: Diarization Tuning | `settings`, `recognitionStatsLog`, `enrollmentDiarizerFactory` | `knownVoicesSheet` |
+| **Output** | LLM Provider (with the local model's folder and Check Model) · Notes Language · Output Folder · Notion Export · Recording Retention · Meeting Notes Templates · Template Rules | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel`, the rules section in `TemplateRulesModel` |
 | **Advanced** | Permissions · Diagnostics | — | `micPermission`, `screenRecordingOK`, `accessibilityOK` |
 | **About** | Build identity · Dependencies · Updates | `settings`, `updateChecker?` | — |
 
@@ -1094,7 +1098,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 2. **PipelineQueue decoupling** — Recording and post-processing run independently; WatchLoop enqueues jobs and resumes watching
 3. **AudioTapLib as SPM library** — Direct in-process audio capture via CATapDescription (App Store compatible)
 4. **Dual-source recording** — Enables speaker separation without diarization (app=Remote, mic=Me)
-5. **Graceful degradation** — Diarization optional, mute detection optional, continues on partial failure
+5. **Graceful degradation** — Diarization optional, continues on partial failure
 6. **Pre-loaded model** — Selected engine (WhisperKit or Parakeet) loaded at app launch, prevents delay on first meeting
 7. **5s cooldown** — Prevents re-detecting same meeting after handling
 8. **FluidAudio on-device diarization** — Replaces Python pyannote subprocess, no external dependencies

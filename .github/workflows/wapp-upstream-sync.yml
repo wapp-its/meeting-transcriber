@@ -67,7 +67,7 @@ jobs:
       upstream_sha: ${{ steps.merge.outputs.upstream_sha }}
       problems: ${{ steps.report.outputs.problems }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           ref: ${{ env.HOME_BRANCH }}
           fetch-depth: 0
@@ -140,7 +140,7 @@ jobs:
       errors: ${{ steps.build.outputs.errors }}
       merged_sha: ${{ steps.push.outputs.merged_sha }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           ref: ${{ needs.check.outputs.home_sha }}
           fetch-depth: 0

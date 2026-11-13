@@ -59,7 +59,7 @@ final class WatchLoopTests: XCTestCase {
     func testOnStateChangeCallback() {
         let loop = makeLoop()
         var transitions: [(WatchLoop.State, WatchLoop.State)] = []
-        loop.onStateChange = { old, new in
+        loop.onStateChange = { old, new, _ in
             transitions.append((old, new))
         }
 
@@ -236,44 +236,6 @@ final class WatchLoopTests: XCTestCase {
         )
     }
 
-    // MARK: - Stop Manual Recording Enqueues Job
-
-    func testStopManualRecordingEnqueuesJob() async throws {
-        let queue = try makeIsolatedQueue()
-        let (loop, recorder) = makeTestWatchLoop(pipelineQueue: queue)
-        recorder.mixPath = URL(fileURLWithPath: "/tmp/test_mix.wav")
-
-        try await loop.startManualRecording(pid: 42, appName: "Chrome", title: "Standup")
-        XCTAssertTrue(loop.isManualRecording)
-
-        loop.stopManualRecording()
-
-        XCTAssertFalse(loop.isManualRecording)
-        XCTAssertEqual(loop.state, .idle)
-        XCTAssertTrue(recorder.stopCalled)
-        XCTAssertEqual(queue.jobs.count, 1)
-        XCTAssertEqual(queue.jobs.first?.meetingTitle, "Standup")
-        XCTAssertEqual(queue.jobs.first?.appName, "Chrome")
-    }
-
-    // MARK: - Double Start Manual Recording
-
-    func testStartManualRecordingWhileRecordingIsNoOp() async throws {
-        let (loop, recorder) = makeTestWatchLoop()
-
-        try await loop.startManualRecording(pid: 42, appName: "Chrome", title: "First")
-        defer { loop.stop() }
-
-        XCTAssertTrue(loop.isManualRecording)
-        XCTAssertEqual(loop.manualRecordingInfo?.title, "First")
-
-        // Second start should be ignored because state is already .recording
-        try await loop.startManualRecording(pid: 99, appName: "Safari", title: "Second")
-
-        XCTAssertEqual(loop.manualRecordingInfo?.title, "First")
-        XCTAssertTrue(recorder.startCalled)
-    }
-
     // MARK: - Permission Pre-Check
 
     func testManualRecordingFailsWhenPermissionBroken() async {
@@ -302,8 +264,8 @@ final class WatchLoopTests: XCTestCase {
             HealthCheckResult(screenRecording: .healthy, microphone: .healthy, accessibility: .denied)
         }
 
-        // Accessibility feeds participant reading and mute detection, neither of
-        // which this path uses, and Settings presents it as optional. Refusing
+        // Accessibility feeds only Teams participant reading, which this path
+        // does not use, and Settings presents it as optional. Refusing
         // over it left the app recording an auto-detected meeting while turning
         // down the one the user asked for by hand.
         try await loop.startManualRecording(pid: 123, appName: "Test", title: "Test")

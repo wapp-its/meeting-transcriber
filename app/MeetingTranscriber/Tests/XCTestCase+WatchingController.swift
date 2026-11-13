@@ -42,6 +42,8 @@ extension XCTestCase {
     /// - Parameter permissions: the permission controller to hand through, for
     ///   a test that drives its checks; nil (the default) builds one with the
     ///   live probe, which nothing here asks to run.
+    /// - Parameter captionFlushOverride: replaces starting the live-caption flush
+    ///   on leaving `.recording`; nil keeps the production flush.
     func makeWatchingController(
         logDir: URL,
         notifier: any AppNotifying = RecordingNotifier(),
@@ -59,6 +61,7 @@ extension XCTestCase {
         permissions: PermissionsController? = nil,
         makeDetector: @escaping () -> any MeetingDetecting = { makeSilentDetector() },
         makeRecorder: @escaping @MainActor () -> any RecordingProvider = { makeMockRecorder() },
+        captionFlushOverride: (@MainActor () -> Void)? = nil,
     ) -> WatchingController {
         // Own defaults suite, like `makeRPCTestState`: `AppSettings()` on
         // `.standard` writes into the test host's real preferences, and
@@ -125,6 +128,7 @@ extension XCTestCase {
             joinClock: joinClock,
             makeDetector: makeDetector,
             makeRecorder: makeRecorder,
+            captionFlushOverride: captionFlushOverride,
         )
     }
 }
