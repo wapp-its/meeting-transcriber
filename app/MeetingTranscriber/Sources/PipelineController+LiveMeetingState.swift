@@ -41,13 +41,6 @@ extension PipelineController {
         }
     }
 
-    /// Whether `liveMeetingState` answers from what is known of the job. Not when the
-    /// queue does not hold it and the saved jobs do not read: that answer only holds the
-    /// audio back, and says nothing about what happens once they read again.
-    func knowsLiveState(jobID: UUID) -> Bool {
-        queue.jobs.contains { $0.id == jobID } || jobsTheQueueHasNotRead() != nil
-    }
-
     /// Whether the All Recordings window still has a row for a meeting. Saved jobs that
     /// cannot be known may hold one.
     func listsMeeting(jobID: UUID) -> Bool {
