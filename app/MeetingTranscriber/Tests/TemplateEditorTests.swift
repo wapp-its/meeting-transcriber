@@ -35,10 +35,6 @@ final class TemplateEditorTests: XCTestCase {
         XCTAssertEqual(editor, .missing(bundleIdentifier: Fake.typora.bundleIdentifier))
         XCTAssertNil(editor.appName)
         XCTAssertTrue(editor.helpText.contains("Edit shows one in Finder, as abnerworks.Typora was not found."))
-        XCTAssertEqual(editor.newTemplateNote(name: "Board"), """
-        Creates “Board.md” in the templates folder from the built-in template and shows it in Finder, as \
-        abnerworks.Typora was not found. To use an app, click the arrow beside Edit and choose Open With.
-        """)
     }
 
     func testWithNothingRememberedTheDefaultAppIsTheEditor() {
@@ -75,7 +71,7 @@ final class TemplateEditorTests: XCTestCase {
 
     // MARK: - Wording
 
-    func testTheHelpTextAndTheNoteNameTheEditorApp() {
+    func testTheHelpTextNamesTheEditorApp() {
         let editor = TemplateEditor.app(Fake.textEdit)
 
         XCTAssertEqual(editor.helpText, """
@@ -84,20 +80,12 @@ final class TemplateEditorTests: XCTestCase {
         {MEETING_TIME} are filled in for every template. Background info entered for a meeting is added to the \
         prompt automatically.
         """)
-        XCTAssertEqual(editor.newTemplateNote(name: " Daily stand-up "), """
-        Creates “Daily stand-up.md” in the templates folder from the built-in template and opens it in TextEdit, \
-        where you change and save it. To use another app, click the arrow beside Edit and choose Open With.
-        """)
     }
 
-    func testWithoutAnAppTheHelpTextAndTheNoteSayTheFileIsShownInFinder() {
+    func testWithoutAnAppTheHelpTextSaysTheFileIsShownInFinder() {
         XCTAssertTrue(TemplateEditor.noApp.helpText.contains(
             "Edit shows one in Finder, as no app is set to open Markdown files.",
         ))
-        XCTAssertEqual(TemplateEditor.noApp.newTemplateNote(name: ""), """
-        Creates a Markdown file in the templates folder from the built-in template and shows it in Finder, as no \
-        app is set to open Markdown files. To use an app, click the arrow beside Edit and choose Open With.
-        """)
     }
 
     func testEachReasonHasItsLineWhetherOrNotFinderShowsTheFile() {

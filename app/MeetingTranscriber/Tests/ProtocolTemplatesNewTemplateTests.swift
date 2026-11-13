@@ -2,27 +2,42 @@
 import XCTest
 
 /// The New Template window's state and writes, on `ProtocolTemplatesModel`: what
-/// Create writes and opens, the red line under the name, and what Cancel and a
-/// failed write leave behind. The window's controls are wired in
-/// `ProtocolTemplatesSettingsTests`.
+/// Create writes, that it opens nothing, the note, the red line under the name,
+/// and what Cancel and a failed write leave behind. The window's controls are
+/// wired in `ProtocolTemplatesSettingsTests`.
 @MainActor
 final class ProtocolTemplatesNewTemplateTests: XCTestCase {
-    func testCreateWritesTheBuiltInTextClosesTheWindowAndOpensTheFileInTheEditorApp() async throws {
+    /// Create only writes the file; Edit opens it afterwards, in the same app
+    /// as every other template.
+    func testCreateWritesTheBuiltInTextClosesTheWindowAndOpensNothing() throws {
         let fixture = try ProtocolTemplatesFixture(self)
         let model = fixture.makeModel()
         model.showNewTemplate()
         model.newTemplateName = "  Board  "
 
         model.createTemplate()
-        await model.openTask?.value
 
         let url = fixture.store.fileURL(named: "Board")
         XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), ProtocolGenerator.protocolPrompt)
         XCTAssertFalse(model.isNewTemplateShown)
         XCTAssertEqual(model.newTemplateName, "")
         XCTAssertEqual(model.names, ["Board"])
-        XCTAssertEqual(fixture.apps.opened, [.init(file: url, app: "com.apple.TextEdit")])
+        XCTAssertNil(model.openTask)
+        XCTAssertEqual(fixture.apps.opened, [])
+        XCTAssertEqual(fixture.apps.revealed, [])
         XCTAssertNil(model.notice)
+    }
+
+    /// The note names no app, so it never disagrees with the app Edit uses.
+    func testTheNoteSaysCreateOnlyWritesTheFileAndEditOpensIt() {
+        XCTAssertEqual(ProtocolTemplatesModel.newTemplateNote(name: " Daily stand-up "), """
+        Creates “Daily stand-up.md” in the templates folder from the built-in template. To change it, click Edit \
+        in its row; the arrow beside Edit lets you pick the app.
+        """)
+        XCTAssertEqual(ProtocolTemplatesModel.newTemplateNote(name: ""), """
+        Creates a Markdown file in the templates folder from the built-in template. To change it, click Edit in \
+        its row; the arrow beside Edit lets you pick the app.
+        """)
     }
 
     func testARefusedNameShowsTheStoresMessageAndDisablesCreate() throws {
@@ -116,21 +131,22 @@ final class ProtocolTemplatesNewTemplateTests: XCTestCase {
         XCTAssertEqual(model.newTemplateName, "")
     }
 
-    /// No template exists yet and no app was ever chosen: the help text and
-    /// the note still name the Mac's default app for Markdown files.
-    func testWithAnEmptyFolderTheHelpTextAndTheNoteNameTheDefaultMarkdownApp() throws {
+    /// No template exists yet and no app was ever chosen: the help text names
+    /// the Mac's default app for Markdown files, the note no app.
+    func testWithAnEmptyFolderTheHelpTextNamesTheDefaultMarkdownAppAndTheNoteNone() throws {
         let fixture = try ProtocolTemplatesFixture(self)
         let model = fixture.makeModel()
         model.newTemplateName = "Board"
 
         XCTAssertEqual(model.editor, .app(FakeTemplateOpener.textEdit))
         XCTAssertTrue(model.editor.helpText.contains("Edit opens one in TextEdit."))
-        XCTAssertTrue(model.newTemplateNote.contains("Creates “Board.md” in the templates folder"))
-        XCTAssertTrue(model.newTemplateNote.contains("opens it in TextEdit"))
+        XCTAssertEqual(model.newTemplateNote, ProtocolTemplatesModel.newTemplateNote(name: "Board"))
+        XCTAssertFalse(model.newTemplateNote.contains("TextEdit"))
     }
 
-    /// With no app for Markdown files, Create shows the new file in Finder.
-    func testWithoutAMarkdownAppCreateShowsTheFileInFinder() throws {
+    /// With no app for Markdown files, Create still only writes the file:
+    /// nothing goes to Finder and no orange line appears.
+    func testWithoutAMarkdownAppCreateStillOnlyWritesTheFile() throws {
         let fixture = try ProtocolTemplatesFixture(self)
         fixture.apps.defaultApp = nil
         fixture.apps.offered = []
@@ -140,8 +156,8 @@ final class ProtocolTemplatesNewTemplateTests: XCTestCase {
 
         model.createTemplate()
 
-        let url = fixture.store.fileURL(named: "Board")
-        XCTAssertEqual(fixture.apps.revealed, [url])
-        XCTAssertEqual(model.notice, .warning(TemplateOpenFailure.noApp.shownInFinder(file: "Board.md")))
+        XCTAssertEqual(fixture.files, ["Board.md"])
+        XCTAssertEqual(fixture.apps.revealed, [])
+        XCTAssertNil(model.notice)
     }
 }

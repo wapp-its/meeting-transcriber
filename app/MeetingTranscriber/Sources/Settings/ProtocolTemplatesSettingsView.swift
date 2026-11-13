@@ -70,7 +70,7 @@ final class ProtocolTemplatesModel {
         set { settings.defaultProtocolTemplate = newValue }
     }
 
-    /// The app Edit and Create open a template in.
+    /// The app Edit opens a template in.
     var editor: TemplateEditor {
         TemplateEditor.resolve(
             remembered: settings.templateEditorBundleIdentifier,
@@ -166,21 +166,31 @@ final class ProtocolTemplatesModel {
 
     /// The window's note for the name typed so far.
     var newTemplateNote: String {
-        editor.newTemplateNote(name: newTemplateName)
+        Self.newTemplateNote(name: newTemplateName)
     }
 
-    /// Creates a template from the built-in text under the typed name, closes
-    /// the window and opens the file in the editor app. The store checks the
-    /// name against the folder again, so one taken since the window opened is
-    /// refused; a refusal or a failed write keeps the window and the name.
+    /// The note for `typed`. It names no app: Create only writes the file, and
+    /// Edit opens it in the editor app, as it does every template.
+    static func newTemplateNote(name typed: String) -> String {
+        let name = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        let file = name.isEmpty ? "a Markdown file" : "“\(name).md”"
+        return "Creates \(file) in the templates folder from the built-in template. To change it, click Edit in "
+            + "its row; the arrow beside Edit lets you pick the app."
+    }
+
+    /// Creates a template from the built-in text under the typed name and
+    /// closes the window. It opens nothing: Edit opens the new row like any
+    /// other, so a template never opens in one app on Create and another on
+    /// Edit. The store checks the name against the folder again, so one taken
+    /// since the window opened is refused; a refusal or a failed write keeps
+    /// the window and the name.
     func createTemplate() {
         do {
-            let url = try store.create(name: newTemplateName)
+            _ = try store.create(name: newTemplateName)
             isNewTemplateShown = false
             newTemplateName = ""
             notice = nil
             reload()
-            openInEditor(url)
         } catch {
             reload()
             createError = error.localizedDescription
