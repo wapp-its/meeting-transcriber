@@ -17,7 +17,7 @@ After a Mac restart, the app starts again by itself when the user logs in. In th
 Why it matters:
 
 - **A menu bar app that is not running looks like one that is idle.** The point of the app is that it records without being watched; after a restart it watches nothing until someone notices. [paraphrase]
-- **The original already built the login item.** Its PR 916 (merged 2026-11-08, from its discussion 796) adds "Launch at login" and "Start watching when the app opens" to Settings → General → Startup, with launch at login off until the user switches it on. It has not reached `wapp/main` yet: the upstream merge is blocked by conflicts, tracked in #211. This spec builds on that code and adds only what the fork wants on top: the default, a launch log line, and the update check. [inferred]
+- **The original already built the login item.** Its PR 916 (merged 2026-11-08, from its discussion 796) adds "Launch at login" and "Start watching when the app opens" to Settings → General → Startup, with launch at login off until the user switches it on. It reached `wapp/main` with the upstream merge in #227 (merged 2026-11-13, commit 4f4fbb6f), which finished #211. This spec builds on that code and adds only what the fork wants on top: the default, a launch log line, and the update check. [inferred]
 - **The notice comes from the original too** (its PR 704, for its issue 703) and is still the same text there; nothing in the original fixes the missing date. [inferred]
 
 The control is named "Launch at login", the original's label; the issue's "Open at login" means the same. [inferred]
@@ -26,7 +26,7 @@ The control is named "Launch at login", the original's label; the issue's "Open 
 
 ## Architecture & Data Models
 
-- **The login item itself is the original's code**, arriving with #211: `app/MeetingTranscriber/Sources/LoginItemController.swift` (`LoginItemController` on `SMAppService.mainApp`, the macOS service that registers an app as a login item, behind the `LoginItemRegistering` protocol so tests use a fake) and the Startup section in `Settings/GeneralSettingsView.swift`. The toggle reads the status from macOS and stores nothing. This spec does not change those files. [inferred]
+- **The login item itself is the original's code**, on `wapp/main` since #227: `app/MeetingTranscriber/Sources/LoginItemController.swift` (`LoginItemController` on `SMAppService.mainApp`, the macOS service that registers an app as a login item, behind the `@MainActor` protocol `LoginItemRegistering` with `status`, `register()` and `unregister()`, so tests use a fake) and the Startup section in `Settings/GeneralSettingsView.swift`. The toggle reads the status from macOS on appear and whenever the app comes to the front, and stores nothing. `MeetingTranscriberApp` holds the controller as `@State` and hands it to Settings in both build variants. This spec does not change those files. [inferred]
 - **One fork-only file holds the default:** `app/MeetingTranscriber/Sources/LoginItemDefault.swift`, a pure decision plus a small launch step. Keeping it in its own file keeps the nightly upstream merge free of conflicts in the original's files. [inferred]
   - Decision inputs: build variant (App Store or not), the running bundle's folder, whether the other Meeting Transcriber copy is installed in `/Applications` (`MeetingTranscriber.app` for the Dev build, `MeetingTranscriber-Dev.app` for the release-named build), whether the default was already applied, and the login item status. [inferred]
   - Decision outputs: register now; nothing to do (already on, or waiting for approval); default already applied; skipped with a reason (App Store build, not in `/Applications`, other copy installed). [inferred]
@@ -45,7 +45,7 @@ None for outside callers: the `/v1` automation API and the debug RPC server do n
 
 ## Edge Cases & Constraints
 
-- **Prerequisite: #211 is merged,** so `wapp/main` contains the original's `LoginItemController` and Startup section. If it does not when this spec is built, the build stops and reports; it does not copy or cherry-pick the original's commits. [inferred]
+- **The original's code is in place:** #227 brought `LoginItemController` and the Startup section onto `wapp/main` (4f4fbb6f). The build starts from there and copies or cherry-picks nothing from the original. [inferred]
 - **First launch after the update** registers the item, and macOS shows its own "Login Item Added" notification once. That is expected and stays. [inferred]
 - **Switched off by the user**, in Settings or in System Settings → General → Login Items: the default never applies again, because the key is set. macOS may then report `requiresApproval`; the original's toggle shows that as on with a hint, unchanged. [inferred]
 - **A login item works only after login.** A Mac that waits at the login window after a restart watches nothing until the user logs in. [inferred]
@@ -53,7 +53,7 @@ None for outside callers: the `/v1` automation API and the debug RPC server do n
 - **Silent start needs the grants.** On a machine without the microphone and audio-capture grants, macOS asks for them when watching starts, as the original's readme says. [inferred]
 - **Two copies with the same bundle identifier** (the copy in `/Applications` and an end-to-end test copy the e2e scripts deploy to the user's own Applications folder): which one macOS starts at login is not known. The default never registers the e2e copy, because it is not in `/Applications`. [inferred]
 - **A login item the user added by hand earlier** (the older login items list) stays; macOS opens one running instance of the app. [inferred]
-- **Tests never reach the real service:** unit tests use the fake `LoginItemRegistering`; the launch step is not in `AppState.init`; no `/ui/press` entry for the toggle (the original's rule in `docs/architecture/gui-testing.md`). [inferred]
+- **Tests never reach the real service:** unit tests use a fake `LoginItemRegistering` (the existing `FakeLoginItem` is `private` to `LoginItemTests.swift`, so the new tests bring their own or move it to a shared test helper); the launch step is not in `AppState.init`; no `/ui/press` entry for the toggle (the original's rule in `docs/architecture/gui-testing.md`). [inferred]
 - **No meeting content** in logs or tests. The log line carries status words only. [inferred]
 
 ## Acceptance Criteria
@@ -71,7 +71,7 @@ None for outside callers: the `/v1` automation API and the debug RPC server do n
 - A length in the notice ("for 2 days"), and a second place for the notice (a menu item or a `/state` field), are not in this spec. [inferred]
 - An "Open Login Items" button and a special hint for `notFound` are not in this spec; the original left them out on purpose. [inferred]
 - Re-registering the item after an update, if R5 finds it lost, is not in this spec (A6). [inferred]
-- Resolving the upstream merge (#211), including any duplicate auto-watch toggle it leaves, is #211's work, not this spec's. [inferred]
+- The auto-watch toggle is not changed. After #227 there is exactly one, "Start watching when the app opens" in Startup (`A11yID.autoWatchToggle`); the merge moved the switch there from Detection, so no duplicate is left to remove. [inferred]
 - The default-on login item is fork-only and never goes to the original. Offering the notice fix (R1) to the original is a separate step after the owner's go. [inferred]
 
 ## Decision Context
@@ -79,7 +79,7 @@ None for outside callers: the `/v1` automation API and the debug RPC server do n
 - **D1 · Add a setting that starts the app at login, using `SMAppService.mainApp`.** why: after a restart the app stays off and watches nothing · status: active [owner-stated 2026-10-14, issue body]
 - **D2 · The notice's second time gets a date or a length.** why: after a gap of a day or more it reads like zero minutes · status: active [owner-stated 2026-10-14, issue body]
 - **D3 · Check that the login item survives an mt-update install.** why: mt-update replaces the bundle at the same path · status: active [owner-stated 2026-10-14, issue body]
-- **A1 · Adopt the original's launch-at-login code (its PR 916) through the upstream merge in #211 instead of building a second one.** flip at: #211 stays blocked when this spec is due, and the owner allows copying the original's three commits · test: R2's tests run against the original's `LoginItemRegistering` · status: active [agent-inferred 2026-11-12]
+- **A1 · Adopt the original's launch-at-login code (its PR 916) through the upstream merge instead of building a second one.** flip at: none left, the merge landed in #227 on 2026-11-13 · test: R2's tests run against the original's `LoginItemRegistering` · status: active [agent-inferred 2026-11-12]
 - **A2 · Launch at login is on by default in the fork's non-App-Store builds, applied once at the first launch from `/Applications`, never again.** flip at: the owner prefers the original's default (off), which drops R2, R3 and the default part of R4 and R5 · test: R2's decision tests · status: active [agent-assumed 2026-11-12]
 - **A3 · The App Store build keeps launch at login off by default.** why: Apple's App Review Guidelines (2.4.5) forbid starting at login without the user's consent · flip at: none expected · test: R3's App Store case · status: active [agent-inferred 2026-11-12]
 - **A4 · The default applies only to a bundle directly in `/Applications`, and not when the other Meeting Transcriber copy is installed there.** why: keeps build folders and e2e copies out of the login items, and keeps two copies from both starting and both recording one meeting · flip at: a user who installs elsewhere asks for the default · test: R3's location and other-copy cases · status: active [agent-assumed 2026-11-12]
@@ -87,3 +87,10 @@ None for outside callers: the `/v1` automation API and the debug RPC server do n
 - **A6 · If R5 finds the item lost after an mt-update install, the agent reports instead of adding a re-register rule.** why: a re-register at launch can fight a user's off switch in System Settings, and the status macOS reports there is not measured · flip at: R5's check fails · test: R5's check · status: active [agent-assumed 2026-11-12]
 - **A7 · The notice dates both times when they fall on different days, instead of naming the length.** why: the smaller change, one date format, no rounding rule for lengths · flip at: the owner prefers the length ("for 2 days") · test: R1's test · status: active [agent-assumed 2026-11-12]
 - **A8 · "Start watching when the app opens" keeps its default (off).** why: the original and the fork both keep it off, and starting detection without a click is a separate choice · flip at: the owner wants both on by default · test: none, unchanged · status: active [agent-assumed 2026-11-12]
+
+FIT: GO · 2026-11-13 · base 4f4fbb6f · engine flow-next 9.9.1 · #227 brought the original's login item onto wapp/main; anchors hold, #211 wording updated
+  - `LoginItemController.swift` and `LoginItemRegistering` exist as cited; the Startup section in `Settings/GeneralSettingsView.swift` holds "Launch at login" and "Start watching when the app opens", the only auto-watch toggle in Sources
+  - the merged code stores nothing and registers nothing on its own (`LoginItemController.setEnabled` only), so R2 to R5 are still undelivered; R3's "toggle starts off" is the original's behaviour and needs no code
+  - `AppSettings.autoWatch` still defaults to false; `PreviousExitNotice.swift` and `testAWindowFromAnEarlierDayCarriesTheDate` unchanged since capture, R1 still fails today for its stated reason
+  - entry points as cited: `AppLauncher.main()` arms `LivenessMarker`, `MeetingTranscriberApp.init` schedules auto-watch; bundle ids and app names match `scripts/lib/bundle-ids.sh` and mt-update
+  - no open spec and no open issue or PR in the original claims the default or the notice date
