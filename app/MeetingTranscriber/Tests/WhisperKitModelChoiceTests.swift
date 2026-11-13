@@ -218,6 +218,34 @@ final class WhisperKitModelChoiceTests: XCTestCase {
         XCTAssertNil(engine.deferredSelection)
     }
 
+    /// The launch download (idle unloading on) leaves a deferred model alone like the
+    /// preload does; once nothing is deferred, it fetches the missing model.
+    func testTheLaunchDownloadLeavesADeferredModelAlone() async {
+        let engine = WhisperKitEngine()
+        var downloads = 0
+        let folder = URL(fileURLWithPath: "/unused-model")
+        engine.installModelSourceForTesting(WhisperKitModelSource(
+            locateLocal: { _ in nil },
+            download: { _, _ in
+                downloads += 1
+                return folder
+            },
+            makePipe: { _, _ in throw URLError(.cannotOpenFile) },
+        ))
+        engine.applyModelVariant(small.variant, origin: small.origin)
+        engine.deferredSelection = small
+
+        let fetchedWhileDeferred = await engine.downloadModelIfMissing()
+        XCTAssertFalse(fetchedWhileDeferred)
+        XCTAssertEqual(downloads, 0)
+        XCTAssertEqual(engine.modelState, .unloaded)
+
+        engine.deferredSelection = nil
+        let fetched = await engine.downloadModelIfMissing()
+        XCTAssertTrue(fetched)
+        XCTAssertEqual(downloads, 1)
+    }
+
     func testDeclineClearsTheOfferAndLoadsNothing() async throws {
         let engine = WhisperKitEngine()
         let recorder = try await installRecordingSource(on: engine)

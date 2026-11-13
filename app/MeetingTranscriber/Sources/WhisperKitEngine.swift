@@ -545,7 +545,11 @@ extension WhisperKitEngine {
         let source = modelSource(origin, hubToken)
         // Matches no caller's generation, so a load that joined runs its own pass.
         var attempt = LoadAttempt(variant: variant, origin: origin, builtPipe: false, generation: -1)
-        guard pipe == nil, case .hub = origin, await source.prepareAndLocate(variant) == nil else { return attempt }
+        // A deferred model (Settings is asking about it, or "Later") is not fetched
+        // either: it waits for an explicit load or the first transcription.
+        guard pipe == nil, case .hub = origin,
+              deferredSelection != WhisperKitModelSelection(variant: variant, origin: origin),
+              await source.prepareAndLocate(variant) == nil else { return attempt }
 
         loadFailureReason = nil
         modelState = .downloading
