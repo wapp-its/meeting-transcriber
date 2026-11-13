@@ -39,16 +39,16 @@ struct RecordingAudioLine: Equatable, Sendable {
 
     /// `live` is nil when the queue no longer lists the job, and `audio` nil when the
     /// row has no record. `retained` is the running build's retention registry entry
-    /// for the meeting, nil when it lists none: the line promises an automatic
-    /// deletion only where that build's retention pass would make it.
+    /// for the meeting, nil when it lists none, and `bundleID` that build's: the
+    /// line promises an automatic deletion only where that build's pass would make it.
     static func resolve( // swiftlint:disable:this function_parameter_count
         record: MeetingFileRecord?, live: LiveMeetingState?, audio: AudioOnDisk?, retention: RecordingRetentionSettings,
-        retained: RetainedRecording?, now: Date, calendar: Calendar, locale: Locale,
+        retained: RetainedRecording?, bundleID: String?, now: Date, calendar: Calendar, locale: Locale,
     ) -> Self {
         guard let record, let audio else { return Self(text: nil, showsKeepBadge: false, incompleteText: nil) }
         let inputs = Inputs(
-            record: record, live: live, audio: audio, retention: retention, retained: retained, now: now, calendar: calendar,
-            locale: locale,
+            record: record, live: live, audio: audio, retention: retention, retained: retained, bundleID: bundleID, now: now,
+            calendar: calendar, locale: locale,
         )
         return Self(
             text: inputs.text,
@@ -72,6 +72,7 @@ struct RecordingAudioLine: Equatable, Sendable {
         let audio: AudioOnDisk
         let retention: RecordingRetentionSettings
         let retained: RetainedRecording?
+        let bundleID: String?
         let now: Date
         let calendar: Calendar
         let locale: Locale
@@ -127,9 +128,10 @@ struct RecordingAudioLine: Equatable, Sendable {
 
         /// What happens to audio on disk, or nil when the line has nothing to promise.
         /// Keep is true in every state, and the setting only reaches a finished meeting
-        /// this build's retention registry lists, as the pass deletes nothing else:
-        /// no import, no record-only recording, none of another build or from before
-        /// the registry. Days count as the pass counts them, in 24-hour steps.
+        /// this build's retention registry lists and whose record lets the pass
+        /// delete it (`allowsRetention`): no import, no record-only recording, none
+        /// of another build or from before the registry. Days count as the pass
+        /// counts them, in 24-hour steps.
         func next(_ standing: Standing) -> String? {
             if record.keep { return "kept, never deleted automatically" }
             switch standing {
@@ -143,7 +145,7 @@ struct RecordingAudioLine: Equatable, Sendable {
                 return nil
 
             case .finished:
-                guard retention.enabled, let retained, !record.isHeldFromRetention else { return nil }
+                guard retention.enabled, let retained, record.allowsRetention(by: bundleID) else { return nil }
                 guard retained.eligibleAt != nil else { return "kept, no notes were saved" }
                 let due = retained.recordedAt.addingTimeInterval(TimeInterval(max(0, retention.days)) * 86400)
                 return "deleted automatically \(due <= now ? "at the next check" : "on \(day(due))")"

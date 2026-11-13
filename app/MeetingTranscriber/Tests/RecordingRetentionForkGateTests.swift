@@ -81,6 +81,8 @@ final class RecordingRetentionForkGateTests: XCTestCase {
             ("from before the records", { $0.excludedFromAutomaticDeletion = true }),
             ("another build's", { $0.createdBy = RetentionFixture.otherBuild }),
             ("from before the field", { $0.createdBy = nil }),
+            ("failed", { $0.outcome = .failed }),
+            ("left the queue unfinished", { $0.outcome = .leftUnfinished }),
         ]
         for (name, hold) in holds {
             let harness = try makeHarness()
@@ -110,6 +112,63 @@ final class RecordingRetentionForkGateTests: XCTestCase {
         await sweep(pipeline.recordingRetention)
 
         XCTAssertEqual(onDisk(tracks(of: job)), [true])
+    }
+
+    /// A job the records do not know, as one from before them or whose record
+    /// could not be written, keeps its audio.
+    func testAJobWithoutARecordKeepsItsAudio() async throws {
+        let harness = try makeHarness()
+        let pipeline = makePipeline(harness)
+        let job = try dueMeeting(harness, pipeline)
+        XCTAssertTrue(harness.store.remove(jobID: job.id), "test premise")
+
+        await sweep(pipeline.recordingRetention)
+
+        XCTAssertEqual(onDisk(tracks(of: job)), [true, true, true])
+    }
+
+    /// The export uploads the notes but owns the job until it ends, and a failed
+    /// one may still need a retry: the audio waits, as the fork's rules had it.
+    func testAJobWhoseNotionExportRunsKeepsItsAudio() async throws {
+        let harness = try makeHarness()
+        let queue = harness.makeQueue()
+        let pipeline = harness.controller(queue: queue)
+        pipeline.connectRetentionToMeetingRecords()
+        var exporting = try dueMeeting(harness, pipeline)
+        exporting.beginNotionExport(speakerNames: [])
+        queue.insertJobForTesting(exporting)
+        let settled = try dueMeeting(harness, pipeline)
+        queue.insertJobForTesting(settled)
+
+        await sweep(pipeline.recordingRetention)
+
+        XCTAssertEqual(onDisk(tracks(of: exporting)), [true, true, true])
+        XCTAssertEqual(onDisk(tracks(of: settled)), [false, false, false], "done, and its export is not running")
+    }
+
+    /// A queue that tried its snapshot and could not read it holds none of the
+    /// saved jobs, so a pass it starts cannot tell a finished job from one still
+    /// running: nothing goes. Its successors inherit that until a restart.
+    func testAQueueWhoseSnapshotDidNotReadDeletesNothing() async throws {
+        for readable in [false, true] {
+            let harness = try makeHarness()
+            let pipeline = harness.controller()
+            let job = try dueMeeting(harness, pipeline)
+            let snapshot = harness.logDir.appendingPathComponent(PipelineSnapshot.snapshotFilename)
+            if readable {
+                try PipelineSnapshot.save([], to: harness.logDir)
+            } else {
+                try Data("not json".utf8).write(to: snapshot)
+            }
+            pipeline.activate { MockEngine() }
+            pipeline.rebuild()
+            XCTAssertNotNil(pipeline.queue.engine, "test premise")
+            XCTAssertEqual(pipeline.queue.snapshotRestoreFailed, !readable, "test premise")
+
+            await pipeline.queue.sweepRetainedRecordings()
+
+            XCTAssertEqual(onDisk(tracks(of: job)), Array(repeating: !readable, count: 3), "readable \(readable)")
+        }
     }
 
     /// Unread, a Keep cannot be told from no Keep, so the pass deletes nothing.
@@ -147,12 +206,15 @@ final class RecordingRetentionForkGateTests: XCTestCase {
             try FileManager.default.removeItem(at: url)
             held.add(jobID)
         }
+        let gate = { (_: Set<UUID>) -> RecordingRetentionPolicy.RecordGate in
+            .only(held.jobs.contains(jobID) ? [] : [jobID])
+        }
         let retention = RecordingRetention(
             registry: RecordingRetentionRegistry(path: root.appendingPathComponent("logs/retained_recordings.json")),
             settings: { RecordingRetentionSettings(enabled: true, days: 0) },
             deleter: deleter,
         )
-        retention.heldJobs = { held.jobs }
+        retention.recordGate = gate
         retention.registry.register(jobID: jobID, paths: paths, root: root, recordedAt: Date(timeIntervalSince1970: 0))
         retention.registry.markEligible(jobID: jobID, output: output, at: Date(timeIntervalSince1970: 0))
 
@@ -161,26 +223,27 @@ final class RecordingRetentionForkGateTests: XCTestCase {
         XCTAssertEqual(onDisk(paths), [false, true, true])
     }
 
-    func testThePolicyKeepsAJobTheUserHolds() {
+    func testThePolicyKeepsAJobTheRecordsDoNotAllow() {
         let root = URL(fileURLWithPath: "/Volumes/Archive/Protocols")
         let entry = RetainedRecording(
             jobID: UUID(), paths: [root.appendingPathComponent("recordings/a_mix.wav")], root: root,
             recordedAt: Date(timeIntervalSince1970: 0), eligibleAt: Date(timeIntervalSince1970: 60),
             outputPath: root.appendingPathComponent("a.md"),
         )
-        func decide(held: Set<UUID>) -> RecordingRetentionDecision {
+        func decide(_ gate: RecordingRetentionPolicy.RecordGate) -> RecordingRetentionDecision {
             RecordingRetentionPolicy.decide(
                 entry, now: Date(timeIntervalSince1970: 86400), settings: .init(enabled: true, days: 0),
                 environment: .init(
                     excludedPaths: [], scopedRoot: nil, fileExists: { _ in true }, hasContent: { _ in true },
-                    resolve: { $0 }, canList: { _ in true }, heldJobs: held,
+                    resolve: { $0 }, canList: { _ in true }, recordGate: gate,
                 ),
             )
         }
 
-        XCTAssertEqual(decide(held: []), .delete(entry.paths))
-        XCTAssertEqual(decide(held: [entry.jobID]), .keep(.heldByUser))
-        XCTAssertEqual(decide(held: [UUID()]), .delete(entry.paths))
+        XCTAssertEqual(decide(.everything), .delete(entry.paths), "the original's behaviour")
+        XCTAssertEqual(decide(.only([entry.jobID])), .delete(entry.paths))
+        XCTAssertEqual(decide(.only([UUID()])), .keep(.heldByRecord))
+        XCTAssertEqual(decide(.only([])), .keep(.heldByRecord))
     }
 
     // MARK: - One registry per build

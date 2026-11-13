@@ -48,7 +48,7 @@ final class RecordingAudioLineTests: XCTestCase {
         }
         return RecordingAudioLine.resolve(
             record: record, live: live, audio: audio ?? mb286, retention: retention, retained: retained,
-            now: now ?? beforeDue, calendar: calendar, locale: locale,
+            bundleID: Fixture.thisBuild, now: now ?? beforeDue, calendar: calendar, locale: locale,
         )
     }
 
@@ -187,6 +187,8 @@ final class RecordingAudioLineTests: XCTestCase {
     func testAMeetingThePassNeverDeletesShowsItsSizeOnly() {
         XCTAssertEqual(line(Fixture.record { $0.excludedFromAutomaticDeletion = true }).text, "Audio · 286 MB", "from before the records")
         XCTAssertEqual(line(Fixture.record(), listed: .unlisted).text, "Audio · 286 MB", "not in this build's registry")
+        XCTAssertEqual(line(Fixture.record { $0.createdBy = Fixture.otherBuild }).text, "Audio · 286 MB", "another build's meeting")
+        XCTAssertEqual(line(Fixture.record { $0.createdBy = nil }).text, "Audio · 286 MB", "a record from before the field")
         XCTAssertEqual(line(Fixture.record(outcome: .leftUnfinished)).text, "Audio · 286 MB", "left the queue unfinished")
         XCTAssertEqual(
             line(Fixture.record { $0.pending = .init(kind: .audioToTrash, paths: []) }).text, "Audio · 286 MB",

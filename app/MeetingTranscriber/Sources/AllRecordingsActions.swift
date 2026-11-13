@@ -63,6 +63,9 @@ struct AllRecordingsActions {
     /// This build's retention registry entry for a meeting, nil when it lists none:
     /// the audio line promises an automatic deletion only for a listed meeting.
     var retainedRecording: (UUID) -> RetainedRecording? = { _ in nil }
+    /// The running build's bundle identifier, as the record store has it: the line
+    /// promises an automatic deletion only for a meeting this build recorded.
+    var bundleID: String?
 
     // MARK: Regenerate sheet
 

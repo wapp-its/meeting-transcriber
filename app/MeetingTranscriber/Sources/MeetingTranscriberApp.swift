@@ -213,6 +213,7 @@ struct MeetingTranscriberApp: App {
                 )
             },
             retainedRecording: { id in appState.pipeline.recordingRetention.registry.entries.first { $0.jobID == id } },
+            bundleID: appState.pipeline.meetingFileStore.bundleID,
             templateChoices: { appState.protocolTemplateChoices() },
             optionsUse: { appState.protocolOptionsUse() },
             chooseFile: { RegenerateProtocolView.chooseFile(startingIn: appState.settings.effectiveOutputDir) },

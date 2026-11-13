@@ -69,6 +69,12 @@ final class PipelineControllerRetentionTests: XCTestCase {
         let registry = controller.recordingRetention.registry
         registry.register(jobID: jobID, paths: [mix], root: root, recordedAt: recordedAt)
         registry.markEligible(jobID: jobID, output: protocolFile, at: Date())
+        // The fork deletes only what a meeting record of this build allows.
+        XCTAssertTrue(controller.meetingFileStore.create(MeetingFileRecord(
+            jobID: jobID, origin: .recorded, recordingDate: recordedAt,
+            files: [MeetingFile(role: .mix, url: mix, owned: true)],
+            outcome: .finished(protocolExpected: true), createdBy: controller.meetingFileStore.bundleID,
+        )), "test premise")
         return mix
     }
 

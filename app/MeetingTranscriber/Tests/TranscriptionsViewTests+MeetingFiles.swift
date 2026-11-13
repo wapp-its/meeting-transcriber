@@ -70,6 +70,7 @@ extension TranscriptionsViewTests {
                 jobID: id, paths: [], root: URL(fileURLWithPath: "/rec"), recordedAt: recorded, eligibleAt: recorded, outputPath: nil,
             )
         }
+        actions.bundleID = RetentionFixture.thisBuild
         return actions
     }
 

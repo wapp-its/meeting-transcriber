@@ -1,30 +1,31 @@
 import Foundation
 
 /// The fork's link between the original's recording retention and the meeting
-/// records behind All Recordings: what a user holds there is never deleted, and
-/// what a pass deleted shows on the meeting's row.
+/// records behind All Recordings: a pass deletes only what a record and the
+/// queue let it, and what a pass deleted shows on the meeting's row.
 extension PipelineController {
     /// Set once from `activate`, before the first pass can run.
     func connectRetentionToMeetingRecords() {
-        recordingRetention.heldJobs = { [weak self] in self?.jobsHeldFromRetention() }
-        recordingRetention.didDelete = { [weak self] jobID, paths in
-            self?.noteDeletedByRetention(jobID: jobID, paths: paths)
+        recordingRetention.recordGate = { [weak self] jobs in self?.retentionRecordGate(for: jobs) }
+        recordingRetention.didDelete = { [weak self] jobID, gone in
+            self?.noteDeletedByRetention(jobID: jobID, paths: gone)
         }
     }
 
-    /// The jobs whose audio the retention pass must leave, read fresh from the
-    /// record file, which the other build writes too: the ones the user holds
-    /// (`isHeldFromRetention`), and, as the fork's rules always had it, every
-    /// import and every meeting this build did not create (`createdBy`, nil in a
-    /// record from before that field). The registry already lists only this
-    /// build's relocations; these keep that true whatever reaches it. Nil when the
-    /// file does not read.
-    func jobsHeldFromRetention() -> Set<UUID>? { // swiftlint:disable:this discouraged_optional_collection
+    /// Which of `jobs` this build's retention pass may delete the audio of: the
+    /// record, read fresh from the file the other build writes too, has to allow
+    /// it (`MeetingFileRecord.allowsRetention`), and the queue has to be through
+    /// with the job (`LiveMeetingState.isSettled`), so a running Notion export
+    /// holds the audio, and so do saved jobs that do not read. A job without a
+    /// record is never allowed. Nil when the record file does not read.
+    func retentionRecordGate(for jobs: Set<UUID>) -> RecordingRetentionPolicy.RecordGate? {
         guard meetingFileStore.reload() else { return nil }
         let build = meetingFileStore.bundleID
-        return Set(meetingFileStore.records.filter { record in
-            record.isHeldFromRetention || record.origin == .imported || record.createdBy == nil || record.createdBy != build
-        }.map(\.jobID))
+        let allowed = meetingFileStore.records
+            .filter { jobs.contains($0.jobID) && $0.allowsRetention(by: build) }
+            .map(\.jobID)
+            .filter { liveMeetingState(jobID: $0)?.isSettled ?? true }
+        return .only(Set(allowed))
     }
 
     /// Mark the files a pass deleted as gone in the meeting's record, and date the
@@ -53,10 +54,14 @@ extension PipelineController {
 }
 
 extension MeetingFileRecord {
-    /// Whether the retention pass must leave the meeting's audio, whatever its
-    /// registry entry says: marked Keep, a deletion of the user's under way or
-    /// unfinished, or a recovered recording from before the records existed.
-    var isHeldFromRetention: Bool {
-        keep || pending != nil || incomplete != nil || excludedFromAutomaticDeletion
+    /// Whether the retention pass of the build `bundleID` may delete the meeting's
+    /// audio once its registry entry is due, as the fork's rules have it: a
+    /// recording (never an import) that this build created (`createdBy`, nil in a
+    /// record from before that field) and that finished, which is neither marked
+    /// Keep, nor in a deletion of the user's under way or left incomplete, nor a
+    /// recovered recording from before the records existed.
+    func allowsRetention(by bundleID: String?) -> Bool {
+        guard origin == .recorded, let createdBy, createdBy == bundleID, case .finished = outcome else { return false }
+        return !keep && pending == nil && incomplete == nil && !excludedFromAutomaticDeletion
     }
 }

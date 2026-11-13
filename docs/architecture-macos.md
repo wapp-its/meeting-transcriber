@@ -942,22 +942,25 @@ only what its registry lists, the audio this build's stage 3 relocated, once the
 notes are saved and the days since the recording have passed. The fork adds four
 things on top of it (`PipelineController+RetentionRecords.swift`):
 
-- **What the user holds stays.** A pass reads the record file fresh, also right
-  before each delete, and keeps the audio of a meeting marked Keep, of one with a
-  deletion of the user's under way or left incomplete, and of a recovered
-  recording from before the records existed (`isHeldFromRetention`). A record
-  file that does not read skips the pass.
+- **Only what the record and the queue allow goes.** A pass reads the record
+  file fresh, at its start and again right before each delete, and deletes the
+  audio of a listed job only when its record allows it
+  (`MeetingFileRecord.allowsRetention`): a recording, not an import, that this
+  build created (`createdBy`), that finished, and that is neither marked Keep,
+  nor in a deletion of the user's under way or left incomplete, nor a recovered
+  recording from before the records existed. A job without a record is never
+  deleted, and a record file that does not read skips the pass. The queue has
+  to be through with the job as well (`LiveMeetingState.isSettled`): a running
+  Notion export holds the audio, and so do saved jobs the queue could not read.
 - **One registry per build.** The development and the release build share the
   data folder but not their settings, so each keeps its own registry,
   `retained_recordings.<bundle id>.json`: a build's setting reaches only what
-  that build relocated. On top of that a pass keeps every import and every
-  meeting whose record another build created (`createdBy`, or none in a record
-  from before that field), whatever reaches the registry.
-- **The row says what happened.** The files a pass deleted are marked gone in
-  the meeting's record, and once no audio is left the deletion is dated, so the
-  row reads "Audio deleted automatically on …". Before that, the row's audio
-  line and the window's footer say what the setting will do, the row only for a
-  meeting this build's registry lists.
+  that build relocated.
+- **The row says what happened.** The files a pass found gone are marked gone
+  in the meeting's record, and once no audio is left the deletion is dated, so
+  the row reads "Audio deleted automatically on …". Before that, the row's
+  audio line and the window's footer say what the setting will do, the row only
+  for a meeting this build's registry lists and its record allows.
 - **Records do not pile up.** `MeetingRecordPruner` removes, at launch and once
   a day, the record of a meeting the window no longer lists and of which the disk
   answers gone for every file.

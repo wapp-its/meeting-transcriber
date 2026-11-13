@@ -82,13 +82,30 @@ enum RecordingRetentionDecision: Equatable {
         case rootUnreachable
         case outputMissing
         case outsideRoot
-        /// The meeting is marked Keep in All Recordings, or a deletion the user
-        /// started there is under way or did not finish. The fork's addition.
-        case heldByUser
+        /// The meeting's record does not let this build delete its audio
+        /// (`RecordGate`). The fork's addition.
+        case heldByRecord
     }
 
     enum DropReason: Equatable {
         case filesGone
+    }
+}
+
+extension RecordingRetentionPolicy {
+    /// Which jobs' audio the fork's meeting records let a pass delete: every job
+    /// (the original's behaviour, where nothing sets a gate), or only the listed
+    /// ones (`PipelineController.retentionRecordGate`). The fork's addition.
+    enum RecordGate: Equatable {
+        case everything
+        case only(Set<UUID>)
+
+        func allows(_ jobID: UUID) -> Bool {
+            switch self {
+            case .everything: true
+            case let .only(jobs): jobs.contains(jobID)
+            }
+        }
     }
 }
 
@@ -151,20 +168,19 @@ enum RecordingRetentionPolicy {
         /// Whether a folder's contents can be read, so that a file missing
         /// from it is really gone rather than out of sight.
         let canList: (URL) -> Bool
-        /// Jobs whose meeting the user holds in All Recordings: marked Keep, or
-        /// with a deletion of their own under way or left unfinished. Their
-        /// audio is never due. The fork's addition.
-        var heldJobs: Set<UUID> = []
+        /// Which jobs the meeting records let this build delete. The fork's
+        /// addition.
+        var recordGate = RecordGate.everything
 
         /// The file system as it is.
-        static func live(excludedPaths: Set<String>, scopedRoot: URL?, heldJobs: Set<UUID> = []) -> Self {
+        static func live(excludedPaths: Set<String>, scopedRoot: URL?, recordGate: RecordGate = .everything) -> Self {
             Self(
                 excludedPaths: excludedPaths, scopedRoot: scopedRoot,
                 fileExists: { FileManager.default.fileExists(atPath: $0.path) },
                 hasContent: { RecordingRetentionPolicy.isWrittenFile($0) },
                 resolve: { $0.resolvingSymlinksInPath() },
                 canList: { FileManager.default.isReadableFile(atPath: $0.path) },
-                heldJobs: heldJobs,
+                recordGate: recordGate,
             )
         }
     }
@@ -212,7 +228,7 @@ enum RecordingRetentionPolicy {
         guard entry.outputExported || entry.outputPath.map(environment.hasContent) == true else {
             return .keep(.outputMissing)
         }
-        guard !environment.heldJobs.contains(entry.jobID) else { return .keep(.heldByUser) }
+        guard environment.recordGate.allows(entry.jobID) else { return .keep(.heldByRecord) }
         return .delete(present)
     }
 

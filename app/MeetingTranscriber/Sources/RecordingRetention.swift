@@ -106,16 +106,17 @@ final class RecordingRetention {
         context.excludedPaths().union(heldPaths())
     }
 
-    /// The jobs whose meeting the user holds in All Recordings
-    /// (`Environment.heldJobs`), read on every pass and again right before each
-    /// delete, since another build can change a record meanwhile. Nil when that
-    /// cannot be told because the meeting records do not read: the pass then
-    /// deletes nothing. Set by the controller. The fork's addition.
-    var heldJobs: () -> Set<UUID>? = { [] } // swiftlint:disable:this discouraged_optional_collection
+    /// Which of the jobs asked about the meeting records and the queue let a
+    /// pass delete (`Environment.recordGate`): asked with every listed job at
+    /// the start of a pass and with the one job again right before each delete,
+    /// since another build can change a record meanwhile. Nil when the records
+    /// do not read: the pass then deletes nothing. Set by the controller. The
+    /// fork's addition.
+    var recordGate: (Set<UUID>) -> RecordingRetentionPolicy.RecordGate? = { _ in .everything }
 
     /// Told which files of a job a pass deleted or found gone, so the meeting's
     /// record can say so. Set by the controller. The fork's addition.
-    var didDelete: (UUID, [URL]) -> Void = { _, _ in }
+    var didDelete: (_ jobID: UUID, _ gone: [URL]) -> Void = { _, _ in }
 
     private let settings: () -> RecordingRetentionSettings
     private let deleter: RecordingFileDeleter
@@ -215,13 +216,13 @@ final class RecordingRetention {
             logger.warning("Retention pass skipped: the registry could not be saved")
             return
         }
-        guard let held = heldJobs() else {
+        guard let gate = recordGate(Set(registry.entries.map(\.jobID))) else {
             logger.warning("Retention pass skipped: the meeting records could not be read")
             return
         }
         let current = effectiveSettings
         let environment = RecordingRetentionPolicy.Environment.live(
-            excludedPaths: inUse(context), scopedRoot: context.scopeRoot, heldJobs: held,
+            excludedPaths: inUse(context), scopedRoot: context.scopeRoot, recordGate: gate,
         )
         let instant = now()
         var due: [(jobID: UUID, urls: [URL])] = []
@@ -269,35 +270,37 @@ final class RecordingRetention {
         defer { context.scopeRoot.map(context.securityScope.stop) }
 
         for (jobID, urls) in due {
-            var gone: [URL] = []
-            for url in urls {
-                guard mayStillDelete(url, of: jobID, context) else { break }
-                gone += await deleter.delete([url])
-            }
-            // One write per recording. Forgetting after the deletes is safe:
-            // a listed file that is gone is dropped by the next pass, and a
-            // path a newer recording takes over leaves this entry on its own.
-            forget(gone, of: jobID)
-            summary.deletedFiles += gone.count
+            summary.deletedFiles += await deleteDue(urls, of: jobID, context)
         }
+    }
+
+    /// Deletes one recording's due files, each checked again right before, and
+    /// returns how many are gone afterwards.
+    private func deleteDue(_ urls: [URL], of jobID: UUID, _ context: SweepContext) async -> Int {
+        var gone: [URL] = []
+        for url in urls {
+            guard mayStillDelete(url, of: jobID, context) else { break }
+            gone += await deleter.delete([url])
+        }
+        // One write per recording. Forgetting after the deletes is safe:
+        // a listed file that is gone is dropped by the next pass, and a
+        // path a newer recording takes over leaves this entry on its own.
+        registry.forget(gone, of: jobID)
+        if !gone.isEmpty { didDelete(jobID, gone) }
+        return gone.count
     }
 
     /// Checked again right before each delete, on the main actor: a job may have
     /// taken a track into use, a newer recording may have taken the path over,
     /// the settings may have been switched off or lengthened, a registry write
-    /// may have failed since the decision, or (the fork's addition) the user may
-    /// have come to hold the meeting.
+    /// may have failed since the decision, or (the fork's addition) the meeting's
+    /// record may no longer let it go.
     private func mayStillDelete(_ url: URL, of jobID: UUID, _ context: SweepContext) -> Bool {
         guard registry.isPersisted,
               let entry = registry.entry(listing: url, for: jobID),
               RecordingRetentionPolicy.isDue(entry, now: now(), settings: effectiveSettings),
               !RecordingRetentionPolicy.isInUse(entry, excludedPaths: inUse(context))
         else { return false }
-        return heldJobs().map { !$0.contains(jobID) } ?? false
-    }
-
-    private func forget(_ gone: [URL], of jobID: UUID) {
-        registry.forget(gone, of: jobID)
-        if !gone.isEmpty { didDelete(jobID, gone) }
+        return recordGate([jobID])?.allows(jobID) ?? false
     }
 }
