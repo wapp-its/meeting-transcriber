@@ -536,7 +536,11 @@ extension ParakeetEngine {
             }
             try await downloadModels(report)
         } catch {
-            logger.error("Parakeet model download failed: \(error.localizedDescription, privacy: .public)")
+            // Type public, message redacted, as for the load above: a download error
+            // can name the model folder under the home folder.
+            logger.error(
+                "Parakeet model download failed (\(String(describing: type(of: error)), privacy: .public): \(error.localizedDescription, privacy: .private))",
+            )
         }
         if asrManager == nil {
             modelState = .unloaded
