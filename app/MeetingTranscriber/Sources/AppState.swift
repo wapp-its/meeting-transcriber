@@ -537,34 +537,6 @@ final class AppState {
         watching.canPauseRecording
     }
 
-    // MARK: - Updates (mt-update mode)
-
-    /// Why "Install Update" is not possible right now, or nil: what mt-update
-    /// itself waits for. The manual-recording predicate is the controller's
-    /// wide one, so a manual start that has not built its loop yet counts.
-    var updateInstallBlockedReason: String? {
-        UpdateInstallGate.blockedReason(
-            isRecording: watching.isRecording,
-            manualRecordingStarting: watching.isManualRecording,
-            waitingJobs: pipeline.queue.pendingJobs.count,
-            activeJobs: pipeline.queue.activeJobs.count,
-        )
-    }
-
-    func installUpdate() {
-        updateChecker.installNow(blockedReason: updateInstallBlockedReason, isWatching: watching.isWatching)
-    }
-
-    /// Reports an install the previous instance started, and turns meeting
-    /// watching back on through the auto-watch path when it was on then.
-    /// The auto-watch start posted at launch also checks "not already
-    /// watching", so whichever of the two runs second does nothing.
-    func resumeUpdateAfterLaunch() {
-        if updateChecker.resumeAfterLaunch(), !watching.isWatching {
-            watching.toggleWatching(userInitiated: false)
-        }
-    }
-
     // Internal (not private): also formats `postedAt` in the RPC snapshot
     // extension (AppState+RPC.swift), where file-private wouldn't reach.
     static let isoFormatter = ISO8601DateFormatter()
