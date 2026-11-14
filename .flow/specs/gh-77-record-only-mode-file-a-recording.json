@@ -278,7 +278,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-77-record-only-mode-file-a-recording.md",
-  "status": "open",
+  "status": "done",
   "title": "Record-only mode: file a recording recovered after a crash instead of processing it",
   "tracker": {
     "baseHashFlow": null,
@@ -292,5 +292,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/77"
   },
-  "updated_at": "2026-11-14T21:18:50.906194Z"
+  "updated_at": "2026-11-14T21:22:09.240679Z"
 }

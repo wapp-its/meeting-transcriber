@@ -10,7 +10,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-77-record-only-mode-file-a-recording",
   "spec_path": ".flow/tasks/gh-77-record-only-mode-file-a-recording.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement Record-only mode: file a recording recovered after a crash instead of processing it",
   "updated_at": "2026-11-14T19:59:41.326905Z"
 }
