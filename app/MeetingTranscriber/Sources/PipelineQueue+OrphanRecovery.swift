@@ -79,8 +79,9 @@ extension PipelineQueue {
     }
 
     /// The mix paths a job of this queue or a run in this process already has,
-    /// which the scan skips and the adoption checks again.
-    private func accountedForMixPaths() -> Set<String> {
+    /// which the scan skips and the adoption (or, in record-only mode, the
+    /// filing, `fileOrphanedRecordings`) checks again.
+    func accountedForMixPaths() -> Set<String> {
         Set(jobs.compactMap { $0.mixPath?.standardizedFileURL.path }).union(inFlightRuns.claimedAudioPaths)
     }
 
@@ -106,7 +107,7 @@ extension PipelineQueue {
         for group in candidates {
             guard let mixURL = group.mix else { continue }
             var job = PipelineJob(
-                meetingTitle: "Recovered Recording (\(group.stem))",
+                meetingTitle: Self.recoveredRecordingTitle(stem: group.stem),
                 appName: "Unknown",
                 mixPath: mixURL,
                 appPath: group.app,
@@ -121,6 +122,12 @@ extension PipelineQueue {
         saveSnapshot()
         logger.info("Recovered \(candidates.count) orphaned recording(s)")
         triggerProcessing()
+    }
+
+    /// The title a recording recovered from staging gets, as a job and, in
+    /// record-only mode, in its sidecar.
+    nonisolated static func recoveredRecordingTitle(stem: String) -> String {
+        "Recovered Recording (\(stem))"
     }
 
     /// Recorded, as only the recorder writes to staging, and dated when it entered

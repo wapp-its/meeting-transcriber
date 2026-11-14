@@ -48,8 +48,9 @@ struct RecordingSidecar: Codable {
     /// one field this build cannot interpret.
     private let triggerRaw: String?
 
-    /// `nil` for version 1 sidecars, which predate the field, and for values
-    /// introduced by a newer schema version than this build knows.
+    /// `nil` for version 1 sidecars, which predate the field, for values
+    /// introduced by a newer schema version than this build knows, and for a
+    /// recording filed by the crash recovery, whose start is not known.
     var trigger: Trigger? {
         triggerRaw.flatMap(Trigger.init(rawValue:))
     }
@@ -66,6 +67,7 @@ struct RecordingSidecar: Codable {
         case triggerRaw = "trigger"
     }
 
+    /// A nil `trigger` leaves the `trigger` key out of the file.
     init(
         title: String,
         appName: String,
@@ -73,7 +75,7 @@ struct RecordingSidecar: Codable {
         stoppedAt: Date,
         participants: [String],
         micDelaySeconds: TimeInterval,
-        trigger: Trigger,
+        trigger: Trigger?,
         mixFilename: String,
         appFilename: String?,
         micFilename: String?,
@@ -86,7 +88,7 @@ struct RecordingSidecar: Codable {
         self.stoppedAt = stoppedAt
         self.participants = participants
         self.micDelaySeconds = micDelaySeconds
-        self.triggerRaw = trigger.rawValue
+        self.triggerRaw = trigger?.rawValue
         self.files = Files(mix: mixFilename, app: appFilename, mic: micFilename)
         self.pauses = pauses.isEmpty ? nil : pauses
     }

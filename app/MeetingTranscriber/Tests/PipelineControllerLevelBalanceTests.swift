@@ -28,7 +28,7 @@ final class PipelineControllerLevelBalanceTests: XCTestCase {
         try FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
         let handed = Handed()
         var environment = IsolatedQueueEnvironment.make(logDir: logDir)
-        environment.recoverStagedRecordings = { _, levelBalance in handed.flags.append(levelBalance) }
+        environment.recoverStagedRecordings = { _, levelBalance, _ in handed.flags.append(levelBalance) }
         let pc = PipelineController(
             settings: settings,
             notifier: RecordingNotifier(),
