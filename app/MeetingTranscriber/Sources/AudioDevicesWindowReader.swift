@@ -168,11 +168,18 @@ final class AudioDevicesWindowReader {
     }
 
     private func markLateReading() {
-        guard var flight = inFlight, !flight.late,
-              now().timeIntervalSince(flight.startedAt) >= Self.readDeadline
-        else { return }
+        guard var flight = inFlight, !flight.late, isOverdue(flight) else { return }
         flight.late = true
         inFlight = flight
+        forgetReading()
+    }
+
+    private func isOverdue(_ flight: InFlight) -> Bool {
+        now().timeIntervalSince(flight.startedAt) >= Self.readDeadline
+    }
+
+    /// What a late reading would have answered reads unknown.
+    private func forgetReading() {
         if status != .unknown { status = .unknown }
         if selfRunningInput != nil { selfRunningInput = nil }
         meetingAppAnsweredPIDs = []
@@ -204,7 +211,12 @@ final class AudioDevicesWindowReader {
     private func adopt(_ reading: AudioDeviceStatusReading, id: Int) {
         guard let flight = inFlight, flight.id == id else { return }
         inFlight = nil
-        guard flight.generation == generation, isOpen, !flight.late else { return }
+        guard flight.generation == generation, isOpen else { return }
+        // Late also when it returns past the deadline before a tick saw it.
+        guard !flight.late, !isOverdue(flight) else {
+            forgetReading()
+            return
+        }
 
         var meetingApp = status.meetingApp
         // The recording can have ended, or another started, while the read was out.

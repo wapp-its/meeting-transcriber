@@ -154,6 +154,29 @@ final class AudioDevicesWindowReaderTests: XCTestCase {
         XCTAssertEqual(reads.count, 3, "the late answer was dropped and a later reading answered")
     }
 
+    /// A reading that returns past the deadline before any tick marked it
+    /// late is late all the same: its answer is dropped, and the next
+    /// reading's is shown.
+    func testAReadingReturningPastTheDeadlineBeforeATickIsDroppedAsLate() async {
+        let reads = Reads()
+        let clock = Clock()
+        let reader = makeReader(reads, clock: clock)
+        reader.windowOpened()
+        await waitFor(reader.status.running != nil, timeout: .seconds(2))
+
+        reads.hold()
+        clock.advance(1)
+        reader.tick()
+        await waitFor(reads.count == 2, timeout: .seconds(2))
+        reads.reading = AudioDeviceStatusReading(running: ["MicUID": false], selfRunningInput: true, meetingApp: nil)
+        clock.advance(2.01)
+        reads.release()
+        await waitFor(reader.status.running == ["MicUID": false], timeout: .seconds(2))
+
+        XCTAssertEqual(reader.status.running, ["MicUID": false])
+        XCTAssertEqual(reads.count, 3, "the overdue answer was dropped and a later reading answered")
+    }
+
     // MARK: - Only while the window is open
 
     func testNothingIsReadWhileTheWindowIsClosedAndClosingItStopsTheReads() async throws {
