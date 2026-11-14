@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-130-record-a-meeting-again-after-stopping",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-11-14T21:36:51.116240Z",
+  "completion_reviewed_at": "2026-11-14T23:09:14.992919Z",
   "created_at": "2026-11-12T20:43:12.695238Z",
   "default_impl": null,
   "default_review": null,
@@ -218,12 +218,57 @@
       "timestamp": "2026-11-14T21:36:51.083763Z",
       "tool_calls": 25,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "c6907d6e37870f66bfd9ac85b145aeca4d7034b3f2fb4316ded6d8dc0d3ea928",
+      "backend": "codex",
+      "base_sha": "322dd8b7457d234def6e2c575e1dfc24a5819b31",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-08f2fa3f41723bd0c57b79277fed52da",
+            "classification": "pre_existing",
+            "findingId": "finding-08f2fa3f41723bd0c57b79277fed52da",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "b7ba20255754186fc482d2dc0dd10b2cf06d959f",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 417568,
+      "output_sha256": "d5fc34e00e09ec87717e89b4eedbe258507d5645838a75ede4bab276eb998898",
+      "reservation_id": "d0bc8196a4e84674885ac1ece33f14be",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T23:09:14.967515Z",
+      "tool_calls": 22,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-130-record-a-meeting-again-after-stopping.1": 1,
     "plan": 1,
-    "plan#completion": 1
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -248,5 +293,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nSometimes I stop the recording of a detected meeting while the call is still going on. Then there is no easy way to record the rest of it. The app does not detect the meeting again until the call ends. This is on purpose: Teams keeps its call signal after a call, so the app can't tell \"same call\" from \"next call\" (log line `redetect_hold_set app=Microsoft Teams`).\n\nThe only way is \"Record App + Microphone...\" and picking the meeting app again. It is not obvious, and that recording does not stop when the call ends. A manual recording only stops when the app quits, on the silence question or at the maximum length.\n\n## NOTES\n\n- Idea: while a hold is active and the call is still there, show \"Record Again\" where \"Stop Recording\" was. One click lifts the hold and starts a new recording of the same meeting, which then ends with the call like the first one.\n- Condition: only if new meetings are still detected reliably. After the second recording ends with the call, no hold may be left, so the next call is detected as usual. Today a hold is only set when I stop by hand or on the silence stop, so this should hold. It needs a test anyway.\n- The menu is being reworked in #125, so this should come after it.\n\n## TASKS\n\n- [ ] Add a one-click \"Record Again\" item for a held meeting that is still running\n- [ ] Test that the next call is detected after the second recording ends with the call\n- [ ] Find out if I missed the record items in the menu after the stop (they should still show)",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/130"
   },
-  "updated_at": "2026-11-14T21:44:32.313252Z"
+  "updated_at": "2026-11-14T23:09:14.996337Z"
 }
