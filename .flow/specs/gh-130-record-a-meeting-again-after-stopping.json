@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-130-record-a-meeting-again-after-stopping",
-  "completion_review_status": "not_required",
-  "completion_reviewed_at": "2026-11-14T21:16:14.590098Z",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-11-14T21:36:51.116240Z",
   "created_at": "2026-11-12T20:43:12.695238Z",
   "default_impl": null,
   "default_review": null,
@@ -173,17 +173,63 @@
       "task": "gh-130-record-a-meeting-again-after-stopping.1",
       "timestamp": "2026-11-14T21:10:13.717645Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "fab4e6308a492db1f7b5690203afe5f1019c5ee27c27afe49eb9050be00977ce",
+      "backend": "codex",
+      "base_sha": "f911fcb0a331240d287db28e1880c98fd770bc7c",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-2bf44ae75e4286482757a181a22c42a9",
+            "classification": "pre_existing",
+            "findingId": "finding-2bf44ae75e4286482757a181a22c42a9",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "649592210e35a15f82c681ebbbc0f93d13d1a73c",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 381391,
+      "output_sha256": "6f487fccdf5b56b8ddf861f2cce13fa5eae6d07ecaa9bd8e9e88df8426182a3e",
+      "reservation_id": "094ebca0df114af89e8c32ae783220a6",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T21:36:51.083763Z",
+      "tool_calls": 25,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-130-record-a-meeting-again-after-stopping.1": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-130-record-a-meeting-again-after-stopping.1": 0,
     "plan": 0
   },
@@ -202,5 +248,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/130"
   },
-  "updated_at": "2026-11-14T21:16:14.590432Z"
+  "updated_at": "2026-11-14T21:36:51.120220Z"
 }
