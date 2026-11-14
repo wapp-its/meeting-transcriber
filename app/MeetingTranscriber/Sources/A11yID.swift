@@ -209,6 +209,10 @@ enum A11yID {
     static let consentPromptRecordWithOptions = "consentPromptRecordWithOptions"
     static let consentPromptIgnore = "consentPromptIgnore"
 
+    /// The menu's "Record Again (<App>)", one line per held app, all under
+    /// this one identifier. No app name, for the reason on `consentDeniedAppRemove`.
+    static let recordAgainMenuItem = "recordAgainMenuItem"
+
     /// The Record Meeting window's buttons. The window shows background text
     /// and stays off every RPC allowlist.
     static let consentOptionsRecordButton = "consentOptionsRecordButton"

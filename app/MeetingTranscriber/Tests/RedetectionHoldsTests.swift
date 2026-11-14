@@ -57,6 +57,45 @@ final class RedetectionHoldsTests: XCTestCase {
         XCTAssertTrue(holds.heldApps.isEmpty)
     }
 
+    // MARK: - Offered for "Record Again"
+
+    /// Only an offered hold is offered, sorted by app; a released one is
+    /// forgotten, so the same app held again later is offered only if that
+    /// hold is.
+    func testOnlyOfferedHoldsAreOffered() {
+        var holds = RedetectionHolds()
+        let (teams, zoom) = (meeting(.teams), meeting(.zoom))
+        _ = holds.hold(zoom, offered: true)
+        _ = holds.hold(meeting(.webex))
+        _ = holds.hold(teams, offered: true)
+
+        XCTAssertEqual(holds.offeredMeetings, [teams, zoom])
+        XCTAssertEqual(holds.heldApps, ["Microsoft Teams", "Webex", "Zoom"])
+
+        _ = holds.release { $0 == teams }
+        _ = holds.hold(teams)
+        XCTAssertEqual(holds.offeredMeetings, [zoom], "the new hold is not offered")
+    }
+
+    /// Lifting hands back the meeting of an offered hold whose meeting still
+    /// runs and removes only that hold; anything else changes nothing.
+    func testLiftOfferedTakesOnlyAnOfferedHoldWhoseMeetingRuns() {
+        var holds = RedetectionHolds()
+        let teams = meeting(.teams)
+        _ = holds.hold(teams, offered: true)
+        _ = holds.hold(meeting(.zoom))
+        let before = holds
+
+        XCTAssertNil(holds.liftOffered("Zoom") { _ in true }, "not offered")
+        XCTAssertNil(holds.liftOffered("Webex") { _ in true }, "not held")
+        XCTAssertNil(holds.liftOffered("Microsoft Teams") { _ in false }, "its meeting is over")
+        XCTAssertEqual(holds, before)
+
+        XCTAssertEqual(holds.liftOffered("Microsoft Teams") { _ in true }, teams)
+        XCTAssertEqual(holds.heldApps, ["Zoom"], "every other hold stays")
+        XCTAssertTrue(holds.offeredMeetings.isEmpty)
+    }
+
     func testRemoveAllEmptiesIt() {
         var holds = RedetectionHolds()
         _ = holds.hold(meeting(.teams))

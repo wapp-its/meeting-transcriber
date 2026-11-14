@@ -297,6 +297,13 @@ class MicInputDetector: MeetingDetecting {
         }
     }
 
+    /// See `MeetingDetecting`. The count goes up again at the next poll that
+    /// finds the signal, so it is over the threshold there.
+    func markConfirmed(appName: String) {
+        consecutiveHits[appName] = confirmationCount
+        cooldownUntil[appName] = nil
+    }
+
     // MARK: - Diagnostics
 
     /// Log, once per distinct bundle, that a process is capturing mic input but
@@ -437,6 +444,12 @@ final class CompositeMeetingDetector: MeetingDetecting {
     func reset(appName: String?) {
         for detector in detectors {
             detector.reset(appName: appName)
+        }
+    }
+
+    func markConfirmed(appName: String) {
+        for detector in detectors {
+            detector.markConfirmed(appName: appName)
         }
     }
 }

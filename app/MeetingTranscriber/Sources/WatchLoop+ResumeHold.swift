@@ -9,15 +9,15 @@ import Foundation
 /// meeting the detector reports signalling at that moment, confirmed or not,
 /// gets the re-detection hold (`WatchLoop+RedetectionHold.swift`), whose own
 /// rule releases it: the first watching poll that finds that meeting's signal
-/// gone. `start()` keeps holds and `stop()` discards them, so this runs on a
-/// loop before its `start()`.
+/// gone. "Record Again" is not offered for these. `start()` keeps holds and
+/// `stop()` discards them, so this runs on a loop before its `start()`.
 extension WatchLoop {
     /// Hold every meeting signalling now and log how many. The count line
     /// names no app; each hold logs its own app.
     func holdSignallingMeetings() {
         let meetings = detector.signallingMeetings()
         for meeting in meetings {
-            holdRedetection(of: meeting)
+            holdRedetection(of: meeting, offeringRecordAgain: false)
         }
         diagnostics.notice("watch_resumed_after_manual_recording held=\(meetings.count)")
     }

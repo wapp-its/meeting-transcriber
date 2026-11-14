@@ -96,6 +96,8 @@ class WatchLoop {
     var stopByHandRequestedAt: Date?
     /// Apps kept out of detection until their signal has gone once (`WatchLoop+RedetectionHold.swift`).
     var redetectionHolds = RedetectionHolds()
+    /// The held app "Record Again" was chosen for, parked for the next poll (`WatchLoop+RecordAgain.swift`).
+    var recordAgainRequest: String?
     var silencePrompt: SilencePromptRuntime
     /// The recording's pauses, from its capture start to its stop (`WatchLoop+Pause.swift`).
     var recordingPauses: RecordingPauseRecord?
@@ -234,6 +236,7 @@ class WatchLoop {
         declineParkedConsent()
         cleanupManualRecording()
         redetectionHolds.removeAll()
+        recordAgainRequest = nil
         update { next in
             next.phase = .idle
             next.currentMeeting = nil
@@ -418,12 +421,14 @@ class WatchLoop {
     private func watchLoop() async {
         while !Task.isCancelled {
             releaseEndedRedetectionHolds()
-            // A prompt answered since the last poll comes first: the answer
-            // arrives out of band, but recordings only ever start here.
-            // Re-checked because up to a poll interval has passed since the
-            // answer, and the call may have ended in it.
-            if let approved = takeApprovedConsent(), detector.isMeetingActive(approved.meeting),
-               !appsHeldFromDetection.contains(approved.meeting.pattern.identityKey) {
+            // A Record Again click comes first, then a prompt answered since
+            // the last poll: both arrive out of band, but recordings only ever
+            // start here. Each is re-checked, since up to a poll interval has
+            // passed and the call may have ended in it.
+            if let again = takeRecordAgain() {
+                if await runMeeting(again, startCause: .recordAgain) { return }
+            } else if let approved = takeApprovedConsent(), detector.isMeetingActive(approved.meeting),
+                      !appsHeldFromDetection.contains(approved.meeting.pattern.identityKey) {
                 if await runMeeting(approved.meeting, protocolOptions: approved.protocolOptions) { return }
             } else if let meeting = detector.checkOnce(excluding: appsExcludedFromDetection.union(appsHeldFromDetection)) {
                 // A detected meeting asks before recording unless its app
@@ -449,10 +454,10 @@ class WatchLoop {
 
     /// Record one meeting to completion and return to watching. True means the
     /// loop was cancelled mid-recording and must exit.
-    private func runMeeting(_ meeting: DetectedMeeting, protocolOptions: MeetingProtocolOptions? = nil) async -> Bool {
+    private func runMeeting(_ meeting: DetectedMeeting, protocolOptions: MeetingProtocolOptions? = nil, startCause: PhaseChangeCause = .regular) async -> Bool {
         var endReason = MeetingEndReason.ended
         do {
-            endReason = try await handleMeeting(meeting, protocolOptions: protocolOptions)
+            endReason = try await handleMeeting(meeting, protocolOptions: protocolOptions, startCause: startCause)
         } catch {
             if error is CancellationError || isNothingRecordedAtQuit(error) { return true }
             let msg = "Recording error: \(error.localizedDescription)"
@@ -503,8 +508,13 @@ class WatchLoop {
 
     // MARK: - Meeting Handling
 
+    /// `startCause` goes with the move into `.recording` (see `PhaseChangeCause`).
     @discardableResult
-    func handleMeeting(_ meeting: DetectedMeeting, protocolOptions: MeetingProtocolOptions? = nil) async throws -> MeetingEndReason {
+    func handleMeeting(
+        _ meeting: DetectedMeeting,
+        protocolOptions: MeetingProtocolOptions? = nil,
+        startCause: PhaseChangeCause = .regular,
+    ) async throws -> MeetingEndReason {
         defer { stopByHandRequestedAt = nil }
         onMeetingCapture?(true)
         defer { onMeetingCapture?(false) }
@@ -514,7 +524,7 @@ class WatchLoop {
         let source = RecordingSource.forApp(pid: meeting.windowPID, noMic: noMic())
         let micDeviceUID = micDeviceUID()
         recordingSource = source
-        update { next in
+        update(cause: startCause) { next in
             next.phase = .recording
             next.currentMeeting = meeting
             next.detail = "Recording: \(title)"
@@ -536,14 +546,7 @@ class WatchLoop {
         let recordingStartedAt = nowProvider()
         recordingPauses = RecordingPauseRecord(startedAt: recordingStartedAt)
 
-        // Read participants (Teams)
-        var participants: [String] = []
-        if meeting.pattern.appName == "Microsoft Teams",
-           let names = ParticipantReader.readParticipants(pid: meeting.windowPID),
-           !names.isEmpty {
-            logger.info("Detected \(names.count) participants")
-            participants = names
-        }
+        let participants = readParticipants(of: meeting)
 
         // Wait for the meeting to end. A cancelled watch task (Stop Watching,
         // which calls `stop()` → `watchTask.cancel()`) comes back here like a

@@ -56,6 +56,19 @@ final class CompositeMeetingDetectorTests: XCTestCase {
         XCTAssertNil(composite.checkOnce(), "the reset must have reached the mic strategy's cooldown")
     }
 
+    /// The same proof for the opposite step: the mark lifts the mic
+    /// strategy's cooldown, so the snapshot it suppressed fires again.
+    func testMarkConfirmedReachesEveryStrategy() throws {
+        let composite = CompositeMeetingDetector([assertionDetector(active: false), micDetector()])
+        let meeting = try XCTUnwrap(composite.checkOnce())
+        composite.reset(appName: meeting.pattern.identityKey)
+        XCTAssertNil(composite.checkOnce(), "precondition: in cooldown")
+
+        composite.markConfirmed(appName: meeting.pattern.identityKey)
+
+        XCTAssertEqual(composite.checkOnce()?.pattern.identityKey, meeting.pattern.identityKey)
+    }
+
     func testLivenessIsPerStrategyOr() throws {
         let mic = micDetector()
         let composite = CompositeMeetingDetector([assertionDetector(active: false), mic])

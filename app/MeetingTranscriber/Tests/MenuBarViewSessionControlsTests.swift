@@ -15,10 +15,11 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
         case button(String)
     }
 
-    /// Counts the two callbacks the controls under test call.
+    /// Counts the callbacks the controls under test call.
     private final class Taps {
         var stops = 0
         var toggles = 0
+        var recordAgain: [RecordAgainOffer] = []
     }
 
     private static let stopRecording = "Stop Recording"
@@ -32,11 +33,13 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
         recording: Bool = false,
         meeting: MeetingInfo? = nil,
         error: String? = nil,
+        offers: [RecordAgainOffer] = [],
         taps: Taps = Taps(),
     ) throws -> MenuBarView {
         var actions = MenuActions.noop
         actions.startStop = { taps.toggles += 1 }
         actions.stopManualRecording = recording ? { taps.stops += 1 } : nil
+        actions.recordAgain = { taps.recordAgain.append($0) }
         return try MenuBarView(
             status: TranscriberStatus(
                 version: 1,
@@ -53,6 +56,7 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
             updateChecker: nil,
             noMic: false,
             manualRecordingPendingOrActive: false,
+            recordAgainOffers: offers,
             actions: actions,
         )
     }
@@ -144,6 +148,52 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
             XCTAssertEqual(toggles.count, testCase.recording ? 0 : 1, testCase.name)
             XCTAssertEqual(menu.filter { $0 == .button(Self.stopRecording) }.count, testCase.recording ? 1 : 0, testCase.name)
         }
+    }
+
+    // MARK: - Record Again
+
+    private static let offers = [
+        RecordAgainOffer(identityKey: "Microsoft Teams", appName: "Microsoft Teams"),
+        RecordAgainOffer(identityKey: "Zoom", appName: "Zoom"),
+    ]
+
+    private func recordAgainItems(of view: MenuBarView) throws -> [InspectableView<ViewType.ClassifiedView>] {
+        try view.inspect().findAll { (try? $0.accessibilityIdentifier()) == A11yID.recordAgainMenuItem }
+    }
+
+    /// One line per offer, directly under the status line, then the watch
+    /// toggle on the next line; none while a recording runs.
+    func testRecordAgainLinesComeBetweenTheStatusAndTheWatchToggle() throws {
+        let sut = try makeView(state: .watching, isWatching: true, offers: Self.offers)
+
+        XCTAssertEqual(try Array(lines(of: sut, state: .watching).prefix(4)), [
+            .status, .button("Record Again (Microsoft Teams)"), .button("Record Again (Zoom)"), .button(Self.stopWatching),
+        ])
+        let shortcuts = try shortcutKeys(of: sut)
+        XCTAssertNil(shortcuts["Record Again (Microsoft Teams)"], "no keyboard shortcut")
+
+        let recording = try makeView(state: .recording, isWatching: true, recording: true, offers: Self.offers)
+        XCTAssertTrue(try recordAgainItems(of: recording).isEmpty)
+    }
+
+    func testATapOnRecordAgainPassesTheOfferItShows() throws {
+        let taps = Taps()
+        let sut = try makeView(state: .watching, isWatching: true, offers: Self.offers, taps: taps)
+
+        let items = try recordAgainItems(of: sut)
+        XCTAssertEqual(items.count, 2)
+        try items[1].button().tap()
+
+        XCTAssertEqual(taps.recordAgain, [Self.offers[1]])
+        XCTAssertEqual(taps.toggles, 0)
+    }
+
+    /// After a stop by hand the record items stay in the menu.
+    func testTheRecordItemsShowBesideARecordAgainOffer() throws {
+        let body = try makeView(state: .watching, isWatching: true, offers: Self.offers).inspect()
+
+        XCTAssertNoThrow(try body.find(viewWithAccessibilityIdentifier: A11yID.recordMicrophoneMenuItem))
+        XCTAssertNoThrow(try body.find(viewWithAccessibilityIdentifier: A11yID.recordWithOptionsMenuItem))
     }
 
     // MARK: - Keyboard shortcuts
