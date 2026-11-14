@@ -548,14 +548,7 @@ class WatchLoop {
         let recordingStartedAt = nowProvider()
         recordingPauses = RecordingPauseRecord(startedAt: recordingStartedAt)
 
-        // Read participants (Teams)
-        var participants: [String] = []
-        if meeting.pattern.appName == "Microsoft Teams",
-           let names = ParticipantReader.readParticipants(pid: meeting.windowPID),
-           !names.isEmpty {
-            logger.info("Detected \(names.count) participants")
-            participants = names
-        }
+        let participants = Self.teamsParticipants(of: meeting)
 
         // Wait for the meeting to end. A cancelled watch task (Stop Watching,
         // which calls `stop()` → `watchTask.cancel()`) comes back here like a
