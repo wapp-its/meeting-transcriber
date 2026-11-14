@@ -34,6 +34,8 @@ struct MenuActions {
     var processFiles: () -> Void
     /// Opens the All Recordings window.
     var showAllTranscriptions: () -> Void
+    /// "Device Details…": opens the Audio Devices window, or brings it to the front.
+    var showAudioDevices: () -> Void
     /// Remove on a failed job: off the menu and out of the history for good.
     var removeFailedJob: (UUID) -> Void
     /// Dismiss on a job waiting for speaker names, and "Discard Notion Retry"
@@ -62,6 +64,7 @@ struct MenuActions {
         openSettings: {},
         processFiles: {},
         showAllTranscriptions: {},
+        showAudioDevices: {},
         removeFailedJob: { _ in },
         dismissJob: { _ in },
         quit: {},
