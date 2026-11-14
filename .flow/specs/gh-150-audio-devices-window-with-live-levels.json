@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-150-audio-devices-window-with-live-levels",
-  "completion_review_status": "not_required",
-  "completion_reviewed_at": "2026-11-14T22:25:32.027711Z",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-11-14T22:39:01.657470Z",
   "created_at": "2026-11-14T20:04:08.124186Z",
   "default_impl": null,
   "default_review": null,
@@ -318,17 +318,63 @@
       "task": "gh-150-audio-devices-window-with-live-levels.1",
       "timestamp": "2026-11-14T22:06:12.801282Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "c95e21f074dba3c161dbe66990775996d29e1073ccda6c73ece61517bb0f46b1",
+      "backend": "codex",
+      "base_sha": "f911fcb0a331240d287db28e1880c98fd770bc7c",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-5658d1e8f0c6d79134b4b9390d223d2f",
+            "classification": "introduced",
+            "findingId": "finding-5658d1e8f0c6d79134b4b9390d223d2f",
+            "firstSeenThisRound": true,
+            "severity": "P3",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "b59e349adf481191bc712e0f7797b5547a3da183",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 455595,
+      "output_sha256": "302284254c5942e8c57eaaae21db0b1e8f3a1683f749740693ca74faada7f5d0",
+      "reservation_id": "739e2bb8923540fe948f39c44462c85d",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T22:39:01.630860Z",
+      "tool_calls": 32,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-150-audio-devices-window-with-live-levels.1": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-150-audio-devices-window-with-live-levels.1": 0,
     "plan": 0
   },
@@ -347,5 +393,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/150"
   },
-  "updated_at": "2026-11-14T22:25:32.028121Z"
+  "updated_at": "2026-11-14T22:39:01.661213Z"
 }
