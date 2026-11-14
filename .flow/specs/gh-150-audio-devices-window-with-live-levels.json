@@ -11,9 +11,9 @@
   "impl_review_rounds": {},
   "next_task": 1,
   "no_plan": true,
-  "plan_review_rounds": 1,
+  "plan_review_rounds": 2,
   "plan_review_status": "needs_work",
-  "plan_reviewed_at": "2026-11-14T20:52:39.044071Z",
+  "plan_reviewed_at": "2026-11-14T20:56:46.292684Z",
   "review_attempts": [
     {
       "artifact_sha256": "ed688cf3b24c61a74941045c0a9fc816832000f1850739b6fe9c8e346809dc35",
@@ -75,6 +75,74 @@
       "timestamp": "2026-11-14T20:52:39.011674Z",
       "tool_calls": 21,
       "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "b516891f26bdaa6bbc062ef817351a7b677bd3e7afad3dd3ca5369de2318d7d0",
+      "backend": "codex",
+      "base_sha": "f911fcb0a331240d287db28e1880c98fd770bc7c",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-1ab637762bee1adf51fb0fc73daada0f",
+            "classification": "introduced",
+            "findingId": "finding-1ab637762bee1adf51fb0fc73daada0f",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-86706b2a22d807e7b7fd66f30909ed40",
+            "classification": "introduced",
+            "findingId": "finding-86706b2a22d807e7b7fd66f30909ed40",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-6f13c3745665b7a4625bbf288d2e1efd",
+            "classification": "introduced",
+            "findingId": "finding-6f13c3745665b7a4625bbf288d2e1efd",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-2d0c6b0166a77000585058dbd6deb5f5",
+            "classification": "introduced",
+            "findingId": "finding-2d0c6b0166a77000585058dbd6deb5f5",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "19b0094ca2de5bc793738cc90f679456c7cc8aa3",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1810,
+      "output_sha256": "468443c29290f55d98c0045b1f779e9fab889e1dde9a2d597a70ed04e9bcb1b3",
+      "reservation_id": "3eb25434758341a3912d0047d6ff3f24",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T20:56:46.264298Z",
+      "verdict": "NEEDS_WORK"
     }
   ],
   "review_hash_epoch": {},
@@ -98,5 +166,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/150"
   },
-  "updated_at": "2026-11-14T20:54:44.734260Z"
+  "updated_at": "2026-11-14T20:57:26.165222Z"
 }
