@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-150-audio-devices-window-with-live-levels",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "not_required",
+  "completion_reviewed_at": "2026-11-14T22:25:32.027711Z",
   "created_at": "2026-11-14T20:04:08.124186Z",
   "default_impl": null,
   "default_review": null,
@@ -347,5 +347,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/150"
   },
-  "updated_at": "2026-11-14T22:06:12.812236Z"
+  "updated_at": "2026-11-14T22:25:32.028121Z"
 }
