@@ -10,18 +10,18 @@ final class MicMuteTranscriptTests: XCTestCase {
         let text = [
             TimestampedSegment(start: 5, end: 6, text: "before"),
             TimestampedSegment(start: 25, end: 26, text: "after"),
-        ].transcriptText(note: nil, micMuted: muted)
+        ].transcriptText(note: nil, pauses: [], micMuted: muted)
         XCTAssertEqual(text, "[00:05] before\n[Mic muted 00:10–00:20]\n[00:25] after")
     }
 
     func testMarkerSortsAheadOfALineAtTheSameMoment() {
         let text = [TimestampedSegment(start: 10, end: 11, text: "remote")]
-            .transcriptText(note: nil, micMuted: muted)
+            .transcriptText(note: nil, pauses: [], micMuted: muted)
         XCTAssertEqual(text, "[Mic muted 00:10–00:20]\n[00:10] remote")
     }
 
     func testNoteStaysAboveTheMarkers() {
-        let text = [TimestampedSegment]().transcriptText(note: "[note]", micMuted: muted)
+        let text = [TimestampedSegment]().transcriptText(note: "[note]", pauses: [], micMuted: muted)
         XCTAssertEqual(text, "[note]\n\n[Mic muted 00:10–00:20]")
     }
 

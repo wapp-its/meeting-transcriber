@@ -35,8 +35,9 @@ final class TranscriptPauseMarkerTests: XCTestCase {
 
     private func render(
         _ segments: [TimestampedSegment], pauses: [RecordingPause], note: String? = nil,
+        micMuted: [MicMuteInterval] = [],
     ) -> String {
-        segments.transcriptText(note: note, pauses: pauses, timeZone: utc)
+        segments.transcriptText(note: note, pauses: pauses, micMuted: micMuted, timeZone: utc)
     }
 
     // MARK: - Rendering
