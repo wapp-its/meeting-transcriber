@@ -433,6 +433,8 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `AppSettings+RPC.swift` | Builds the read-only settings projection for the debug RPC `/state` endpoint |
 | `AppState+RPC.swift` | Builds `RPCStateSnapshot` from live `AppState` for the `/state` endpoint (`#if !APPSTORE`) |
 | `RPCStateSnapshot.swift` | JSON-serializable RPC state snapshot type (`#if !APPSTORE`) |
+| `AudioDevicesWindowSnapshot.swift` | `/state.audioDevicesWindow`, built from the window's state and the reader's last results, with no Core Audio call (`#if !APPSTORE`) |
+| `DebugRPCServer+AudioDevices.swift` | `POST /action/openAudioDevices` and `/action/closeAudioDevices` (`#if !APPSTORE`) |
 | `Bundle+AppVersion.swift` | Bundle extension: `appVersion` + `gitCommitHash` from `Info.plist` |
 | `DiagnosticExporter.swift` | Reads log entries and writes shareable `.log` file (Settings → Advanced → Export Diagnostics) |
 | `PersistentDiagnosticLog.swift` | Persistent `log stream` subprocess with sliding-window restart policy for long-term log retention |

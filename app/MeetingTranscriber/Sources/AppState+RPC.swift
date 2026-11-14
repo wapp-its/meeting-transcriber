@@ -128,6 +128,7 @@
                 badge: currentBadge,
                 updateStatus: updateStatusSnapshot(),
                 windows: windowsSnapshot(),
+                audioDevicesWindow: audioDevicesWindowSnapshot(),
             )
         }
 

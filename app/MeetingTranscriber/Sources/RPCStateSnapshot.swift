@@ -86,6 +86,10 @@
         /// mere visibility, is what makes the regression net non-vacuous: an
         /// un-pinned window also stays visible on deactivation.
         let windows: [WindowInfo]
+        /// The Audio Devices window: whether it is open, its rows, and whether
+        /// this app's own process runs audio input. Built from the window's
+        /// state and its reader's last results, with no Core Audio call.
+        let audioDevicesWindow: AudioDevicesWindowSnapshot
 
         struct WindowInfo: Codable {
             /// The scene identifier (e.g. "speaker-naming", "settings").
@@ -506,6 +510,7 @@
             badge: BadgeKind = .inactive,
             updateStatus: UpdateStatus = .empty,
             windows: [WindowInfo] = [],
+            audioDevicesWindow: AudioDevicesWindowSnapshot = .closed,
         ) {
             self.pipeline = pipeline
             self.speakerDB = speakerDB
@@ -524,6 +529,7 @@
             self.badge = badge
             self.updateStatus = updateStatus
             self.windows = windows
+            self.audioDevicesWindow = audioDevicesWindow
         }
 
         func jsonData() throws -> Data {
