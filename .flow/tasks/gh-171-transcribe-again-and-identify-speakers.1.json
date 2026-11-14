@@ -1,0 +1,15 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-11-14T20:19:06.661251Z",
+  "depends_on": [],
+  "id": "gh-171-transcribe-again-and-identify-speakers.1",
+  "priority": null,
+  "review": "codex:gpt-6-astra:xhigh",
+  "spec": "gh-171-transcribe-again-and-identify-speakers",
+  "spec_path": ".flow/tasks/gh-171-transcribe-again-and-identify-speakers.1.md",
+  "status": "todo",
+  "title": "Keep each meeting's run inputs in its record",
+  "updated_at": "2026-11-14T20:19:06.661251Z"
+}
