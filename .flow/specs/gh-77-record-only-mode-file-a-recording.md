@@ -139,3 +139,10 @@ FIT: GO · 2026-11-13 · base 4f4fbb6 · engine flow-next 9.9.1 · the upstream 
   - no open spec claims this scope (gh-5 and gh-6 mention recovery and record-only for their own fields only); no open issue or PR in the original addresses record-only recovery
 
 Maintainability (plan review): duplication - the recovery hand-on and `WatchLoop.enqueueRecording` each decide record-only versus processing; structure - none identified
+
+FIT: GO · 2026-11-14 · base f911fcb · engine flow-next 9.10.0 · PRs 232 and 233 and the plan review edits leave every anchor in place; no scope moved
+  - since base 4f4fbb6 none of the files the spec names changed (`PipelineController+ProductionEnvironment.swift`, `PipelineQueue+OrphanRecovery.swift`, `WatchLoop+RecordOnly.swift`, `WatchLoop+Quit.swift`, `WatchingController+Quit.swift`, `WatchingController+LoopFactory.swift`, `RecordingSidecar.swift`); `PipelineQueue.swift` gained `lastDrainID` and `WatchingController.swift` `captionFlushesInFlight` for idle model unloading, which reads only queue jobs, and a recovered record-only recording has none
+  - anchors re-checked at f911fcb: `scanForOrphanedRecordings` / `adoptOrphanedRecordings([PairedRecordingResolver.Group])`, `QueueEnvironment.recoverStagedRecordings(queue, levelBalance)`, `WatchingController.isQuitting`, `WatchLoop.recordOnlyFileTransfer`, `writeRecordOnlyOffMain`, `reportStagingFilesKept`, `StagedRecoveryFolderTests.runPass(on:into:)`, `OrphanRecoveryRaceTests`
+  - not yet in `wapp/main`: the original's mic-mute work (b4cb1e53, open upstream-sync issue #234 with conflicts) changes `adoptOrphanedRecordings` to take `MicMuteLog.RecoveryCandidate`, removes a stem's mute log on adoption and adds `micMuteIntervals` to the sidecar; A8's flip point applies only if that lands before this build, so the build follows today's shape and the later merge threads the mute times through the record-only hand-on
+  - engine 9.9.1 to 9.10.0 adds only Bitbucket forge support; nothing the direct route, the reviews or the spec relies on changed
+  - no open spec claims this scope: gh-130 names record-only only for its own sidecar trigger, gh-127 not at all
