@@ -24,15 +24,17 @@ enum MicMuteLog {
     }
 
     /// The intervals a crashed recording left, with a mute still open running to
-    /// the end of `micTrack`. Empty when there is no log or no mic track: on any
-    /// other track they would silence the far end. Leaves the file for `remove`.
+    /// the end of `micTrack`, and none past that end: a meeting-end cut that
+    /// recovery applied shortened the track after the log was written. Empty
+    /// when there is no log or no mic track: on any other track they would
+    /// silence the far end. Leaves the file for `remove`.
     static func recoveredIntervals(stem: String, in dir: URL, micTrack: URL?) -> [MicMuteInterval] {
         guard let track = micTrack,
               let data = try? Data(contentsOf: url(stem: stem, in: dir)),
               let timeline = try? JSONDecoder().decode(MicMuteTimeline.self, from: data) else { return [] }
 
         let duration = Double(AudioMixer.frameCount(of: track)) / Double(AudioConstants.targetSampleRate)
-        return timeline.intervals(endingAt: duration)
+        return timeline.intervals(endingAt: duration).clipped(at: duration)
     }
 
     typealias RecoveryCandidate = (group: PairedRecordingResolver.Group, micMuted: [MicMuteInterval])

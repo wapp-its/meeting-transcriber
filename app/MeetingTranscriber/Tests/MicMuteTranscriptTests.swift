@@ -93,6 +93,19 @@ final class MicMuteLogTests: XCTestCase {
         XCTAssertTrue(MicMuteLog.recoveredIntervals(stem: "s", in: dir, micTrack: track).isEmpty)
     }
 
+    /// A meeting-end cut recovered after a crash shortens the microphone track
+    /// after the log was written: a span crossing the track's new end ends
+    /// there, and one after it is gone.
+    func testSpansPastTheEndOfTheTrackEndWithIt() throws {
+        let track = dir.appendingPathComponent("s_mic.wav")
+        try AudioMixer.saveWAV(samples: [Float](repeating: 0, count: 32000), sampleRate: 16000, url: track)
+        let log = #"{"closed":[{"start":1,"end":3},{"start":4,"end":5}],"position":5}"#
+        try Data(log.utf8).write(to: dir.appendingPathComponent("s" + RecordingFileSuffix.micMuteLog))
+
+        let intervals = MicMuteLog.recoveredIntervals(stem: "s", in: dir, micTrack: track)
+        XCTAssertEqual(intervals, [MicMuteInterval(start: 1, end: 2)])
+    }
+
     func testRecordingWithNoMuteRecoversNoIntervals() {
         let track = dir.appendingPathComponent("s_mic.wav")
         XCTAssertTrue(MicMuteLog.recoveredIntervals(stem: "s", in: dir, micTrack: track).isEmpty)

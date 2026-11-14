@@ -125,6 +125,8 @@ class MockRecorder: RecordingProvider {
     private(set) var pausesBegun = 0
     /// The capture's pause positions `stop()` reports.
     var pauseOffsets: [TimeInterval] = []
+    /// The mute spans `stop()` reports.
+    var micMuteIntervals: [MicMuteInterval] = []
 
     func start(source: RecordingSource, micDeviceUID: String?, debugLogging _: Bool) {
         calls.append(.start)
@@ -177,6 +179,7 @@ class MockRecorder: RecordingProvider {
             micDelay: 0,
             recordingStartDate: recordingStartDate ?? Date(),
             pauseOffsets: pauseOffsets,
+            micMuteIntervals: micMuteIntervals,
         )
     }
 }

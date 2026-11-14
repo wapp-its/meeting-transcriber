@@ -1,3 +1,4 @@
+import AudioTapLib
 import AVFoundation
 @testable import MeetingTranscriber
 import XCTest
@@ -164,7 +165,8 @@ final class RecordingCutTests: XCTestCase { // swiftlint:disable:this balanced_x
 
     /// Renames keep failing, so the mix, already swapped in, cannot be put
     /// back. Its original survives under its second name, the error names it,
-    /// and the redirected recording reads every track as recorded.
+    /// and the redirected recording reads every track as recorded, with its
+    /// pauses and mute spans.
     func testAnOriginalThatCannotBePutBackIsKeptAndNamed() throws {
         let mix = try makeTrack("r_mix.wav", seconds: 10)
         let app = try makeTrack("r_app.wav", seconds: 10)
@@ -172,6 +174,7 @@ final class RecordingCutTests: XCTestCase { // swiftlint:disable:this balanced_x
         let before = try contents([mix, app, mic])
         var cut = recording(mix: mix, app: app, mic: mic)
         cut.pauseOffsets = [2.5, 6]
+        cut.micMuteIntervals = [MicMuteInterval(start: 3, end: 7)]
 
         var uncut: [URL: URL] = [:]
         XCTAssertThrowsError(
@@ -185,6 +188,7 @@ final class RecordingCutTests: XCTestCase { // swiftlint:disable:this balanced_x
         let paths = try [redirected.mixPath, XCTUnwrap(redirected.appPath), XCTUnwrap(redirected.micPath)]
         XCTAssertEqual(try contents(paths), before, "the recording is processed uncut")
         XCTAssertEqual(redirected.pauseOffsets, [2.5, 6], "the pauses keep the positions the capture measured")
+        XCTAssertEqual(redirected.micMuteIntervals, [MicMuteInterval(start: 3, end: 7)], "the mute spans stay as recorded")
         XCTAssertFalse(FileManager.default.fileExists(atPath: mix.path), "the cut copy is not left posing as the mix")
     }
 
