@@ -94,3 +94,8 @@ FIT: GO · 2026-11-13 · base 4f4fbb6f · engine flow-next 9.9.1 · #227 brought
   - `AppSettings.autoWatch` still defaults to false; `PreviousExitNotice.swift` and `testAWindowFromAnEarlierDayCarriesTheDate` unchanged since capture, R1 still fails today for its stated reason
   - entry points as cited: `AppLauncher.main()` arms `LivenessMarker`, `MeetingTranscriberApp.init` schedules auto-watch; bundle ids and app names match `scripts/lib/bundle-ids.sh` and mt-update
   - no open spec and no open issue or PR in the original claims the default or the notice date
+
+FIT: GO · 2026-11-14 · base f911fcb0 · engine flow-next 9.10.0 · the upstream merges in #232 and the fix in #233 touch nothing the spec relies on
+  - since 4f4fbb6f the named files changed only in `AppSettings.swift` (new `unloadModelsWhenIdle`), `AppState.swift` (mt-update actions moved to `AppState+Updates.swift`) and the two docs (Accessibility not applicable in the App Store build, idle model unloading); `LoginItemController.swift`, `GeneralSettingsView.swift`, `PreviousExitNotice.swift`, `PreviousExitNoticeTests.swift`, `AppLauncher.swift` and `MeetingTranscriberApp.swift` are unchanged
+  - the spec's own edit after the last receipt is the plan review's R3 wording fix, reviewed to SHIP; specs changed since then on any ref are gh-77 only, which does not touch the login item or the notice
+  - flow-next 9.9.1 to 9.10.0 adds Bitbucket support only; the direct route, completion review and the commands the build uses are unchanged
