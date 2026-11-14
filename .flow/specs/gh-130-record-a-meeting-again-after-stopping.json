@@ -8,7 +8,9 @@
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-130-record-a-meeting-again-after-stopping",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-130-record-a-meeting-again-after-stopping.1": 0
+  },
   "next_task": 1,
   "no_plan": true,
   "plan_review_rounds": 0,
@@ -136,15 +138,53 @@
       "task": null,
       "timestamp": "2026-11-12T20:59:20.998694Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "4eb40316f57f9539c6a2b45bc4a178913028284c270d3794a98f373890b05b62",
+      "backend": "codex",
+      "base_sha": "d066a282fc825804b8ace240e358edd7c0429a57",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "3278535f124fdbd3e47cb70cf57e9702ce28e76f",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "cb8baf4eab8b43cbbd1bd85613f1dd1c",
+      "round_consumed": true,
+      "scope": "impl:gh-130-record-a-meeting-again-after-stopping.1",
+      "superseded_by": null,
+      "task": "gh-130-record-a-meeting-again-after-stopping.1",
+      "timestamp": "2026-11-14T21:10:13.717645Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-130-record-a-meeting-again-after-stopping.1": 1,
     "plan": 1,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-130-record-a-meeting-again-after-stopping.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-130-record-a-meeting-again-after-stopping.md",
@@ -162,5 +202,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/130"
   },
-  "updated_at": "2026-11-12T21:00:56.573906Z"
+  "updated_at": "2026-11-14T21:10:18.846727Z"
 }
