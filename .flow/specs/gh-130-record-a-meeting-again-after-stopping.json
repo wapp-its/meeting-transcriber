@@ -234,7 +234,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-130-record-a-meeting-again-after-stopping.md",
-  "status": "open",
+  "status": "done",
   "title": "Record a meeting again after stopping it by hand",
   "tracker": {
     "baseHashFlow": null,
@@ -248,5 +248,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/130"
   },
-  "updated_at": "2026-11-14T21:36:51.120220Z"
+  "updated_at": "2026-11-14T21:39:32.376601Z"
 }
