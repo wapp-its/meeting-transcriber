@@ -225,6 +225,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `RecordingRetentionPolicy.swift` | Pure decision per registry entry: delete, keep (with the reason) or drop |
 | `RecordingRetentionRegistry.swift` | The list of relocated recordings retention may delete (`retained_recordings.<bundle id>.json` in the fork, one per build), the only thing the cleaner acts on |
 | `PipelineQueue+OrphanRecovery.swift` | Orphaned-recording recovery for `PipelineQueue`: the staging scan and the jobs it creates |
+| `RecordOnlyRecovery.swift` | In record-only mode, files the recordings a recovery pass finds into the output folder with a sidecar instead of giving them jobs (issue #77) |
 | `RecoveredCut.swift` | Applies a stored meeting-end cut when launch recovery brings back a recording the app died with while asking: collects the stored cuts before headers are repaired, places the cut by the live cut's rule (or applies one already resolved), refuses a recording that ran on past the countdown's deadline, and logs one line per stored cut it settles; the orphan scan passes over a recording whose cut is not settled yet (its stem held by a live stop of this process, or a stored cut beside it that recovery could still apply), so it is never queued before it is cut |
 | `PipelineQueue+EchoBleed.swift` | Warns when a dual-source recording carries the same speech on both tracks (loudspeaker bleeding into the microphone) — measurement half of the echo mitigation (issue #581) |
 | `PipelineQueue+EchoCancellation.swift` | Removes the far end from the microphone track before anything reads it — cancellation half of the echo mitigation, the other branch of `EchoRemedy` |
@@ -243,7 +244,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `PipelineSnapshot.swift` | Pure I/O helpers for persisting `PipelineQueue` jobs to disk (atomic rename) |
 | `PipelineEventLog.swift` | Append-only JSONL log of `PipelineQueue` job state transitions |
 | `StageTimingStats.swift` | Per-stage wall-clock duration tracking, backs `ProcessingStatsView` |
-| `ProcessedRecordingsLedger.swift` | File-backed ledger of mix-file paths that completed the pipeline (dedupes recovery re-processing) |
+| `ProcessedRecordingsLedger.swift` | File-backed ledger of mix-file paths the pipeline finished (dedupes recovery re-processing); nothing seeds it from staging |
 | `InFlightRunRegistry.swift` | Process-wide record of currently-executing pipeline runs, so a second `PipelineQueue` built while the first is still working can't double-start the same job/audio (issue #558) |
 | `SnapshotWriterActor.swift` | Actor isolating pipeline queue snapshot writes (prevents main-actor stalls on macOS 26 rename deadlock) |
 | `SpeakerNamingSession.swift` | Collaborator `PipelineQueue` calls for the speaker-naming work still owned by the queue, split out for size |

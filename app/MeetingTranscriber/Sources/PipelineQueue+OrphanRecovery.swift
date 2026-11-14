@@ -32,12 +32,6 @@ extension PipelineQueue {
         recordingsDir: URL,
         maxAge: TimeInterval = 86400,
     ) async -> [PairedRecordingResolver.Group] {
-        // One-time migration: seed processed list with existing recordings
-        // Only for the default recordings directory (not test overrides)
-        if recordingsDir == AppPaths.recordingsDir {
-            await processedLedger.migrate(recordingsDir: recordingsDir)
-        }
-
         // Read here, on the main actor, before the detached hop: the registry
         // is main-actor isolated, and reading it from inside the detached task
         // would be a different question anyway, asked later.
