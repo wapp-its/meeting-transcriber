@@ -58,7 +58,7 @@ extension WatchLoop {
             title: title, appName: appName, recording: recording, trigger: trigger, pauses: pauses,
             participants: participants,
         ).perform()
-        reportStagingFilesKept(kept)
+        RecordOnlyWrite.reportStagingFilesKept(kept, to: notifier)
     }
 
     /// `writeRecordOnlySidecar` with the file work on a detached task, for a
@@ -79,23 +79,10 @@ extension WatchLoop {
         )
         do {
             let kept = try await Task.detached(priority: .userInitiated) { try write.perform() }.value
-            reportStagingFilesKept(kept)
+            RecordOnlyWrite.reportStagingFilesKept(kept, to: notifier)
         } catch {
             reportRecordOnlyFailure(error)
         }
-    }
-
-    /// A committed write whose staging files could not be removed: the next
-    /// launch's orphan scan picks the mix up and processes the recording again,
-    /// next to its record-only output. Said once, not per file.
-    func reportStagingFilesKept(_ kept: [URL]) {
-        guard !kept.isEmpty else { return }
-        notifier.notify(
-            title: "Record-only: files left in staging",
-            body: "The recording was written, but \(kept.count) of its staging files could not be removed. "
-                + "The next launch will process it again.",
-            urgency: .standard,
-        )
     }
 
     /// Record-only performs no state transition, so this is the entire report
@@ -172,7 +159,8 @@ struct RecordOnlyWrite: Sendable {
     let title: String
     let appName: String
     let recording: RecordingResult
-    let trigger: RecordingSidecar.Trigger
+    /// Nil for a recording the crash recovery files, whose start is not known.
+    let trigger: RecordingSidecar.Trigger?
     let participants: [String]
     /// The recording's pauses, written into the sidecar.
     var pauses: [RecordingPause] = []
@@ -245,8 +233,21 @@ struct RecordOnlyWrite: Sendable {
             throw error
         }
         let notRemoved = Self.removeSources(sources)
-        logger.info("Record-only: wrote sidecar + WAVs to \(destDir.path) for \(title, privacy: .private)")
+        logger.info("Record-only: wrote the sidecar and \(sources.count, privacy: .public) audio file(s)")
         return notRemoved
+    }
+
+    /// A committed write whose staging files could not be removed: the next
+    /// launch's orphan scan picks the mix up again, next to its record-only
+    /// output. Said once per write, not per file.
+    static func reportStagingFilesKept(_ kept: [URL], to notifier: any AppNotifying) {
+        guard !kept.isEmpty else { return }
+        notifier.notify(
+            title: "Record-only: files left in staging",
+            body: "The recording was written, but \(kept.count) of its staging files could not be removed. "
+                + "The next launch will pick it up again.",
+            urgency: .standard,
+        )
     }
 
     /// What follows the stem in a recording file's name (`_mix.wav`, ...).
@@ -306,7 +307,7 @@ struct RecordOnlyWrite: Sendable {
     /// step of the write that fails after the content is written (the
     /// owner-only permission change, on a file system that refuses it) is
     /// logged and does not stop the commit, since keeping the sources would
-    /// have the next launch process the recording again.
+    /// have the next launch pick the recording up again.
     private func commitSidecar(_ sidecar: RecordingSidecar, at sidecarURL: URL) throws {
         let fm = FileManager.default
         let temp = sidecarURL.deletingLastPathComponent()
@@ -316,7 +317,10 @@ struct RecordOnlyWrite: Sendable {
             try writeSidecar(sidecar, temp)
         } catch {
             guard fm.fileExists(atPath: temp.path) else { throw error }
-            logger.error("Record-only: sidecar written, a step after it failed: \(error.localizedDescription)")
+            let code = error as NSError
+            logger.error(
+                "Record-only: sidecar written, a step after it failed (\(code.domain, privacy: .public) \(code.code, privacy: .public))",
+            )
         }
         // RENAME_EXCL: never onto a sidecar that exists, whoever wrote it.
         guard renamex_np(temp.path, sidecarURL.path, UInt32(RENAME_EXCL)) == 0 else {
@@ -345,9 +349,9 @@ struct RecordOnlyWrite: Sendable {
     }
 
     /// Remove the staging sources of a committed write, the mix first: a mix
-    /// left behind would be picked up by the orphan scan and processed a
-    /// second time; a track left behind is only litter. Returns, and logs,
-    /// each one that stays.
+    /// left behind would be picked up by the orphan scan a second time; a
+    /// track left behind is only litter. Returns, and logs, each one that
+    /// stays.
     private static func removeSources(_ sources: [URL]) -> [URL] {
         let fm = FileManager.default
         var notRemoved: [URL] = []
@@ -357,9 +361,7 @@ struct RecordOnlyWrite: Sendable {
             } catch {
                 guard fm.fileExists(atPath: source.path) else { continue }
                 notRemoved.append(source)
-                logger.error(
-                    "Record-only: \(source.lastPathComponent) stays in staging after the write; the next launch processes it again",
-                )
+                logger.error("Record-only: a staging file stays after the write; the next launch picks it up again")
             }
         }
         return notRemoved

@@ -67,7 +67,7 @@ final class WatchingController {
     /// a test can reach the four-hour limit without waiting it out.
     @ObservationIgnored var manualRecordingClock: () -> Date = Date.init
 
-    /// Set by `finishForQuit`: a start parked on a permission prompt gives up.
+    /// Set by `finishForQuit`: a start parked on a permission prompt gives up, and a staged recovery starts no record-only write.
     var isQuitting = false
 
     let settings: AppSettings
@@ -196,10 +196,11 @@ final class WatchingController {
         self.makeDetector = makeDetector ?? { [settings] in
             Self.defaultDetector(settings: settings)
         }
-        // See `PipelineController.onQueueReplaced`.
+        // See `PipelineController.onQueueReplaced` and `quitHasBegun`.
         pipeline.onQueueReplaced = { [weak self] queue in
             self?.watchLoop?.pipelineQueue = queue
         }
+        pipeline.quitHasBegun = { [weak self] in self?.isQuitting == true }
         holdLocalModelInRecordOnlyMode()
     }
 
