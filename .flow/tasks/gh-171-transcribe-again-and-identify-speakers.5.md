@@ -4,7 +4,7 @@ satisfies: [R2, R3, R11]
 # gh-171-transcribe-again-and-identify-speakers.5 Offer Transcribe Again in a finished meeting's row, with its sheet
 
 ## Description
-The user-facing half of slice 1 (R2, R3, D5, D6, A16, A18, A19): the row item in both menus with D5's separators, the pure row decision's new inputs, the Transcribe Again sheet with its pure texts, and the wiring to `rerunJob`. Depends only on task 2's entry point, so it can be built beside tasks 3 and 4.
+The user-facing half of slice 1 (R2, R3, D5, D6, A16, A18, A19): the row item in both menus with D5's separators, the pure row decision's new inputs, the Transcribe Again sheet with its pure texts, and the wiring to `rerunJob`. Built after task 4, so slice 1's pipeline is complete when its row item appears.
 
 **Size:** M
 **Files:** `app/MeetingTranscriber/Sources/RecordingRowActions.swift`, `app/MeetingTranscriber/Sources/TranscriptionsView.swift`, `app/MeetingTranscriber/Sources/TranscriptionsView+RowLabels.swift`, `app/MeetingTranscriber/Sources/A11yID.swift`, `app/MeetingTranscriber/Sources/AllRecordingsActions.swift`, `app/MeetingTranscriber/Sources/MeetingTranscriberApp.swift`, new `app/MeetingTranscriber/Sources/RerunSheetText.swift` and `app/MeetingTranscriber/Sources/TranscribeAgainSheet.swift`, tests
@@ -34,7 +34,6 @@ No `DESIGN.md`. The look is the accepted board written out in Architecture (D6):
 ### Key context
 - `TranscriptionsView.swift` is at 571 lines (SwiftLint warns at 600): the sheet and its texts go in their own files.
 - SwiftUI builds both menus on every redraw: the decision reads only cached availability, never the disk (gh-170).
-
 ## Acceptance
 - [ ] Row decision tests: the item follows Regenerate Notes with D5's separators; absent without a record, for a failed meeting, a meeting waiting for names and when none of its source audio was found; disabled while the meeting waits, runs or has a Notion export running, with a deletion pending or incomplete, while a regeneration runs, with its audio only on a drive that is not connected, and in record-only mode.
 - [ ] The "…" menu and the right-click menu list the same items.
@@ -42,7 +41,6 @@ No `DESIGN.md`. The look is the accepted board written out in Architecture (D6):
 - [ ] ViewInspector tests located by `A11yID`: the item opens the sheet for its row; Cancel closes it and queues nothing; the default button calls the action; a refusal keeps the sheet open with its line.
 - [ ] The row menu snapshot test, if it covers this menu, is updated deliberately.
 - [ ] The Quick commands' focused tests and `./scripts/lint.sh` pass.
-
 ## Done summary
 TBD
 
