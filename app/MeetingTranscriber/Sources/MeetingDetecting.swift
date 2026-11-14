@@ -66,6 +66,15 @@ protocol MeetingDetecting {
     /// `appName` carries the app's identity key (`AppMeetingPattern.identityKey`),
     /// which is its name only for a built-in app or a browser.
     func reset(appName: String?)
+
+    /// Count the app's meeting as confirmed and end its cooldown, so the next
+    /// poll that finds its signal returns it at once, as after the detection
+    /// that confirmed it. "Record Again" calls this before it records a held
+    /// app (`WatchLoop+RecordAgain.swift`): the stop before it went through
+    /// `reset(appName:)`, and a new-call split relies on the recorded app's
+    /// count still standing (`WatchLoop.runMeeting`). `appName` carries the
+    /// identity key, as for `reset(appName:)`.
+    func markConfirmed(appName: String)
 }
 
 extension MeetingDetecting {
@@ -76,6 +85,11 @@ extension MeetingDetecting {
     func reset() {
         reset(appName: nil)
     }
+
+    /// For a detector whose counts never matter in production: the test
+    /// doubles, and the window-title `MeetingDetector`, which is not the
+    /// production detector.
+    func markConfirmed(appName _: String) {}
 
     /// For a detector that reports at most one meeting per poll anyway: drop
     /// it when it is an excluded one. The detectors that can confirm several
