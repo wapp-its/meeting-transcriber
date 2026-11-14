@@ -24,6 +24,7 @@ extension WatchingController {
                 // without restarting watching.
                 dualSource.silentTrackWatchdogEnabled = self?.settings.silentTrackWatchdogEnabled ?? false
                 dualSource.levelBalanceEnabled = self?.settings.levelBalanceEnabled ?? false
+                dualSource.micStartsMuted = self?.settings.startRecordingsMicMuted ?? false
                 await self?.liveTranscription.attachSinks(to: dualSource)
             }
             return recorder

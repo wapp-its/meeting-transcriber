@@ -1,3 +1,4 @@
+import AudioTapLib
 import AVFoundation
 import Foundation
 
@@ -81,7 +82,19 @@ enum RecordingCut {
             recordingStartDate: recording.recordingStartDate,
             levelBalanced: recording.levelBalanced,
             pauseOffsets: recording.pauseOffsets,
+            micMuteIntervals: recording.micMuteIntervals,
         )
+    }
+
+    /// The recording's mute spans that a cut keeping the first `seconds` of
+    /// the timeline leaves. They are in seconds of the microphone track, which
+    /// keeps `seconds` less its offset on the timeline. A span the cut point
+    /// crosses ends there and one after it is dropped, so a mute begun after
+    /// the meeting ended neither marks the transcript nor counts toward a
+    /// microphone muted throughout.
+    static func micMuteIntervals(of recording: RecordingResult, keepingFirst seconds: TimeInterval) -> [MicMuteInterval] {
+        let micOffset = tracks(of: recording).last { $0.url == recording.micPath }?.offset ?? 0
+        return recording.micMuteIntervals.clipped(at: seconds - micOffset)
     }
 
     /// One saved track and where its first frame sits on the recording's
@@ -303,5 +316,12 @@ enum RecordingCut {
             try output.write(from: buffer)
             remaining -= AVAudioFramePosition(buffer.frameLength)
         }
+    }
+}
+
+extension [MicMuteInterval] {
+    /// The spans before `end`, one that crosses it ending there.
+    func clipped(at end: TimeInterval) -> [MicMuteInterval] {
+        compactMap { $0.start < end ? MicMuteInterval(start: $0.start, end: Swift.min($0.end, end)) : nil }
     }
 }

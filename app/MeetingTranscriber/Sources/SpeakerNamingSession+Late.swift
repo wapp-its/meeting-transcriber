@@ -1,3 +1,4 @@
+import AudioTapLib
 import Foundation
 import os.log
 
@@ -562,6 +563,7 @@ extension SpeakerNamingSession {
             annotations: (
                 note: delegate.job(withID: jobID)?.trackViability?.transcriptNote,
                 pauses: delegate.job(withID: jobID)?.pauses ?? [],
+                micMuted: delegate.job(withID: jobID)?.micMuteSpansOnTranscript ?? [],
             ),
         ) else { return }
         do {

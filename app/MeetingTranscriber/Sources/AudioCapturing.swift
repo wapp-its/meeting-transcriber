@@ -55,6 +55,13 @@ protocol AudioCapturing: AnyObject {
     var micInputDevice: MicInputDevice? { get }
     var microphoneTrackActive: Bool { get }
     func selectMicrophone(deviceUID: String?)
+
+    var hasOpenMic: Bool { get }
+
+    /// Silence or restore the microphone track. Nil when the session has no open
+    /// microphone, otherwise the timeline after the change.
+    @discardableResult
+    func setMicMuted(_ muted: Bool) -> MicMuteTimeline?
 }
 
 @available(macOS 14.2, *)

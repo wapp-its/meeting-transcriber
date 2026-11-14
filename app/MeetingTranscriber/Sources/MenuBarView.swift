@@ -24,6 +24,17 @@ struct MenuBarView: View {
     /// Whether the running recording is paused, which picks the label of the
     /// item `MenuActions.togglePause` drives.
     var isRecordingPaused = false
+    /// Whether the running recording's microphone is muted, which picks the
+    /// label of the item `MenuActions.toggleMicMute` drives.
+    var isMicMuted = false
+    /// The global shortcut, which replaces the item's default when one is set.
+    var micMuteShortcut: KeyboardShortcut?
+
+    /// Free by default: "Record Microphone Only" holds ⌘M, and is hidden while recording.
+    var micMuteItemShortcut: KeyboardShortcut {
+        micMuteShortcut ?? KeyboardShortcut("m")
+    }
+
     /// The open "Record <App> meeting?" prompt, nil when none is open.
     var consentQuestion: ConsentQuestion?
     /// The Microphone entry; nil leaves it out.
@@ -188,6 +199,7 @@ struct MenuBarView: View {
             watchToggle
         }
         pauseResumeItem
+        micMuteItem
     }
 
     /// The line under "Stop Recording", for every kind of recording.
@@ -203,6 +215,24 @@ struct MenuBarView: View {
                 }
             }
             .accessibilityIdentifier(A11yID.pauseResumeRecording)
+        }
+    }
+
+    /// The line under "Pause Recording", while a recording with an open
+    /// microphone runs.
+    @ViewBuilder private var micMuteItem: some View {
+        if let toggleMicMute = actions.toggleMicMute {
+            Button {
+                toggleMicMute()
+            } label: {
+                if isMicMuted {
+                    Label("Unmute Mic in Recording", systemImage: "mic.fill")
+                } else {
+                    Label("Mute Mic in Recording", systemImage: "mic.slash.fill")
+                }
+            }
+            .keyboardShortcut(micMuteItemShortcut)
+            .help("Only affects this recording. People on the call can still hear you.")
         }
     }
 

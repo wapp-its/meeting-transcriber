@@ -22,6 +22,7 @@ extension WatchLoop {
             appPath: recording.appPath,
             micPath: recording.micPath,
             micDelay: recording.micDelay,
+            micMuteIntervals: recording.micMuteIntervals,
             participants: participants,
             meetingStartTime: recording.recordingStartDate,
             pauses: pauses,
