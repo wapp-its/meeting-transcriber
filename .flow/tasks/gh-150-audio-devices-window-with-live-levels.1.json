@@ -10,7 +10,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-150-audio-devices-window-with-live-levels",
   "spec_path": ".flow/tasks/gh-150-audio-devices-window-with-live-levels.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement Audio devices window with live levels",
   "updated_at": "2026-11-14T21:02:06.025572Z"
 }

@@ -379,7 +379,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-150-audio-devices-window-with-live-levels.md",
-  "status": "open",
+  "status": "done",
   "title": "Audio devices window with live levels",
   "tracker": {
     "baseHashFlow": null,
@@ -393,5 +393,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/150"
   },
-  "updated_at": "2026-11-14T22:39:01.661213Z"
+  "updated_at": "2026-11-14T22:42:15.692973Z"
 }
