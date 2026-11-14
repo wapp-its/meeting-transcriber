@@ -148,15 +148,16 @@ final class MicMuteMenuTests: XCTestCase {
     private func makeView(
         isMicMuted: Bool = false, shortcut: KeyboardShortcut? = nil, onToggle: (() -> Void)?,
     ) -> MenuBarView {
-        MenuBarView(
+        var actions = MenuActions.noop
+        actions.toggleMicMute = onToggle
+        return MenuBarView(
             status: nil, isWatching: true,
             pipelineQueue: PipelineQueue(logDir: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)),
             updateChecker: nil,
-            onStartStop: {}, onRecordApp: {}, onRecordMicrophone: {}, noMic: false,
-            manualRecordingPendingOrActive: false, onStopManualRecording: nil,
-            isMicMuted: isMicMuted, onToggleMicMute: onToggle, micMuteShortcut: shortcut,
-            onOpenProtocol: { _ in }, onOpenProtocolsFolder: {},
-            onOpenSettings: {}, onNameSpeakers: nil, onProcessFiles: {}, onDismissJob: { _ in }, onQuit: {},
+            noMic: false,
+            manualRecordingPendingOrActive: false,
+            isMicMuted: isMicMuted, micMuteShortcut: shortcut,
+            actions: actions,
         )
     }
 
