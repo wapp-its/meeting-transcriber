@@ -284,11 +284,11 @@ final class AudioDevicesWindowReaderTests: XCTestCase {
     /// Devices 10 and 11 answer; 12's UID and 13's running flag fail and are
     /// left out. This app is process 990; pid 42 is process 420, which uses
     /// device 10 for input and 11 and 14 for output, 14's UID failing; pid 7
-    /// has no process object.
+    /// has no process object, and pid 8's translation fails.
     func testTheProbeReportsWhatItCouldReadAndLeavesOutWhatItCouldNot() throws {
         let log = SelectorLog()
         let reads = MeetingMicrophoneProbe.RawReads(
-            processObject: { pid in [99: 990, 42: 420][pid] },
+            processObject: { pid in pid == 8 ? .failed(2_003_332_927) : .value([99: 990, 42: 420][pid]) },
             uint32: { object, selector, _ in
                 log.note(selector)
                 return switch (object, selector) {
@@ -325,8 +325,12 @@ final class AudioDevicesWindowReaderTests: XCTestCase {
         XCTAssertEqual(reading.meetingApp, MeetingAppDevices(
             inputUIDs: ["MicUID"], outputUIDs: ["SpeakerUID"], inputComplete: true, outputComplete: false,
         ))
+        XCTAssertEqual(AudioDeviceStatusProbe.read(tappedPIDs: [8, 42], ownPID: 99, reads: reads).meetingApp, MeetingAppDevices(
+            inputUIDs: ["MicUID"], outputUIDs: ["SpeakerUID"], inputComplete: false, outputComplete: false,
+        ), "a failed translation leaves both sides incomplete")
         XCTAssertNil(AudioDeviceStatusProbe.read(tappedPIDs: [], ownPID: 99, reads: reads).meetingApp)
         XCTAssertNil(AudioDeviceStatusProbe.read(tappedPIDs: [], ownPID: 5, reads: reads).selfRunningInput)
+        XCTAssertNil(AudioDeviceStatusProbe.read(tappedPIDs: [], ownPID: 8, reads: reads).selfRunningInput)
         XCTAssertTrue(log.selectors.isSubset(of: Self.readSelectors), "\(log.selectors)")
     }
 }

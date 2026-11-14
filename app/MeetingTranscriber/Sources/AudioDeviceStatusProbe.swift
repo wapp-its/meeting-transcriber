@@ -33,7 +33,7 @@ enum AudioDeviceStatusProbe {
     ) -> AudioDeviceStatusReading {
         AudioDeviceStatusReading(
             running: runningDevices(reads),
-            selfRunningInput: reads.processObject(ownPID).flatMap { process in
+            selfRunningInput: value(reads.processObject(ownPID)).flatMap(\.self).flatMap { process in
                 value(reads.uint32(process, kAudioProcessPropertyIsRunningInput, kAudioObjectPropertyScopeGlobal))
                     .map { $0 != 0 }
             },
@@ -56,14 +56,23 @@ enum AudioDeviceStatusProbe {
     }
 
     /// A pid without a process object uses no audio device, and is skipped
-    /// as the meeting microphone probe skips it.
+    /// as the meeting microphone probe skips it. A pid whose translation
+    /// failed may use any device, so both sides are incomplete.
     private static func meetingAppDevices(pids: [pid_t], reads: MeetingMicrophoneProbe.RawReads) -> MeetingAppDevices {
-        let processes = pids.compactMap(reads.processObject)
+        var processes: [AudioObjectID] = []
+        var translated = true
+        for pid in pids {
+            switch reads.processObject(pid) {
+            case let .value(object?): processes.append(object)
+            case .value(nil): continue
+            case .failed: translated = false
+            }
+        }
         let input = deviceUIDs(processes, scope: kAudioObjectPropertyScopeInput, reads: reads)
         let output = deviceUIDs(processes, scope: kAudioObjectPropertyScopeOutput, reads: reads)
         return MeetingAppDevices(
             inputUIDs: input.uids, outputUIDs: output.uids,
-            inputComplete: input.complete, outputComplete: output.complete,
+            inputComplete: translated && input.complete, outputComplete: translated && output.complete,
         )
     }
 

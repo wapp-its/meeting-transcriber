@@ -9,7 +9,7 @@ final class MeetingMicrophoneProbeTests: XCTestCase {
     /// device list fails; pid 4 runs input with two devices, the second of
     /// which fails every read.
     private static let reads = MeetingMicrophoneProbe.RawReads(
-        processObject: { pid in pid == 1 ? nil : AudioObjectID(pid) * 10 },
+        processObject: { pid in .value(pid == 1 ? nil : AudioObjectID(pid) * 10) },
         uint32: { object, selector, _ in
             switch (object, selector) {
             case (20, kAudioProcessPropertyIsRunningInput): .failed(560_947_818)

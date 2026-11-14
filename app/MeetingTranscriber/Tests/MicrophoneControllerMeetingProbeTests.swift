@@ -372,7 +372,7 @@ final class MicrophoneControllerMeetingProbeTests: XCTestCase {
     func testAFailedNameReadReachesTheDebugLineAsItsStatus() async {
         settings.verboseDiagnostics = true
         let reads = MeetingMicrophoneProbe.RawReads(
-            processObject: { AudioObjectID($0) },
+            processObject: { .value(AudioObjectID($0)) },
             uint32: { _, selector, _ in
                 selector == kAudioProcessPropertyIsRunningInput ? .value(1) : .value(kAudioDeviceTransportTypeUSB)
             },

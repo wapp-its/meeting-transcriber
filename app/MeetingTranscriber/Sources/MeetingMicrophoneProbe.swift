@@ -55,10 +55,12 @@ enum MeetingMicrophoneProbe {
 
     /// The four raw Core Audio reads, injectable so a test can make any one of
     /// them fail and follow the status into the log lines. `processObject` is
-    /// nil for a pid without a process object, which the probe skips; the
-    /// others keep the status of a failed call.
+    /// `.value(nil)` for a pid without a process object and `.failed` when the
+    /// translation itself failed; this probe skips both, while the Audio
+    /// Devices window reports a failure as an incomplete answer. The others
+    /// keep the status of a failed call.
     struct RawReads: Sendable {
-        let processObject: @Sendable (pid_t) -> AudioObjectID?
+        let processObject: @Sendable (pid_t) -> Reading<AudioObjectID?>
         let uint32: @Sendable (AudioObjectID, AudioObjectPropertySelector, AudioObjectPropertyScope) -> Reading<UInt32>
         let objectIDs: @Sendable (AudioObjectID, AudioObjectPropertySelector, AudioObjectPropertyScope) -> Reading<[AudioObjectID]>
         let string: @Sendable (AudioObjectID, AudioObjectPropertySelector) -> Reading<String>
@@ -74,7 +76,7 @@ enum MeetingMicrophoneProbe {
     /// The input side of every tapped process that has a process object.
     static func read(pids: [pid_t], reads: RawReads = .coreAudio) -> [MeetingInputProcess] {
         pids.compactMap { pid in
-            guard let object = reads.processObject(pid) else { return nil }
+            guard case let .value(object?) = reads.processObject(pid) else { return nil }
             let devices = reads.objectIDs(object, kAudioProcessPropertyDevices, kAudioObjectPropertyScopeInput)
             return MeetingInputProcess(
                 pid: pid,
@@ -99,7 +101,7 @@ enum MeetingMicrophoneProbe {
 
     /// AudioTapLib's PID translation (`AppAudioCapture.translatePID`), which is
     /// internal to the library.
-    private static func translatePID(_ pid: pid_t) -> AudioObjectID? {
+    private static func translatePID(_ pid: pid_t) -> Reading<AudioObjectID?> {
         var address = propertyAddress(kAudioHardwarePropertyTranslatePIDToProcessObject, kAudioObjectPropertyScopeGlobal)
         var objectID = AudioObjectID(kAudioObjectUnknown)
         var size = UInt32(MemoryLayout<AudioObjectID>.size)
@@ -108,8 +110,8 @@ enum MeetingMicrophoneProbe {
             AudioObjectID(kAudioObjectSystemObject), &address,
             UInt32(MemoryLayout<pid_t>.size), &mutablePid, &size, &objectID,
         )
-        guard status == noErr, objectID != kAudioObjectUnknown else { return nil }
-        return objectID
+        guard status == noErr else { return .failed(status) }
+        return .value(objectID == kAudioObjectUnknown ? nil : objectID)
     }
 
     private static func readUInt32(
