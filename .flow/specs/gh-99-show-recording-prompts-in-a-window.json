@@ -1,11 +1,74 @@
 {
   "branch_name": "gh-99-show-recording-prompts-in-a-window",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
   "created_at": "2026-11-12T20:43:18.772986Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-99-show-recording-prompts-in-a-window",
+  "impl_review_rounds": {},
   "next_task": 1,
-  "plan_review_status": "unknown",
-  "plan_reviewed_at": null,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-11-14T20:06:48.196250Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "b27677faf0dd3673430063a0807d62508c409d867303061c69c1a36e6cf1a3d4",
+      "backend": "codex",
+      "base_sha": "f911fcb0a331240d287db28e1880c98fd770bc7c",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-8b332020e2ebf8fddbcb3496cf50cd44",
+            "classification": "introduced",
+            "findingId": "finding-8b332020e2ebf8fddbcb3496cf50cd44",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "89ed40f4640afac92eb1dd0bc1181d56dfa1bba4",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 314015,
+      "output_sha256": "3f82125520b8accc106e028ec66ee9a246dfbe63de0757c8e50e9524268e5990",
+      "reservation_id": "d3bd12b7517644158a2354055d95da01",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T20:06:48.177908Z",
+      "tool_calls": 18,
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
   "spec_path": ".flow/specs/gh-99-show-recording-prompts-in-a-window.md",
   "status": "open",
   "title": "Show recording prompts in a window below the menu bar icon",
@@ -21,5 +84,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/99"
   },
-  "updated_at": "2026-11-12T20:43:18.788933Z"
+  "updated_at": "2026-11-14T20:07:50.392320Z"
 }
