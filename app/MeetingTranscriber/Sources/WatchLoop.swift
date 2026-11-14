@@ -44,10 +44,6 @@ class WatchLoop {
 
     private var manualRecordingTask: Task<Void, Never>?
 
-    var isManualRecording: Bool {
-        manualRecordingInfo != nil
-    }
-
     // Dependencies
     let detector: any MeetingDetecting
     let recorderFactory: @MainActor () async -> any RecordingProvider
@@ -183,9 +179,7 @@ class WatchLoop {
         micDeviceUID: @escaping () -> String? = { nil },
         verboseDiagnostics: @escaping () -> Bool = { false },
         recordOnly: @escaping () -> Bool = { false },
-        recordOnlyDestination: @escaping () -> RecordOnlyDestination = {
-            .unscoped(AppPaths.recordingsDir)
-        },
+        recordOnlyDestination: @escaping () -> RecordOnlyDestination = { .unscoped(AppPaths.recordingsDir) },
         recordOnlyFileTransfer: @escaping RecordOnlyWrite.Transfer = RecordOnlyWrite.linkOrCopy,
         recordWithoutAskingApps: @escaping () -> [String] = { [] },
         speechActivity: @escaping () -> SpeechActivity? = { nil },
@@ -193,9 +187,7 @@ class WatchLoop {
         notifier: any AppNotifying = SilentNotifier(),
         diagnostics: any DiagnosticsLogging = OSLogDiagnostics(category: "WatchLoop"),
         nowProvider: @escaping () -> Date = Date.init,
-        sleepProvider: @escaping (TimeInterval) async throws -> Void = { interval in
-            try await Task.sleep(for: .seconds(interval))
-        },
+        sleepProvider: @escaping (TimeInterval) async throws -> Void = { interval in try await Task.sleep(for: .seconds(interval)) },
         pidAliveCheck: @escaping (pid_t) -> Bool = { kill($0, 0) == 0 },
         consentPolicy: BrowserConsentPolicy = BrowserConsentPolicy(),
         denyListStore: any ConsentDenyListStoring = InMemoryConsentDenyListStore(),
@@ -433,10 +425,9 @@ class WatchLoop {
     private func watchLoop() async {
         while !Task.isCancelled {
             releaseEndedRedetectionHolds()
-            // A Record Again click comes first, then a prompt answered since
-            // the last poll: both arrive out of band, but recordings only ever
-            // start here. Each is re-checked, since up to a poll interval has
-            // passed and the call may have ended in it.
+            // A Record Again click, then a prompt answered since the last poll:
+            // both arrive out of band, but recordings only ever start here, and
+            // each is re-checked, since the call may have ended in the meantime.
             if let again = takeRecordAgain() {
                 if await runMeeting(again, startCause: .recordAgain) { return }
             } else if let approved = takeApprovedConsent(), detector.isMeetingActive(approved.meeting),
@@ -520,7 +511,6 @@ class WatchLoop {
 
     // MARK: - Meeting Handling
 
-    /// `startCause` goes with the move into `.recording` (see `PhaseChangeCause`).
     @discardableResult
     func handleMeeting(
         _ meeting: DetectedMeeting,

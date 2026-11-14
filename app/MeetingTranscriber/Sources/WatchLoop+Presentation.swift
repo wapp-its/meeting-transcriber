@@ -1,6 +1,10 @@
 import Foundation
 
 extension WatchLoop {
+    var isManualRecording: Bool {
+        manualRecordingInfo != nil
+    }
+
     /// Strip app suffixes from meeting titles for cleaner display.
     static func cleanTitle(_ title: String) -> String {
         let suffixes = [" | Microsoft Teams", " - Zoom", " - Webex"]

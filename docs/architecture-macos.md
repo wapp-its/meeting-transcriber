@@ -171,7 +171,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | File | Role |
 |------|------|
 | `WatchLoop.swift` | Main orchestrator: detect → record → enqueue PipelineJob |
-| `WatchLoop+Presentation.swift` | Title cleanup and the `TranscriberState` mapping, split out of `WatchLoop` for size |
+| `WatchLoop+Presentation.swift` | Title cleanup, `isManualRecording` and the `TranscriberState` mapping, split out of `WatchLoop` for size |
 | `WatchLoop+Participants.swift` | The Teams roster read when a detected meeting starts recording, split out of `WatchLoop` for size |
 | `WatchLoop+ManualRecording.swift` | The poll loop that decides when a manually started recording ends, split out of `WatchLoop` |
 | `WatchLoop+StopByHand.swift` | "Stop Recording" for a detected meeting: parks a request the meeting-end wait takes at its next poll, so the recording ends through the same stop, cut and enqueue as every other meeting end; split out of `WatchLoop` |
@@ -189,6 +189,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `PowerAssertionDetector.swift` | IOKit power assertion–based meeting detection (sandbox-safe); carries the Chrome WebRTC pattern for browser meetings (issue #503) |
 | `PowerAssertionDetector+Diagnostics.swift` | "Saw something that looks like a meeting and did not act on it" diagnostic, split out of `PowerAssertionDetector` (line-cap) |
 | `MicInputDetector.swift` | Third `MeetingDetecting` strategy: watches which processes hold `kAudioProcessPropertyIsRunningInput` via the Core Audio process-object API — covers call apps (WeChat, Tencent Meeting, FaceTime, WhatsApp, Slack Huddles) with no reliable power-assertion signal; each app opt-in and off by default. Also carries Safari browser meetings (WebKit GPU process attributed to Safari), selected by Browser Web Meetings and consent-gated |
+| `MicInputDetector.MicPattern+Matching.swift` | How a watched app's bundle IDs match a process (`MicPattern.matchLength`), split out of `MicInputDetector` for size |
 | `MeetingPatterns.swift` | Regex patterns for Teams, Zoom, Webex, browser (Chrome WebRTC) |
 | `BrowserConsentPolicy.swift` | Pure decision logic for the browser-meeting "ask before recording" prompt — decline cooldown (issue #503) |
 | `ConsentAnswer.swift` | Three-way outcome of a consent prompt (yes / no / unanswered) — kept distinct from a `Bool` so a decline and a timeout get different re-prompt cooldowns (issue #543) |
