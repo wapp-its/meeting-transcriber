@@ -1,3 +1,4 @@
+import AudioTapLib
 import Foundation
 
 /// A transcribed segment with timestamps and optional speaker label.
@@ -54,18 +55,26 @@ extension [TimestampedSegment] {
     /// The recording's pauses ride here for the same reason and have no
     /// default either. Each becomes its own marker line, in offset order,
     /// before the first rendered line starting at or after the pause's
-    /// offset; one past the last line goes at the end.
+    /// offset; one past the last line goes at the end. Mute markers ride here
+    /// too, placed by time among the lines.
     func transcriptText(
-        note: String?, pauses: [RecordingPause], timeZone: TimeZone = .autoupdatingCurrent,
+        note: String?, pauses: [RecordingPause], micMuted: [MicMuteInterval],
+        timeZone: TimeZone = .autoupdatingCurrent,
     ) -> String {
+        let spoken = filter { !$0.suppressed }.map { (start: $0.start, line: $0.formattedLine) }
+        let markers = micMuted.map { (start: $0.start, line: $0.transcriptMarker) }
+        // Markers first, so one sorts ahead of a line starting at the same moment.
+        let timed = (markers + spoken).enumerated()
+            .sorted { ($0.element.start, $0.offset) < ($1.element.start, $1.offset) }
+            .map(\.element)
         var pending = pauses.sorted { ($0.offsetSeconds, $0.startedAt) < ($1.offsetSeconds, $1.startedAt) }[...]
         var lines: [String] = []
-        for segment in self where !segment.suppressed {
-            while let pause = pending.first, pause.offsetSeconds <= segment.start {
+        for entry in timed {
+            while let pause = pending.first, pause.offsetSeconds <= entry.start {
                 lines.append(pause.markerLine(in: timeZone))
                 pending.removeFirst()
             }
-            lines.append(segment.formattedLine)
+            lines.append(entry.line)
         }
         lines += pending.map { $0.markerLine(in: timeZone) }
         return TranscriptNote.prepend(note, to: lines.joined(separator: "\n"))
@@ -86,13 +95,17 @@ extension TimestampedSegment {
 
     /// Format timestamp as [MM:SS] or [H:MM:SS] for long recordings.
     var formattedTimestamp: String {
-        let total = Int(start)
+        "[\(Self.clockTime(start))]"
+    }
+
+    static func clockTime(_ time: TimeInterval) -> String {
+        let total = Int(time)
         let h = total / 3600
         let m = (total % 3600) / 60
         let s = total % 60
         return h > 0
-            ? String(format: "[%d:%02d:%02d]", h, m, s)
-            : String(format: "[%02d:%02d]", m, s)
+            ? String(format: "%d:%02d:%02d", h, m, s)
+            : String(format: "%02d:%02d", m, s)
     }
 
     /// Format as "[MM:SS] Speaker: text" or "[MM:SS] text" if no speaker.
@@ -102,5 +115,77 @@ extension TimestampedSegment {
             return "\(ts) \(text)"
         }
         return "\(ts) \(speaker): \(text)"
+    }
+}
+
+extension MicMuteInterval {
+    /// Past any real recording, and small enough that its frame count at any
+    /// sample rate, and its clock time, convert to `Int` without trapping.
+    static let maxSeconds: TimeInterval = 7 * 24 * 3600
+
+    /// Bracketed like the recording note, so it cannot read as something said.
+    var transcriptMarker: String {
+        "[Mic muted \(TimestampedSegment.clockTime(start))–\(TimestampedSegment.clockTime(end))]"
+    }
+}
+
+extension [MicMuteInterval] {
+    func shifted(by offset: TimeInterval) -> [MicMuteInterval] {
+        map { MicMuteInterval(start: $0.start + offset, end: $0.end + offset) }
+    }
+
+    /// Finite, within `[0, MicMuteInterval.maxSeconds]`, ordered and merged where
+    /// they overlap. They come from files on disk, a reimported sidecar among
+    /// them, and the frame arithmetic traps on a huge value or double-counts
+    /// an overlap into a recording "muted throughout".
+    var sanitized: [MicMuteInterval] {
+        let clipped = compactMap { interval -> MicMuteInterval? in
+            guard interval.start.isFinite, interval.end.isFinite else { return nil }
+
+            let start = Swift.max(0, interval.start)
+            let end = Swift.min(interval.end, MicMuteInterval.maxSeconds)
+            return end > start ? MicMuteInterval(start: start, end: end) : nil
+        }
+        var merged: [MicMuteInterval] = []
+        for interval in clipped.sorted(by: { $0.start < $1.start }) {
+            if let last = merged.last, interval.start <= last.end {
+                merged[merged.count - 1] = MicMuteInterval(start: last.start, end: Swift.max(last.end, interval.end))
+            } else {
+                merged.append(interval)
+            }
+        }
+        return merged
+    }
+
+    func mutedFrames(rate: Int) -> Int {
+        var seconds: TimeInterval = 0
+        for interval in self {
+            seconds += interval.end - interval.start
+        }
+        return Int(seconds * Double(rate))
+    }
+}
+
+extension TimestampedSegment {
+    /// The share of a segment that may lie inside mutes before it is dropped.
+    /// Not zero, because a sentence that ended as the user muted still holds words
+    /// that were recorded; not near one, because the engines invent text on long
+    /// zeroes and that text would survive. So a long segment that runs from real
+    /// speech into a mute is dropped whole, and one just under half invented is kept.
+    static let maxMutedShare = 0.5
+}
+
+extension [TimestampedSegment] {
+    /// Drops text timed mostly inside a muted stretch. A zero-length segment is
+    /// always kept, even one wholly inside a mute: it has no share to measure.
+    func removingMuted(_ intervals: [MicMuteInterval]) -> [TimestampedSegment] {
+        guard !intervals.isEmpty else { return self }
+
+        return filter { segment in
+            let muted = intervals.reduce(0) { total, interval in
+                total + Swift.max(0, Swift.min(segment.end, interval.end) - Swift.max(segment.start, interval.start))
+            }
+            return muted <= TimestampedSegment.maxMutedShare * (segment.end - segment.start)
+        }
     }
 }

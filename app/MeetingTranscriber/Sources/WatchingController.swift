@@ -30,8 +30,15 @@ import Observation
 final class WatchingController {
     @ObservationIgnored var detectedCapturesRunning = 0
     var watchLoop: WatchLoop? {
-        didSet { watchLoopChanged() }
+        didSet {
+            watchLoopChanged()
+            watchLoop?.onMicMuteAvailabilityChange = { [weak self] in self?.syncMicMuteHotkey() }
+            syncMicMuteHotkey()
+        }
     }
+
+    /// Registered only while a recording can be muted; otherwise the keys reach the frontmost app.
+    let micMuteHotkeyRegistrar: any HotkeyRegistering
 
     /// Non-nil while `toggleWatching`'s async start is in flight — it awaits mic
     /// access before `watchLoop` is assigned, so without this a second toggle in
@@ -175,7 +182,9 @@ final class WatchingController {
         makeDetector: (() -> any MeetingDetecting)? = nil,
         makeRecorder: @escaping @MainActor () -> any RecordingProvider = { DualSourceRecorder() },
         captionFlushOverride: (@MainActor () -> Void)? = nil,
+        micMuteHotkeyRegistrar: any HotkeyRegistering = GlobalHotkeyRegistrar(),
     ) {
+        self.micMuteHotkeyRegistrar = micMuteHotkeyRegistrar
         self.settings = settings
         self.notifier = notifier
         self.pipeline = pipeline
@@ -211,33 +220,9 @@ final class WatchingController {
 
     // MARK: - Derived
 
-    var isWatching: Bool {
-        watchLoop?.isActive == true && watchLoop?.isManualRecording == false
-    }
-
-    /// Whether a recording is currently in progress (the watch loop is in its
-    /// `.recording` state).
-    var isRecording: Bool {
-        watchLoop?.state == .recording
-    }
-
     /// Caption flushes still running; ASR stays loaded while any is. Written only
     /// by `flushLiveTranscriptionAfterRecording()` (WatchingController+CaptionFlush).
     var captionFlushesInFlight = 0
-
-    /// Whether a manual (app-picker) recording owns the loop, or is on its way
-    /// to owning it. Exposed because `toggleWatching` silently refuses in that
-    /// state, and a silent refusal is invisible to a remote caller — the
-    /// automation API turns this into a 409.
-    ///
-    /// The in-flight half matters: `startManualRecording` assigns `watchLoop`
-    /// only after awaiting the mic gate, so reading the loop alone reports
-    /// "no manual recording" for the whole of that window, and a remote start
-    /// landing in it would build an auto loop that the manual task then
-    /// overwrites without stopping.
-    var isManualRecording: Bool {
-        manualStartTask != nil || watchLoop?.isManualRecording == true
-    }
 
     // MARK: - Start / Stop
 

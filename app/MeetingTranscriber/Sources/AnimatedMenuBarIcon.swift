@@ -21,6 +21,7 @@ struct AnimatedMenuBarIcon: View {
     let recordOnlyOverlay: Bool
     let micSilentOverlay: Bool
     let appSilentOverlay: Bool
+    let micMutedOverlay: Bool
 
     @State private var animationFrame = 0
     // `.default` (not `.common`) so the timer never fires inside the status-bar
@@ -39,6 +40,7 @@ struct AnimatedMenuBarIcon: View {
         recordOnlyOverlay: Bool,
         micSilentOverlay: Bool,
         appSilentOverlay: Bool,
+        micMutedOverlay: Bool,
     ) {
         self.badge = badge
         self.pausedOverlay = pausedOverlay
@@ -49,6 +51,7 @@ struct AnimatedMenuBarIcon: View {
         self.recordOnlyOverlay = recordOnlyOverlay
         self.micSilentOverlay = micSilentOverlay
         self.appSilentOverlay = appSilentOverlay
+        self.micMutedOverlay = micMutedOverlay
         iconTimer = MenuBarIcon.animationTicks(for: badge)
     }
 
@@ -64,6 +67,7 @@ struct AnimatedMenuBarIcon: View {
             recordOnlyOverlay: recordOnlyOverlay,
             micSilentOverlay: micSilentOverlay,
             appSilentOverlay: appSilentOverlay,
+            micMutedOverlay: micMutedOverlay,
         ))
         .onReceive(iconTimer) { _ in
             let next = MenuBarIcon.nextFrame(animationFrame, badge: badge)
