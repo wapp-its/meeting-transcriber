@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-127-start-the-app-at-login-and-date-both",
-  "completion_review_status": "not_required",
-  "completion_reviewed_at": "2026-11-14T20:30:52.337951Z",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-11-14T20:48:42.617973Z",
   "created_at": "2026-11-12T20:43:04.308801Z",
   "default_impl": null,
   "default_review": null,
@@ -141,17 +141,54 @@
       "task": "gh-127-start-the-app-at-login-and-date-both.1",
       "timestamp": "2026-11-14T20:25:19.907387Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "d3c7d87a4edc756c1b8d8341b1a6d62e6608d177ad7f1d966323eeb7222d6cad",
+      "backend": "codex",
+      "base_sha": "f911fcb0a331240d287db28e1880c98fd770bc7c",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "2c225b0a03c1c20afa979e04adb4184bdc46896c",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 227434,
+      "output_sha256": "49199c4b89cee642561830d35fa2ed03de0b8db7499cbd6425d9b7def76940ef",
+      "reservation_id": "da261c23b69e4057b86c7850c1476953",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T20:48:42.590899Z",
+      "tool_calls": 14,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-127-start-the-app-at-login-and-date-both.1": 1,
     "plan": 2,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-127-start-the-app-at-login-and-date-both.1": 0,
     "plan": 0
   },
@@ -170,5 +207,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/127"
   },
-  "updated_at": "2026-11-14T20:30:52.338347Z"
+  "updated_at": "2026-11-14T20:48:42.621768Z"
 }
