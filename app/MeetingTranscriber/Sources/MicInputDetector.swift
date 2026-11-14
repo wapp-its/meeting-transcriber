@@ -1,4 +1,5 @@
 import AppKit
+import AudioTapLib
 import CoreAudio
 import os.log
 
@@ -24,6 +25,12 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "MicInpu
 /// default, detection needs N consecutive polls, a 5 s cooldown follows a
 /// reset, and a detected call asks before recording unless the user switched
 /// that app to record without asking.
+///
+/// The one exception is Safari (`safariPatterns`), selected by the Browser
+/// Web Meetings toggle rather than an app toggle of its own: WebKit holds no
+/// WebRTC power assertion, so the mic is the only call signal Safari gives,
+/// and those patterns ask before recording exactly as the assertion-based
+/// browser channel does.
 @Observable
 class MicInputDetector: MeetingDetecting {
     /// A call app watched by bundle ID.
@@ -36,6 +43,18 @@ class MicInputDetector: MeetingDetecting {
         /// a helper bundle such as `com.example.callapp.helper`.
         var matchesHelpers = false
         var usesBuiltInMeetingPattern = true
+        /// When non-empty, a process matching `bundleIDs` counts only if macOS
+        /// holds one of these apps responsible for it, and the recorder taps
+        /// that app instead of the process. For shared system services:
+        /// `com.apple.WebKit.GPU` captures the mic for Safari and for every
+        /// other app that embeds a WKWebView, and only Safari's is a browser
+        /// meeting.
+        var responsibleBundleIDs: [String] = []
+        /// Carried into the synthesised `AppMeetingPattern` (see
+        /// `AppMeetingPattern.requiresRecordingConsent`). Only takes effect
+        /// for a pattern with `responsibleBundleIDs`: built-ins bring their
+        /// own, and an added app always asks.
+        var requiresRecordingConsent = false
 
         /// The length of the longest of this pattern's bundle IDs that
         /// `bundleID` is or is a helper of, nil when the process is not this
@@ -60,15 +79,24 @@ class MicInputDetector: MeetingDetecting {
         /// has no "record without asking" switch, and its display name can
         /// equal a built-in app's, whose switch must not carry over to it.
         /// For the same reason it is keyed by its bundle ID, not its name.
+        /// A pattern with `responsibleBundleIDs` (Safari) is a browser
+        /// identity instead, keyed by its name as the assertion channel files
+        /// that browser, and asks as `requiresRecordingConsent` says.
         var meetingPattern: AppMeetingPattern {
+            let synthesized = AppMeetingPattern(
+                appName: appName,
+                ownerNames: [appName],
+                meetingPatterns: [],
+                requiresRecordingConsent: requiresRecordingConsent,
+            )
             guard usesBuiltInMeetingPattern else {
+                guard responsibleBundleIDs.isEmpty else { return synthesized }
                 return AppMeetingPattern(
                     appName: appName, ownerNames: [appName], meetingPatterns: [], requiresRecordingConsent: true,
                     identityKey: AddedAppIdentity.key(bundleID: bundleIDs.first ?? appName),
                 )
             }
-            return AppMeetingPattern.forAppName(appName)
-                ?? AppMeetingPattern(appName: appName, ownerNames: [appName], meetingPatterns: [])
+            return AppMeetingPattern.forAppName(appName) ?? synthesized
         }
     }
 
@@ -97,8 +125,8 @@ class MicInputDetector: MeetingDetecting {
         // placeholder, and ParticipantReader has no window to read. Note also
         // that `avconferenced` serves AV conferencing in general, not FaceTime
         // alone. A FaceTime *link* joined in a browser is owned by
-        // `com.apple.WebKit.GPU` instead and is not covered here; that case
-        // belongs to the browser detection channel.
+        // `com.apple.WebKit.GPU` instead and is not covered here; in Safari it
+        // is a browser meeting (`safariPatterns`).
         MicPattern(appName: "FaceTime", bundleIDs: ["com.apple.FaceTime", "com.apple.avconferenced"]),
         MicPattern(appName: "WhatsApp", bundleIDs: ["net.whatsapp.WhatsApp"]),
         // Slack Huddles. Not measured on a real huddle: Slack is Electron, so
@@ -109,18 +137,67 @@ class MicInputDetector: MeetingDetecting {
         MicPattern(appName: "Slack", bundleIDs: ["com.tinyspeck.slackmacgap"], matchesHelpers: true),
     ]
 
+    /// Safari browser meetings, measured during a Google Meet call in Safari
+    /// on macOS 27.0.1. WebKit never creates the "WebRTC has active
+    /// PeerConnections" assertion the browser channel keys on (that is
+    /// Chromium's), and Safari's media-playback assertions are the same for a
+    /// YouTube video, so the mic is the signal: `com.apple.WebKit.GPU` runs
+    /// input for the whole call, keeps running it while the call is muted, and
+    /// stops when the user leaves with the tab still open. A second
+    /// participant joining changes nothing, so the pre-join preview, which also
+    /// opens the mic, looks like a call; the consent prompt is the filter, as
+    /// it is for Chromium.
+    ///
+    /// The GPU service is shared with every app that embeds a WKWebView, so
+    /// the hit counts only when macOS holds Safari responsible for it, and the
+    /// recorder taps Safari's main process, which `ProcessResponsibility.tapPIDs`
+    /// widens back to the WebKit services that carry the call audio. Each
+    /// Safari is its own identity, as each Chromium fork is on the assertion
+    /// channel, and the name matches what that channel would file a "Safari"
+    /// process under, so the cooldown and deny-list entries are one and the
+    /// same. Safari Technology Preview is assumed to use the same GPU bundle
+    /// ID; not measured. The App Store build cannot resolve responsibility
+    /// (private symbol), so there these patterns never match.
+    static let safariPatterns: [MicPattern] = [
+        safariPattern(appName: "Safari", bundleID: "com.apple.Safari"),
+        safariPattern(appName: "Safari Technology Preview", bundleID: "com.apple.SafariTechnologyPreview"),
+    ]
+
+    private static func safariPattern(appName: String, bundleID: String) -> MicPattern {
+        MicPattern(
+            appName: appName,
+            bundleIDs: ["com.apple.WebKit.GPU"],
+            usesBuiltInMeetingPattern: false,
+            responsibleBundleIDs: [bundleID],
+            requiresRecordingConsent: AppMeetingPattern.browserMeetings.requiresRecordingConsent,
+        )
+    }
+
     /// The `defaultPatterns` subset selected by the user's "Apps to Watch"
-    /// toggles — same contract as `PowerAssertionDetector.patterns(watching:)`.
+    /// toggles — same contract as `PowerAssertionDetector.patterns(watching:)`
+    /// — plus `safariPatterns` when Browser Web Meetings is on.
     /// Custom bundle IDs a selected built-in already matches are dropped, so
     /// one process is never watched under two patterns; with that built-in
-    /// deselected the custom entry applies again.
+    /// deselected the custom entry applies again. The Safari patterns take no
+    /// part in that: they claim only the GPU processes Safari is responsible
+    /// for, so a custom `com.apple.WebKit.GPU` entry still sees the rest, and
+    /// sits after them so a Safari call is filed under Safari.
     static func patterns(watching watchedAppNames: [String], customBundleIDs: [String] = []) -> [MicPattern] {
         let watched = Set(watchedAppNames)
         let builtIns = defaultPatterns.filter { watched.contains($0.appName) }
+        #if APPSTORE
+            // The sandboxed build cannot resolve responsibility (private
+            // symbol), so a Safari pattern could never match there; leaving
+            // them out keeps the browser toggle from starting a Core Audio
+            // enumeration on every poll for nothing.
+            let browsers: [MicPattern] = []
+        #else
+            let browsers = watched.contains(AppMeetingPattern.browserMeetings.appName) ? safariPatterns : []
+        #endif
         let customs = customBundleIDs
             .filter { id in !builtIns.contains { $0.matches(bundleID: id) } }
             .map(customPattern(bundleID:))
-        return builtIns + customs
+        return builtIns + browsers + customs
     }
 
     static func customPattern(bundleID: String) -> MicPattern {
@@ -145,6 +222,8 @@ class MicInputDetector: MeetingDetecting {
     /// Bundle IDs already logged as running-input-but-unmatched, so a live
     /// call on an unlisted bundle names itself once per session in the log.
     private var loggedMissBundles: Set<String> = []
+    /// Denied identities already logged, once per session each.
+    private var loggedDenied: Set<String> = []
 
     /// Injectable process snapshot for tests. Production reads Core Audio.
     var processProvider: () -> [AudioProcessSnapshot] = MicInputDetector.systemAudioProcesses
@@ -155,14 +234,20 @@ class MicInputDetector: MeetingDetecting {
     /// Apps the user answered "Never for this app" about, by identity key
     /// (`AppMeetingPattern.identityKey`), so they never reach confirmation.
     /// Same reason as `PowerAssertionDetector.isIdentityDenied`:
-    /// a denied app holding the mic would otherwise re-confirm every few polls
-    /// for as long as it does, and each skip at the consent gate resets every
-    /// app's confirmation count.
+    /// a denied app holding the mic (a refused Safari that keeps its mic
+    /// open, say) would otherwise re-confirm every few polls for as long as
+    /// it does, and each skip at the consent gate resets every app's
+    /// confirmation count.
     var isIdentityDenied: (String) -> Bool = { _ in false }
 
     var mainAppPIDProvider: (String) -> pid_t? = { bundleID in
         NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first?.processIdentifier
     }
+
+    /// The app macOS holds responsible for a PID. Asked only for processes a
+    /// pattern with `responsibleBundleIDs` matches by bundle. Injectable for
+    /// tests; production resolves it through `ProcessResponsibility`.
+    var responsibleAppProvider: (pid_t) -> ResponsibleApp? = MicInputDetector.systemResponsibleApp
 
     private let matchers: [String: MeetingTitleMatcher]
 
@@ -170,6 +255,11 @@ class MicInputDetector: MeetingDetecting {
         let bundleID: String
         let pid: pid_t
         let isRunningInput: Bool
+    }
+
+    struct ResponsibleApp: Equatable {
+        let pid: pid_t
+        let bundleID: String
     }
 
     init(
@@ -200,23 +290,32 @@ class MicInputDetector: MeetingDetecting {
                 if let until = cooldownUntil[key], Date() < until { return true }
                 return false
             },
+            denied: { logDeniedOnce($0) },
             unmatched: { logUnmatchedRunningInput(bundleID: $0) },
         )
         for key in firstMatch.keys {
             consecutiveHits[key, default: 0] += 1
         }
 
-        for (key, hits) in consecutiveHits where !excludedApps.contains(key) {
-            if hits >= confirmationCount, let match = firstMatch[key] {
-                return detectedMeeting(for: match)
-            }
-        }
-
+        // Before the pick, not after: a Safari call whose consent prompt is
+        // parked is returned on every poll, and a stale single hit of another
+        // app would then survive it and later confirm in one poll.
         for key in consecutiveHits.keys where firstMatch[key] == nil {
             consecutiveHits[key] = 0
         }
 
-        return nil
+        // One meeting per poll, a meeting that records without asking before
+        // one waiting for consent, then by identity key: the parked Safari
+        // call re-confirms every poll, and in dictionary order it would take
+        // the slot from a WhatsApp call starting during the prompt (as on the
+        // assertion channel, issue #814).
+        let pick = firstMatch
+            .filter { !excludedApps.contains($0.key) && consecutiveHits[$0.key, default: 0] >= confirmationCount }
+            .min { lhs, rhs in
+                (lhs.value.pattern.requiresRecordingConsent ? 1 : 0, lhs.key)
+                    < (rhs.value.pattern.requiresRecordingConsent ? 1 : 0, rhs.key)
+            }
+        return pick.map { detectedMeeting(for: $0.value) }
     }
 
     /// See `MeetingDetecting`. Same early return as `checkOnce` for an install
@@ -235,22 +334,29 @@ class MicInputDetector: MeetingDetecting {
     /// matching rule detection and `signallingMeetings` share. Filed under the
     /// identity key, so an added app never shares state with a same-named one;
     /// the name is only for the title and owner the person reads. Denied
-    /// identities are never a hit; `skip` passes over further ones (cooldowns),
-    /// and `unmatched` hears every capturing bundle no pattern claims.
+    /// identities are never a hit, and `denied` hears the name of each one
+    /// passed over; `skip` passes over further ones (cooldowns), and
+    /// `unmatched` hears every capturing bundle no pattern claims.
     private func signallingHits(
         in processes: [AudioProcessSnapshot],
         skipping skip: (String) -> Bool = { _ in false },
+        denied: (String) -> Void = { _ in },
         unmatched: (String) -> Void = { _ in },
     ) -> [String: Hit] {
         var hits: [String: Hit] = [:]
         for process in processes where process.isRunningInput {
-            guard let pattern = mostSpecificPattern(for: process.bundleID) else {
+            guard let claim = claim(process) else {
                 unmatched(process.bundleID)
                 continue
             }
-            let key = pattern.meetingPattern.identityKey
-            if isIdentityDenied(key) || skip(key) || hits[key] != nil { continue }
-            hits[key] = (tapRootPID(for: process, pattern: pattern), pattern.meetingPattern)
+            let meetingPattern = claim.pattern.meetingPattern
+            let key = meetingPattern.identityKey
+            if isIdentityDenied(key) {
+                denied(meetingPattern.appName)
+                continue
+            }
+            if skip(key) || hits[key] != nil { continue }
+            hits[key] = (claim.tapRoot, meetingPattern)
         }
         return hits
     }
@@ -264,22 +370,47 @@ class MicInputDetector: MeetingDetecting {
 
     func isMeetingActive(_ meeting: DetectedMeeting) -> Bool {
         processProvider().contains { process in
-            process.isRunningInput
-                && mostSpecificPattern(for: process.bundleID)?.meetingPattern.identityKey == meeting.pattern.identityKey
+            process.isRunningInput && claim(process)?.pattern.meetingPattern.identityKey == meeting.pattern.identityKey
         }
     }
 
-    /// The pattern a microphone-holding process belongs to: the one whose
-    /// matching bundle ID is longest, never the first one added. Two added
-    /// apps may have prefix-related bundle IDs (`com.acme.meet` and
+    /// The pattern that takes `process` and the PID the recorder should tap
+    /// for it, or nil when no watched pattern does. Detection and liveness go
+    /// through this one rule.
+    ///
+    /// Among the patterns that take it, the one whose matching bundle ID is
+    /// longest wins, never simply the first one added: two added apps may
+    /// have prefix-related bundle IDs (`com.acme.meet` and
     /// `com.acme.meet.beta`), and helper matching would otherwise file the
     /// second app's microphone use, and its liveness, under the first app's
-    /// key. Both detection and liveness go through this one rule.
-    private func mostSpecificPattern(for bundleID: String) -> MicPattern? {
-        patterns
-            .compactMap { pattern in pattern.matchLength(bundleID: bundleID).map { (pattern: pattern, length: $0) } }
-            .max { $0.length < $1.length }?
-            .pattern
+    /// key. Between equally long matches pattern order decides, so a Safari
+    /// call is filed under Safari ahead of a custom `com.apple.WebKit.GPU`
+    /// entry. A pattern with `responsibleBundleIDs` takes the process only
+    /// when macOS holds one of those apps responsible for it; the
+    /// responsible app is resolved at most once, and only when such a
+    /// pattern matches by bundle.
+    private func claim(_ process: AudioProcessSnapshot) -> (pattern: MicPattern, tapRoot: pid_t)? {
+        var owner: ResponsibleApp?
+        var ownerResolved = false
+        var best: (pattern: MicPattern, length: Int, ownerPID: pid_t?)?
+        for pattern in patterns {
+            guard let length = pattern.matchLength(bundleID: process.bundleID),
+                  length > best?.length ?? -1
+            else { continue }
+            guard !pattern.responsibleBundleIDs.isEmpty else {
+                best = (pattern, length, nil)
+                continue
+            }
+            if !ownerResolved {
+                owner = responsibleAppProvider(process.pid)
+                ownerResolved = true
+            }
+            if let owner, pattern.responsibleBundleIDs.contains(owner.bundleID) {
+                best = (pattern, length, owner.pid)
+            }
+        }
+        guard let best else { return nil }
+        return (best.pattern, best.ownerPID ?? tapRootPID(for: process, pattern: best.pattern))
     }
 
     /// A helper holding the mic is swapped for its main app, whose bundle the
@@ -290,6 +421,17 @@ class MicInputDetector: MeetingDetecting {
         return pattern.bundleIDs.lazy.compactMap(mainAppPIDProvider).first ?? process.pid
     }
 
+    /// The app macOS holds responsible for `pid`, through the same private
+    /// lookup the recorder uses to widen a Safari tap. Nil when the symbol is
+    /// unavailable (App Store build) or the owner has no bundle.
+    static func systemResponsibleApp(of pid: pid_t) -> ResponsibleApp? {
+        let owner = ProcessResponsibility.responsiblePID(of: pid)
+        guard owner > 0,
+              let bundleID = NSRunningApplication(processIdentifier: owner)?.bundleIdentifier
+        else { return nil }
+        return ResponsibleApp(pid: owner, bundleID: bundleID)
+    }
+
     func reset(appName: String? = nil) {
         consecutiveHits.removeAll()
         if let appName {
@@ -298,6 +440,14 @@ class MicInputDetector: MeetingDetecting {
     }
 
     // MARK: - Diagnostics
+
+    private func logDeniedOnce(_ appName: String) {
+        guard loggedDenied.insert(appName).inserted else { return }
+        logger.info("""
+        Mic input from \(appName, privacy: .public) matched but is ignored: \
+        the app is on the "Never for this app" list (Settings → General).
+        """)
+    }
 
     /// Log, once per distinct bundle, that a process is capturing mic input but
     /// matched no watched pattern — the discovery channel for call apps whose

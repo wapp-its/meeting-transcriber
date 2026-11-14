@@ -147,7 +147,9 @@ enum MenuBarIcon {
     /// the **bottom half** is red — signalling the app-audio channel went silent. The two are
     /// independent; if both are true, both halves are red (effectively all-red bars).
     /// Any of these bypass the pre-rendered cache and force a non-template image, because red
-    /// would not survive template rendering.
+    /// would not survive template rendering. If `micMutedOverlay` is true, a diagonal strike
+    /// crosses the waveform: the user muted the mic in this recording. It takes the mic-silent
+    /// tint's place, which callers drop while muted.
     ///
     /// `watchingOverlay` adds a small dot at the top right while watching for meetings is on,
     /// so the icon tells "watching, nothing going on" from "not watching". It is drawn in the
@@ -182,8 +184,11 @@ enum MenuBarIcon {
         recordOnlyOverlay: Bool = false,
         micSilentOverlay: Bool = false,
         appSilentOverlay: Bool = false,
+        micMutedOverlay: Bool = false,
     ) -> NSImage {
-        if pausedOverlay || meetingEndCountdownOverlay || permissionOverlay || recordOnlyOverlay || micSilentOverlay || appSilentOverlay {
+        let overlaid = pausedOverlay || meetingEndCountdownOverlay || permissionOverlay || recordOnlyOverlay
+            || micSilentOverlay || appSilentOverlay || micMutedOverlay
+        if overlaid {
             // Honour the cache's frame discipline: animated badges advance, static ones
             // stay on frame 0. Without this, the live animationFrame leaks through and
             // makes `.inactive` (idle waveform) bounce as if recording.
@@ -198,6 +203,7 @@ enum MenuBarIcon {
                 recordOnlyOverlay: recordOnlyOverlay,
                 micSilentOverlay: micSilentOverlay,
                 appSilentOverlay: appSilentOverlay,
+                micMutedOverlay: micMutedOverlay,
             )
         }
         let frameCache = if questionOverlay { questionCache } else if watchingOverlay { watchingCache } else { cache }
@@ -229,6 +235,7 @@ enum MenuBarIcon {
         recordOnlyOverlay: Bool = false,
         micSilentOverlay: Bool = false,
         appSilentOverlay: Bool = false,
+        micMutedOverlay: Bool = false,
     ) -> NSImage {
         let size = NSSize(width: 18, height: 18)
         // The `.error` badge and any red overlay all need an explicit foreground color
@@ -267,6 +274,10 @@ enum MenuBarIcon {
                 drawTintedHalf(in: rect, half: .bottom) {
                     drawBadgeBody(badge: badge, in: rect, frame: frame, paused: pausedOverlay)
                 }
+            }
+
+            if micMutedOverlay {
+                drawMutedStrike(in: rect, color: needsExplicitForeground && isDark ? .white : .black)
             }
 
             if questionOverlay {
@@ -333,6 +344,26 @@ enum MenuBarIcon {
         default:
             drawRecordingAnimation(in: rect, frame: frame)
         }
+    }
+
+    /// A strike with a cleared halo either side, so it stays readable over the bars.
+    private static func drawMutedStrike(in rect: NSRect, color: NSColor) {
+        guard let ctx = NSGraphicsContext.current else { return }
+
+        let strike = NSBezierPath()
+        strike.move(to: NSPoint(x: rect.minX + 2, y: rect.maxY - 2))
+        strike.line(to: NSPoint(x: rect.maxX - 2, y: rect.minY + 2))
+        strike.lineCapStyle = .round
+
+        ctx.saveGraphicsState()
+        ctx.compositingOperation = .clear
+        strike.lineWidth = 4
+        strike.stroke()
+        ctx.restoreGraphicsState()
+
+        color.setStroke()
+        strike.lineWidth = 1.8
+        strike.stroke()
     }
 
     private enum Half { case top, bottom }

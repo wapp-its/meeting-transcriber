@@ -242,6 +242,8 @@ public class AudioCaptureSession {
         // separate the two. Releasing a device is not something to leave to a
         // release that happens to be prompt.
         micCapture = mic
+        // Before the engine starts, so not one buffer reaches the file unmuted.
+        if config.micStartsMuted { mic.setMuted(true) }
         do {
             try mic.start(deviceUID: config.micDeviceUID)
             mic.onGiveUp = { [weak self] in
@@ -463,6 +465,19 @@ public class AudioCaptureSession {
         pauseGate.isPaused
     }
 
+    /// False when there is no microphone, or one that failed to open on an app
+    /// recording: the session swallows that failure.
+    public var hasOpenMic: Bool {
+        micCapture != nil
+    }
+
+    /// Silence or restore the microphone track. Nil when this session has no
+    /// open microphone, otherwise the timeline after the change.
+    @discardableResult
+    public func setMicMuted(_ muted: Bool) -> MicMuteTimeline? {
+        micCapture?.setMuted(muted)
+    }
+
     /// Stop all capture and return the result.
     public func stop() -> AudioCaptureResult {
         appCapture?.stop()
@@ -472,7 +487,7 @@ public class AudioCaptureSession {
         // arithmetic to a pure, unit-tested builder. The app file is what
         // `AppAudioCapture` actually WROTE — 16 kHz mono after the in-IOProc
         // resample, not the device's raw capture format.
-        let result = AudioCaptureResult.make(
+        var result = AudioCaptureResult.make(
             appOutputURL: config.appOutputURL,
             micOutputURL: config.micOutputURL,
             configured: (sampleRate: config.sampleRate, channels: config.channels),
@@ -487,6 +502,7 @@ public class AudioCaptureSession {
             ),
             pauses: pauseGate.timeline,
         )
+        result.micMuteIntervals = micCapture?.muteIntervals ?? []
 
         try? appFileHandle?.close()
         appFileHandle = nil
