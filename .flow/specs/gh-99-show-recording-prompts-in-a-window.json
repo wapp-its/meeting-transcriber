@@ -12,7 +12,7 @@
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
-  "plan_reviewed_at": "2026-11-14T20:08:52.493151Z",
+  "plan_reviewed_at": "2026-11-14T20:22:13.810984Z",
   "review_attempts": [
     {
       "artifact_sha256": "b27677faf0dd3673430063a0807d62508c409d867303061c69c1a36e6cf1a3d4",
@@ -102,10 +102,54 @@
       "task": null,
       "timestamp": "2026-11-14T20:08:52.469499Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "2c09f1e6d3b320e698f8417be691925455f57476cc8ab37c7f297a19b0a562ab",
+      "backend": "codex",
+      "base_sha": "f911fcb0a331240d287db28e1880c98fd770bc7c",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-8b332020e2ebf8fddbcb3496cf50cd44",
+            "classification": "introduced",
+            "findingId": "finding-8b332020e2ebf8fddbcb3496cf50cd44",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 2,
+      "head_sha": "8cffaff9b92e1e6e8a5c149dcfcec00ea3251292",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 764,
+      "output_sha256": "b4af2c47713054e53a0ed3e6a613314ff4ef6993f6f0d160327b92de69a2b298",
+      "reservation_id": "d2233db8874f4ddca6f41cf375e3df09",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T20:22:13.789997Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
-    "plan": 2,
+    "plan": 3,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
@@ -128,5 +172,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/99"
   },
-  "updated_at": "2026-11-14T20:20:25.079119Z"
+  "updated_at": "2026-11-14T20:22:13.812366Z"
 }
