@@ -401,13 +401,9 @@ public class MicCaptureHandler: @unchecked Sendable {
             self.accumulateDebugRMS(buffer: buffer)
             self.publishCurrentLevel()
             self.maybeReportDebugRMS()
-            // Read after the level is published and applied before anything is
-            // written, so health checks still see a live microphone while neither
-            // the file nor the live captions ever receive muted speech.
-            let isMuted = self.muteTimeline.withLock { $0.isMuted }
-            self.writeUnpausedFrames(
-                of: buffer, at: when, converter: converter, resampleRatio: resampleRatio, isMuted: isMuted,
-            )
+            // After the level is published, so health checks still see a live
+            // microphone while muted (`writeUnpausedFrames` zeroes the frames).
+            self.writeUnpausedFrames(of: buffer, at: when, converter: converter, resampleRatio: resampleRatio)
         }
 
         try ensureAttemptIsCurrent(generation)
