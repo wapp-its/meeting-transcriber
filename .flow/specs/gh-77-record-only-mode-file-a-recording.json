@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-77-record-only-mode-file-a-recording",
-  "completion_review_status": "not_required",
-  "completion_reviewed_at": "2026-11-14T20:59:27.374951Z",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-11-14T21:18:50.903353Z",
   "created_at": "2026-11-12T20:43:15.851448Z",
   "default_impl": null,
   "default_review": null,
@@ -226,17 +226,54 @@
       "task": "gh-77-record-only-mode-file-a-recording.1",
       "timestamp": "2026-11-14T20:51:30.663677Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "30c96c386963c79e54387779972e12ef36d9742b7450777a427f5572dff88f84",
+      "backend": "codex",
+      "base_sha": "f911fcb0a331240d287db28e1880c98fd770bc7c",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "345665759a26b031810793320e38a9d70879c1fe",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 403534,
+      "output_sha256": "7af0d3e6b62f9925db4ab4bcf2caa3610b6d459edf3c1600086ffaf46c37b52a",
+      "reservation_id": "0c9ebdc0bbe247c5bd21389c775a8947",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T21:18:50.880946Z",
+      "tool_calls": 25,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-77-record-only-mode-file-a-recording.1": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-77-record-only-mode-file-a-recording.1": 0,
     "plan": 0
   },
@@ -255,5 +292,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/77"
   },
-  "updated_at": "2026-11-14T20:59:27.375316Z"
+  "updated_at": "2026-11-14T21:18:50.906194Z"
 }
