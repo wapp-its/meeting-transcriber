@@ -1,3 +1,4 @@
+import AudioTapLib
 @testable import MeetingTranscriber
 import XCTest
 
@@ -81,7 +82,8 @@ final class NamingSessionMockDelegate: SpeakerNamingSessionDelegate {
 
     func renderLabeledTranscript(
         run _: DiarizationRun, cachedSegments: [TimestampedSegment],
-        isDualSource _: Bool, autoNames _: [String: String], annotations _: (note: String?, pauses: [RecordingPause]),
+        isDualSource _: Bool, autoNames _: [String: String],
+        annotations _: (note: String?, pauses: [RecordingPause], micMuted: [MicMuteInterval]),
     ) -> String? {
         renderedSegmentCounts.append(cachedSegments.count)
         return nil

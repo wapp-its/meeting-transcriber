@@ -80,6 +80,10 @@ public class MicCaptureHandler: @unchecked Sendable {
     /// Lock order: this, then `arbiter`, never the reverse. The session factory
     /// runs under it, so a factory must never call back into the handler.
     let attemptBuildLock = NSLock()
+    /// Lives here rather than on the engine session, so a mute survives a device
+    /// restart. Lock-guarded because the toggle arrives on main and the render
+    /// thread reads it per buffer.
+    let muteTimeline = OSAllocatedUnfairLock(initialState: MicMuteTimeline())
 
     /// Restart attempts run here, never on the main queue: the call that brings
     /// an engine up can block forever, and on the main queue that takes the whole
@@ -397,7 +401,13 @@ public class MicCaptureHandler: @unchecked Sendable {
             self.accumulateDebugRMS(buffer: buffer)
             self.publishCurrentLevel()
             self.maybeReportDebugRMS()
-            self.writeUnpausedFrames(of: buffer, at: when, converter: converter, resampleRatio: resampleRatio)
+            // Read after the level is published and applied before anything is
+            // written, so health checks still see a live microphone while neither
+            // the file nor the live captions ever receive muted speech.
+            let isMuted = self.muteTimeline.withLock { $0.isMuted }
+            self.writeUnpausedFrames(
+                of: buffer, at: when, converter: converter, resampleRatio: resampleRatio, isMuted: isMuted,
+            )
         }
 
         try ensureAttemptIsCurrent(generation)

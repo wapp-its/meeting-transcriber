@@ -20,6 +20,10 @@ extension WatchingController {
         let assertions = PowerAssertionDetector(
             patterns: PowerAssertionDetector.patterns(watching: settings.watchApps),
         )
+        let mic = MicInputDetector(patterns: MicInputDetector.patterns(
+            watching: settings.watchApps,
+            customBundleIDs: settings.watchCustomApps,
+        ))
         // Read through the settings each poll rather than captured once, so a
         // Settings "Remove" takes effect without restarting the watch loop.
         let isDenied: (String) -> Bool = { [settings] app in
@@ -27,11 +31,7 @@ extension WatchingController {
         }
         assertions.isIdentityDenied = isDenied
         assertions.addedAppBundleIDs = settings.watchCustomApps
-        let micInput = MicInputDetector(patterns: MicInputDetector.patterns(
-            watching: settings.watchApps,
-            customBundleIDs: settings.watchCustomApps,
-        ))
-        micInput.isIdentityDenied = isDenied
-        return [assertions, micInput]
+        mic.isIdentityDenied = isDenied
+        return [assertions, mic]
     }
 }

@@ -29,7 +29,19 @@ class WatchLoop {
     /// `appLevelDBFS` / `micLevelDBFS` here at ~10 Hz to drive the asymmetric-silence
     /// indicator. Setter stays private so the recording lifecycle flows through
     /// this class only.
-    private(set) var activeRecorder: (any RecordingProvider)?
+    private(set) var activeRecorder: (any RecordingProvider)? {
+        didSet {
+            isMicMuted = activeRecorder?.isMicMuted ?? false
+            canMuteMic = activeRecorder?.canMuteMic ?? false
+            onMicMuteAvailabilityChange?()
+        }
+    }
+
+    /// Mirrors of the recorder's state, which is not observable, reset by the `didSet`.
+    var isMicMuted = false
+    private(set) var canMuteMic = false
+    var onMicMuteAvailabilityChange: (() -> Void)?
+
     private var manualRecordingTask: Task<Void, Never>?
 
     var isManualRecording: Bool {

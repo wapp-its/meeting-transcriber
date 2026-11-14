@@ -5,7 +5,8 @@ import os.log
 private let logger = Logger(subsystem: "com.meetingtranscriber.audiotap", category: "MicCapture")
 
 /// The microphone tap block's write path: cut the frames captured inside a
-/// pause, then convert, gap fill, write and forward what is left. Extracted to
+/// pause, then convert, zero while muted, gap fill, write and forward what is
+/// left. Extracted to
 /// a sibling file so `MicCaptureHandler.swift` stays under the 600-line lint
 /// cap, the same pattern as `+Timeline`.
 extension MicCaptureHandler {
@@ -20,9 +21,11 @@ extension MicCaptureHandler {
     ///
     /// `converter` and `resampleRatio` belong to the session whose tap block
     /// calls this (issue #589), which is why they are passed in rather than
-    /// read from the handler.
+    /// read from the handler. `isMuted` is read once per tap buffer, so every
+    /// piece of one buffer is muted or none is.
     func writeUnpausedFrames(
         of buffer: AVAudioPCMBuffer, at when: AVAudioTime, converter: AVAudioConverter?, resampleRatio: Double,
+        isMuted: Bool,
     ) {
         let timeline = pauseGate.timeline
         let hostTicks = when.isHostTimeValid ? when.hostTime : mach_absolute_time()
@@ -43,17 +46,17 @@ extension MicCaptureHandler {
             guard let part = piece.isWhole(of: frameCount) ? buffer : Self.copy(piece, of: buffer) else { continue }
             write(
                 part, recordingSeconds: piece.recordingSeconds, arrivedAt: arrivedAt,
-                converter: converter, resampleRatio: resampleRatio,
+                converter: converter, resampleRatio: resampleRatio, isMuted: isMuted,
             )
         }
     }
 
-    /// Convert → gap fill → write → live sink for one run of unpaused frames.
-    /// `recordingSeconds` is its first frame on the session's pause-free
-    /// recording clock, `arrivedAt` the buffer's arrival on that clock.
+    /// Convert → mute → gap fill → write → live sink for one run of unpaused
+    /// frames. `recordingSeconds` is its first frame on the session's
+    /// pause-free recording clock, `arrivedAt` the buffer's arrival on that clock.
     private func write(
         _ buffer: AVAudioPCMBuffer, recordingSeconds: Double, arrivedAt: Double,
-        converter: AVAudioConverter?, resampleRatio: Double,
+        converter: AVAudioConverter?, resampleRatio: Double, isMuted: Bool,
     ) {
         do {
             if let converter {
@@ -72,19 +75,12 @@ extension MicCaptureHandler {
                 if let error {
                     logger.warning("Mic resample error: \(error.localizedDescription, privacy: .public)")
                 } else {
-                    fillTimelineGap(
-                        atRecordingSeconds: recordingSeconds, outputFrames: Int(outputBuffer.frameLength),
-                        arrivedAt: arrivedAt,
+                    try writeCaptured(
+                        outputBuffer, recordingSeconds: recordingSeconds, arrivedAt: arrivedAt, isMuted: isMuted,
                     )
-                    try outputFile?.write(from: outputBuffer)
-                    forwardToLiveSink(buffer: outputBuffer)
                 }
             } else {
-                fillTimelineGap(
-                    atRecordingSeconds: recordingSeconds, outputFrames: Int(buffer.frameLength), arrivedAt: arrivedAt,
-                )
-                try outputFile?.write(from: buffer)
-                forwardToLiveSink(buffer: buffer)
+                try writeCaptured(buffer, recordingSeconds: recordingSeconds, arrivedAt: arrivedAt, isMuted: isMuted)
             }
         } catch {
             logger.warning("Mic write error: \(error.localizedDescription, privacy: .public)")

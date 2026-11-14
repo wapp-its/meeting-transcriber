@@ -1,3 +1,4 @@
+import AudioTapLib
 import Foundation
 import os.log
 
@@ -235,6 +236,7 @@ struct RecordOnlyWrite: Sendable {
                 mixFilename: finalNames[0],
                 appFilename: recording.appPath.map { stem + Self.suffix(of: $0.lastPathComponent, after: basename) },
                 micFilename: recording.micPath.map { stem + Self.suffix(of: $0.lastPathComponent, after: basename) },
+                micMuteIntervals: recording.micMuteIntervals,
                 pauses: pauses,
             )
             try commitSidecar(sidecar, at: sidecarURL)

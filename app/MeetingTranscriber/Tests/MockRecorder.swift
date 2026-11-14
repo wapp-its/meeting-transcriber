@@ -75,6 +75,14 @@ class MockRecorder: RecordingProvider {
     /// how many switches reached the recording and which device each asked for.
     private(set) var selectMicrophoneCalls: [String?] = []
 
+    /// Off by default, like the protocol: a test opts in to a mutable microphone.
+    var canMuteMic = false
+    var isMicMuted = false
+
+    func setMicMuted(_ muted: Bool) {
+        isMicMuted = muted
+    }
+
     /// Overrides the `recordingStartDate` `stop()` reports. `nil` (default)
     /// yields `Date()` at stop time, matching a real recorder; set it to pin a
     /// specific meeting-start time (e.g. filename-anchoring tests).
