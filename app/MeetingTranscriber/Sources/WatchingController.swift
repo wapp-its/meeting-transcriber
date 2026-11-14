@@ -554,8 +554,8 @@ final class WatchingController {
     /// the microphone controller and post-`.error` notifications. Shared between the auto-detect path
     /// (`toggleWatching`) and the manual-recording path (`startManualRecording`)
     /// so the red-tint indicator + asymmetric-silence notification fire in both.
-    /// `notifyOnRecording` only fires "Meeting Detected" notifications for the
-    /// auto-detect path; manual recording emits its own start notification.
+    /// `notifyOnRecording` fires "Meeting Detected" for the auto-detect path only, and not
+    /// for the recording a "Record Again" click started; manual recording announces itself.
     private func attachStateChangeHandler(to loop: WatchLoop, notifyOnRecording: Bool) {
         loop.onStateChange = { [weak self, weak loop, notifier] oldState, newState, cause in
             self?.recordingActivityChanged()
@@ -572,7 +572,7 @@ final class WatchingController {
             }
             switch newState {
             case .recording:
-                if notifyOnRecording, let meeting = loop?.currentMeeting {
+                if notifyOnRecording, cause != .recordAgain, let meeting = loop?.currentMeeting {
                     notifier.notify(
                         title: "Meeting Detected",
                         body: "Recording: \(meeting.windowTitle)",

@@ -26,6 +26,8 @@ struct MenuBarView: View {
     var isRecordingPaused = false
     /// The open "Record <App> meeting?" prompt, nil when none is open.
     var consentQuestion: ConsentQuestion?
+    /// The held calls a click can record again (`WatchLoop.recordAgainOffers`).
+    var recordAgainOffers: [RecordAgainOffer] = []
     /// The Microphone entry; nil leaves it out.
     var microphoneMenu: MicrophoneMenuState?
     /// The Output entry; nil leaves it out.
@@ -185,9 +187,28 @@ struct MenuBarView: View {
             }
             .keyboardShortcut(".")
         } else {
+            recordAgainItems
             watchToggle
         }
         pauseResumeItem
+    }
+
+    /// One "Record Again (<App>)" line per held call, directly under the
+    /// status line and above the watch toggle; no keyboard shortcut.
+    private var recordAgainItems: some View {
+        ForEach(recordAgainOffers, id: \.identityKey) { offer in
+            Button {
+                actions.recordAgain?(offer)
+            } label: {
+                Label(recordAgainLabel(offer), systemImage: "record.circle")
+            }
+            .accessibilityIdentifier(A11yID.recordAgainMenuItem)
+        }
+    }
+
+    /// Hoisted out of the `ViewBuilder`, as `meetingLabel` is.
+    private func recordAgainLabel(_ offer: RecordAgainOffer) -> String {
+        "Record Again (\(offer.appName))"
     }
 
     /// The line under "Stop Recording", for every kind of recording.

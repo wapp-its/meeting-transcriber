@@ -45,6 +45,10 @@ struct MenuActions {
     var answerConsent: ((ConsentQuestion, Bool) -> Void)?
     /// Opens the Record Meeting window for the question the menu displayed.
     var recordConsentWithOptions: ((ConsentQuestion) -> Void)?
+    /// "Record Again" for the offer the menu displayed. Handed the offer, like
+    /// `answerConsent` the question, so a click on a menu that went stale asks
+    /// for exactly that app and is refused when its hold is gone.
+    var recordAgain: ((RecordAgainOffer) -> Void)?
     var quit: () -> Void
     /// Stores a chosen microphone's UID, empty for System Default.
     var selectMicrophone: (String) -> Void
