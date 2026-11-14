@@ -254,8 +254,9 @@ extension WatchLoop {
     /// is how `cutAt` is placed on the audio's own timeline
     /// (`RecordingCut.keptSeconds`). The pauses come back clipped at `cutAt`:
     /// one that began at or after it is dropped, one spanning it ends there.
+    /// The mute spans are clipped at the same point on the microphone track.
     /// A failed cut returns the recording uncut, never lost, and its pauses
-    /// unclipped: the tracks as recorded, or, when an original could not be
+    /// and mute spans unclipped: the tracks as recorded, or, when an original could not be
     /// put back on its path, pointing at it where it is. After a cut, a
     /// balanced mix is made again from the cut tracks, since its gains
     /// were measured on the audio the cut threw away; a failed remix keeps the
@@ -312,6 +313,7 @@ extension WatchLoop {
         // wall-clock time, so the pauses do not shorten it.
         var cut = recording
         cut.recordedUntil = recording.recordingStartDate.addingTimeInterval(cutAt.timeIntervalSince(startedAt))
+        cut.micMuteIntervals = RecordingCut.micMuteIntervals(of: recording, keepingFirst: seconds)
         return (cut, stopped.pauses.clipped(at: cutAt))
     }
 

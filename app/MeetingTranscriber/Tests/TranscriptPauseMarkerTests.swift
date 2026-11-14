@@ -1,3 +1,4 @@
+import AudioTapLib
 @testable import MeetingTranscriber
 import XCTest
 
@@ -35,8 +36,9 @@ final class TranscriptPauseMarkerTests: XCTestCase {
 
     private func render(
         _ segments: [TimestampedSegment], pauses: [RecordingPause], note: String? = nil,
+        micMuted: [MicMuteInterval] = [],
     ) -> String {
-        segments.transcriptText(note: note, pauses: pauses, timeZone: utc)
+        segments.transcriptText(note: note, pauses: pauses, micMuted: micMuted, timeZone: utc)
     }
 
     // MARK: - Rendering
@@ -95,6 +97,20 @@ final class TranscriptPauseMarkerTests: XCTestCase {
         XCTAssertEqual(
             render(lines, pauses: [latest, early, later]),
             "[00:00] one\n\(marker(early))\n\(marker(later))\n[00:05] two\n\(marker(latest))\n[00:10] three",
+        )
+    }
+
+    /// Pause and mute markers share the timeline. A pause at the moment a
+    /// mute begins goes above the mute's marker: the mute started after the
+    /// resume, on audio written after it.
+    func testPauseAndMuteMarkersAppearInTimelineOrder() {
+        let early = pause(at: 3, minute: 1)
+        let atMute = pause(at: 8, minute: 2)
+        let muted = MicMuteInterval(start: 8, end: 9)
+
+        XCTAssertEqual(
+            render(lines, pauses: [atMute, early], micMuted: [muted]),
+            "[00:00] one\n\(marker(early))\n[00:05] two\n\(marker(atMute))\n\(muted.transcriptMarker)\n[00:10] three",
         )
     }
 

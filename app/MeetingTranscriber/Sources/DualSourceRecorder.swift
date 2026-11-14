@@ -28,6 +28,8 @@ struct RecordingResult {
     /// Where each pause begins on the saved tracks' timeline, in seconds and
     /// in order (`AudioCaptureResult.pauseOffsets`). Empty without a pause.
     var pauseOffsets: [TimeInterval] = []
+    /// The stretches of the mic track the user muted, in seconds of that track.
+    var micMuteIntervals: [MicMuteInterval] = []
 }
 
 /// The format `buildRecording` should expect the app track to arrive in, passed
@@ -453,6 +455,23 @@ class DualSourceRecorder: RecordingProvider {
     /// `AppSettings.levelBalanceEnabled`, like the watchdog flag above.
     var levelBalanceEnabled = false
 
+    /// Whether the next recording silences its microphone from the first buffer.
+    /// Set before `start(...)`, like the property above. A microphone-only
+    /// recording ignores it: the microphone is the only thing it records.
+    var micStartsMuted = false
+
+    private(set) var canMuteMic = false
+    private(set) var isMicMuted = false
+
+    /// Mutes this recording only. The call, and the OS microphone indicator, are
+    /// unaffected. Saved at each toggle so a crash cannot lose the mute times.
+    func setMicMuted(_ muted: Bool) {
+        guard let timeline = captureSession?.setMicMuted(muted), let stem = startTimestamp else { return }
+
+        isMicMuted = timeline.isMuted
+        MicMuteLog.write(timeline, stem: stem, in: recordingsDir)
+    }
+
     /// Start recording whichever channels `source` asks for.
     func start(
         source: RecordingSource,
@@ -513,6 +532,7 @@ class DualSourceRecorder: RecordingProvider {
                 silentTrackWatchdog: silentTrackWatchdogEnabled,
                 appLiveSink: appLiveSink,
                 micLiveSink: micLiveSink,
+                micStartsMuted: micStartsMuted && source.capturesAppAudio,
             ))
             try session.start()
         } catch {
@@ -527,6 +547,9 @@ class DualSourceRecorder: RecordingProvider {
         captureSession = session
         tappedPIDs = effectivePids
         pauseState = RecorderPauseState(tracks: [appTempURL, micURL].compactMap(\.self))
+        canMuteMic = session.hasOpenMic
+        isMicMuted = false
+        if micStartsMuted, source.capturesAppAudio { setMicMuted(true) }
 
         isRecording = true
         recordingStartDate = Date()
@@ -587,6 +610,8 @@ class DualSourceRecorder: RecordingProvider {
         isRecording = false
         tappedPIDs = []
         endPause()
+        canMuteMic = false
+        isMicMuted = false
 
         guard let session = captureSession else {
             throw RecorderError.noAudioData

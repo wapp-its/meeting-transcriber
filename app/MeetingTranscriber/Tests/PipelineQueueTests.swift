@@ -1012,6 +1012,23 @@ final class PipelineQueueTests: XCTestCase {
 
     // MARK: - Auto-Removal Tests
 
+    /// Completed-job lifetime for the expiry tests below.
+    private static let expiryLifetime: TimeInterval = 0.05
+
+    /// How long an expiry test sleeps when it cannot wait on a condition:
+    /// either it asserts that a job is still there once the lifetime has
+    /// passed, or it needs the timer to have fired while its effect (a job
+    /// held back for an open menu) leaves nothing to observe. The 200 ms past
+    /// the lifetime is the room a late timer has, the same these tests had
+    /// with a 0.2 s lifetime and a 0.4 s sleep.
+    private static let pastExpiry: Duration = .seconds(expiryLifetime) + .milliseconds(200)
+
+    /// How long an expiry test waits for a job to go. Far above the lifetime,
+    /// so a loaded machine does not trip it, and low enough that a lifetime
+    /// taken ten times too long, or not from the parameter at all, still
+    /// fails: the default is a minute.
+    private static let expiryCeiling: Duration = .seconds(1)
+
     func testDismissCannotRemoveAJobDuringNotionExport() {
         var job = makeJob()
         job.state = .done
@@ -1028,26 +1045,26 @@ final class PipelineQueueTests: XCTestCase {
         XCTAssertTrue(queue.jobs.isEmpty)
     }
 
-    func testCompletedJobAutoRemovedAfterDelay() async throws {
-        let queue = PipelineQueue(logDir: tmpDir, completedJobLifetime: 0.2)
+    func testCompletedJobAutoRemovedAfterDelay() async {
+        let queue = PipelineQueue(logDir: tmpDir, completedJobLifetime: Self.expiryLifetime)
         let job = makeJob()
         queue.enqueue(job)
         queue.updateJobState(id: job.id, to: .done)
         XCTAssertEqual(queue.jobs.count, 1)
 
-        try await Task.sleep(for: .milliseconds(400))
+        await waitFor({ queue.jobs.isEmpty }, timeout: Self.expiryCeiling)
         XCTAssertEqual(queue.jobs.count, 0, "Done job should be auto-removed")
     }
 
     func testFailedNotionExportJobIsRetainedPastCompletedLifetime() async throws {
-        let queue = PipelineQueue(logDir: tmpDir, completedJobLifetime: 0.2)
+        let queue = PipelineQueue(logDir: tmpDir, completedJobLifetime: Self.expiryLifetime)
         var job = makeJob()
         job.beginNotionExport(speakerNames: [])
         job.finishNotionExport(succeeded: false)
         queue.enqueue(job)
         queue.updateJobState(id: job.id, to: .done)
 
-        try await Task.sleep(for: .milliseconds(400))
+        try await Task.sleep(for: Self.pastExpiry)
 
         XCTAssertEqual(queue.jobs.first?.id, job.id)
         XCTAssertEqual(queue.jobs.first?.notionExportStatus, .failed)
@@ -1073,12 +1090,12 @@ final class PipelineQueueTests: XCTestCase {
     }
 
     func testErrorJobNotAutoRemoved() async throws {
-        let queue = PipelineQueue(logDir: tmpDir, completedJobLifetime: 0.2)
+        let queue = PipelineQueue(logDir: tmpDir, completedJobLifetime: Self.expiryLifetime)
         let job = makeJob()
         queue.enqueue(job)
         queue.updateJobState(id: job.id, to: .error, error: "Test error")
 
-        try await Task.sleep(for: .milliseconds(400))
+        try await Task.sleep(for: Self.pastExpiry)
         XCTAssertEqual(queue.jobs.count, 1, "Error job should NOT be auto-removed")
     }
 
@@ -1195,8 +1212,9 @@ final class PipelineQueueTests: XCTestCase {
     /// that job, so a second run walks into the first run's intermediate files.
     /// This pins the collision half: a `pipeline_<jobID>` directory that already
     /// holds a `mix_16k.wav` must not fail the run that arrives second.
-    /// `AudioMixer.resampleFile` copies when the source is already 16 kHz mono,
-    /// and `copyItem` onto an existing destination throws Cocoa 516.
+    /// `AudioMixer.resampleFile` copies when the source is already a 16 kHz
+    /// mono PCM WAV, which the test audio is, and `copyItem` onto an existing
+    /// destination throws Cocoa 516.
     func testRunIsNotFailedByAnotherRunsWorkDirectory() async throws {
         let engine = MockEngine()
         engine.segmentsToReturn = [
@@ -4015,7 +4033,7 @@ final class PipelineQueueTests: XCTestCase {
         let protocolsDir = tmpDir.appendingPathComponent("protocols")
         try FileManager.default.createDirectory(at: protocolsDir, withIntermediateDirectories: true)
         let transcriptPath = protocolsDir.appendingPathComponent("dualsource_transcript.txt")
-        let originalTranscript = "[00:00] Roman Passler: Morgen.\n[00:30] R_S2: Hallo\n[00:42] R_S3: Hi\n[09:55] M_S0: Da kenne ich mich nicht aus."
+        let originalTranscript = "[00:00] Speaker A: Morgen.\n[00:30] R_S2: Hallo\n[00:42] R_S3: Hi\n[09:55] M_S0: Da kenne ich mich nicht aus."
         try originalTranscript.write(to: transcriptPath, atomically: true, encoding: .utf8)
 
         let queue = PipelineQueue(logDir: tmpDir)
@@ -4032,7 +4050,7 @@ final class PipelineQueueTests: XCTestCase {
         let namingData = PipelineQueue.SpeakerNamingData(
             jobID: job.id,
             meetingTitle: "Dual Source Test",
-            mapping: ["R_S2": "R_S2", "R_S3": "R_S3", "M_S0": "Roman Passler"],
+            mapping: ["R_S2": "R_S2", "R_S3": "R_S3", "M_S0": "Speaker A"],
             speakingTimes: ["R_S2": 5, "R_S3": 5, "M_S0": 5],
             embeddings: ["R_S2": [1, 0], "R_S3": [0, 1], "M_S0": [0, 0]],
             audioPath: nil,
@@ -4059,7 +4077,7 @@ final class PipelineQueueTests: XCTestCase {
         let rewritten = try String(contentsOf: transcriptPath, encoding: .utf8)
         XCTAssertTrue(rewritten.contains("] Lennart: Hallo"), "R_S2 should be renamed to Lennart")
         XCTAssertTrue(rewritten.contains("] Diana: Hi"), "R_S3 should be renamed to Diana")
-        XCTAssertTrue(rewritten.contains("] Roman Passler: Morgen."), "Already-named speaker should be untouched")
+        XCTAssertTrue(rewritten.contains("] Speaker A: Morgen."), "Already-named speaker should be untouched")
         XCTAssertFalse(rewritten.contains("R_S2:"), "R_S2 label should be gone")
         XCTAssertFalse(rewritten.contains("R_S3:"), "R_S3 label should be gone")
     }

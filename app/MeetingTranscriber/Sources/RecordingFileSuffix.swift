@@ -43,6 +43,10 @@ enum RecordingFileSuffix {
     /// so no scan of the staging folder takes it for audio.
     static let pendingCut = "_pending_cut.json"
 
+    /// The mute times of a recording still in progress, saved at each toggle so
+    /// crash recovery can attach them. See `MicMuteLog`.
+    static let micMuteLog = "_mic_mute.json"
+
     /// Raw float32 app-audio temp file written live during capture (16 kHz
     /// mono, in-IOProc resampled) and consumed by `buildRecording` at `stop()`.
     /// A leftover one means the writer was killed mid-recording (crash) — see
