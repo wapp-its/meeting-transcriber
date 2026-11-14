@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-77-record-only-mode-file-a-recording",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-11-14T21:18:50.903353Z",
+  "completion_reviewed_at": "2026-11-14T23:14:08.657628Z",
   "created_at": "2026-11-12T20:43:15.851448Z",
   "default_impl": null,
   "default_review": null,
@@ -262,12 +262,48 @@
       "timestamp": "2026-11-14T21:18:50.880946Z",
       "tool_calls": 25,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "5571d5b1343d0681514685cf1c53d7c3d36ea79dace785edd3f99e1edd97f63c",
+      "backend": "codex",
+      "base_sha": "322dd8b7457d234def6e2c575e1dfc24a5819b31",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "0fce3078c3fac38486a0a77d57e579734e5e8962",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 380869,
+      "output_sha256": "3af350a9cb7411228c6cc2500e86ae374b97390303a59544a9dab3d0ac4b6d4e",
+      "reservation_id": "1e81ca40edbe4c6f9b0ba8124776eba4",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T23:14:08.621283Z",
+      "tool_calls": 32,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-77-record-only-mode-file-a-recording.1": 1,
     "plan": 1,
-    "plan#completion": 1
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -292,5 +328,5 @@
     "mergeBaseTracker": "Gefunden beim Planen von #60, besteht schon vorher.\n\n## Problem\nIst \u201eRecord only\u201c (nur aufnehmen, keine Verarbeitung) eingeschaltet und st\u00fcrzt die App w\u00e4hrend einer Aufnahme ab, holt die Wiederherstellung beim n\u00e4chsten Start die Aufnahme zur\u00fcck und schickt sie **immer** in die Verarbeitung (Transkription, Sprecher, Protokoll), statt sie wie im Nur-Aufnahme-Modus nur samt Begleitdatei abzulegen.\n\n## Wunsch\nDie Wiederherstellung folgt demselben Modus wie ein normal beendeter Mitschnitt: im Nur-Aufnahme-Modus ablegen statt verarbeiten.\n\n## Abnahme\nNur-Aufnahme an, Aufnahme l\u00e4uft, App wird hart beendet \u2192 nach dem Neustart liegt die Aufnahme mit Begleitdatei im Ausgabeordner, und es l\u00e4uft kein Transkriptions-Job.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/77"
   },
-  "updated_at": "2026-11-14T21:28:21.808466Z"
+  "updated_at": "2026-11-14T23:14:08.661641Z"
 }
