@@ -1,3 +1,4 @@
+import AudioTapLib
 import Foundation
 import os.log
 
@@ -48,24 +49,28 @@ extension PipelineQueue {
     /// A recording that fails any of these is skipped with no write, no
     /// notice and no job, its files left where they are.
     ///
+    /// The mute times the scan read from the recording's mute log go into
+    /// its sidecar, and the log is removed once the write committed, as the
+    /// adoption removes it once the job exists.
+    ///
     /// A failed write leaves the recording in staging for the next pass, and
     /// one notice per pass says how many failed. It is never processed
     /// instead.
-    func fileOrphanedRecordings(_ scanned: [PairedRecordingResolver.Group], recordOnly: RecordOnlyRecovery) async {
+    func fileOrphanedRecordings(_ scanned: [MicMuteLog.RecoveryCandidate], recordOnly: RecordOnlyRecovery) async {
         var filed = 0
         var failed = 0
-        for group in scanned {
+        for (group, micMuted) in scanned {
             guard !isRetired, !recordOnly.quitHasBegun() else { break }
             guard let mix = group.mix, isStillOrphaned(mix) else { continue }
             let destination = recordOnly.destination()
-            let (stem, app, mic) = (group.stem, group.app, group.mic)
             do {
                 // Off the main actor: into an output folder on another volume
                 // each file is a copy.
                 let kept = try await Task.detached(priority: .utility) {
-                    try RecordOnlyWrite.recovered(stem: stem, mix: mix, app: app, mic: mic, into: destination).perform()
+                    try RecordOnlyWrite.recovered(group, mix: mix, micMuted: micMuted, into: destination).perform()
                 }.value
                 filed += 1
+                MicMuteLog.remove(stem: group.stem, in: mix.deletingLastPathComponent())
                 RecordOnlyWrite.reportStagingFilesKept(kept, to: recordOnly.notifier)
             } catch {
                 failed += 1
@@ -100,17 +105,26 @@ extension PipelineQueue {
 }
 
 extension RecordOnlyWrite {
-    /// The write for a recording the recovery pass found in staging. Nothing
-    /// about how it was started survived the crash, so it gets the title the
-    /// processing path gives it, no app, participants, trigger or pauses, its
-    /// tracks aligned at their starts, and a stop at its start plus the length
-    /// of its mix. Reads the files, so it runs off the main actor.
-    static func recovered(stem: String, mix: URL, app: URL?, mic: URL?, into destination: RecordOnlyDestination) -> Self {
-        let startedAt = recordedStart(stem: stem, files: [mix, app, mic].compactMap(\.self))
+    /// The write for a recording the recovery pass found in staging (`group`,
+    /// with `mix` its mix). Nothing about how it was started survived the
+    /// crash, so it gets the title the processing path gives it, no app,
+    /// participants, trigger or pauses, its tracks aligned at their starts,
+    /// the mute times its mute log kept (`micMuted`, empty without a mic
+    /// track), and a stop at its start plus the length of its mix. Reads the
+    /// files, so it runs off the main actor.
+    static func recovered(
+        _ group: PairedRecordingResolver.Group, mix: URL, micMuted: [MicMuteInterval],
+        into destination: RecordOnlyDestination,
+    ) -> Self {
+        let startedAt = recordedStart(stem: group.stem, files: [mix, group.app, group.mic].compactMap(\.self))
+        var recording = RecordingResult(
+            mixPath: mix, appPath: group.app, micPath: group.mic, micDelay: 0, recordingStartDate: startedAt,
+        )
+        recording.micMuteIntervals = micMuted
         return RecordOnlyWrite(
-            title: PipelineQueue.recoveredRecordingTitle(stem: stem),
+            title: PipelineQueue.recoveredRecordingTitle(stem: group.stem),
             appName: "Unknown",
-            recording: RecordingResult(mixPath: mix, appPath: app, micPath: mic, micDelay: 0, recordingStartDate: startedAt),
+            recording: recording,
             trigger: nil,
             participants: [],
             stoppedAt: startedAt.addingTimeInterval(RecordingCut.duration(of: mix) ?? 0),

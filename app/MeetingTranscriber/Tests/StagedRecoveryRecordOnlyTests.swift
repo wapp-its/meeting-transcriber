@@ -1,3 +1,4 @@
+import AudioTapLib
 @testable import MeetingTranscriber
 import XCTest
 
@@ -141,7 +142,7 @@ final class StagedRecoveryRecordOnlyTests: XCTestCase {
         let data = try Data(contentsOf: recordings.appendingPathComponent(stem + RecordingSidecar.filenameSuffix))
         let keys = try Set(XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any]).keys)
         XCTAssertEqual(
-            keys, ["version", "title", "appName", "startedAt", "stoppedAt", "participants", "micDelaySeconds", "files"],
+            keys, ["version", "title", "appName", "startedAt", "stoppedAt", "participants", "micDelaySeconds", "micMuteIntervals", "files"],
             "trigger and pauses are left out",
         )
         let sidecar = try XCTUnwrap(RecordingSidecar.read(fromDirectory: recordings, basename: stem))
@@ -158,11 +159,38 @@ final class StagedRecoveryRecordOnlyTests: XCTestCase {
         XCTAssertEqual(sidecar.stoppedAt.timeIntervalSince(startedAt), mixLength, accuracy: 1)
         XCTAssertEqual(sidecar.participants, [])
         XCTAssertEqual(sidecar.micDelaySeconds, 0)
+        // No mute log in staging: no mute times.
+        XCTAssertEqual(sidecar.micMuteIntervals, [])
         XCTAssertNil(sidecar.trigger)
         XCTAssertNil(sidecar.pauses)
         XCTAssertEqual(
             [sidecar.files.mix, sidecar.files.app, sidecar.files.mic],
             [stem + RecordingFileSuffix.mix, stem + RecordingFileSuffix.app, stem + RecordingFileSuffix.mic],
+        )
+    }
+
+    /// The mute times the crashed recording's mute log kept go into its
+    /// sidecar, as the adoption hands them to a job, and the log leaves
+    /// staging with the recording.
+    func testARecoveredSidecarCarriesTheMuteTimesAndTheMuteLogIsRemoved() async throws {
+        let staging = try makeTempDirectory(prefix: "StagedRecoveryRecordOnlyMute")
+        let output = try makeTempDirectory(prefix: "StagedRecoveryRecordOnlyOutput")
+        try stageCrashedRecording(in: staging)
+        var timeline = MicMuteTimeline()
+        timeline.setMuted(true)
+        MicMuteLog.write(timeline, stem: stem, in: staging)
+
+        try await runPass(on: staging, into: makeQueue(staging: staging), recordOnly: .writing(into: output))
+
+        let recordings = output.appendingPathComponent("recordings")
+        let sidecar = try XCTUnwrap(RecordingSidecar.read(fromDirectory: recordings, basename: stem), "not filed")
+        let mic = recordings.appendingPathComponent(stem + RecordingFileSuffix.mic)
+        let micLength = Double(AudioMixer.frameCount(of: mic)) / Double(AudioConstants.targetSampleRate)
+        XCTAssertGreaterThan(micLength, 0, "test premise: the filed mic track has audio")
+        XCTAssertEqual(sidecar.micMuteIntervals, [MicMuteInterval(start: 0, end: micLength)])
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: staging.appendingPathComponent(stem + RecordingFileSuffix.micMuteLog).path),
+            "the mute log stayed in staging",
         )
     }
 

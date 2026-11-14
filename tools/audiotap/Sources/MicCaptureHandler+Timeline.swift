@@ -89,6 +89,7 @@ extension MicCaptureHandler {
                 guard !bridgeGate.isAbandoned else { return nil }
                 let written = Self.writeSilence(frames: owed, to: outputFile, logged: false)
                 timelineAnchor.noteBridgeWritten(frames: written)
+                noteWrittenTrackLength()
                 return (owed, written)
             }
             guard let chunk else { break }
@@ -128,6 +129,7 @@ extension MicCaptureHandler {
             outputFile = nil
             return
         }
+        noteWrittenTrackLength()
         outputFile = nil
         gate.lock.unlock()
     }

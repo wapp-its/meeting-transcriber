@@ -23,6 +23,8 @@ public struct AudioCaptureResult: Sendable {
     /// delivered one, which is the transcript timeline's origin once the
     /// recorder has normalised the mic delay. Empty without a pause.
     public let pauseOffsets: [TimeInterval]
+    /// The stretches of the mic track the user muted, in seconds of that track.
+    public var micMuteIntervals: [MicMuteInterval] = []
 
     /// A `public` struct's synthesized memberwise init is only `internal`, so
     /// other modules can't construct one — declare it `public` to complete the

@@ -123,6 +123,12 @@ protocol RecordingProvider {
     /// Remove the stored cut and release its hold. Nothing stored: a no-op
     /// that reports `.removed`. Default: `.removed`.
     func clearPendingCut() -> PendingRecordingCut.RemoveOutcome
+
+    /// Whether this recording has an open microphone that can be muted. Default
+    /// false, so a double that does not simulate mute offers no control.
+    var canMuteMic: Bool { get }
+    var isMicMuted: Bool { get }
+    func setMicMuted(_ muted: Bool)
 }
 
 /// A change to the stored meeting-end cut that is not durable.
@@ -218,4 +224,14 @@ extension RecordingProvider {
     func clearPendingCut() -> PendingRecordingCut.RemoveOutcome {
         .removed
     }
+
+    var canMuteMic: Bool {
+        false
+    }
+
+    var isMicMuted: Bool {
+        false
+    }
+
+    func setMicMuted(_: Bool) {}
 }
