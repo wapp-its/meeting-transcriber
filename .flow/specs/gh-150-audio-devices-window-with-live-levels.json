@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-150-audio-devices-window-with-live-levels",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-11-14T22:39:01.657470Z",
+  "completion_reviewed_at": "2026-11-14T22:55:50.383002Z",
   "created_at": "2026-11-14T20:04:08.124186Z",
   "default_impl": null,
   "default_review": null,
@@ -363,12 +363,64 @@
       "timestamp": "2026-11-14T22:39:01.630860Z",
       "tool_calls": 32,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "adcc2d587b01c8ae59831300974f0c709cbe1017812dfbefde03f462bdcf34b0",
+      "backend": "codex",
+      "base_sha": "322dd8b7457d234def6e2c575e1dfc24a5819b31",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-5658d1e8f0c6d79134b4b9390d223d2f",
+            "classification": "introduced",
+            "findingId": "finding-5658d1e8f0c6d79134b4b9390d223d2f",
+            "firstSeenThisRound": false,
+            "severity": "P3",
+            "status": "not_fixed"
+          },
+          {
+            "chainRoot": "finding-f73b5f8378b489d8d9bcb05914c21f96",
+            "classification": "introduced",
+            "findingId": "finding-f73b5f8378b489d8d9bcb05914c21f96",
+            "firstSeenThisRound": true,
+            "severity": "P3",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "48c9522bfbddaf0dbf00ad0439b587dd031861f3",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 6889,
+      "output_sha256": "bd99be61caaac2d09bc1b63800f8573548bf99f6d76c0198b23eda9f37e1d711",
+      "reservation_id": "6f422d77483d40f0a1584c902fad1f0c",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T22:55:50.352984Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-150-audio-devices-window-with-live-levels.1": 1,
     "plan": 1,
-    "plan#completion": 1
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -393,5 +445,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nWhen a track comes out silent, it's hard to tell which microphone or output device carries the sound. A small live level indicator per device in the menu (microphones and outputs) would show the right one to pick. Follow-up to #148, which adds the Output entry to the menu.\n\n## NOTES\n\n- Levels of the recorded channels exist already while recording. Levels of devices that are not recorded need extra capture, so probably more permissions and a privacy indicator.\n\n## TASKS\n\n- [ ] Find out what a per-device level costs (permissions, CPU, privacy indicator)\n- [ ] Implement it for the menu, or close it",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/150"
   },
-  "updated_at": "2026-11-14T22:47:01.709383Z"
+  "updated_at": "2026-11-14T22:55:50.384452Z"
 }
