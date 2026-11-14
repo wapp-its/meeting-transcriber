@@ -193,7 +193,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-127-start-the-app-at-login-and-date-both.md",
-  "status": "open",
+  "status": "done",
   "title": "Start the app at login and date both ends of the not-running notice",
   "tracker": {
     "baseHashFlow": null,
@@ -207,5 +207,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/127"
   },
-  "updated_at": "2026-11-14T20:48:42.621768Z"
+  "updated_at": "2026-11-14T20:53:04.369123Z"
 }

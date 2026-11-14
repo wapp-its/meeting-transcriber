@@ -10,7 +10,7 @@
   "review": "codex:gpt-6-astra:xhigh",
   "spec": "gh-127-start-the-app-at-login-and-date-both",
   "spec_path": ".flow/tasks/gh-127-start-the-app-at-login-and-date-both.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement Start the app at login and date both ends of the not-running notice",
   "updated_at": "2026-11-14T19:57:52.882554Z"
 }
