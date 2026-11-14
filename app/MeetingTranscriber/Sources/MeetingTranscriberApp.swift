@@ -139,6 +139,8 @@ struct MeetingTranscriberApp: App {
             noMic: appState.settings.noMic,
             manualRecordingPendingOrActive: appState.watching.isManualRecording,
             isRecordingPaused: appState.isRecordingPaused,
+            isMicMuted: appState.isMicMuted,
+            micMuteShortcut: appState.micMuteShortcut,
             consentQuestion: appState.pendingConsentQuestion,
             recordAgainOffers: appState.recordAgainOffers,
             microphoneMenu: appState.microphoneMenuState,
@@ -160,6 +162,7 @@ struct MeetingTranscriberApp: App {
             togglePause: appState.canPauseRecording ? {
                 appState.watching.togglePause()
             } : nil,
+            toggleMicMute: appState.micMuteToggle,
             openJob: { Self.openJob($0, scopeRoot: appState.settings.effectiveOutputDir) },
             openLastNotes: openLastNotes,
             openSettings: { bringWindowToFront(id: "settings") },
@@ -244,6 +247,7 @@ struct MeetingTranscriberApp: App {
                 // per-channel overlay inputs.
                 micSilentOverlay: appState.micSilentOverlay,
                 appSilentOverlay: appState.appSilentOverlay,
+                micMutedOverlay: appState.isMicMuted,
             )
         }
         .onReceive(NotificationCenter.default.publisher(for: .autoWatchStart)) { _ in

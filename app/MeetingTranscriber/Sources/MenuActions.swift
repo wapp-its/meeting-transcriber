@@ -5,8 +5,8 @@ import Foundation
 /// `MeetingTranscriberApp.menuBarContent`.
 ///
 /// An optional member is optional because nil changes the menu: it hides
-/// "Stop Recording", "Pause/Resume Recording" and "Name Speakers…", and
-/// disables "Install Update".
+/// "Stop Recording", "Pause/Resume Recording", "Mute/Unmute Mic in Recording"
+/// and "Name Speakers…", and disables "Install Update".
 @MainActor
 struct MenuActions {
     /// Starts an mt-update install; nil disables the menu's install item.
@@ -20,6 +20,9 @@ struct MenuActions {
     /// Pauses a running recording or resumes a paused one, whatever kind it is;
     /// set only while a recording's capture is running.
     var togglePause: (() -> Void)?
+    /// Mutes or unmutes the microphone of the running recording; set only
+    /// while a recording with an open microphone runs.
+    var toggleMicMute: (() -> Void)?
     /// A job line's Open: the job's protocol, else its transcript, or its
     /// Notion page as `JobOpenTarget` decides ("Open in Notion").
     var openJob: (JobOpenTarget) -> Void

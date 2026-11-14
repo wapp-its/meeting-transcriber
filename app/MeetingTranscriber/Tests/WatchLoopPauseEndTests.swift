@@ -1,3 +1,4 @@
+import AudioTapLib
 import AVFoundation
 @testable import MeetingTranscriber
 import XCTest
@@ -5,7 +6,8 @@ import XCTest
 /// A paused recording at its end. A cut back from the meeting-end question or
 /// the long-silence question lands on the saved tracks' timeline, which leaves
 /// the paused time out, and the job and the record-only sidecar carry the
-/// pauses clipped at the cut time; a failed cut keeps them as recorded. Driven
+/// pauses clipped at the cut time; a failed cut keeps them as recorded. The
+/// job's mute spans are clipped at the cut the same way. Driven
 /// on `TestClock`, polling once a virtual second with a 10 s end grace and a
 /// 40 s countdown, so every timing below is exact, with tracks as long as the
 /// audio the capture would have saved.
@@ -213,6 +215,27 @@ final class WatchLoopPauseEndTests: XCTestCase {
         XCTAssertEqual(sidecar.pauses, [pause(25, 30, offset: 25)])
         let mix = try AVAudioFile(forReading: outputDir.appendingPathComponent("\(Self.basename)\(RecordingFileSuffix.mix)"))
         XCTAssertEqual(mix.length, 400_000, "the tracks keep the audio before the pause")
+    }
+
+    // MARK: - Mute spans at the cut
+
+    /// The job keeps the mute spans the cut keeps: one before the cut as
+    /// recorded, one spanning it ending there, one after it dropped. Left as
+    /// recorded they would count 40 s of mute on a microphone track the cut
+    /// left at 30 s, which the pipeline takes for a microphone muted
+    /// throughout and leaves out of the transcript.
+    func testTheQuestionsCutClipsTheMuteSpans() async throws {
+        let harness = EndHarness()
+        try giveTracks(to: harness, seconds: 70)
+        harness.recorder.micMuteIntervals = [
+            MicMuteInterval(start: 5, end: 10), MicMuteInterval(start: 25, end: 45), MicMuteInterval(start: 50, end: 65),
+        ]
+        let queue = try makeQueue()
+
+        try await endUnanswered(harness, pausing: [], queue: queue)
+
+        XCTAssertEqual(harness.diagnostics.lines(.notice, startingWith: "recording_cut"), ["recording_cut kept_s=30"], "precondition")
+        XCTAssertEqual(queue.jobs.first?.micMuteIntervals, [MicMuteInterval(start: 5, end: 10), MicMuteInterval(start: 25, end: 30)])
     }
 }
 
