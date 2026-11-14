@@ -39,6 +39,9 @@ enum AppLauncher {
         // never enters this function, so no test process writes a marker the
         // next real launch would read as a crash.
         previousExit = LivenessMarker.arm()
+        // Fork only. Here for the same reason: no test may reach the real
+        // login item service. It acts once launch has finished.
+        LoginItemDefault.applyAfterLaunch()
         MeetingTranscriberApp.main()
     }
 }

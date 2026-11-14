@@ -35,6 +35,9 @@ again to update.
 - Codex CLI or any command-line tool can write the protocol (the meeting summary),
   in addition to Claude CLI and local model servers.
 - All permissions are in one place: Settings → Advanced → Permissions.
+- It opens by itself when you log in, so it runs again after a restart (not when
+  the original app is installed too). To turn this off, clear **Settings → General →
+  Startup → Launch at login**.
 
 The full list is in the
 [merged pull requests](https://github.com/wapp-its/meeting-transcriber/pulls?q=is%3Apr+is%3Amerged+base%3Awapp%2Fmain).
