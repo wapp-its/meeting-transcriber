@@ -29,14 +29,16 @@ struct PreviousExitNotice: Equatable {
         let time = Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, calendar: calendar, timeZone: timeZone)
         let dayAndMonth = Date.FormatStyle(date: .omitted, time: .omitted, locale: locale, calendar: calendar, timeZone: timeZone)
             .day().month(.abbreviated)
-        // The date is added only when it is not today's, which is when the
-        // time alone would read as this morning. After the time, on its own,
-        // because a combined style renders "8 Mar at 10:52" and the sentence
-        // already says "at about".
-        let stopped = calendar.isDate(lastAlive, inSameDayAs: now)
-            ? lastAlive.formatted(time)
-            : "\(lastAlive.formatted(time)) on \(lastAlive.formatted(dayAndMonth))"
-        body = "It stopped without quitting at about \(stopped) and was not watching for meetings "
-            + "until \(now.formatted(time)). Nothing was recorded in between."
+        // Both ends are dated when they fall on different days, and neither
+        // when they do not. A dated stop alone read "10:52 on 8 Mar ... until
+        // 10:53" for a gap of two days, which looks like one minute. The date
+        // goes after the time, on its own, because a combined style renders
+        // "8 Mar at 10:52" and the sentence already says "at about".
+        let sameDay = calendar.isDate(lastAlive, inSameDayAs: now)
+        func stamp(_ date: Date) -> String {
+            sameDay ? date.formatted(time) : "\(date.formatted(time)) on \(date.formatted(dayAndMonth))"
+        }
+        body = "It stopped without quitting at about \(stamp(lastAlive)) and was not watching for meetings "
+            + "until \(stamp(now)). Nothing was recorded in between."
     }
 }
