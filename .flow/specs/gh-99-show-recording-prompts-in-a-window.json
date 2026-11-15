@@ -349,7 +349,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-99-show-recording-prompts-in-a-window.md",
-  "status": "open",
+  "status": "done",
   "title": "Show recording prompts in a window below the menu bar icon",
   "tracker": {
     "baseHashFlow": null,
@@ -363,5 +363,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/99"
   },
-  "updated_at": "2026-11-15T19:46:37.764794Z"
+  "updated_at": "2026-11-15T19:53:06.864653Z"
 }

@@ -9,7 +9,7 @@
   "review": "codex:gpt-6.1-sol:xhigh",
   "spec": "gh-99-show-recording-prompts-in-a-window",
   "spec_path": ".flow/tasks/gh-99-show-recording-prompts-in-a-window.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "Settings switch for prompts below the menu bar icon",
   "updated_at": "2026-11-14T20:20:00.851330Z"
 }

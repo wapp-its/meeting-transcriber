@@ -9,7 +9,7 @@
   "review": "codex:gpt-6.1-sol:xhigh",
   "spec": "gh-99-show-recording-prompts-in-a-window",
   "spec_path": ".flow/tasks/gh-99-show-recording-prompts-in-a-window.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Never-key prompt panel placed below the menu bar icon, proven first",
   "updated_at": "2026-11-14T20:20:35.858082Z"
 }
