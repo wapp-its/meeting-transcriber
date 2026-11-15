@@ -35,6 +35,9 @@ struct MenuActions {
     /// Opens the naming window; set only while a job waits for speaker names.
     var nameSpeakers: (() -> Void)?
     var processFiles: () -> Void
+    /// "Generate Meeting Notes from Transcript…": picks transcripts and queues
+    /// meeting notes for each.
+    var generateNotesFromTranscripts: () -> Void
     /// Opens the All Recordings window.
     var showAllTranscriptions: () -> Void
     /// "Device Details…": opens the Audio Devices window, or brings it to the front.
@@ -66,6 +69,7 @@ struct MenuActions {
         openLastNotes: { _ in },
         openSettings: {},
         processFiles: {},
+        generateNotesFromTranscripts: {},
         showAllTranscriptions: {},
         showAudioDevices: {},
         removeFailedJob: { _ in },

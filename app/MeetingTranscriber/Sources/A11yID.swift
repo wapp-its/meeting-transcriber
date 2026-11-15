@@ -228,6 +228,7 @@ enum A11yID {
 
     /// The menu's "Retry All Meeting Notes (N)", shown from two such jobs on.
     static let retryAllMeetingNotesButton = "retryAllMeetingNotesButton"
+    static let generateNotesFromTranscriptButton = "generateNotesFromTranscriptButton"
 
     static let recordOnlyBanner = "recordOnlyBanner"
     /// Settings → Advanced: the line saying where the diagnostics export went.

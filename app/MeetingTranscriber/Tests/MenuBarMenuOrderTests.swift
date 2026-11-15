@@ -137,6 +137,15 @@ final class MenuBarMenuOrderTests: XCTestCase {
 
     // MARK: - The whole menu
 
+    /// The original's "Generate Meeting Notes from Transcript…", after the
+    /// import; the App Store build leaves it out (its sandbox grants the
+    /// picked file, not the folder the notes go to).
+    #if APPSTORE
+        private static let notesFromTranscriptItem: [Line] = []
+    #else
+        private static let notesFromTranscriptItem: [Line] = [.item("Generate Meeting Notes from Transcript…")]
+    #endif
+
     /// The accepted mockup, top to bottom, for an idle menu with a finished
     /// recording, a job waiting for names and both device entries; and the
     /// shortcut on each item that has one, no other item carrying one.
@@ -162,6 +171,7 @@ final class MenuBarMenuOrderTests: XCTestCase {
             .item("Record Microphone Only"),
             .item("Record with Options…"),
             .item("Import Audio/Video Files…"),
+        ] + Self.notesFromTranscriptItem + [
             .heading("Audio Devices"),
             .item(Self.microphone.title),
             .item(Self.output.title),
