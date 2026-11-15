@@ -29,6 +29,8 @@ enum A11yID {
     static let watchBrowserToggle = "watchBrowserToggle"
     static let silencePromptToggle = "silencePromptToggle"
     static let silencePromptMinutesStepper = "silencePromptMinutesStepper"
+    static let promptWindowToggle = "promptWindowToggle"
+    static let promptWindowHelp = "promptWindowHelp"
     static let watchSlackToggle = "watchSlackToggle"
     static let browserConsentWarning = "browserConsentWarning"
     static let consentDenyListSection = "consentDenyListSection"
