@@ -123,7 +123,7 @@ extension WatchLoop {
                 case let .askToEnd(pending):
                     phase = .askingToEnd(pending)
                     if let recording { storeMeetingEndCut(pending, recorder: recording.recorder, startedAt: recording.startedAt) }
-                    askToEnd(meeting)
+                    askToEnd(meeting, pending: pending)
 
                 case let .withdrawQuestion(next):
                     withdrawMeetingEndQuestion()
@@ -357,21 +357,26 @@ extension WatchLoop {
     }
 
     /// Ask the person, under a fresh id, so an answer to an earlier question
-    /// can be told apart from one to this.
-    private func askToEnd(_ meeting: DetectedMeeting) {
-        let id = UUID().uuidString
-        meetingEndQuestionID = id
-        meetingEndAnswer = nil
+    /// can be told apart from one to this. The question is stored before it
+    /// is posted, with the deadline of `pending`, the one this wait ends the
+    /// recording at, and its notification shows exactly its title and body.
+    private func askToEnd(_ meeting: DetectedMeeting, pending: PendingMeetingEnd) {
         let app = meeting.pattern.appName
         let appLabel = app.isEmpty ? meeting.ownerName : app
         // In whole minutes: the app's countdown is a fixed two, and only tests
         // inject a shorter one.
         let minutes = Int((meetingEndCountdown / 60).rounded())
-        notifier.askBeforeEndingRecording(
-            id: id,
+        let question = MeetingEndQuestion(
+            id: UUID().uuidString,
+            app: appLabel,
             title: "Meeting seems to have ended",
             body: "No sign of the \(appLabel) call. The recording ends in \(minutes) minutes.",
-        ) { [weak self] answer in
+            deadline: pending.deadline,
+        )
+        meetingEndQuestion = question
+        meetingEndAnswer = nil
+        let id = question.id
+        notifier.askBeforeEndingRecording(id: id, title: question.title, body: question.body) { [weak self] answer in
             self?.receiveMeetingEndAnswer(answer, forQuestion: id)
         }
     }
@@ -395,7 +400,7 @@ extension WatchLoop {
     private func withdrawMeetingEndQuestion() {
         guard let id = meetingEndQuestionID else { return }
         notifier.withdrawMeetingEndQuestion(id: id)
-        meetingEndQuestionID = nil
+        meetingEndQuestion = nil
         meetingEndAnswer = nil
     }
 }

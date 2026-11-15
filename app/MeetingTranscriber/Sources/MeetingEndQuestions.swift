@@ -19,6 +19,12 @@ extension AppNotifying {
     ) {}
 
     func withdrawMeetingEndQuestion(id _: String) {}
+
+    /// Nothing was asked, so nothing is answered.
+    @MainActor
+    func answerMeetingEndQuestion(id _: String, answer _: MeetingEndAnswer) -> Bool {
+        false
+    }
 }
 
 /// The open "meeting seems to have ended" questions, by notification id.

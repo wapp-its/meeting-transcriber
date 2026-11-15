@@ -91,6 +91,34 @@ final class NotificationManagerMeetingEndTests: XCTestCase {
         XCTAssertEqual(answers.received, [])
     }
 
+    /// An answer by id from outside the notification (the prompt window) takes
+    /// the handler from the registry a tap uses and runs it at once, so neither
+    /// a second answer nor a tap after it answers the question again.
+    func testAnAnswerByIdRunsTheHandlerOnceAndNothingAnswersAgain() async {
+        let (manager, _) = makeManager()
+        let answers = ask(manager)
+
+        XCTAssertTrue(manager.answerMeetingEndQuestion(id: "q1", answer: .keepRecording))
+        XCTAssertEqual(answers.received, [.keepRecording], "the handler ran at once")
+        XCTAssertFalse(manager.answerMeetingEndQuestion(id: "q1", answer: .stopNow), "a second answer")
+        await manager.answerMeetingEndQuestion(id: "q1", actionIdentifier: NotificationManager.stopNowActionID)
+        XCTAssertEqual(answers.received, [.keepRecording], "nor a tap after it")
+    }
+
+    /// An id nothing was asked under, and a question that could not be posted
+    /// (gh-54 R5), answer nothing.
+    func testAnAnswerByIdToAnUnknownOrUnpostedQuestionAnswersNothing() {
+        let (manager, _) = makeManager()
+        let open = ask(manager)
+        XCTAssertFalse(manager.answerMeetingEndQuestion(id: "unknown", answer: .keepRecording))
+        XCTAssertEqual(open.received, [], "the open question is not answered in its place")
+
+        let (unposted, _) = makeManager(setUp: false)
+        let answers = ask(unposted)
+        XCTAssertFalse(unposted.answerMeetingEndQuestion(id: "q1", answer: .keepRecording))
+        XCTAssertEqual(answers.received, [])
+    }
+
     /// R5: a question that cannot be shown is not posted and can never be
     /// answered, so the countdown, not the notification, decides.
     func testAQuestionThatCannotBeShownIsNeitherPostedNorAnswerable() async {

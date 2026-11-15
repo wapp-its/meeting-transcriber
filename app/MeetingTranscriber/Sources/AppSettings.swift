@@ -294,6 +294,15 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         didSet { defaults.set(recordWithoutAskingApps, forKey: "recordWithoutAskingApps") }
     }
 
+    /// Also show the "Record … meeting?" prompt and the "Meeting seems to have
+    /// ended" countdown in a window below the menu bar icon, which a Focus
+    /// mode does not hold back as it does the notifications (issue #99). Off
+    /// by default: the window bypasses Focus on purpose, so it is the user's
+    /// choice; a missing or unreadable stored value reads as off.
+    var promptWindowEnabled: Bool {
+        didSet { defaults.set(promptWindowEnabled, forKey: "promptWindowEnabled") }
+    }
+
     /// Mic-input-detected call apps (see `MicInputDetector`). Off by default —
     /// additive opt-in so existing installs see no new auto-recording behavior.
     var watchWeChat: Bool {
@@ -1117,6 +1126,7 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         let storedCustomApps = defaults.stringArray(forKey: "watchCustomApps") ?? []
         consentDeniedApps = Self.loadConsentDeniedApps(from: defaults, addedBundleIDs: storedCustomApps)
         recordWithoutAskingApps = defaults.stringArray(forKey: "recordWithoutAskingApps") ?? []
+        promptWindowEnabled = defaults.bool(forKey: "promptWindowEnabled", default: false)
         watchWeChat = defaults.bool(forKey: "watchWeChat", default: false)
         watchTencentMeeting = defaults.bool(forKey: "watchTencentMeeting", default: false)
         watchFaceTime = defaults.bool(forKey: "watchFaceTime", default: false)

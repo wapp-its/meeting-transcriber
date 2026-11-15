@@ -1,25 +1,367 @@
 {
   "branch_name": "gh-99-show-recording-prompts-in-a-window",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-11-15T19:46:37.760596Z",
   "created_at": "2026-11-12T20:43:18.772986Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-99-show-recording-prompts-in-a-window",
+  "impl_review_rounds": {
+    "gh-99-show-recording-prompts-in-a-window.1": 0,
+    "gh-99-show-recording-prompts-in-a-window.2": 0,
+    "gh-99-show-recording-prompts-in-a-window.3": 0,
+    "gh-99-show-recording-prompts-in-a-window.4": 0
+  },
   "next_task": 1,
-  "plan_review_status": "unknown",
-  "plan_reviewed_at": null,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-11-14T20:22:13.810984Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "b27677faf0dd3673430063a0807d62508c409d867303061c69c1a36e6cf1a3d4",
+      "backend": "codex",
+      "base_sha": "f911fcb0a331240d287db28e1880c98fd770bc7c",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-8b332020e2ebf8fddbcb3496cf50cd44",
+            "classification": "introduced",
+            "findingId": "finding-8b332020e2ebf8fddbcb3496cf50cd44",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "89ed40f4640afac92eb1dd0bc1181d56dfa1bba4",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 314015,
+      "output_sha256": "3f82125520b8accc106e028ec66ee9a246dfbe63de0757c8e50e9524268e5990",
+      "reservation_id": "d3bd12b7517644158a2354055d95da01",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T20:06:48.177908Z",
+      "tool_calls": 18,
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "b834c0d814292aab335c0b64c49b55b578aea9fd3d54f531aa010665b7866926",
+      "backend": "codex",
+      "base_sha": "f911fcb0a331240d287db28e1880c98fd770bc7c",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-8b332020e2ebf8fddbcb3496cf50cd44",
+            "classification": "introduced",
+            "findingId": "finding-8b332020e2ebf8fddbcb3496cf50cd44",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "936080f73c56b2d6575e66dcccda4cce881afbb8",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 677,
+      "output_sha256": "c9b562cfa9f30fe02a7e3c90dec64fa0705d4d58b37188fe07cc17717a8ec6db",
+      "reservation_id": "9cb0dd0028ca403b9595aa247cdccdd4",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T20:08:52.469499Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "2c09f1e6d3b320e698f8417be691925455f57476cc8ab37c7f297a19b0a562ab",
+      "backend": "codex",
+      "base_sha": "f911fcb0a331240d287db28e1880c98fd770bc7c",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-8b332020e2ebf8fddbcb3496cf50cd44",
+            "classification": "introduced",
+            "findingId": "finding-8b332020e2ebf8fddbcb3496cf50cd44",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 2,
+      "head_sha": "8cffaff9b92e1e6e8a5c149dcfcec00ea3251292",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 764,
+      "output_sha256": "b4af2c47713054e53a0ed3e6a613314ff4ef6993f6f0d160327b92de69a2b298",
+      "reservation_id": "d2233db8874f4ddca6f41cf375e3df09",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T20:22:13.789997Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "a88fa77f92167956ca910f6906ce1ddd950dc7703222f7e6f491c6c3cc3dd372",
+      "backend": "codex",
+      "base_sha": "e128491d81ccda004bc8c1d977cca723355e517d",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "e18f56c0bffe8b0d970b0ea55616a1f56d0f97f7",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6.1-sol",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "930eda3f33e24855a0e72440ddc00083",
+      "round_consumed": true,
+      "scope": "impl:gh-99-show-recording-prompts-in-a-window.1",
+      "superseded_by": null,
+      "task": "gh-99-show-recording-prompts-in-a-window.1",
+      "timestamp": "2026-11-15T16:33:00.789016Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "9452e370278a622744236f044ff01f9a5abbb77d31a4b68fb59a0c6a1121a02d",
+      "backend": "codex",
+      "base_sha": "411750ff9d78110b318e896a984a14a55682782f",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "2ff1b05ebaf153af6cf45caa313258048802bb4f",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6.1-sol",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "4cc1662faeb24525a2e5194772ac8713",
+      "round_consumed": true,
+      "scope": "impl:gh-99-show-recording-prompts-in-a-window.3",
+      "superseded_by": null,
+      "task": "gh-99-show-recording-prompts-in-a-window.3",
+      "timestamp": "2026-11-15T16:46:49.697046Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "bef3a9a4b9e4002049d7229c78662ef23d73b7ddfaa9267268506766a650d7f4",
+      "backend": "codex",
+      "base_sha": "c0fc3bcfc2960b8c697d86cb413fcc1df3de56b3",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "9abd8c0855906b3d7275a724e7811417c11ee46a",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6.1-sol",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "1281572d0abb4c1dbb8c39ca32a61035",
+      "round_consumed": true,
+      "scope": "impl:gh-99-show-recording-prompts-in-a-window.2",
+      "superseded_by": null,
+      "task": "gh-99-show-recording-prompts-in-a-window.2",
+      "timestamp": "2026-11-15T17:02:14.431012Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "7c2d5bf9d9432634326de3773c8b75a3e43993bf7ba41b2b7d55c77236a371a9",
+      "backend": "codex",
+      "base_sha": "a5fd687a3763d991cea2ce140542590111b1e8cc",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "c8084922ffbf38d848002990572779512846a57c",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6.1-sol",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "571483915c21402f84fcb44be00645ab",
+      "round_consumed": true,
+      "scope": "impl:gh-99-show-recording-prompts-in-a-window.4",
+      "superseded_by": null,
+      "task": "gh-99-show-recording-prompts-in-a-window.4",
+      "timestamp": "2026-11-15T19:25:54.138733Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "81d5e8309355ab534dd8ab0f3ba55d83fb0ee7afcdc172cf2f518f461d4566a2",
+      "backend": "codex",
+      "base_sha": "1d09282725e72ba97c40f83cbf54ada9fccca663",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "97ecccb68bfdff67efa0249cf80892b59aa4eb45",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 555225,
+      "output_sha256": "d4f09c0bc654bbf3118207e33aa639483e3d3b34a588df3eada273b32a53d252",
+      "reservation_id": "88905fce08a44d1ab4aeb0bc3ebc9e58",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-15T19:46:37.742490Z",
+      "tool_calls": 30,
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "impl:gh-99-show-recording-prompts-in-a-window.1": 1,
+    "impl:gh-99-show-recording-prompts-in-a-window.2": 1,
+    "impl:gh-99-show-recording-prompts-in-a-window.3": 1,
+    "impl:gh-99-show-recording-prompts-in-a-window.4": 1,
+    "plan": 3,
+    "plan#completion": 1
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-99-show-recording-prompts-in-a-window.1": 0,
+    "impl:gh-99-show-recording-prompts-in-a-window.2": 0,
+    "impl:gh-99-show-recording-prompts-in-a-window.3": 0,
+    "impl:gh-99-show-recording-prompts-in-a-window.4": 0,
+    "plan": 0
+  },
   "spec_path": ".flow/specs/gh-99-show-recording-prompts-in-a-window.md",
-  "status": "open",
+  "status": "done",
   "title": "Show recording prompts in a window below the menu bar icon",
   "tracker": {
-    "baseHashFlow": null,
-    "baseHashTracker": null,
+    "baseHashFlow": "0164bc9114bae5c3ba867ae1162f0fb418521f3bffb79e8bcc114b4806de0746",
+    "baseHashTracker": "ce08b9aa9d8095dde202d93138673ad9bce51fa9e3da8ae88bf93ee5d1f21e39",
     "depRelations": [],
     "id": "I_kwDOUvyDOc8AAAABV4PpkA",
     "identifier": "#99",
-    "lastSyncedAt": null,
+    "lastSyncedAt": "2026-11-15T19:59:22.065561Z",
     "linkState": "linked",
-    "mergeBaseFlow": null,
-    "mergeBaseTracker": null,
+    "mergeBaseFlow": "# Show recording prompts in a window below the menu bar icon\n\n## Conversation Evidence\n\nThe fork is public, so the owner's turns are paraphrased, not quoted. Issue #99 is written in German; the lines below are paraphrased translations.\n\n> owner, issue #99 (problem, paraphrased): macOS notifications are not enough for questions that need an answer. A Focus mode holds them back, because the app may not mark them as time sensitive (the log says `timeSensitive=notSupported`); in a test call two \"Record \u2026 meeting?\" prompts went unnoticed that way.\n> owner, issue #99 (problem, paraphrased): a missed question is lost silently. The recording prompt counts as declined after 5 minutes and the meeting is not recorded; the \"Meeting seems to have ended\" countdown runs 2 minutes and then ends the recording. Banners disappear after a few seconds, and Notification Center is only seen when opened.\n> owner, issue #99 (wish, paraphrased): a setting in Settings \u2192 General, for example \"Show prompts below the menu bar icon\"; off means today's behaviour. When on, a small window appears directly below the menu bar icon in addition to the notification, with the same text and the same answers: Record / Ignore / Never for this app for the recording prompt, Keep recording / Stop now with the time left for the countdown.\n> owner, issue #99 (wish, paraphrased): the window stays until answered, expired or closed with \u2715. An answer in the window withdraws the notification and the other way round, through one answer path, the one a notification tap uses (the coordinator that #49 answers by question id), not a second one. It appears without activating the app, so the meeting window keeps the focus.\n> owner, issue #99 (open points, paraphrased): which events; what to do during screen sharing (macOS hides notifications while the screen is shared, but not an app's own window, so everyone in the call could see it); the window bypasses Focus on purpose, which is why it is a setting and not the default.\n> owner, issue #99 (technical notes, paraphrased): the live caption panel is already a status-bar-level `NSPanel`; a non-activating floating panel on all Spaces fits. The menu bar extra does not hand out its status item, so the icon's position has to be read from the status bar window, with a fallback to the top right below the menu bar; try this briefly first (risks: icon in the notch overflow or hidden by a menu bar manager). Build it after #49 and with or after #80, or a third display copy of the same question appears.\n> owner, issue #99 (acceptance, paraphrased): setting on, Focus on, a detected meeting asks \u2192 the window appears below the icon, \"Record\" starts the recording, the notification disappears. The question expires \u2192 the window closes. Setting off \u2192 no window, behaviour as today.\n> owner, issue #99 comment 2026-10-08 (decision, paraphrased): step one covers only the questions, \"Record \u2026 meeting?\" and the \"Meeting seems to have ended\" countdown, behind a setting, built after #49 on its `ConsentQuestion` and its answer by question id. Rejected: a one-day prototype first (it would be rebuilt after #49) and showing all notices including start, stop and errors (too loud, and more visible during screen sharing). The screen-sharing question stays open for planning.\n> owner (2026-11-12, paraphrased): picked this issue for a spec.\n\n## Goal & Context\n\nA person who works with a Focus mode on, or who simply misses a banner, today loses meetings without noticing: the recording prompt expires and counts as declined, and the end countdown stops a recording the person wanted to keep. With the new setting on, both questions also appear in a small window right below the menu bar icon. The window stays on screen until the question is settled, so the person sees it during the call and can answer it with one click, without leaving the meeting window. With the setting off, nothing changes. [paraphrase]\n\nFocus holds the notifications back because the fork's own build does not carry the restricted Time Sensitive notification entitlement (the issue's log shows `timeSensitive=notSupported`; `scripts/lib/signing.sh` adds the key only when a provisioning profile allows it). The window does not depend on notifications at all. [inferred]\n\nWhat the code does today (checked 2026-11-12 on `wapp/main` 4f3818b4, re-checked 2026-11-14 on f911fcb0). Specs gh-3, gh-49, gh-54 (`.flow/specs/gh-54-ask-before-auto-stopping-a-meeting.md`, whose R-numbers this spec cites) and gh-58 are done and merged; nothing this spec needs is still open. \"#80\" is the fork issue about a shared question mechanic. [inferred]\n\n- The open recording prompt is `WatchLoop.pendingConsentQuestion` (`ConsentQuestion`: id, app, title, body). The menu answers it by id through `WatchLoop.answerParkedConsent` \u2192 `AppNotifying.answerConsentPrompt(id:granted:)` \u2192 `ConsentPromptCoordinator.resolve(id:\u2026)`, the call a notification tap makes. That path carries only yes or no: \"Never for this app\" exists in the notification only, whose tap reaches the coordinator's `resolve(id:answer:)` with a full `ConsentAnswer` (`NotificationManager.resolveConsent`); `AppNotifying` exposes only the yes-or-no form. [inferred]\n- The prompt is parked even when the person switched notifications off: `NotificationManager` refuses delivery only without an app bundle or before set-up. Its text names the app, never the meeting title: \"Record <App> meeting?\" / \"A meeting is active in <App>. Everyone must agree to being recorded.\" [inferred]\n- The end countdown has no question value. `WatchLoop.askToEnd` stores only `meetingEndQuestionID`; the deadline lives in a local `MeetingEndPhase` inside `waitForMeetingEnd`, and the text (\"Meeting seems to have ended\" / \"No sign of the <App> call. The recording ends in 2 minutes.\") is built inline. A notification tap answers through the `MeetingEndQuestions` registry by id (each question at most once); the loop applies the answer and withdraws the notification on its next poll (3 s by default). This is point 2 of issue #80. [inferred]\n- The icon already shows a question mark for an open prompt (gh-49) and pulses during a countdown (gh-58). The live caption panel (`LiveCaptionsWindowController`) and the speaker naming window (`NamingWindowPolicy`) show how the app builds a floating, non-activating panel on all Spaces. [inferred]\n\n<!-- Source: 0% user / 25% [paraphrase] / 75% [inferred] -->\n\n## Architecture & Data Models\n\n- **The countdown becomes a question value.** A small value type `MeetingEndQuestion` (id, app label, title, body, deadline) is built once in `askToEnd`, before the question is posted; its title and body are exactly what is posted, and its deadline is the one the loop's countdown uses. The loop stores it as `meetingEndQuestion`; `meetingEndQuestionID` becomes a read-only computed view of `meetingEndQuestion?.id`, so its readers (the icon pulse, the answer guard, the withdraw) keep working and the two cannot disagree. It is cleared on every way out of the question, as the id is today. This is the observable countdown state that #80 point 2 asks for; the shared question mechanic of #80 is not built here. [inferred]\n- **One answer path per question, by id.** The window answers through the calls a notification tap uses, never through a second registry. [paraphrase]\n  - Recording prompt: the answer-by-id call carries a full `ConsentAnswer` (Record = granted, Ignore = declined, Never = never), so \"Never for this app\" from the window resolves the parked prompt in `ConsentPromptCoordinator` exactly as the notification's Never does, and the loop's existing completion puts the app on the deny list. The menu keeps its current Record / Ignore behaviour on the same call. [inferred]\n  - Countdown: `AppNotifying` gains an answer-by-id call for the meeting-end question (default: answers nothing and returns false). `NotificationManager` takes the handler from `MeetingEndQuestions`, the registry a tap uses, so each question is answered at most once whoever answers first. A `WatchLoop` accessor answers only when the given question is still the open one, like `answerParkedConsent`. [inferred]\n- **What the window shows is one pure decision.** Inputs: the setting, the open recording prompt, the open countdown question, and the ids the person closed with \u2715. Output: the ordered list of questions to show (countdown first), empty when the window must be closed. The window controller only renders this list; the bulk of the tests run against it. [inferred]\n- **The window.** A new AppKit controller owns one `NSPanel` hosting a SwiftUI view: non-activating, status-bar level and not hidden on deactivate as the live caption panel (`LiveCaptionsWindowController`), with `canJoinAllSpaces` + `fullScreenAuxiliary` as the speaker naming window (`NamingWindowPolicy`; the caption panel has `.stationary` and no `fullScreenAuxiliary`). Unlike the caption panel it takes mouse clicks, and it never becomes key or main: an `NSPanel` subclass whose `canBecomeKey` and `canBecomeMain` return false (the caption panel only sets `becomesKeyOnlyIfNeeded`). Its hosting view accepts the first mouse (`acceptsFirstMouse(for:)` returns true), so one click on a button answers although the panel is not key; as with the icon frame below, the build first proves this in the running app with another app frontmost (one real click answers and that app stays frontmost) before the window is built on it, and if only a key panel takes the click, that changes R8 and goes to the owner. It is shown with `orderFrontRegardless` and never activates the app. It carries a window identifier so the debug `/state.windows` lists it. Its sharing type is set to \"none\" as a best effort against screen capture (D4). Its look and wording are the accepted boards' (D5 to D9). [inferred]\n- **Placement is a pure function.** Inputs: the frame of the menu bar icon's window when it can be read, the screens' frames and visible frames, and the window's size. Output: the window's origin, its top edge a small gap (about 6 pt, D6) below the menu bar, centred under the icon and kept inside the screen; without a usable icon frame, at the top right of the screen that holds the menu bar. The icon frame is read from the window AppKit creates for the app's menu bar item, found among the app's own windows. As issue #99 asks, the build first proves this read in the running app (icon visible, icon in the notch overflow, icon hidden by a menu bar manager) before the window is built on it; the fallback keeps the feature working when the read fails. [paraphrase]\n- **Time left.** The countdown row computes the time left from the question's deadline once per second while the window shows; it never feeds anything back into the loop, whose own deadline stays the only one that ends the recording. [inferred]\n- **The setting.** One stored Boolean on `AppSettings`, default off, with a switch and its help text in Settings \u2192 General. [paraphrase]\n- **Both build variants.** Nothing here sits behind `#if !APPSTORE`: the panel, the question values and the answer calls work in the App Store build too. Only the `/state.windows` listing is debug-only, as today. [inferred]\n\n## API Contracts\n\nNone for outside clients: no new automation endpoint, and the `/state`, `/v1/watch` and `/v1/record` fields stay unchanged. The window is internal UI; the debug `/state.windows` list shows it like the app's other windows, which the live check uses. [inferred]\n\n## Edge Cases & Constraints\n\n- **Answered elsewhere just before the click.** The window can lag a moment behind the question (the countdown closes on the loop's next poll). A click on a question that is no longer open finds nothing under its id and changes nothing; it never answers a different question. [inferred]\n- **Between setting and parking.** The recording prompt is set before the coordinator registers it; a click in that moment returns false, changes nothing, and the window stays (gh-49 has the same window for the menu). [inferred]\n- **Answer after the deadline.** A \"Keep recording\" given after the countdown reached 0:00 counts for nothing, exactly as a late notification tap (gh-54 rules); the window shows 0:00 until the loop ends the recording at its next poll. [inferred]\n- **Another meeting records while a prompt is open.** The window still offers the prompt; a Record answer is dropped as a notification Record is today (\"an approval is not a reservation\"). [inferred]\n- **Both questions open at once** (a countdown for the recording meeting while another app's prompt waits): both show in the one window, the countdown first, each with its own answers and \u2715 (A3). Apps waiting behind the open prompt are not shown, as in the notification. [inferred]\n- **Notifications switched off, alert style None, or Focus on:** the window shows anyway; that is its purpose. Without an app bundle or before notification set-up (never the case in the installed app) the recording prompt resolves at once as a decline, and the countdown's answer buttons answer nothing; the countdown then ends the recording as gh-54 R5 says. [inferred]\n- **Icon position unknown.** The icon hidden in the notch overflow, removed by a menu bar manager, or on a screen whose menu bar is hidden: the window uses the fallback position. A meeting app in full screen hides the menu bar; the window still appears at the same place, over the full-screen app. With several screens, it appears on the screen of the icon's window, else on the screen with the menu bar. [paraphrase]\n- **The menu open at the same time:** the menu draws above the window; nothing else changes. [inferred]\n- **Keyboard.** The window never becomes the key window, so a key pressed in the meeting app can never answer it. [inferred]\n- **Screen sharing.** No public macOS call tells an app that the screen is being shared. The \"none\" sharing type keeps a window out of some captures, but developer reports say ScreenCaptureKit captures such windows anyway since macOS 15.4, so it is a best effort only, and the help text says so (D4). The window shows only the notification's text, which names the app and never the meeting title. [inferred]\n- **Privacy.** No new log line carries a title or app window name; tests use made-up prompts, no real meeting content. [inferred]\n- **Build gates.** A SwiftUI body that type-checks for over 300 ms fails the build, so the window's view is split into small properties and reads single-member `AppState` accessors. SwiftLint runs with `--strict`, so the `file_length` warning at 600 lines is a hard cap; on 2026-11-15 (wapp/main 1d092827) `WatchLoop.swift` has 600 lines, `AppState.swift` 583 and `MeetingTranscriberApp.swift` 592, whose `MeetingTranscriberApp` struct body holds about 392 of the 400 code lines `type_body_length` allows, so new code goes into new files or extensions (in `WatchLoop.swift` the stored `meetingEndQuestion` only replaces the stored `meetingEndQuestionID` line for line; the computed id goes into an extension file). [inferred]\n- **Docs and fork rules.** The consent prompt paragraph of `docs/architecture/detection.md` and the file table and menu bar sections of `docs/architecture-macos.md` are updated in the same change; `CLAUDE.md` is not edited. [inferred]\n\n### Verification\n\n- **Pure decision:** setting off \u2192 empty; one prompt \u2192 that prompt; one countdown \u2192 that countdown; both \u2192 countdown first; a closed id hides only that question; a new question with a new id shows again after a \u2715 on an earlier one. [inferred]\n- **Placement:** an icon in the middle of the menu bar, an icon near the right edge (window kept inside the screen), no icon frame, an icon frame outside every screen, and two screens. [inferred]\n- **Answer paths, against the real coordinator and registry:** Never from the window puts the app on the deny list with no cooldown, as the notification's Never; Record and Ignore behave as from the menu; a countdown answer by id runs the handler once, a second answer (or a notification tap after it) returns false; an id that is not open returns false and changes nothing; the countdown question's title, body and deadline equal what was posted and what the loop counts down to, and the question is nil after every way out (signal back, Keep recording, Stop now, expiry, cap, a new call, a stop by hand, Stop Watching). [inferred]\n- **Wiring (ViewInspector):** one test per control, found by its `A11yID` constant: Record, Ignore, Never for this app, Keep recording, Stop now, \u2715, and the Settings switch's write-back and help text. [inferred]\n- **Window set-up:** a test on the built panel checks non-activating, never key or main, status-bar level, `canJoinAllSpaces` + `fullScreenAuxiliary`, sharing type none, and a content view that accepts the first mouse. [inferred]\n- **Live:** in the running dev app with the setting on, a prompt raised by the meeting simulator makes the window appear in `/state.windows` (asserting `isVisible` only: its `floating` reads false at status-bar level, and `fullScreenAuxiliary` is not stable on the CI runner, per `docs/architecture/gui-testing.md`), and answering it through `POST /action/confirmBrowserConsent` closes it; the frontmost app is the same before and after. A real click, as the RPC answer bypasses the panel's mouse handling: with another app frontmost, one mouse click on \"Ignore\" in the window, posted from outside the app at the button's screen point (not `MouseInjection.click`, which activates the app first), answers the prompt, closes the window and leaves that app frontmost; where the runner cannot post such a click, this joins the owner checks below. [inferred]\n- The look, the real Focus behaviour, the position under the icon on a notched screen, and what a screen share shows are owner checks after merge. [inferred]\n\n## Acceptance Criteria\n\n- **R1:** Settings \u2192 General has a group \"Prompts\" with a switch \"Show prompts below the menu bar icon\", off by default and kept across launches. Below the switch, its help text reads word for word: `The \"Record \u2026 meeting?\" question and the \"Meeting seems to have ended\" countdown also appear in a small window below the menu bar icon, even when a Focus mode holds notifications back. Others may see this window while you share your screen.` (D9). Off: no window ever appears and the app behaves exactly as today. Turning it off closes a shown window at once; turning it on while a question is open shows that question. Errors: a missing or unreadable stored value reads as off. [paraphrase]\n- **R2:** With the setting on, when a \"Record <App> meeting?\" prompt opens, a window appears directly below the menu bar icon, in addition to the notification, with the prompt's title and text exactly as posted and, right-aligned below them, the buttons \"Never for this app\", \"Ignore\" and \"Record\" in that order, \"Record\" being the prominent one (D6, D7). It appears whatever the notification permission, alert style or Focus mode. Errors: a prompt that cannot be posted (no app bundle, notifications not set up) resolves at once as a decline, as today, and its window closes with it. [paraphrase]\n- **R3:** \"Record\", \"Ignore\" and \"Never for this app\" answer that prompt by its id through the consent coordinator a notification tap uses, with the notification's effect: Record starts the recording under the existing rules, Ignore starts the same cooldown, Never puts the app on the \"Never record these apps\" list. The notification leaves Notification Center and the window closes. Errors: a click on a prompt that is no longer open (expired, answered elsewhere, declined by Stop Watching or a manual start, or replaced by a new prompt, also one about the same app) changes nothing and never answers another prompt. [paraphrase]\n- **R4:** With the setting on, when a \"Meeting seems to have ended\" question opens, the window shows its title and text as posted, the time left until the recording ends as \"Ends in m:ss\" (for example \"Ends in 1:42\"; updated every second, \"Ends in 0:00\" at the deadline), and the buttons \"Stop now\" and \"Keep recording\" in that order, \"Keep recording\" being the prominent one (D8). Errors: when the question could not be posted (no app bundle, notifications not set up), the buttons answer nothing and the countdown ends the recording as gh-54 R5 says. [paraphrase]\n- **R5:** \"Keep recording\" and \"Stop now\" answer that question by its id through the registry a notification tap uses, so each question is answered at most once, with the notification's effect (gh-54 R2 and R4); the notification leaves Notification Center no later than the loop's next poll, and the window closes. Errors: an answer to a question that is no longer open (signal back, already answered in the notification, recording ended) changes nothing; an answer after the deadline counts for nothing, as a late notification tap. [paraphrase]\n- **R6:** The window closes when its question ends by any path: answered in the window, the notification, the menu or `POST /action/confirmBrowserConsent`; expired; withdrawn because the signal came back; declined by Stop Watching or a manual start; or its recording ended. It closes no later than one poll interval after the question ended. Errors: none beyond R3 and R5. [paraphrase]\n- **R7:** \"\u2715\" (accessibility label \"Hide this question\") hides that question only and is not an answer: the question stays open in the notification and the menu, the icon keeps its question mark or pulse, the prompt expires and the countdown ends the recording on time as without the window. A later question (a new id) opens the window again. When a countdown and a prompt are open at once, the window shows both, the countdown first and a thin divider line between them, each with its own buttons and \u2715; a \u2715 on one leaves the other in the window. Errors: none beyond R3 and R5. [paraphrase]\n- **R8:** The window's top edge sits a small gap (about 6 pt) below the menu bar, centred under the menu bar icon and kept inside the screen; when the icon's position cannot be read or lies outside every screen, the window sits at the top right of the screen with the menu bar, the same gap below the menu bar. It shows on every Space, also over an app in full screen. Showing it and clicking its buttons do not activate the app and do not change the frontmost app; it never becomes the key window, so no key press answers it. Errors: no error surface; a position that cannot be read falls back as stated. [paraphrase]\n- **R9:** The window shows only the notification's text (the app name, never the meeting title) and is marked as not to be shared, as a best effort against screen capture. Errors: where macOS or a sharing tool ignores the mark, the window is visible in the share, as R1's help text warns (D4). [paraphrase]\n\n## Early proof point\n\nTask gh-99-show-recording-prompts-in-a-window.1 validates the core approach (a panel that never becomes key, shown below the menu bar icon, takes a real first click without activating the app, and the icon's position can be read from the app's own windows). If it fails, re-evaluate the never-key panel (R8) with the owner before continuing with .4; .2 and .3 do not depend on it.\n\n## Boundaries\n\n- Other notices (recording started or stopped, errors, the 4-hour warning and notices of gh-58, local model notices) do not appear in the window: not in this spec. [paraphrase]\n- The long-silence question of #45 does not appear in the window: follow-up. [inferred]\n- \"Record with Options\u2026\" stays in the menu only; the window offers the notification's three answers. [inferred]\n- No time left for the recording prompt (its five-minute timeout); no sound, animation or keyboard shortcut; the window cannot be moved or resized and remembers no position: not in this spec. [inferred]\n- No detection of screen sharing, and no hiding of the window while sharing. [inferred]\n- The notifications themselves, their timeouts, cooldowns and texts, the menu section of gh-49, and the icon marks of gh-49 and gh-58 stay as they are. No new automation endpoint. [inferred]\n- The shared question mechanic and the `WatchLoop` split of #80 are not built here; this spec adds only the countdown question value. [inferred]\n- The Settings warning that an unseen prompt means nothing is recorded (`BrowserConsentReadiness`) keeps its wording when the window is on: follow-up. [inferred]\n- The Time Sensitive entitlement for the fork's own build is not addressed. [inferred]\n- Submitting this to the original project is a separate step, not part of this spec. [inferred]\n\n## Decision Context\n\n- **D1 \u00b7 Step one shows only the \"Record \u2026 meeting?\" prompt and the \"Meeting seems to have ended\" countdown, behind a setting, built after #49 on its `ConsentQuestion` and its answer by question id.** why: owner decision in the issue #99 comment of 2026-10-08; a one-day prototype first was rejected because it would be rebuilt after #49, and showing all notices was rejected as too loud and more visible during screen sharing \u00b7 status: active [owner-stated 2026-10-08]\n- **D2 \u00b7 A setting in Settings \u2192 General, off by default; off keeps today's behaviour.** why: issue #99 body (2026-10-08): the window bypasses Focus on purpose, so it is the person's choice, not the default \u00b7 status: active [owner-stated 2026-10-08]\n- **D3 \u00b7 The window comes in addition to the notification, with the same text and answers, stays until answered, expired or closed with \u2715, answers through the one path a notification tap uses, and appears without activating the app.** why: issue #99 body (2026-10-08), wish section \u00b7 status: active [owner-stated 2026-10-08]\n- **A1 \u00b7 During screen sharing the window shows anyway, with the notification's text only (app name, never the meeting title), marked as not to be shared as a best effort, and the setting's help text warns that others may see it; not hiding it while sharing (no reliable signal exists, and hiding would bring back the missed question) and not a neutral text without the app name. Open product call for the owner.** flip at: the owner's answer on the screen-sharing question left open in the issue #99 comment of 2026-10-08 \u00b7 test: the panel set-up test (sharing type none) and the Settings help text test \u00b7 status: superseded by D4 [agent-assumed 2026-11-12]\n- **A2 \u00b7 The countdown gets its own question value (`MeetingEndQuestion` with id, text and deadline) on `WatchLoop`, with `meetingEndQuestionID` derived from it; the shared question mechanic of #80 is not built here.** flip at: #80 lands first, and the window then reads its question value instead \u00b7 test: the WatchLoop countdown-question tests (value equals what was posted, nil after every way out) \u00b7 status: active [agent-inferred 2026-11-12]\n- **A3 \u00b7 When a countdown and a prompt are open at once, one window shows both, the countdown first, each with its own \u2715.** flip at: the pure show decision \u00b7 test: the pure decision test with both questions open \u00b7 status: active [agent-assumed 2026-11-12]\n- **A4 \u00b7 \u2715 is not an answer: it hides only that question, and the question runs on as without the window.** flip at: the pure show decision and the \u2715 action \u00b7 test: the pure decision test (closed id) and the \u2715 wiring test \u00b7 status: active [agent-inferred 2026-11-12]\n- **A5 \u00b7 \"Never for this app\" from the window resolves the parked prompt by id with the `never` answer through `ConsentPromptCoordinator`, so the loop's existing completion applies it.** flip at: the answer-by-id call on `AppNotifying` \u00b7 test: the coordinator-backed answer test (deny list set, no cooldown) \u00b7 status: active [agent-inferred 2026-11-12]\n- **A6 \u00b7 The window sits under the icon, read from the menu bar item's window, and falls back to the top right below the menu bar.** flip at: the placement function and the icon-frame lookup \u00b7 test: the placement tests and the live position check \u00b7 status: active [agent-inferred 2026-11-12]\n- **A7 \u00b7 The window never becomes the key window, so it has no keyboard answers.** flip at: the panel set-up \u00b7 test: the panel set-up test \u00b7 status: active [agent-assumed 2026-11-12]\n- **A8 \u00b7 The long-silence question of #45 and \"Record with Options\u2026\" stay out of the window.** flip at: the owner asks for them \u00b7 test: the pure decision takes only the two question kinds \u00b7 status: active [agent-assumed 2026-11-12]\n- **D4 \u00b7 During screen sharing the window shows anyway, with the notification's text only (the app name, never the meeting title); it is marked as not to be shared as a best effort against screen capture, and the setting's help text warns that others may see it.** why: the owner's sign of the scope on 2026-11-12 settled the screen-sharing question the issue #99 comment of 2026-10-08 left open (paraphrased: the window shows anyway, with the app name only); no public macOS call reports a screen share, and hiding the window would bring back the missed question \u00b7 status: active [owner-stated 2026-11-12]\n- **D5 \u00b7 The owner accepted the three mockup boards as drawn (the recording question in the window below the menu bar icon, the countdown and a recording question open at once, the switch in Settings \u2192 General); D6 to D9 write out their layout and wording.** why: the owner's acceptance of 2026-11-14 (paraphrased: accept, all boards as drawn) \u00b7 status: active [owner-stated 2026-11-14]\n- **D6 \u00b7 The window is about 340 pt wide, light, with rounded corners and a shadow, its top edge a small gap (about 6 pt) below the menu bar under the icon; each question shows its title in bold, the notification's body below it in smaller secondary text, and at its top right a \u2715 with the accessibility label \"Hide this question\"; a single question has a small tile with the app's microphone glyph left of its text, and with both open the rows have no tile.** why: the accepted boards draw it so \u00b7 status: active [owner-stated 2026-11-14]\n- **D7 \u00b7 The recording question's buttons sit in one row below its text, right-aligned, in the order \"Never for this app\", \"Ignore\", \"Record\"; \"Record\" is the prominent (accent-coloured) button and the other two are plain; no button has a keyboard shortcut.** why: the accepted board draws this order and \"Record\" as the prominent button, and its note says the window never takes keyboard focus (R8) \u00b7 status: active [owner-stated 2026-11-14]\n- **D8 \u00b7 Below the countdown's text one row shows \"Ends in\" and the time left as m:ss in bold, fixed-width digits on the left (for example \"Ends in 1:42\") and on the right \"Stop now\", then \"Keep recording\" as the prominent button; with both questions open the countdown comes first and a thin divider line separates it from the recording question.** why: the accepted board of both questions open at once \u00b7 status: active [owner-stated 2026-11-14]\n- **D9 \u00b7 Settings \u2192 General gets a group \"Prompts\" that holds the switch \"Show prompts below the menu bar icon\" with the help text below it, word for word as R1 gives it.** why: the accepted Settings board \u00b7 status: active [owner-stated 2026-11-14]\n- **A9 \u00b7 The \"Prompts\" group sits directly after \"Record Without Asking\", whose text describes the same prompt; the board does not show its place among the groups.** flip at: the group order in `GeneralSettingsView` \u00b7 test: the Settings wiring test finds the switch and its help text in General \u00b7 status: active [agent-assumed 2026-11-14]\n- **A10 \u00b7 The group shows only the switch and its help text; the line drawn below the group on the Settings board (off by default, off keeps today's behaviour) is read as a note for the owner, not app text.** flip at: the owner wants that line in the app \u00b7 test: the Settings wiring test finds no further text in the group \u00b7 status: active [agent-assumed 2026-11-14]\n- **A11 \u00b7 The build runs as four tasks: .1 the never-key panel and its placement, opening with both prove-it-first checks; .2 the countdown question value and the answer calls; .3 the Settings switch; .4 the questions in the window, the wiring and the docs. The window slice is split in two because it is a new subsystem of about ten files, and .1 to .3 share no files, so they can run side by side.** flip at: the owner's OK of the task split before the ready mark \u00b7 test: `flowctl validate --coverage` maps every R-ID to a task \u00b7 status: active [agent-assumed 2026-11-14]\n- **A12 \u00b7 When the menu bar icon shows on two displays, the window goes under the icon on the screen that holds the menu bar; the other display's icon is used only when that one cannot be read.** flip at: `MenuBarIconFrame.frame(among:menuBarScreen:)` \u00b7 test: `MenuBarIconFrameTests.testFindsTheIconWindowPreferringTheOneOnTheMenuBarScreen` \u00b7 status: active [agent-assumed 2026-11-15]\n- **A13 \u00b7 The window keeps the same 6 pt gap from a screen's side edges as from the menu bar, both when it is pushed back inside the screen and in the top-right fallback.** flip at: `PromptWindowPlacement.gap` in `clamped` and in the fallback's x \u00b7 test: `PromptWindowPlacementTests.testIconNearTheRightEdgeKeepsTheWindowInsideTheScreen` and `testNoIconFramePutsTheWindowAtTheTopRightBelowTheMenuBar` \u00b7 status: active [agent-assumed 2026-11-15]\n- **A14 \u00b7 The window's background follows the system appearance (`windowBackgroundColor`): light as the accepted boards draw it in light mode, dark in dark mode.** flip at: the `.background` in `PromptWindowView.body` \u00b7 test: none pins a colour; the look check after the merge \u00b7 status: active [agent-assumed 2026-11-15]\n- **A15 \u00b7 The single-question tile is the SF Symbol `mic.fill` in white on an accent-coloured rounded square.** flip at: the `if showsTile` block in `PromptRowText` \u00b7 test: `PromptWindowViewTests.testEachQuestionShowsItsTextAndItsButtonsInTheDrawnOrder` (the tile shows only while one question is open) \u00b7 status: active [agent-assumed 2026-11-15]\n\nMockup gate: accepted by the owner on 2026-11-14. The boards are on a private design canvas, so this spec writes out their layout and wording (D5 to D9); the app names in them (\"Teams\", \"Zoom\"), the time left (\"1:42\") and the stand-in body of the recording question are examples, and the question texts in the window stay those the notifications post.\n\nUpstream check 2026-11-14: the original has no open issue or pull request about showing prompts in a window or about prompts that a Focus mode holds back.\n\nFIT: GO \u00b7 2026-11-14 \u00b7 base f911fcb0 \u00b7 engine flow-next 9.10.0 \u00b7 no spec or design doc now claims part of this scope (gh-127, gh-130 and gh-77 only share files); plan facts refreshed: the panel recipe (caption panel plus the naming window's full-screen flags, never key), line counts, two more ways out of the countdown, and the live window assertion\n\nFIT: GO \u00b7 2026-11-15 \u00b7 base 1d092827 \u00b7 engine flow-next 9.10.0 \u00b7 merges #237 to #244 claim none of this scope and leave every cited contract unchanged (consent prompt, answer by id, coordinator, meeting-end registry, notifier, panel recipes); plan facts refreshed: line counts and anchors in WatchLoop.swift and MeetingTranscriberApp.swift\n  - What the window lists stays the two questions (D1): the menu's \"Needs you\" group now also holds jobs whose meeting notes failed (`TranscriptionList.menuSections`), but those are jobs waiting for a retry, with no answer deadline, and their notification is an error notice, which the Boundaries keep out of the window.\n  - Record Again (#240) adds a way out of the countdown only through the existing stop by hand and silence stop (`holdRedetection(of:offeringRecordAgain:)`), both already in task .2's list; it is a menu offer, not a question.\n  - `WatchLoop.swift` is at 600 of 600 lines, so task .2's stored property swap must be line for line; the `MeetingTranscriberApp` struct body is near `type_body_length` (about 392 of 400), and task .4 adds one line there.\n\n## Quick commands\n\nMeasured green at the spec base f911fcb0 on 2026-11-14 (191 tests, exit 0). The first three names match the test classes the tasks add. Send the output to a file and read it there; never pipe a test run into `tail` or `grep`.\n\n```bash\ncd app/MeetingTranscriber && mkdir -p .build/test-home && swift build --build-tests -j 2 && CFFIXED_USER_HOME=\"$PWD/.build/test-home\" swift test -j 2 --filter 'PromptWindow|PromptPanel|MenuBarIconFrame|MeetingEndQuestion|WatchLoopMeetingEnd|NotificationManagerMeetingEndTests|NotificationManagerSchedulingTests|ConsentPromptCoordinatorTests|WatchLoopAskBeforeRecordingTests|WatchLoopBrowserConsentTests|AppStateConsentPromptTests|NamingWindowPolicyTests|GeneralSettings|AppSettingsTests|MenuBarIconCountdownTests'\n```\n\n## Requirement coverage\n\n| Req | Description | Task(s) | Gap justification |\n| --- | --- | --- | --- |\n| R1 | Settings \u2192 General has a group \"Prompts\" with a switch \"Show prompts below the menu bar icon\", off by default and kept across launches. Below the switch, its help text reads word for word: `The \"Record \u2026 meeting?\" question and the \"Meeting seems to have ended\" countdown also appear in a small window below the menu bar icon, even when a Focus mode holds notifications back. Others may see this window while you share your screen.` (D9). Off: no window ever appears and the app behaves exactly as today. Turning it off closes a shown window at once; turning it on while a question is open shows that question. Errors: a missing or unreadable stored value reads as off. | gh-99-show-recording-prompts-in-a-window.3, gh-99-show-recording-prompts-in-a-window.4 | \u2014 |\n| R2 | With the setting on, when a \"Record <App> meeting?\" prompt opens, a window appears directly below the menu bar icon, in addition to the notification, with the prompt's title and text exactly as posted and, right-aligned below them, the buttons \"Never for this app\", \"Ignore\" and \"Record\" in that order, \"Record\" being the prominent one (D6, D7). It appears whatever the notification permission, alert style or Focus mode. Errors: a prompt that cannot be posted (no app bundle, notifications not set up) resolves at once as a decline, as today, and its window closes with it. | gh-99-show-recording-prompts-in-a-window.4 | \u2014 |\n| R3 | \"Record\", \"Ignore\" and \"Never for this app\" answer that prompt by its id through the consent coordinator a notification tap uses, with the notification's effect: Record starts the recording under the existing rules, Ignore starts the same cooldown, Never puts the app on the \"Never record these apps\" list. The notification leaves Notification Center and the window closes. Errors: a click on a prompt that is no longer open (expired, answered elsewhere, declined by Stop Watching or a manual start, or replaced by a new prompt, also one about the same app) changes nothing and never answers another prompt. | gh-99-show-recording-prompts-in-a-window.2, gh-99-show-recording-prompts-in-a-window.4 | \u2014 |\n| R4 | With the setting on, when a \"Meeting seems to have ended\" question opens, the window shows its title and text as posted, the time left until the recording ends as \"Ends in m:ss\" (for example \"Ends in 1:42\"; updated every second, \"Ends in 0:00\" at the deadline), and the buttons \"Stop now\" and \"Keep recording\" in that order, \"Keep recording\" being the prominent one (D8). Errors: when the question could not be posted (no app bundle, notifications not set up), the buttons answer nothing and the countdown ends the recording as gh-54 R5 says. | gh-99-show-recording-prompts-in-a-window.4 | \u2014 |\n| R5 | \"Keep recording\" and \"Stop now\" answer that question by its id through the registry a notification tap uses, so each question is answered at most once, with the notification's effect (gh-54 R2 and R4); the notification leaves Notification Center no later than the loop's next poll, and the window closes. Errors: an answer to a question that is no longer open (signal back, already answered in the notification, recording ended) changes nothing; an answer after the deadline counts for nothing, as a late notification tap. | gh-99-show-recording-prompts-in-a-window.2, gh-99-show-recording-prompts-in-a-window.4 | \u2014 |\n| R6 | The window closes when its question ends by any path: answered in the window, the notification, the menu or `POST /action/confirmBrowserConsent`; expired; withdrawn because the signal came back; declined by Stop Watching or a manual start; or its recording ended. It closes no later than one poll interval after the question ended. Errors: none beyond R3 and R5. | gh-99-show-recording-prompts-in-a-window.4 | \u2014 |\n| R7 | \"\u2715\" (accessibility label \"Hide this question\") hides that question only and is not an answer: the question stays open in the notification and the menu, the icon keeps its question mark or pulse, the prompt expires and the countdown ends the recording on time as without the window. A later question (a new id) opens the window again. When a countdown and a prompt are open at once, the window shows both, the countdown first and a thin divider line between them, each with its own buttons and \u2715; a \u2715 on one leaves the other in the window. Errors: none beyond R3 and R5. | gh-99-show-recording-prompts-in-a-window.4 | \u2014 |\n| R8 | The window's top edge sits a small gap (about 6 pt) below the menu bar, centred under the menu bar icon and kept inside the screen; when the icon's position cannot be read or lies outside every screen, the window sits at the top right of the screen with the menu bar, the same gap below the menu bar. It shows on every Space, also over an app in full screen. Showing it and clicking its buttons do not activate the app and do not change the frontmost app; it never becomes the key window, so no key press answers it. Errors: no error surface; a position that cannot be read falls back as stated. | gh-99-show-recording-prompts-in-a-window.1, gh-99-show-recording-prompts-in-a-window.4 | \u2014 |\n| R9 | The window shows only the notification's text (the app name, never the meeting title) and is marked as not to be shared, as a best effort against screen capture. Errors: where macOS or a sharing tool ignores the mark, the window is visible in the share, as R1's help text warns (D4). | gh-99-show-recording-prompts-in-a-window.1, gh-99-show-recording-prompts-in-a-window.4 | \u2014 |\n",
+    "mergeBaseTracker": "## Problem\n\nmacOS-Mitteilungen reichen f\u00fcr Fragen, die eine Antwort brauchen, nicht aus:\n\n- **Fokus h\u00e4lt sie zur\u00fcck.** Die App darf ihre Mitteilungen nicht als \u201eDringend\u201c markieren (Berechtigung `com.apple.developer.usernotifications.time-sensitive` fehlt, im Log `timeSensitive=notSupported`). Bei einem Teams-Testanruf blieben deshalb zwei R\u00fcckfragen \u201eRecord \u2026 meeting?\u201c unbemerkt (Kommentar in #49).\n- **Verpasst heisst still verloren.** Die R\u00fcckfrage gilt nach 5 Minuten als abgelehnt, das Meeting wird nicht aufgenommen. Der Countdown \u201eMeeting seems to have ended\u201c (#54) l\u00e4uft 2 Minuten und beendet die Aufnahme, wenn niemand antwortet.\n- Banner verschwinden nach wenigen Sekunden; was danach in der Mitteilungszentrale liegt, sieht man nur, wenn man sie \u00f6ffnet.\n\nVorschlag: zus\u00e4tzlich zur normalen Mitteilung ein Hinweis, der **oben unter dem Men\u00fcleisten-Symbol herausklappt**, per Einstellung einschaltbar.\n\n## Wunsch\n\n- **Einstellung** (Settings \u2192 General), z. B. \u201eShow prompts below the menu bar icon\u201c. Aus: Verhalten wie heute.\n- Eingeschaltet erscheint **zus\u00e4tzlich** zur macOS-Mitteilung ein kleines Fenster direkt unter dem Men\u00fcleisten-Symbol, mit demselben Text und denselben Antworten:\n  - R\u00fcckfrage \u201eRecord \u2026 meeting?\u201c: Record / Ignore / Never for this app\n  - Countdown \u201eMeeting seems to have ended\u201c: Keep recording / Stop now, mit Restzeit\n- Es bleibt stehen, bis beantwortet, abgelaufen oder per \u2715 geschlossen. Eine Antwort im Fenster zieht die Mitteilung zur\u00fcck und umgekehrt: **ein** Antwortweg, derselbe wie beim Tippen auf die Mitteilung (der Koordinator, den #49 nach Frage-ID beantworten l\u00e4sst), kein zweiter.\n- Es erscheint ohne die App zu aktivieren, also ohne dem Meeting-Fenster den Fokus zu nehmen.\n\n## Offen (vor dem Planen kl\u00e4ren)\n\n- **Welche Ereignisse?** Nur Fragen mit Antwort (Vorschlag f\u00fcr den ersten Schritt) oder auch Hinweise wie \u201eRecording started/stopped\u201c, Fehler, die 4-h-Vorwarnung aus #58 (diese dann selbstschliessend)?\n- **Bildschirmfreigabe:** macOS blendet Mitteilungen beim Teilen des Bildschirms aus, ein eigenes Fenster nicht. Das Fenster nennt App und Meeting-Titel und w\u00e4re f\u00fcr alle Teilnehmenden sichtbar. Ausblenden, nur die App ohne Titel zeigen, oder bewusst zeigen?\n- **Fokus:** das Fenster umgeht Fokus absichtlich, das ist der Zweck; deshalb Einstellung, nicht Standard.\n\n## Technische Hinweise\n\n- Muster vorhanden: `LiveCaptionsOverlay` ist bereits ein `NSPanel` auf Statusleisten-Ebene; ein nicht aktivierendes, schwebendes Panel auf allen Spaces passt dazu.\n- **Position:** `MenuBarExtra` gibt sein `NSStatusItem` nicht heraus. Die Position des Symbols muss \u00fcber das Fenster der Statusleiste ermittelt werden, mit R\u00fcckfall oben rechts unter der Men\u00fcleiste. Vor dem Planen kurz ausprobieren (Risiko: Symbol in der Notch-\u00dcberlaufzone oder durch Bartender o. \u00e4. versteckt).\n- Die Frage als eigener Wert mit ID (`ConsentQuestion`) kommt mit #49; die Meeting-Ende-Frage hat heute keinen beobachtbaren Zustand (#80, Punkt 2). Sinnvoll nach #49 und zusammen mit oder nach #80, sonst entsteht eine dritte Anzeige-Kopie derselben Frage.\n\n## Abnahme\n\n- Einstellung an, Fokus an, erkannte Browser- oder Teams-R\u00fcckfrage \u2192 das Fenster erscheint unter dem Symbol, \u201eRecord\u201c startet die Aufnahme, die Mitteilung verschwindet.\n- Frage l\u00e4uft ab \u2192 das Fenster schliesst sich.\n- Einstellung aus \u2192 kein Fenster, Verhalten wie heute.\n\n## Bezug\n\n#49 (R\u00fcckfrage am Symbol und im Men\u00fc; der Kommentar dort w\u00fcnscht ein Fenster/Popover vom Symbol, der Spec zu #49 baut nur Badge und Men\u00fc), #54 / #58 (Countdown), #70 (Countdown und \u201eNever for this app\u201c im Men\u00fc beantworten), #80 (eine R\u00fcckfrage-Mechanik).",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/99"
   },
-  "updated_at": "2026-11-12T20:43:18.788933Z"
+  "updated_at": "2026-11-15T19:59:22.065586Z"
 }
