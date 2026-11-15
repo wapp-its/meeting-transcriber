@@ -391,10 +391,46 @@
       "timestamp": "2026-11-15T09:18:29.147430Z",
       "tool_calls": 16,
       "verdict": null
+    },
+    {
+      "artifact_sha256": "e3d63ef76babbaf4336674e1005f3f83e6ae45b04a9f2821f7ec7a2db9d7e869",
+      "backend": "codex",
+      "base_sha": "f4c2e1bc58ecf18182df59fe353a5a19dbfe0f36",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "175605293689fae9b2c1dc217e503a6c2190a724",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6.1-sol",
+      "outcome": "verdict",
+      "output_bytes": 381725,
+      "output_sha256": "be5df982e5c6c18b3a6723c6abe76fc9609252f233460c80a5d33c423f95e59c",
+      "reservation_id": "43c0e346f4994566ab82af1ebb12b725",
+      "round_consumed": true,
+      "scope": "impl:gh-77-record-only-mode-file-a-recording.1",
+      "superseded_by": null,
+      "task": "gh-77-record-only-mode-file-a-recording.1",
+      "timestamp": "2026-11-15T10:43:06.268243Z",
+      "tool_calls": 22,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
-    "impl:gh-77-record-only-mode-file-a-recording.1": 1,
+    "impl:gh-77-record-only-mode-file-a-recording.1": 2,
     "plan": 1,
     "plan#completion": 2
   },
@@ -403,7 +439,7 @@
   "review_reservations": {},
   "review_transport_failures": {
     "completion": 0,
-    "impl:gh-77-record-only-mode-file-a-recording.1": 3,
+    "impl:gh-77-record-only-mode-file-a-recording.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-77-record-only-mode-file-a-recording.md",
@@ -421,5 +457,5 @@
     "mergeBaseTracker": "Gefunden beim Planen von #60, besteht schon vorher.\n\n## Problem\nIst \u201eRecord only\u201c (nur aufnehmen, keine Verarbeitung) eingeschaltet und st\u00fcrzt die App w\u00e4hrend einer Aufnahme ab, holt die Wiederherstellung beim n\u00e4chsten Start die Aufnahme zur\u00fcck und schickt sie **immer** in die Verarbeitung (Transkription, Sprecher, Protokoll), statt sie wie im Nur-Aufnahme-Modus nur samt Begleitdatei abzulegen.\n\n## Wunsch\nDie Wiederherstellung folgt demselben Modus wie ein normal beendeter Mitschnitt: im Nur-Aufnahme-Modus ablegen statt verarbeiten.\n\n## Abnahme\nNur-Aufnahme an, Aufnahme l\u00e4uft, App wird hart beendet \u2192 nach dem Neustart liegt die Aufnahme mit Begleitdatei im Ausgabeordner, und es l\u00e4uft kein Transkriptions-Job.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/77"
   },
-  "updated_at": "2026-11-15T09:18:29.149181Z"
+  "updated_at": "2026-11-15T10:43:06.289860Z"
 }
