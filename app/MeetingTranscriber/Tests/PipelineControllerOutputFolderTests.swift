@@ -87,7 +87,7 @@ final class PipelineControllerOutputFolderTests: XCTestCase {
                 recognitionStatsLog: logDir.appendingPathComponent("recognition_log.jsonl"),
                 stageTimingLog: logDir.appendingPathComponent("stage_timing.jsonl"),
                 securityScope: recorder.access,
-                recoverStagedRecordings: { _, _ in recorder.recoveries += 1 },
+                recoverStagedRecordings: { _, _, _ in recorder.recoveries += 1 },
                 resolveOutputDir: { resolver in
                     let url = resolver.resolve()
                     recorder.resolved.append(url)

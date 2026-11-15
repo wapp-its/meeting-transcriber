@@ -76,4 +76,43 @@ final class OrphanRecoveryRaceTests: XCTestCase {
 
         XCTAssertTrue(queue.jobs.isEmpty, "recovered a recording that was cancelled during the scan")
     }
+
+    /// The same re-asking in record-only mode, where the hand-on files each
+    /// recording instead of giving it a job. A recording enqueued, started by
+    /// another queue or cancelled while the scan was out, one whose mix a live
+    /// stop moved away meanwhile, and any on a queue retired meanwhile is
+    /// left where it is, with no write and no notice.
+    func testARecordingTakenDuringTheScanIsNotFiledInRecordOnlyMode() async throws {
+        let cases: [(name: String, take: @MainActor (PipelineQueue, InFlightRunRegistry, URL) throws -> Void)] = [
+            ("enqueued", { queue, _, mix in
+                queue.insertJobForTesting(PipelineJob(
+                    meetingTitle: "Standup", appName: "Teams", mixPath: mix, appPath: nil, micPath: nil, micDelay: 0,
+                ))
+            }),
+            ("started by another queue", { _, registry, mix in _ = registry.begin(jobID: UUID(), mixPath: mix) }),
+            ("cancelled", { queue, _, mix in queue.processedLedger.markProcessed(mixPath: mix) }),
+            ("moved away", { _, _, mix in try FileManager.default.removeItem(at: mix) }),
+            ("queue retired", { queue, _, _ in queue.retire() }),
+        ]
+        for (name, take) in cases {
+            let dir = try makeTempDirectory(prefix: "OrphanRecoveryRecordOnly")
+            let staging = dir.appendingPathComponent("recordings")
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+            let mix = staging.appendingPathComponent("20260311_100000_mix.wav")
+            try Data(repeating: 0xFF, count: 100).write(to: mix)
+            let registry = InFlightRunRegistry()
+            let queue = PipelineQueue(logDir: dir, stagingDir: staging, inFlightRuns: registry)
+            let output = dir.appendingPathComponent("output")
+            let notifier = RecordingNotifier()
+
+            let candidates = await queue.scanForOrphanedRecordings(recordingsDir: staging)
+            XCTAssertEqual(candidates.count, 1, "test premise (\(name)): the scan saw the recording")
+            try take(queue, registry, mix)
+            await queue.fileOrphanedRecordings(candidates, recordOnly: .writing(into: output, notifier: notifier))
+
+            XCTAssertFalse(FileManager.default.fileExists(atPath: output.path), "\(name): filed")
+            XCTAssertEqual(notifier.calls.map(\.title), [], name)
+            XCTAssertEqual(FileManager.default.fileExists(atPath: mix.path), name != "moved away", "\(name): moved")
+        }
+    }
 }
