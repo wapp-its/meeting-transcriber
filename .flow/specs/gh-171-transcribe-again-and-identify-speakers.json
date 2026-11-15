@@ -11,8 +11,8 @@
   "impl_review_rounds": {},
   "next_task": 1,
   "plan_review_rounds": 0,
-  "plan_review_status": "ship",
-  "plan_reviewed_at": "2026-11-14T20:47:10.724988Z",
+  "plan_review_status": "stale",
+  "plan_reviewed_at": "2026-11-15T16:02:35.005648Z",
   "ready": true,
   "review_attempts": [
     {
@@ -421,5 +421,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/171"
   },
-  "updated_at": "2026-11-15T15:39:17.228544Z"
+  "updated_at": "2026-11-15T16:02:35.006175Z"
 }

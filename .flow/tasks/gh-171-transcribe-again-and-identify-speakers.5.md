@@ -15,8 +15,8 @@ The user-facing half of slice 1 (R2, R3, D5, D6, A16, A18, A19): the row item in
 - New inputs to the pure decision: record-only mode (`AppSettings.recordOnly`), whether any regeneration runs (`isRegenerating`, `TranscriptionsView.swift:382`), and the source audio's last look: present, only unreachable, or none. `readAudioOnDisk` (`AllRecordingsActions.swift:184-204`) reads owned audio only, so an import's own file is missing from it: add a source-track read through `MeetingFilePresence.of`, cached in `RowAvailability` like today's read.
 - Sheet: a second sheet beside the regenerate sheet's single `.sheet(isPresented:)` (`TranscriptionsView.swift:98`), better as `.sheet(item:)`; layout like `RegenerateProtocolView` (94-145; Cancel with `.cancelAction`, the action with `.defaultAction`). All texts come from pure `RerunSheetText` functions: D6's wording word for word, A16's cases, A18's lines.
 - Values as Settings labels them: engine `TranscriptionEngineSetting.label`, the model's picker label (`TranscriptionSettingsView.whisperKitModels`, custom models, Parakeet), the language's picker label (`PickerLanguages`), vocabulary `customVocabularyEnabled`, speakers `diarize` and `diarizerMode.displayName`, " · 2 tracks" when the record lists both tracks.
-- The action goes through `AllRecordingsActions` (built in `MeetingTranscriberApp.swift:180-226`) to `PipelineController` and `rerunJob`; a refusal for gone or unreachable audio keeps the sheet open with A18's line, and one for files of the last re-run still left with A27's line; queued closes it.
-- `A11yID`: `recordingMenuTranscribeAgain(index)` beside the other menu ids (`A11yID.swift:160-185`) and ids for the sheet's buttons.
+- The action goes through `AllRecordingsActions` (built in `MeetingTranscriberApp.swift:188-233`) to `PipelineController` and `rerunJob`; a refusal for gone or unreachable audio keeps the sheet open with A18's line, and one for files of the last re-run still left with A27's line; queued closes it.
+- `A11yID`: `recordingMenuTranscribeAgain(index)` beside the other menu ids (`A11yID.swift:137-200`) and ids for the sheet's buttons.
 
 ### Investigation targets
 **Required:**
@@ -35,7 +35,7 @@ No `DESIGN.md`. The look is the accepted board written out in Architecture (D6):
 - `TranscriptionsView.swift` is at 571 lines (SwiftLint warns at 600): the sheet and its texts go in their own files.
 - SwiftUI builds both menus on every redraw: the decision reads only cached availability, never the disk (gh-170).
 ## Acceptance
-- [ ] Row decision tests: the item follows Regenerate Notes with D5's separators; absent without a record, for a failed meeting, a meeting waiting for names and when none of its source audio was found; disabled while the meeting waits, runs or has a Notion export running, with a deletion pending or incomplete, while a regeneration runs, with its audio only on a drive that is not connected, and in record-only mode.
+- [ ] Row decision tests: the item follows Regenerate Notes with D5's separators; absent without a record, for a failed meeting, a meeting waiting for names and when none of its source audio was found (a notes-only meeting from Generate Meeting Notes from Transcript, whose record lists no source audio, among them); offered for a finished meeting held for Retry Meeting Notes; disabled while the meeting waits, runs or has a Notion export running, with a deletion pending or incomplete, while a regeneration runs, with its audio only on a drive that is not connected, and in record-only mode.
 - [ ] The "…" menu and the right-click menu list the same items.
 - [ ] Sheet text tests: D6's drawn case word for word, each case of A16, A18's two lines, A27's line.
 - [ ] ViewInspector tests located by `A11yID`: the item opens the sheet for its row; Cancel closes it and queues nothing; the default button calls the action; a refusal keeps the sheet open with its line.
