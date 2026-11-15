@@ -52,9 +52,73 @@ Tests:
 - [ ] Quick commands green; `./scripts/lint.sh` clean with the pinned tools; `./scripts/pre-push.sh --with-appstore` passes.
 
 ## Done summary
-TBD
+With Settings → General → "Show prompts below the menu bar icon" on, the "Record <App> meeting?" prompt and the "Meeting seems to have ended" countdown now also show in a small window below the menu bar icon. The window shows each question's texts and answers, "Ends in m:ss" counting down every second, and a ✕ that hides a question without answering it. Answers go through the same calls a notification tap uses, and the window closes at once when the app took the answer. One modifier line on the menu bar label wires it in, and the two architecture docs describe it in the same commit.
 
+
+stage: implement - ran (model: claude-opus-5-5; delegated: 0)
+
+Tier: implementer - opus (explicit invocation) at xhigh effort (requested) (model: claude-opus-5-5)
+
+### Acceptance
+
+- AC1, test first and wiring tests. `0c315b7a` holds the decision, view and controller tests on their own; at that commit they did not compile ("cannot find type 'PromptWindowInput' in scope", "value of type 'AppState' has no member 'promptWindowInput'"). On `c8084922` they pass. Mutation rounds, each reverted before the commit:
+  - View: all 7 controls unwired → `PromptWindowViewTests.testEachControlAsksForItsAnswerOrForHidingAndNothingElse` fails 7 times, once per control (Record, Ignore, Never, Keep recording, Stop now, both ✕).
+  - Logic: 11 mutations in one run → 20 failures, each mutation caught by at least one test:
+    - an answer taken does not hide → `testAnAnswerTakenHidesItsQuestionAtOnce`
+    - a refused answer hides anyway → `testAnAnswerRefusedKeepsItsQuestion`
+    - ✕ hides nothing → `testHidingAnswersNothingAndANewQuestionShowsAgain`
+    - no timer → `testTheTimeLeftRefreshesEverySecondWhileACountdownShows`
+    - placed only when first shown → placement count 1 instead of 3 in `testFollowsTheOpenQuestionsAndTheSetting`
+    - an empty list leaves the panel up → "nothing left to show" in the same test
+    - setting ignored → `testShowsTheOpenQuestionsCountdownFirstAndNothingWhileTheSettingIsOff` and "setting off"
+    - the prompt shown before the countdown → the same content test
+    - time left rounded down → `testTimeLeftCountsDownToZeroAndStaysThere` ("1:41", "0:00")
+    - the app's input ignores the setting → `testTheAppsInputFollowsTheSettingAndTheCurrentLoop`
+    - the wiring never renders → `testTheAppsWiringFollowsTheSettingAndAnswersThroughTheApp`
+  - The app wiring test (`testTheAppsWiringFollowsTheSettingAndAnswersThroughTheApp`) came with the feat commit, not the test commit. It hosts the real `MeetingTranscriberApp.PromptWindowWiring` on an `AppState` with a test watch loop, follows the setting off/on/off/on, and taps Never. The loop's notifier then receives `.never` for that prompt's id, and the window closes. Dropping `controller.update()` makes it fail.
+- AC2, live: **blocked from verification.** The steps are `/state.windows` showing `recording-prompts` with `isVisible`, `POST /action/confirmBrowserConsent` closing the window with the frontmost app unchanged, and a real click. They are blocked because the installed dev app cannot run branch code and is not replaced during a build, and a second copy of the meeting app is not started. The unit tests cover the same chain up to the panel: input → decision → controller → panel → answer call by id. Task .1 already measured the panel's first click and that the frontmost app stays unchanged, using a throwaway probe; that was not repeated here. Run them after the merge and `mt-update`.
+- AC3, docs in the same commit (`c8084922`):
+  - `docs/architecture/detection.md`: a "The prompt window (issue #99)" passage after the consent prompt paragraph.
+  - `docs/architecture-macos.md`: 8 file-table rows, the Prompts group in the GeneralSettingsView row and in the Settings UI General row, and a paragraph in "Menu Bar Icon Animations".
+- AC4, gates (see Verification).
+
+### Verification
+
+- baseline: green. At `a5fd687a` the Quick command passed (exit 0, 215 tests, 0 failures) and lint passed (0 violations).
+- Quick command, with `-j 6` in both places: `cd app/MeetingTranscriber && mkdir -p .build/test-home && swift build --build-tests -j 6 && CFFIXED_USER_HOME="$PWD/.build/test-home" swift test -j 6 --filter '<the spec filter>'`. Result: exit 0, 231 tests, 0 failures on the final tree, which was then committed unchanged as `c8084922`.
+- `./scripts/lint.sh` with the pinned tools: exit 0, 0 violations in 1287 files, 0/1308 files need formatting. The first run found 3 violations in the new files, all fixed: `file_name`, `type_name` for `ID`, and `attributes`.
+- `./scripts/pre-push.sh --with-appstore` on `c8084922`: exit 0 ("OK — pre-push parity check passed"). The Homebrew and App Store release builds passed, and the local model helper built and passed its tests (21 tests, 3 skipped, 0 failures). The App Store build printed one warning, in the existing `Settings/Notification+SettingsWindow.swift`, which this task did not touch; the new files caused none.
+- not run: `swiftlint analyze` (CI's `unused_declaration`). Every new declaration is used from production or a test. One shape to watch: `MeetingTranscriberApp.PromptWindowWiring` is a struct nested in `extension MeetingTranscriberApp`, which the `file_name` rule needs. It is referenced from the `MeetingTranscriberApp` struct body and from a test, not from inside an extension.
+- not run: a look check. Per the spec's Verification, the look is checked after the merge.
+- Privacy: no new log line. The tests use made-up prompts.
+
+### Choices
+
+- (1) An item's identity is a typed id per kind, `PromptWindowItem.QuestionID` (`.meetingEnd(String)`, `.consent(UUID)`): from the task text "identity is its question's id". It is named `QuestionID`, not `ID`, because the `type_name` lint requires at least 3 characters.
+- (1) Controls draw as in an active window, `.environment(\.controlActiveState, .key)` on the view. D7 asks for the accent-coloured default button, and a throwaway probe measured that in a never-key panel of an inactive app `.borderedProminent` draws like a plain button. `testTheProminentButtonsDrawAsInAnActiveWindow` pins it.
+- (1) Menu bar height is `max(shown menu bar, notch inset, status bar thickness)`, from task .1's note. `testMenuBarHeightIsTheShownMenuBarElseTheNotchElseTheStatusBar` pins it.
+- (1) The Settings UI table row in architecture-macos.md gains "Prompts": the CLAUDE.md upkeep rule.
+- (4) Window background follows the system appearance (`windowBackgroundColor`). Switch point: the `.background` in `PromptWindowView.body`. Test: none, because the look is checked after the merge.
+- (4) The tile is SF Symbol `mic.fill` in white on an accent rounded square, shown only when one question is open. Switch point: the `if showsTile` block in `PromptRowText`. Test: `testEachQuestionShowsItsTextAndItsButtonsInTheDrawnOrder` checks that it shows only when one question is open.
+- (6) Time left rounds whole seconds up, so "0:00" first shows at the deadline.
+- (6) Hidden ids are cut down to the open questions on each render, so the set stays small.
+- (6) The controller compares the measured size against the size it last placed for, not against the panel frame: the hosting view resizes the panel to new content by itself.
+- (6) Fonts headline/callout, padding 14, corner radius 12, width 340 (the look is checked after the merge).
+- (6) A11yID names `promptWindow*`, all kept off the `/ui/tree` and `/ui/press` allowlists, as the task requires.
+- (6) The wiring modifier is nested in `extension MeetingTranscriberApp`, because the `file_name` rule needs a type or extension that matches the file name.
+
+### For the conductor
+
+- Live checks for after the merge and `mt-update`: `/state.windows` lists `recording-prompts` with `isVisible`; `POST /action/confirmBrowserConsent` closes it; the frontmost app is unchanged; a real click on "Ignore".
+- If CI's `swiftlint analyze` reports `PromptWindowWiring` as unused: move the struct to the top level and keep an empty-bodied `extension MeetingTranscriberApp` in the file for `file_name`. Notes: `task-4-window.md` in this run's NOTES_DIR.
+- Follow-ups: none filed.
+
+Integrated verify on the spec branch: the spec's Quick command with -j 6 at c8084922 (fast-forward, commit ids unchanged), exit 0, 231 tests, 0 failures
+
+stage: impl-review - ran [2026-11-15T19:17:06Z..2026-11-15T19:25:30Z] SHIP, three draws (correctness, contracts, integration), no findings (model: gpt-6.1-sol at xhigh)
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 0c315b7a08ed261e2a16b08a39f7a478d2dabe01, c8084922ffbf38d848002990572779512846a57c
+- Tests: cd app/MeetingTranscriber && mkdir -p .build/test-home && swift build --build-tests -j 6 && CFFIXED_USER_HOME="$PWD/.build/test-home" swift test -j 6 --filter 'PromptWindow|PromptPanel|MenuBarIconFrame|MeetingEndQuestion|WatchLoopMeetingEnd|NotificationManagerMeetingEndTests|NotificationManagerSchedulingTests|ConsentPromptCoordinatorTests|WatchLoopAskBeforeRecordingTests|WatchLoopBrowserConsentTests|AppStateConsentPromptTests|NamingWindowPolicyTests|GeneralSettings|AppSettingsTests|MenuBarIconCountdownTests' (exit 0; 231 tests, 0 failures; baseline 215, 0 failures at a5fd687a), ./scripts/lint.sh with pinned SwiftFormat and SwiftLint 0.65.1 (exit 0; 0 violations in 1287 files, 0/1308 files need formatting), ./scripts/pre-push.sh --with-appstore (exit 0; Homebrew and App Store release builds, local model helper build and tests 21 run, 3 skipped, 0 failures), live: /state.windows and POST /action/confirmBrowserConsent blocked from verification - the installed Dev app cannot run branch code and must not be restarted, and no second app copy may run, integrated verify: the spec's Quick command with -j 6 at c8084922 (fast-forward, commit ids unchanged), exit 0, 231 tests, 0 failures
 - PRs:
