@@ -1296,7 +1296,7 @@ class PipelineQueue {
         case .generatingProtocol: usedDiarizerMode(forJobID: jobID)
         }
         stageClocks[jobID] = StageClock(
-            config: StageConfig(stage: stage, engine: activeEngineTag, diarizerMode: mode?.rawValue),
+            config: StageConfig(stage: stage, engine: engineTag(forJobID: jobID), diarizerMode: mode?.rawValue),
             startedAt: Date(),
         )
         estimateStageFinish(jobID: jobID)
@@ -1385,7 +1385,7 @@ class PipelineQueue {
         let event = StageTimingEvent(
             ts: Date(), jobID: jobID, stage: stage,
             wallClockSeconds: wallClock, audioSeconds: audioSeconds(),
-            engine: stage.isEngineScoped ? activeEngineTag : nil,
+            engine: stage.isEngineScoped ? engineTag(forJobID: jobID) : nil,
             diarizerMode: stage.isEngineScoped ? usedDiarizerMode(forJobID: jobID)?.rawValue : nil,
         )
         Task { [weak self] in
@@ -1394,10 +1394,10 @@ class PipelineQueue {
         }
     }
 
-    /// Concrete transcription-engine type name, the comparability tag stamped on
-    /// logged events; also used to resolve a running stage's config.
-    private var activeEngineTag: String? {
-        engine.map { String(describing: type(of: $0)) }
+    /// Concrete type name of the engine `jobID` transcribes with, the comparability
+    /// tag stamped on logged events; also used to resolve a running stage's config.
+    private func engineTag(forJobID jobID: UUID) -> String? {
+        (job(withID: jobID).flatMap { stageEngine(for: $0) } ?? engine).map { String(describing: type(of: $0)) }
     }
 
     /// Reload recent timings and recompute the per-config speeds. A clock that

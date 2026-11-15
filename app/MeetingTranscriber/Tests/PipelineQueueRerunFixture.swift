@@ -93,6 +93,7 @@ final class PipelineQueueRerunFixture {
         notion: NotionExportConfiguration? = nil,
         recordingRetention: RecordingRetention? = nil,
         protocolGenerator: (() -> (any ProtocolGenerating)?)? = nil,
+        stageTimingLog: StageTimingLog? = nil,
     ) -> PipelineQueue {
         let (diarization, protocolGen, speakersDB) = (diarization, protocolGen, speakersDB)
         return PipelineQueue(
@@ -111,6 +112,7 @@ final class PipelineQueueRerunFixture {
             vadConfig: vadConfig,
             engineForKind: engineForKind,
             rerunSettings: rerunSettings,
+            stageTimingLog: stageTimingLog,
             completedJobLifetime: completedJobLifetime,
             notionExportConfigurationProvider: notion.map { configuration in { .ready(configuration) } },
             terminalJobStore: terminal,

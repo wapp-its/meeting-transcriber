@@ -60,16 +60,21 @@ final class PipelineQueueRerunTests: XCTestCase {
         await queue.awaitProcessing()
     }
 
+    /// An engine of another type than the queue's, as the stage timings tell engines apart.
+    private final class OtherKindEngine: MockEngine {}
+
     func testARerunRunsWithTheSettingsNamedAtItsAdmissionOverTheQueuesOwn() async throws {
         let fixture = try makeFixture()
-        let parakeet = MockEngine()
+        let parakeet = OtherKindEngine()
         parakeet.segmentsToReturn = fixture.engine.segmentsToReturn
         var named = PipelineJob.RerunSettings(engine: .whisperKit, diarize: false, numSpeakers: 0, vadThreshold: nil)
         let whisperKit = fixture.engine
+        let timings = StageTimingLog(path: fixture.tmpDir.appendingPathComponent("stage_timings.jsonl"))
         let queue = fixture.makeQueue(
             diarizeEnabled: false,
             engineForKind: { $0 == .parakeet ? parakeet : whisperKit },
             rerunSettings: { named },
+            stageTimingLog: timings,
         )
         let meeting = try await fixture.finishedMeeting(in: queue)
         let firstRunCalls = fixture.engine.transcribeCallCount
@@ -86,6 +91,13 @@ final class PipelineQueueRerunTests: XCTestCase {
         XCTAssertEqual(parakeet.transcribeCallCount, 2, "the engine Settings name did not transcribe both tracks")
         XCTAssertEqual(fixture.diarization.runCount, 2, "speakers were not identified on both tracks")
         XCTAssertTrue(fixture.diarization.receivedNumSpeakers.contains(3), "\(fixture.diarization.receivedNumSpeakers)")
+
+        // Each run's transcription is timed under the engine it ran on.
+        let engines = {
+            timings.loadRecentNow(within: 3600).filter { $0.jobID == meeting.id && $0.stage == .transcribing }.map(\.engine)
+        }
+        try await fixture.poll("both runs' transcription timings") { engines().count == 2 }
+        XCTAssertEqual(engines(), [String(describing: MockEngine.self), String(describing: OtherKindEngine.self)])
     }
 
     /// Settings name the engine kind; the controller hands out that kind's instance
