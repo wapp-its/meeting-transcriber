@@ -1152,20 +1152,25 @@ extension PipelineQueue {
     /// `transcriptIsTheOutputWithoutAProvider: false` for a run that was
     /// started with a provider: resumed after the provider was switched off,
     /// it still owes a protocol, so its transcript does not stand in for one.
+    ///
+    /// The result says whether a provider was there when this asked for one.
+    /// A caller that needs to know reads it instead of asking the factory
+    /// again: the setting can change while the model writes.
+    @discardableResult
     func generateProtocol( // swiftlint:disable:this function_parameter_count
         jobID: UUID, transcript: String, title: String, protocolsDir: URL,
         speakerNames: [String], transcriptIsTheOutputWithoutAProvider: Bool,
-    ) async throws(CancellationError) {
+    ) async throws(CancellationError) -> ProtocolGenerationOutcome {
         // No generator and no LLM call for a job that is already gone.
         try ensureStillQueued(jobID)
-        guard let job = job(withID: jobID) else { return }
+        guard let job = job(withID: jobID) else { return .attempted }
         guard let protocolGeneratorFactory, let generator = protocolGeneratorFactory() else {
             protocolGenerationOn[jobID] = false
             // No protocol, so no export, but an export that is switched on and
             // cannot run is still worth a reason on the job.
             resolveNotionExport(jobID: jobID)
             if transcriptIsTheOutputWithoutAProvider { markOutputWritten(jobID: jobID, output: job.transcriptPath) }
-            return
+            return .noProvider
         }
         protocolGenerationOn[jobID] = true
         // Reuse the basename fixed when the transcript was saved (persisted as
@@ -1187,7 +1192,7 @@ extension PipelineQueue {
             // No protocol, so no export, but an export that is switched on and
             // cannot run is still worth a reason on the job.
             resolveNotionExport(jobID: jobID)
-            return
+            return .attempted
         }
 
         // A job cancelled or removed during the call gets no protocol file and
@@ -1206,12 +1211,26 @@ extension PipelineQueue {
             )
         }
         // Checked again after the model call, which can take many minutes.
-        if notesAppearedDuringTheCall(of: job, basename: basename, protocolsDir: protocolsDir) { return }
+        if notesAppearedDuringTheCall(of: job, basename: basename, protocolsDir: protocolsDir) { return .attempted }
 
+        saveGeneratedNotes(
+            protocolMD, transcript: outputOptions.includeFullTranscriptInProtocol ? transcript : nil,
+            basename: basename, jobID: jobID, protocolsDir: protocolsDir,
+            speakerNames: speakerNames, template: usedTemplate,
+        )
+        return .attempted
+    }
+
+    /// Saves the notes the model wrote and queues their Notion export when one
+    /// is configured. `transcript` is the full transcript to carry along with
+    /// them, nil when the job's output options leave it out; `template` is the
+    /// one the notes were made from, which the export reads.
+    private func saveGeneratedNotes( // swiftlint:disable:this function_parameter_count
+        _ protocolMD: String, transcript: String?, basename: String, jobID: UUID, protocolsDir: URL,
+        speakerNames: [String], template: ProtocolTemplateID,
+    ) {
         let markdown = ProtocolGenerator.composeDocument(
-            protocolMarkdown: protocolMD,
-            transcript: transcript,
-            includeFullTranscript: outputOptions.includeFullTranscriptInProtocol,
+            protocolMarkdown: protocolMD, transcript: transcript ?? "", includeFullTranscript: transcript != nil,
         )
 
         let configuration = resolveNotionExport(jobID: jobID).configuration
@@ -1219,16 +1238,16 @@ extension PipelineQueue {
         // the queue moves on while the export runs, so this is what a quit or a
         // failed export falls back on. A successful Notion-only export removes it.
         let savedLocally = saveProtocolLocally(markdown, basename: basename, jobID: jobID, protocolsDir: protocolsDir)
-        if savedLocally { markOutputWritten(jobID: jobID, output: self.job(withID: jobID)?.protocolPath) }
+        if savedLocally { markOutputWritten(jobID: jobID, output: job(withID: jobID)?.protocolPath) }
         if let configuration {
             queueNotionExport(
                 PendingNotionExport(
                     protocolMD: protocolMD,
-                    transcript: outputOptions.includeFullTranscriptInProtocol ? transcript : nil,
+                    transcript: transcript,
                     speakerNames: speakerNames,
                     configuration: configuration,
                     savedLocally: savedLocally,
-                    template: usedTemplate,
+                    template: template,
                 ),
                 jobID: jobID,
             )
