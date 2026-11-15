@@ -298,6 +298,68 @@
       "timestamp": "2026-11-14T23:14:08.621283Z",
       "tool_calls": 32,
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "749a407cd4bdf257d74a671d4a885ff0305cfe13486cb2a38a35497f5e170ce8",
+      "backend": "codex",
+      "base_sha": "772f6d79875619577b5aa3973287b36087a72f33",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": "nonzero_exit",
+      "failure_message": "2026-11-15T02:12:31.910612Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when AuthRequired(AuthRequiredError { www_authenticate_header: \"Bearer resource_metadata=\\\"https://mcp.consensus.app/.well-known/oauth-protected-resource\\\", scope=\\\"search\\\"\" })",
+      "finalized": {
+        "digest": "complete",
+        "receipt": "not_applicable",
+        "status": "not_applicable"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "aa3c7e21391c7c0bfe1763b1910761e77abf2b4c",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "transport_failure",
+      "output_bytes": 364734,
+      "output_sha256": "4f8da7f4aceb464aeee64afb330f1ee4a60a64d4e54be477b85fe5a8f86b7842",
+      "reservation_id": "89a187c2fd99431fb672535f6635d8fa",
+      "round_consumed": false,
+      "scope": "impl:gh-77-record-only-mode-file-a-recording.1",
+      "superseded_by": null,
+      "task": "gh-77-record-only-mode-file-a-recording.1",
+      "timestamp": "2026-11-15T03:57:00.704788Z",
+      "tool_calls": 23,
+      "verdict": null
+    },
+    {
+      "artifact_sha256": "749a407cd4bdf257d74a671d4a885ff0305cfe13486cb2a38a35497f5e170ce8",
+      "backend": "codex",
+      "base_sha": "772f6d79875619577b5aa3973287b36087a72f33",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": "nonzero_exit",
+      "failure_message": "2026-11-15T04:12:37.573535Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when AuthRequired(AuthRequiredError { www_authenticate_header: \"Bearer resource_metadata=\\\"https://mcp.consensus.app/.well-known/oauth-protected-resource\\\", scope=\\\"search\\\"\" })",
+      "finalized": {
+        "digest": "complete",
+        "receipt": "not_applicable",
+        "status": "not_applicable"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "aa3c7e21391c7c0bfe1763b1910761e77abf2b4c",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "transport_failure",
+      "output_bytes": 83055,
+      "output_sha256": "0bbc83a395641d3515d52ca9b776a60f5eb5d8ddaa131253e8fc33384a900315",
+      "reservation_id": "ae9577937cec481480d7ffa88d9f155c",
+      "round_consumed": false,
+      "scope": "impl:gh-77-record-only-mode-file-a-recording.1",
+      "superseded_by": null,
+      "task": "gh-77-record-only-mode-file-a-recording.1",
+      "timestamp": "2026-11-15T05:10:03.532706Z",
+      "tool_calls": 4,
+      "verdict": null
     }
   ],
   "review_hash_epoch": {
@@ -310,7 +372,7 @@
   "review_reservations": {},
   "review_transport_failures": {
     "completion": 0,
-    "impl:gh-77-record-only-mode-file-a-recording.1": 0,
+    "impl:gh-77-record-only-mode-file-a-recording.1": 2,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-77-record-only-mode-file-a-recording.md",
@@ -328,5 +390,5 @@
     "mergeBaseTracker": "Gefunden beim Planen von #60, besteht schon vorher.\n\n## Problem\nIst \u201eRecord only\u201c (nur aufnehmen, keine Verarbeitung) eingeschaltet und st\u00fcrzt die App w\u00e4hrend einer Aufnahme ab, holt die Wiederherstellung beim n\u00e4chsten Start die Aufnahme zur\u00fcck und schickt sie **immer** in die Verarbeitung (Transkription, Sprecher, Protokoll), statt sie wie im Nur-Aufnahme-Modus nur samt Begleitdatei abzulegen.\n\n## Wunsch\nDie Wiederherstellung folgt demselben Modus wie ein normal beendeter Mitschnitt: im Nur-Aufnahme-Modus ablegen statt verarbeiten.\n\n## Abnahme\nNur-Aufnahme an, Aufnahme l\u00e4uft, App wird hart beendet \u2192 nach dem Neustart liegt die Aufnahme mit Begleitdatei im Ausgabeordner, und es l\u00e4uft kein Transkriptions-Job.",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/77"
   },
-  "updated_at": "2026-11-14T23:14:08.661641Z"
+  "updated_at": "2026-11-15T05:10:03.535259Z"
 }
