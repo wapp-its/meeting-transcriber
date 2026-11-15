@@ -203,6 +203,8 @@ FIT: REVISE · 2026-11-15 · base 1d092827 · engine flow-next 9.10.0 · plan dr
   - no other spec owns part of this scope (gh-99, gh-127, gh-130, gh-150 and gh-77 do not overlap), and the original has no issue or pull request on transcribing a finished meeting again or identifying its speakers again (checked 2026-11-15); line anchors drifted in `PipelineQueue.swift`, `PipelineQueue+Stages.swift`, `PipelineController.swift`, `PipelineJob.swift` and `MeetingTranscriberApp.swift`
   - required: Architecture and Edge Cases cover a held entry with failed notes, the held-job cleanup, `discardFinishedJobs`, `restorePendingNotionExports`, `saveGeneratedNotes`, `doneNotification`, the mute spans, a swap that refuses a taken current name and a meeting without current notes; the task files carry the same, with anchors re-pinned; the Quick commands add `MeetingNotesRetryTests`
 
+FIT: GO · 2026-11-15 · base 1d092827 · engine flow-next 9.10.0 · the REVISE above is repaired in the plan sections and task files; nothing else moved on the base (the original's two newer commits only keep a recovered recording's mute log)
+
 ## Memory findings
 
 | Track | Category | Entry | Why relevant |
