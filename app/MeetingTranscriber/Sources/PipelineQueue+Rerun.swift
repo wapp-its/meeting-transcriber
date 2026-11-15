@@ -33,6 +33,9 @@ enum RerunRefusal: Error, Equatable, Sendable {
     case audioUnreachable
     /// The record could not be written, or changed while the admission read it.
     case recordNotSaved
+    /// Files of the meeting's last re-run are still there and could not be
+    /// removed now either (A27): "Files of the last re-run could not be removed."
+    case filesLeft
 }
 
 extension PipelineJob {
@@ -87,7 +90,13 @@ extension PipelineQueue {
               let finished = terminalJobStore?.records.last(where: { $0.status.jobID == id.uuidString })
         else { return .refused(.notFinished) }
         meetingFileStore.reload()
-        guard let record = meetingFileStore.record(for: id) else { return .refused(.notFinished) }
+        guard var record = meetingFileStore.record(for: id) else { return .refused(.notFinished) }
+        // The files an earlier re-run could not remove are tried again first (A27).
+        if let left = record.rerun, left.isEnding, left.bundleID == meetingFileStore.bundleID {
+            _ = Self.closeRerun(left, jobID: id, in: meetingFileStore)
+            guard let reread = meetingFileStore.record(for: id) else { return .refused(.notFinished) }
+            record = reread
+        }
         if let refusal = record.rerunRefusal { return .refused(refusal) }
         let audio: RelocatedAudioPaths
         switch Self.rerunAudio(from: record.rerunSourceTracks) {
@@ -158,6 +167,7 @@ extension PipelineQueue {
         }
         jobAudioSeconds.removeValue(forKey: job.id)
         protocolResumeDispositions.removeValue(forKey: job.id)
+        rerunWarnings.removeValue(forKey: job.id)
         jobs.append(job)
         eventLog.append(jobID: job.id, event: "rerun_admitted", from: tookOver ? .done : nil, to: .waiting)
         saveSnapshot()

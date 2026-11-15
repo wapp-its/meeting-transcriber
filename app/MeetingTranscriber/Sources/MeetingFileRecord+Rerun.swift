@@ -18,6 +18,14 @@ extension MeetingFileRecord {
         let runID: UUID
         /// Each file the re-run wrote, with the identity it had when it was written.
         var files: [MeetingFile] = []
+        /// True from the moment an end other than success began: the next launch and
+        /// the next admission remove the files it still lists, and nothing resumes
+        /// it. Nil while it runs, and in a marker from before this field.
+        var ending: Bool? // swiftlint:disable:this discouraged_optional_boolean
+
+        var isEnding: Bool {
+            ending == true
+        }
 
         /// The stem every file of the re-run carries: the meeting's stem and the
         /// stamp. It never ends in `)` and holds no ` (`, so the additional-report
@@ -41,13 +49,45 @@ extension MeetingFileRecord {
         }
     }
 
+    /// How a re-run ended, in the record from its end until the next re-run is
+    /// admitted: its stamp, and whether its files took the current names.
+    struct RerunNote: Codable, Equatable, Sendable {
+        let stamp: Date
+        let committed: Bool
+    }
+
     /// Why a re-run of the meeting cannot be admitted, as far as the record says,
     /// nil when it can: the meeting has finished, no deletion of it is pending or
-    /// incomplete, and no re-run of it is under way.
+    /// incomplete, and no re-run of it is under way or left files behind.
     var rerunRefusal: RerunRefusal? {
+        if rerun?.isEnding == true { return .filesLeft }
         guard case .finished = outcome else { return .notFinished }
         guard pending == nil, incomplete == nil else { return .deletionPending }
         return rerun == nil ? nil : .alreadyRerunning
+    }
+
+    /// One end of the re-run `marker` names, other than success, written into the
+    /// record in one update: the outcome it had before, and with no file of the
+    /// re-run `left` the marker gone and the stamp noted as ended. A file left keeps
+    /// the marker, as ending and listing only the files left (A27). A record that
+    /// carries another re-run's marker, or already notes this one, is left as it is.
+    /// A record without either, as an older build rewrites one, ends from `marker`.
+    mutating func endRerun(_ marker: RerunMarker, leaving left: [MeetingFile]) {
+        if let current = rerun {
+            guard current.runID == marker.runID else { return }
+        } else if rerunNote?.stamp == marker.stamp {
+            return
+        }
+        outcome = marker.outcomeBefore
+        if left.isEmpty {
+            rerun = nil
+            rerunNote = RerunNote(stamp: marker.stamp, committed: false)
+        } else {
+            var kept = rerun ?? marker
+            kept.files = left
+            kept.ending = true
+            rerun = kept
+        }
     }
 
     /// The source audio a re-run reads, where the record lists it: the newest

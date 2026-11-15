@@ -725,6 +725,8 @@ extension PipelineQueue {
         }
         let diarizeProcess = diarizationFactory()
         guard diarizeProcess.isAvailable else {
+            // A re-run swaps in no transcript without speakers (A25).
+            if isRerun(ctx.jobID) { throw failRerun(ctx.jobID, RerunFailure.speakersNotAvailable) }
             logger.info("[\(ctx.shortID, privacy: .public)] diarization_skipped")
             return output
         }
@@ -744,6 +746,10 @@ extension PipelineQueue {
                 diarizeProcess: diarizeProcess, useDualTrack: transcription.isDualSource,
                 speakerCount: speakerCount, workDir: workDir, ctx: ctx,
             )
+            // A re-run whose offered track failed ends instead of falling back to the other (A25).
+            if isRerun(ctx.jobID), let track = run.failedTrack {
+                throw failRerun(ctx.jobID, track == .callAudio ? RerunFailure.callAudioSpeakersFailed : RerunFailure.microphoneSpeakersFailed)
+            }
             // Match against the speaker DB and park the job for the (possibly
             // late) naming dialog. A speaker-count/mode re-run is no longer an
             // in-line loop here; it's driven after the job reaches
@@ -774,6 +780,7 @@ extension PipelineQueue {
             // stray `CancellationError` for a job still ours, costs the labels.
             guard isStillQueued(ctx.jobID) else { throw CancellationError() }
             logger.warning("[\(ctx.shortID, privacy: .public)] diarization_failed error=\(error.localizedDescription, privacy: .public)")
+            if isRerun(ctx.jobID) { throw failRerun(ctx.jobID, RerunFailure.speakersFailed) }
             addWarning(id: ctx.jobID, "Diarization failed — speakers not identified")
             // Continue with original transcript
         }
@@ -900,6 +907,7 @@ extension PipelineQueue {
         // track's segments with their raw tag instead of force-matching them; only
         // a both-track failure is a genuine diarization failure that propagates.
         let combined: DiarizationResult
+        var failedTrack: DiarizationRun.Track?
         switch (appDiarization, micDiarization) {
         case let (app?, mic?):
             combined = DiarizationProcess.mergeDualTrackDiarization(appDiarization: app, micDiarization: mic)
@@ -909,6 +917,7 @@ extension PipelineQueue {
             // audio was never offered, and the transcribe stage has already
             // said so once.
             if micError != nil {
+                failedTrack = .microphone
                 logger.warning(
                     "[\(sid, privacy: .public)] mic_diarization_failed error=\(micError?.localizedDescription ?? "unknown", privacy: .public) — falling back to app-only diarization",
                 )
@@ -919,6 +928,7 @@ extension PipelineQueue {
         case let (nil, mic?):
             // Mirror of the arm above: silent when the track was never offered.
             if appError != nil {
+                failedTrack = .callAudio
                 logger.warning(
                     "[\(sid, privacy: .public)] app_diarization_failed error=\(appError?.localizedDescription ?? "unknown", privacy: .public) — falling back to mic-only diarization",
                 )
@@ -932,7 +942,7 @@ extension PipelineQueue {
             )
             throw appError ?? micError ?? DiarizationError.notAvailable
         }
-        return DiarizationRun(app: appDiarization, mic: micDiarization, combined: combined)
+        return DiarizationRun(app: appDiarization, mic: micDiarization, combined: combined, failedTrack: failedTrack)
     }
 
     /// Apply speaker names to the transcript for whichever topology the run
@@ -1193,6 +1203,8 @@ extension PipelineQueue {
             request: (transcript: transcript, title: title, meetingStartTime: meetingStartTime, instructions: instructions),
             meeting: (folder: protocolsDir, basename: initialBasename, template: templateID, background: job.protocolBackground),
         ) else {
+            // A re-run keeps the meeting's notes rather than end without new ones (A25).
+            if isRerun(jobID) { throw failRerun(jobID, RerunFailure.notesNotMade) }
             // The names the notes were to carry, for a retry of them.
             recordNotesSpeakerNames(id: jobID, speakerNames)
             // No protocol, so no export, but an export that is switched on and
@@ -1220,22 +1232,24 @@ extension PipelineQueue {
         // Checked again after the model call, which can take many minutes.
         if notesAppearedDuringTheCall(of: job, basename: basename, protocolsDir: protocolsDir) { return .attempted }
 
-        saveGeneratedNotes(
+        let saved = saveGeneratedNotes(
             protocolMD, transcript: outputOptions.includeFullTranscriptInProtocol ? transcript : nil,
             basename: basename, jobID: jobID, protocolsDir: protocolsDir,
             speakerNames: speakerNames, template: usedTemplate,
         )
+        if !saved, isRerun(jobID) { throw failRerun(jobID, RerunFailure.notesNotSaved) }
         return .attempted
     }
 
     /// Saves the notes the model wrote and queues their Notion export when one
     /// is configured. `transcript` is the full transcript to carry along with
     /// them, nil when the job's output options leave it out; `template` is the
-    /// one the notes were made from, which the export reads.
+    /// one the notes were made from, which the export reads. Returns whether
+    /// they were saved in the folder.
     private func saveGeneratedNotes( // swiftlint:disable:this function_parameter_count
         _ protocolMD: String, transcript: String?, basename: String, jobID: UUID, protocolsDir: URL,
         speakerNames: [String], template: ProtocolTemplateID,
-    ) {
+    ) -> Bool {
         let markdown = ProtocolGenerator.composeDocument(
             protocolMarkdown: protocolMD, transcript: transcript ?? "", includeFullTranscript: transcript != nil,
         )
@@ -1259,6 +1273,7 @@ extension PipelineQueue {
                 jobID: jobID,
             )
         }
+        return savedLocally
     }
 
     /// Reads the export configuration and, when the export is on but cannot run

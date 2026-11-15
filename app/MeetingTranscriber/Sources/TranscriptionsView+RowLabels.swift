@@ -14,6 +14,18 @@ extension TranscriptionsView {
         return "\(app) · \(date) · \(duration)"
     }
 
+    /// The line a finished row shows after its meeting's re-run failed or was left
+    /// unnamed (R6, A23).
+    static func rerunWarningLine(_ warning: RerunWarning) -> String {
+        let action = switch warning.mode {
+        case .transcribeAgain: "Transcribe Again"
+        }
+        return switch warning.cause {
+        case let .failed(reason): "\(action) failed: \(reason)"
+        case .unnamed: "\(action) ended: the speakers were not named in time"
+        }
+    }
+
     static func title(of action: MainAction) -> String {
         switch action {
         case .cancel: "Cancel"

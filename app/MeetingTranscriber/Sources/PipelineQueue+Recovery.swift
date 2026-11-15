@@ -41,6 +41,10 @@ extension PipelineQueue {
         // adoption itself writes nothing (see below): a job that had just
         // failed stayed on disk as running and ran again on the next launch.
         snapshotRestoreFailed = replaced.snapshotRestoreFailed
+        rerunWarnings = replaced.rerunWarnings
+        rerunJobsAwaitingRecord = replaced.rerunJobsAwaitingRecord
+        rerunFileOwed = replaced.rerunFileOwed
+        rerunFileFrozen = replaced.rerunFileFrozen
         var adopted = replaced.jobs
         // An export still running there is not interrupted: it is stopped and
         // started again below, so a slow Notion never keeps the old queue (and
@@ -71,10 +75,14 @@ extension PipelineQueue {
     /// start a queue's job list, and which jobs a fresh list may contain is one
     /// decision, not two. It used to be written out at both call sites, held
     /// together only by a comment saying they had to agree.
+    ///
+    /// A re-run job is never one of them: done, it waits for its swap, and its
+    /// naming data's stem is its own (PipelineQueue+RerunRecovery.swift).
     private func discardFinishedJobs(from list: inout [PipelineJob]) {
-        let finished = list.filter { $0.state == .done && !$0.isHeldAfterCompletion }
+        let isDiscarded = { (job: PipelineJob) in job.state == .done && !job.isHeldAfterCompletion && job.rerun == nil }
+        let finished = list.filter(isDiscarded)
         guard !finished.isEmpty else { return }
-        list.removeAll { $0.state == .done && !$0.isHeldAfterCompletion }
+        list.removeAll(where: isDiscarded)
         removeNamingDataOfDiscardedJobs(finished)
     }
 
@@ -101,17 +109,25 @@ extension PipelineQueue {
     /// jobs whose `mixPath` no longer exists on disk.
     func loadSnapshot() {
         var loaded: [PipelineJob]
+        // This build's re-run jobs, decided by their records first; they skip the
+        // rest of the restore of a new meeting up to the in-flight rule (A24).
+        let reruns = restoreRerunJobs()
         do {
             // A state saved but not yet on disk is the newer one: a queue that
             // replaces another restores while that queue's last write may
             // still be in flight, and the file would hand it the state before.
-            guard let decoded = try PipelineSnapshotStore.latestJobs(in: logDir) else {
+            guard let decoded = try PipelineSnapshotStore.latestJobs(in: logDir) ?? (reruns.isEmpty ? nil : []) else {
                 logger.info("No pipeline snapshot to restore")
                 return
             }
-            loaded = decoded
+            // A live re-run wins over a finished entry of its meeting.
+            let rerunIDs = Set(reruns.map(\.id))
+            loaded = decoded.filter { !rerunIDs.contains($0.id) }
         } catch {
             noteSnapshotRestoreFailed(error)
+            // The re-run jobs stay in their file for the next launch, as the
+            // other saved jobs stay in theirs.
+            rerunFileFrozen = true
             return
         }
 
@@ -136,6 +152,7 @@ extension PipelineQueue {
         discardFinishedJobs(from: &loaded)
 
         discardJobsWithMissingAudio(&loaded, interruptedIn: interruptedStates)
+        loaded += reruns
 
         // Drop what another queue is still running. This is where issue #558
         // brought the job back: a replacement queue reads the same snapshot,
@@ -169,8 +186,19 @@ extension PipelineQueue {
             recordTerminalJob(job)
         }
 
-        // Rebuild the session's naming cache from disk for
-        // .speakerNamingPending jobs.
+        restoreNamingSessions()
+
+        saveSnapshot()
+        cleanupStalePending()
+        logger.info("Restored \(loaded.count) jobs from snapshot")
+        triggerProcessing()
+        // Restored jobs still waiting for names: the window, or with auto-open
+        // off a notification, since they never make the transition again.
+        announceRestoredSpeakerNaming()
+    }
+
+    /// Rebuild the session's naming cache from disk for .speakerNamingPending jobs.
+    private func restoreNamingSessions() {
         let missingNamingDataJobIDs = jobs.compactMap { job -> UUID? in
             guard job.state == .speakerNamingPending else { return nil }
             if let slug = job.namingSlug,
@@ -186,16 +214,13 @@ extension PipelineQueue {
         // retention: the speakers were never confirmed, so the transcript is
         // the unconfirmed draft and the audio stays.
         for jobID in missingNamingDataJobIDs {
-            updateJobState(id: jobID, to: .done)
+            // A re-run is never given the automatic names (A5).
+            if isRerun(jobID) {
+                endRerun(id: jobID, because: .failed(RerunFailure.namingLost))
+            } else {
+                updateJobState(id: jobID, to: .done)
+            }
         }
-
-        saveSnapshot()
-        cleanupStalePending()
-        logger.info("Restored \(loaded.count) jobs from snapshot")
-        triggerProcessing()
-        // Restored jobs still waiting for names: the window, or with auto-open
-        // off a notification, since they never make the transition again.
-        announceRestoredSpeakerNaming()
     }
 
     private func noteSnapshotRestoreFailed(_ error: any Error) {

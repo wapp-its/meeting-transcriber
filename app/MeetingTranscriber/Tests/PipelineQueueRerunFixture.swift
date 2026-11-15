@@ -63,6 +63,20 @@ final class PipelineQueueRerunFixture {
         tmpDir.appendingPathComponent("speakers.json")
     }
 
+    /// Where `makeQueue` keeps its snapshot, and this build's re-run file beside it.
+    var logDir: URL {
+        tmpDir.appendingPathComponent("logs")
+    }
+
+    var rerunFile: URL {
+        logDir.appendingPathComponent(PipelineSnapshot.rerunFilename(bundleID: store.bundleID))
+    }
+
+    /// The finished-job history as bytes, so a test can say nothing changed.
+    var terminalFileBytes: Data? {
+        try? Data(contentsOf: tmpDir.appendingPathComponent("records/terminal_jobs.json"))
+    }
+
     /// The file the record store writes, as bytes, so a test can say nothing changed.
     var recordFileBytes: Data? {
         try? Data(contentsOf: storePath)
@@ -94,6 +108,7 @@ final class PipelineQueueRerunFixture {
         recordingRetention: RecordingRetention? = nil,
         protocolGenerator: (() -> (any ProtocolGenerating)?)? = nil,
         stageTimingLog: StageTimingLog? = nil,
+        staleNamingMaxAge: @escaping () -> TimeInterval? = { StaleNamingTimeout.oneDay.maxAge },
     ) -> PipelineQueue {
         let (diarization, protocolGen, speakersDB) = (diarization, protocolGen, speakersDB)
         return PipelineQueue(
@@ -101,9 +116,10 @@ final class PipelineQueueRerunFixture {
             diarizationFactory: { diarization },
             protocolGeneratorFactory: protocolGenerator ?? { protocolGen },
             outputDir: outputDir,
-            logDir: logDir ?? tmpDir.appendingPathComponent("logs"),
+            logDir: logDir ?? self.logDir,
             stagingDir: stagingDir ?? self.stagingDir,
             diarizeEnabled: diarizeEnabled,
+            staleNamingMaxAge: staleNamingMaxAge,
             echoDedupEnabled: false,
             numSpeakers: numSpeakers,
             useAITitleForFilenames: useAITitleForFilenames,

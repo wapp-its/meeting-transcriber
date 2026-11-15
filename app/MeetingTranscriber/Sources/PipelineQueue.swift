@@ -20,9 +20,19 @@ struct TranscriptOutputOptions {
 /// because it crosses the queue ↔ `SpeakerNamingSession` boundary in both
 /// directions via `SpeakerNamingSessionDelegate`.
 struct DiarizationRun {
+    /// A track of a two-track run.
+    enum Track {
+        case callAudio
+        case microphone
+    }
+
     let app: DiarizationResult?
     let mic: DiarizationResult?
     let combined: DiarizationResult?
+    /// The track that was offered to the diarizer and failed, which a one-track
+    /// fallback covers for a new meeting and which ends a re-run (A25). Nil when
+    /// both worked, and for a track never offered because it held no audio.
+    var failedTrack: Track?
 }
 
 @MainActor
@@ -77,6 +87,23 @@ class PipelineQueue {
     ///
     /// Not persisted: a quit restarts the stage, which decides again.
     var protocolGenerationOn: [UUID: Bool] = [:]
+
+    /// The line a meeting's row shows after its re-run failed or was left unnamed
+    /// (R6, A23), kept in memory until the app quits or the meeting's next re-run is
+    /// admitted, so the record and the finished entry stay as they were. Internal
+    /// because PipelineQueue+RerunEnd.swift writes it and the window reads it.
+    var rerunWarnings: [UUID: RerunWarning] = [:]
+    /// Re-run jobs that left the queue while their record's last update failed.
+    /// They stay in the re-run file, so the next launch acts on what the record
+    /// says (PipelineQueue+RerunEnd.swift).
+    @ObservationIgnored var rerunJobsAwaitingRecord: [UUID: PipelineJob] = [:]
+    /// Whether this build's re-run file may still hold jobs, so the next save
+    /// writes it even with no re-run left (PipelineQueue+RerunRecovery.swift).
+    @ObservationIgnored var rerunFileOwed = false
+    /// The re-run file, or the snapshot, did not read when this queue restored, so
+    /// nothing writes the re-run file over in this queue's life: the next launch
+    /// reads it again.
+    @ObservationIgnored var rerunFileFrozen = false
 
     // Dependencies for processing
     let engine: (any TranscribingEngine)?
@@ -907,6 +934,11 @@ class PipelineQueue {
         // An export-only retry still needs its job to retain a created page's
         // ID if the remote request completes after the menu closes.
         guard !jobs.contains(where: { $0.id == id && $0.state == .done && $0.notionExportStatus == .inProgress }) else { return }
+        // Dismiss of a re-run waiting for names: the meeting stays as it was.
+        if let rerun = job(withID: id), rerun.rerun != nil, rerun.state != .done {
+            endRerun(id: id, because: .cancelled)
+            return
+        }
         completedJobRemovalTokens.removeValue(forKey: id)
         // Read before the job leaves the list: only a job still in work can
         // own a local generation to end (see `cancelWork`).
@@ -959,7 +991,7 @@ class PipelineQueue {
     /// (`endingLocalGeneration`), because the gate refuses every later attempt
     /// of a cancelled job, and regenerating a finished meeting's protocol runs
     /// under that job's ID long after the job left the list.
-    private func cancelWork(of id: UUID, endingLocalGeneration: Bool) {
+    func cancelWork(of id: UUID, endingLocalGeneration: Bool) {
         pipelineRuns[id]?.cancel()
         naming.cancelLateWork(jobID: id)
         if endingLocalGeneration { cancelLocalModelGeneration(jobID: id) }
@@ -998,6 +1030,11 @@ class PipelineQueue {
     /// while the move runs, or after it failed, has to be marked already.
     func cancelJob(id: UUID) {
         guard let job = job(withID: id), job.state != .done, job.state != .error else { return }
+        // A re-run moves no recording and marks none processed.
+        guard job.rerun == nil else {
+            endRerun(id: id, because: .cancelled)
+            return
+        }
         relocateRecordingOfCancelledJob(job)
         removeJob(id: id)
     }
@@ -1043,6 +1080,14 @@ class PipelineQueue {
             eventLog.append(jobID: id, event: "state_change", from: oldState, to: newState)
             saveSnapshot()
             rerunSucceeded(id: id)
+            return
+        }
+        // A re-run that fails leaves the meeting as it was: none of a failed job's
+        // steps below run for it, nor its state-change callback (R6).
+        if newState == .error, jobs[index].rerun != nil {
+            recordStageTransition(from: oldState, to: newState, jobID: id, diarizerMode: diarizerMode)
+            eventLog.append(jobID: id, event: "state_change", from: oldState, to: newState)
+            endRerun(id: id, because: .failed(error ?? RerunFailure.unknown))
             return
         }
         if newState == .done {
@@ -1325,7 +1370,7 @@ class PipelineQueue {
     /// bypass the terminal transition (`removeJob`, `cancelJob`) each have to
     /// reap all of them, and a dictionary added to one and not the other is
     /// how a job cancelled mid-stage came to leak its entries once before.
-    private func forgetStageBookkeeping(for id: UUID) {
+    func forgetStageBookkeeping(for id: UUID) {
         stageStartByJob.removeValue(forKey: id)
         stageClocks.removeValue(forKey: id)
         excludedSubStageSecondsByJob.removeValue(forKey: id)
@@ -1440,7 +1485,11 @@ class PipelineQueue {
     /// `.speakerNamingPending` list to the session, which generates the protocol
     /// with auto-names, transitions them to .done, and deletes sidecar files.
     func cleanupStalePending(maxAge: TimeInterval) {
-        naming.cleanupStalePending(pendingJobs: pendingSpeakerNamingJobs, maxAge: maxAge)
+        let pending = pendingSpeakerNamingJobs
+        // A re-run is never given the automatic names: it ends, and the meeting
+        // stays as it was (A5).
+        endStaleReruns(pending.filter { $0.rerun != nil }, maxAge: maxAge)
+        naming.cleanupStalePending(pendingJobs: pending.filter { $0.rerun == nil }, maxAge: maxAge)
     }
 
     // MARK: - Log Directory
@@ -1465,7 +1514,9 @@ class PipelineQueue {
             return
         }
         ensureLogDir()
-        PipelineSnapshotStore.save(jobs, to: logDir, using: snapshotWriter)
+        // A re-run job goes to this build's own file only (A24).
+        PipelineSnapshotStore.save(jobs.filter { $0.rerun == nil }, to: logDir, using: snapshotWriter)
+        saveRerunFile()
     }
 
     /// Set by `PipelineController.rebuild()` on the queue it replaced. Its
@@ -1494,7 +1545,7 @@ class PipelineQueue {
     /// there is anything to wait for; tests read it to assert the writer
     /// drains and clears itself.
     var isSnapshotWorkerActive: Bool {
-        PipelineSnapshotStore.existing(for: logDir) != nil
+        PipelineSnapshotStore.isWriting(into: logDir)
     }
 }
 

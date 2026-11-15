@@ -97,6 +97,8 @@ struct MeetingFileRecord: Codable, Equatable, Sendable {
     /// The re-run of the meeting under way, from its admission until it ends. While
     /// it is set the outcome reads in progress and no second re-run is admitted.
     var rerun: RerunMarker?
+    /// How the meeting's last re-run ended, kept until the next one is admitted.
+    var rerunNote: RerunNote?
 }
 
 extension MeetingFileRecord {
@@ -140,6 +142,7 @@ extension MeetingFileRecord {
             createdBy: container.decodeIfPresent(String.self, forKey: .createdBy),
             runInputs: container.decodeIfPresent(RunInputs.self, forKey: .runInputs),
             rerun: container.decodeIfPresent(RerunMarker.self, forKey: .rerun),
+            rerunNote: container.decodeIfPresent(RerunNote.self, forKey: .rerunNote),
         )
     }
 

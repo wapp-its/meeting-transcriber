@@ -364,6 +364,7 @@ extension MeetingFileStore {
             refusal = document.records[index].rerunRefusal ?? (document.records[index] == read ? nil : .recordNotSaved)
             guard refusal == nil else { return false }
             document.records[index].rerun = marker
+            document.records[index].rerunNote = nil
             document.records[index].outcome = .inProgress
             return true
         }

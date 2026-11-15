@@ -175,6 +175,7 @@ final class PipelineController {
     /// stored-property init.
     func activate(engineProvider: @escaping () -> (any TranscribingEngine)?) {
         self.engineProvider = engineProvider
+        reconcileInterruptedReruns()
         reconcileInterruptedDeletions()
         observeOutputFolder()
         connectRetentionToMeetingRecords()
