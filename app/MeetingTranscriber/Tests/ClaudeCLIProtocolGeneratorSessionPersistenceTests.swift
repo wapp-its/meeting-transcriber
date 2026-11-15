@@ -14,7 +14,10 @@
             )
             XCTAssertEqual(
                 args,
-                ["-p", "-", "--output-format", "stream-json", "--verbose", "--model", "sonnet", "--no-session-persistence"],
+                [
+                    "-p", "-", "--output-format", "stream-json", "--verbose", "--model", "sonnet",
+                    "--tools", "", "--strict-mcp-config", "--no-session-persistence",
+                ],
             )
         }
 

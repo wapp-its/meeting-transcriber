@@ -130,8 +130,10 @@
         /// Decodes `stderrData`, logs the exit and the sizes of what the CLI
         /// wrote, and builds the error `generate()` throws on a nonzero exit —
         /// pulled out of `generate()` itself to keep that function's body
-        /// short. A run with `arguments` that the CLI refused one of
-        /// `optionalFlags` gets its error wrapped as `OptionsRefused`.
+        /// short. A run with `arguments` that the CLI refused the tool
+        /// restriction gets a message asking for a newer CLI and no second
+        /// run; one refused another of `optionalFlags` gets its error wrapped
+        /// as `OptionsRefused`.
         ///
         /// Nothing the subprocess wrote reaches the log: the prompt carries
         /// the meeting's background info, and a CLI that echoes its input on
@@ -149,6 +151,12 @@
             logger.error(
                 "claude_cli_failed exit=\(exitCode, privacy: .public) stderr_bytes=\(stderrData.count, privacy: .public) text_bytes=\(text.utf8.count, privacy: .public) reason_source=\(reasonSource, privacy: .public)",
             )
+            // Checked first and never retried: a CLI that refuses the tool
+            // restriction gets no run at all (see `noToolsArguments`).
+            if rejectedToolRestriction(stderr: stderrText, message: publicMessage, arguments: arguments) {
+                logger.error("claude_cli_rejected_tool_restriction exit=\(exitCode, privacy: .public)")
+                return makeFailureError(exitCode: exitCode, stderrText: toolRestrictionRejectedMessage(publicMessage))
+            }
             let error = makeFailureError(exitCode: exitCode, stderrText: publicMessage)
             let refused = refusedOptions(stderr: stderrText, message: publicMessage, arguments: arguments)
             return refused.isEmpty ? error : OptionsRefused(options: refused, error: error)
@@ -386,11 +394,12 @@
 
         /// Build the CLI argument vector. When `resolvedBin` is the
         /// `/usr/bin/env` fallback, prepend `claudeBin` so env can resolve
-        /// it from PATH. `noSessionPersistenceFlag` and each of
+        /// it from PATH. `noToolsArguments` are always there, after the
+        /// prompt marker. `noSessionPersistenceFlag` and each of
         /// `isolationOptions` go in when `options` holds its name; pass
         /// what the CLI's `--help` lists (see `launchConfiguration`).
         static func buildSubprocessArgs(claudeBin: String, resolvedBin: String, options: Set<String>) -> [String] {
-            var args = ["-p", "-", "--output-format", "stream-json", "--verbose", "--model", "sonnet"]
+            var args = ["-p", "-", "--output-format", "stream-json", "--verbose", "--model", "sonnet"] + noToolsArguments
             if options.contains(noSessionPersistenceFlag) {
                 args.append(noSessionPersistenceFlag)
             }

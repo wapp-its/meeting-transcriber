@@ -1,7 +1,7 @@
 #if !APPSTORE
-    // What the speaker database routes of `DebugRPCServer` (`/action/renameSpeaker`,
-    // `deleteSpeaker`, `mergeSpeakers`, `seedSpeaker`) call and report. Split out
-    // of `DebugRPCServer.swift` to keep that file under the length cap.
+    import Foundation
+
+    // MARK: - Speaker DB action types
 
     enum SpeakerActionOutcome: String {
         case ok
@@ -40,4 +40,5 @@
             seed: { _ in .invalid },
         )
     }
+
 #endif

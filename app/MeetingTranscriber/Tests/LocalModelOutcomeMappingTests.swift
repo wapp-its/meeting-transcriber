@@ -10,6 +10,9 @@
     @MainActor
     final class LocalModelOutcomeMappingTests: XCTestCase {
         private let failureWarning = "Protocol generation failed — transcript saved"
+        /// The done notification of a job whose notes failed, with the
+        /// failure notice on (the default).
+        private let notesFailed = "Meeting Notes Failed"
         private let lowMemory = LocalModelMemoryReading(pressure: .warning, availableBytes: 1 << 30)
 
         private struct Expectation {
@@ -26,9 +29,9 @@
                 Expectation(outcome: .incomplete(text: "Partial minutes"), warning: incomplete, doneTitle: "Meeting Notes Ready", shortfall: nil),
                 Expectation(outcome: .lowMemory(lowMemory), warning: short.lowMemory.warning, doneTitle: nil, shortfall: .lowMemory),
                 Expectation(outcome: .noModel, warning: short.noModel.warning, doneTitle: nil, shortfall: .noModel),
-                Expectation(outcome: .promptTooLong, warning: failureWarning, doneTitle: "Transcript Saved", shortfall: nil),
-                Expectation(outcome: .deadline(.noProgress), warning: failureWarning, doneTitle: "Transcript Saved", shortfall: nil),
-                Expectation(outcome: .failure(.signal(SIGKILL)), warning: failureWarning, doneTitle: "Transcript Saved", shortfall: nil),
+                Expectation(outcome: .promptTooLong, warning: failureWarning, doneTitle: notesFailed, shortfall: nil),
+                Expectation(outcome: .deadline(.noProgress), warning: failureWarning, doneTitle: notesFailed, shortfall: nil),
+                Expectation(outcome: .failure(.signal(SIGKILL)), warning: failureWarning, doneTitle: notesFailed, shortfall: nil),
             ]
             for expected in expectations {
                 let notifier = LocalModelNoticeSpy()
@@ -67,7 +70,7 @@
             try await bench.waitUntilDone([id])
 
             XCTAssertEqual(bench.job(id)?.warnings, [failureWarning])
-            XCTAssertEqual(notifier.notifications.map(\.title), ["Transcript Saved"])
+            XCTAssertEqual(notifier.notifications.map(\.title), [notesFailed])
             XCTAssertTrue(notifier.notices.isEmpty)
         }
 

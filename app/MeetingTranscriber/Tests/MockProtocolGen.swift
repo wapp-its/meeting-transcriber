@@ -11,6 +11,8 @@ class MockProtocolGen: ProtocolGenerating {
     var capturedMeetingStartTime: Date?
     var capturedInstructions: ProtocolInstructions?
     var shouldThrow = false
+    /// Thrown instead of the generic mock error when set, with `shouldThrow` on.
+    var errorToThrow: (any Error)?
     /// The title the model puts in the heading. Unset, it echoes the title it
     /// was given, which cannot tell a heading the model wrote from the input.
     var headingTitle: String?
@@ -29,6 +31,7 @@ class MockProtocolGen: ProtocolGenerating {
         capturedMeetingStartTime = meetingStartTime
         capturedInstructions = instructions
         if shouldThrow {
+            if let errorToThrow { throw errorToThrow }
             throw NSError(
                 domain: "MockProtocolGen",
                 code: 1,

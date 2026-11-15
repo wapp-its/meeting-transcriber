@@ -81,7 +81,9 @@ extension PipelineQueue {
     /// different job holding the audio reports under an ID nobody is watching
     /// for, so this one ends in error rather than vanishing unanswered.
     private func claimRunOrGiveUpDuplicate(_ job: PipelineJob) -> Bool {
-        switch inFlightRuns.begin(jobID: job.id, mixPath: job.mixPath) {
+        // A notes-only run never reads the audio, so it holds none: another run
+        // of the same recording must not refuse it.
+        switch inFlightRuns.begin(jobID: job.id, mixPath: job.generatesNotesOnly == true ? nil : job.mixPath) {
         case .claimed:
             return true
 
@@ -236,6 +238,13 @@ extension PipelineQueue {
         // nor the output folder, and leaving it behind a nil engine would strand
         // a job that only wants one LLM call until the marking dies with the
         // session.
+        // A notes retry, ahead of the resume: it has its own reading of the
+        // transcript, which ends in the retry still offered, never a full run.
+        if job.generatesNotesOnly == true {
+            protocolResumeDispositions.removeValue(forKey: job.id)
+            await generateNotesOnly(job)
+            return true
+        }
         if await resumeProtocolOnly(job) { return true }
 
         guard let engine, let outputDir else {
@@ -1173,6 +1182,8 @@ extension PipelineQueue {
             request: (transcript: transcript, title: title, meetingStartTime: meetingStartTime, instructions: instructions),
             meeting: (folder: protocolsDir, basename: initialBasename, template: templateID, background: job.protocolBackground),
         ) else {
+            // The names the notes were to carry, for a retry of them.
+            recordNotesSpeakerNames(id: jobID, speakerNames)
             // No protocol, so no export, but an export that is switched on and
             // cannot run is still worth a reason on the job.
             resolveNotionExport(jobID: jobID)
@@ -1194,6 +1205,8 @@ extension PipelineQueue {
                 jobID: jobID, from: initialBasename, titleSlug: titleSlug, protocolsDir: protocolsDir,
             )
         }
+        // Checked again after the model call, which can take many minutes.
+        if notesAppearedDuringTheCall(of: job, basename: basename, protocolsDir: protocolsDir) { return }
 
         let markdown = ProtocolGenerator.composeDocument(
             protocolMarkdown: protocolMD,
@@ -1299,7 +1312,8 @@ extension PipelineQueue {
             // still sees the full text where the result is shown.
             let summary = (error as? ProtocolError)?.logSummary ?? String(describing: type(of: error))
             logger.warning("[\(PipelineJob.shortID(for: jobID), privacy: .public)] protocol_generation_failed error=\(summary, privacy: .public)")
-            addWarning(id: jobID, "Protocol generation failed — transcript saved")
+            addWarning(id: jobID, Self.protocolGenerationFailedWarning)
+            recordNotesFailure(id: jobID, MeetingNotesFailure(error))
             return nil
         }
     }
@@ -1702,8 +1716,13 @@ extension PipelineQueue {
                 addWarning(id: meeting.jobID, LocalModelNotice.Shortfall.noModel.warning)
                 onLocalModelEvent?(.notWritten(.noModel, meeting))
 
-            case .deferredForRecording, .promptTooLong, .deadline, .failure:
-                addWarning(id: meeting.jobID, "Protocol generation failed — transcript saved")
+            case .deadline:
+                addWarning(id: meeting.jobID, Self.protocolGenerationFailedWarning)
+                recordNotesFailure(id: meeting.jobID, .timedOut)
+
+            case .deferredForRecording, .promptTooLong, .failure:
+                addWarning(id: meeting.jobID, Self.protocolGenerationFailedWarning)
+                recordNotesFailure(id: meeting.jobID, .other)
             }
             return nil
         }

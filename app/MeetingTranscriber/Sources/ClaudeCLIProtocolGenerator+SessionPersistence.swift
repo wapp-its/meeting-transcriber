@@ -131,18 +131,22 @@
             let error: ProtocolError
         }
 
-        /// The `optionalFlags` a run given them was refused: those that a
-        /// line of its stderr or reported message names together with
-        /// unknown-option wording, ignoring case. Both are read because the
-        /// message prefers a result event's reason over stderr.
+        /// The `optionalFlags` a run given them was refused (see
+        /// `rejectedOption`).
         static func refusedOptions(stderr: String, message: String, arguments: [String]) -> Set<String> {
+            optionalFlags.filter { rejectedOption($0, stderr: stderr, message: message, arguments: arguments) }
+        }
+
+        /// Whether a run given `option` was refused it: a line of its stderr
+        /// or reported message names the option, as a whole name, together
+        /// with unknown-option wording, ignoring case. Both are read because
+        /// the message prefers a result event's reason over stderr.
+        static func rejectedOption(_ option: String, stderr: String, message: String, arguments: [String]) -> Bool {
+            guard arguments.contains(option) else { return false }
             let wordings = ["unknown option", "unrecognized option", "unrecognised option", "invalid option"]
-            let refusals = [stderr, message].flatMap { $0.split(whereSeparator: \.isNewline) }
+            return [stderr, message].flatMap { $0.split(whereSeparator: \.isNewline) }
                 .map { $0.lowercased() }
-                .filter { line in wordings.contains { line.contains($0) } }
-            return optionalFlags.filter { option in
-                arguments.contains(option) && refusals.contains { names(option, in: $0) }
-            }
+                .contains { line in wordings.contains { line.contains($0) } && names(option.lowercased(), in: line) }
         }
 
         /// Removes the run's working directory, and the CLI's project folder

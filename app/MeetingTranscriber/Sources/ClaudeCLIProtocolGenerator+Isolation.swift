@@ -24,17 +24,18 @@
     /// Ignoring the settings files also drops what the user keeps only there,
     /// a gateway URL in their `env` block for instance; managed settings and
     /// the app's API key field still apply.
+    ///
+    /// No tools and no MCP servers come from `noToolsArguments`, which every
+    /// run gets and a CLI too old for refuses without a second run. What is
+    /// here goes beyond that: the settings files (hooks, plugins, permission
+    /// mode, global instructions), telemetry and the claude.ai connectors.
     extension ClaudeCLIProtocolGenerator {
-        /// No built-in tool (`""` switches them all off), no MCP server but
-        /// those of an `--mcp-config` the app never passes, and no user,
-        /// project or local settings file. A run gets each option, as
-        /// `arguments`, only when the CLI's `--help` lists its `name`: a CLI
-        /// older than the option rejects it. Tuples rather than a small
+        /// No user, project or local settings file. A run gets each option,
+        /// as `arguments`, only when the CLI's `--help` lists its `name`: a
+        /// CLI older than the option rejects it. Tuples rather than a small
         /// struct: SwiftLint's analyzer does not see a struct used inside an
         /// extension of another struct and reports it as unused.
         static let isolationOptions: [(name: String, arguments: [String])] = [
-            (name: "--tools", arguments: ["--tools", ""]),
-            (name: "--strict-mcp-config", arguments: ["--strict-mcp-config"]),
             (name: "--setting-sources", arguments: ["--setting-sources", ""]),
         ]
 

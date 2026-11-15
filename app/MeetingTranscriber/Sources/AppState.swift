@@ -431,6 +431,7 @@ final class AppState {
                 recordStatus: record.status,
                 recordControl: record.control,
                 recordStopAny: record.stopAny,
+                meetingNotes: meetingNotesRPCActions(),
             )
         }
     #endif
