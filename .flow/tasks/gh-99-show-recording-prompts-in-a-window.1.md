@@ -45,9 +45,51 @@ All paths below are relative to `app/MeetingTranscriber/`.
 - [ ] Quick commands green; `./scripts/lint.sh` clean with the pinned tools.
 
 ## Done summary
-TBD
+Task .4 can now build the prompt window on three tested pieces. `PromptPanel` is a never-key, non-activating panel at status-bar level on every Space with sharing type none. `MenuBarIconFrame` reads the menu bar icon's frame from the app's own windows. `PromptWindowPlacement` puts the window 6 pt below the icon, or at the top right below the menu bar when the icon cannot be read. Nothing is wired into the app yet, as the task says.
 
+Both prove-it-first gates ran in a throwaway helper app with its own bundle id and a SwiftUI `MenuBarExtra`, on macOS 26, not in the installed dev app (it cannot run probe code). The helper quit on its own and was removed afterwards.
+
+Gate 0a (icon frame lookup), per case tried:
+- Icon visible: the item got one window per display that shows a menu bar, class `NSStatusBarWindow` (content `NSStatusBarContentView`), level 25 (`.statusBar`), as wide as the icon (32 pt) and as tall as that display's menu bar (33 pt on the notched display, 30 pt on the second display). Both windows were occlusion-visible.
+- Notch overflow (set up with five items in the helper): the icon's window on the notched display kept a non-empty on-screen frame behind the notch, `isVisible` true and occlusion not visible. Items pushed further left, over the app menus, behaved the same. The copies on the second display stayed visible. The lookup therefore takes only occlusion-visible windows, so this case reaches the fallback when no other display shows the icon.
+- Item not inserted (`isInserted` false): its window had an empty frame (height 0), or a frame off every screen. Both reach the fallback.
+- Hidden by a menu bar manager: not set up. No menu bar manager was available to the probe. The occlusion and empty-frame rules above are the expected route to the fallback, unverified.
+
+Gate 0b (first click): passed. A bare panel of the `PromptPanel` shape with one SwiftUI button was shown through `orderFrontRegardless` while another app was frontmost. One CGEvent-level click (one down, one up) was posted from a separate process at the button's centre, after `CGWindowListCopyWindowInfo` confirmed that the topmost window at that point was the helper's own. The button's action ran on that one click. The helper stayed inactive, the panel never became key (no `didBecomeKey`, `keyWindow` nil) and the other app stayed frontmost before, during and after the click. A control run with a plain `NSHostingView` (no `acceptsFirstMouse` override) also ran the action on the first click. The override stays because the spec asks for it, and a plain `NSHostingView` answers false to `acceptsFirstMouse(for:)`.
+
+The first 0b run caught a real trap. Setting `isFloatingPanel = true` resets a panel's level to `.floating` (3), so a panel that sets the level first ends below the Dock's layer-20 window and the click check refused to post. `PromptPanel` sets `isFloatingPanel` before `.statusBar`, and the panel test pins the order.
+
+Tests by acceptance criterion:
+- Panel set-up: `PromptPanelTests.testPanelTakesClicksWithoutEverBecomingKeyOrActivatingTheApp` checks the non-activating style, `canBecomeKey` and `canBecomeMain` false, `.statusBar` level, `canJoinAllSpaces` and `fullScreenAuxiliary`, not hidden on deactivate, sharing type none, the window identifier, and a content view that accepts the first mouse.
+- Placement: `PromptWindowPlacementTests` covers the icon in the middle (centred, top edge 6 pt below the icon), the icon near the right edge (kept inside the screen), no icon frame (top right), an icon frame on no screen (top right), and the icon on the second of two screens. A sixth test covers non-finite screens and icon frames (ignored) and no usable screen (nil).
+- Lookup: `MenuBarIconFrameTests` covers found (preferring the menu bar screen), no such window (real `NSPanel` adapter, wrong class, wrong level, empty list, nil app), empty frame, and an icon window that is not visible (the notch case).
+- Mutation check: moving `isFloatingPanel` after the level turned the panel test red (level 3 instead of 25). Dropping the occlusion filter turned both notch assertions red. Both files were restored before the commit.
+
+baseline: green via handoff (verified at e128491d by the conductor, the spec's Quick command with -j 6, 191 tests, 0 failures); lint green at base (ran, exit 0)
+
+Gates on the task head: the spec's Quick command, run with `-j 6` in both places, exited 0 (202 tests, 0 failures). `./scripts/lint.sh` with the pinned tools exited 0 (0 violations in 1274 files). The App Store variant was not built. The task does not ask for it, and nothing here is behind `#if`.
+
+Choices:
+- Screen model reuses `CaptionScreen` instead of a copy (rule 6).
+- The icon window is identified by class `NSStatusBarWindow`, `.statusBar` level, occlusion-visible and a non-empty frame (rule 1, task step 2 and the spec's edge case that a notch-overflow icon uses the fallback).
+- With the icon visible on two displays, the lookup prefers the window on the screen with the menu bar (rule 4, switch point `MenuBarIconFrame.frame(among:menuBarScreen:)`, test `testFindsTheIconWindowPreferringTheOneOnTheMenuBarScreen`).
+- The 6 pt gap also keeps the window off a screen's side edges, in the clamp and in the top-right fallback (rule 4, switch point `PromptWindowPlacement.gap` in `clamped` and the fallback x, tests `testIconNearTheRightEdgeKeepsTheWindowInsideTheScreen` and `testNoIconFramePutsTheWindowAtTheTopRightBelowTheMenuBar`).
+- The placement ignores non-finite or empty screens and icon frames and returns nil when no screen is usable (rule 1, the display-reconfiguration note in `CaptionBarPlacement`).
+- Window identifier `recording-prompts` (rule 6).
+- Content is a `PromptHostingView` over `AnyView`, replaced through `panel.host.rootView`. The panel size comes from the caller through `init(size:)`, so the 340 pt width of D6 stays with task .4 (rule 6).
+
+Follow-ups and findings for the conductor:
+- `NSStatusBar.system.thickness` read 22 pt, while the notched display's menu bar is 33 pt. Task .4 must not pass it unchanged as `menuBarHeight`, or the fallback window's top edge sits 5 pt inside the menu bar on exactly the screens where the notch overflow forces the fallback. Details are in the run notes.
+- Pre-existing, not fixed (outside this spec): `LiveCaptionsWindowController.ensurePanel` sets `level = .statusBar` before `isFloatingPanel = true`, so the caption panel actually runs at `.floating`.
+
+Tier: implementer - opus (explicit invocation) at xhigh effort (requested) (model: claude-opus-5-5)
+
+Integrated verify on the spec branch: the spec's Quick command with -j 6 at e18f56c0, exit 0, 202 tests, 0 failures
+
+stage: impl-review - ran [2026-11-15T16:27:51Z..2026-11-15T16:32:30Z] SHIP, one correctness draw, no findings (model: gpt-6.1-sol at xhigh)
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: e18f56c0bffe8b0d970b0ea55616a1f56d0f97f7
+- Tests: cd app/MeetingTranscriber && mkdir -p .build/test-home && swift build --build-tests -j 6 && CFFIXED_USER_HOME="$PWD/.build/test-home" swift test -j 6 --filter 'PromptWindow|PromptPanel|MenuBarIconFrame|MeetingEndQuestion|WatchLoopMeetingEnd|NotificationManagerMeetingEndTests|NotificationManagerSchedulingTests|ConsentPromptCoordinatorTests|WatchLoopAskBeforeRecordingTests|WatchLoopBrowserConsentTests|AppStateConsentPromptTests|NamingWindowPolicyTests|GeneralSettings|AppSettingsTests|MenuBarIconCountdownTests' (exit 0: 202 tests, 0 failures), ./scripts/lint.sh with pinned SwiftFormat 0.64.6 / SwiftLint 0.65.1 (exit 0: 0 violations in 1274 files), integrated verify: the spec's Quick command with -j 6 at e18f56c0, exit 0, 202 tests, 0 failures
 - PRs:

@@ -8,7 +8,9 @@
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-99-show-recording-prompts-in-a-window",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-99-show-recording-prompts-in-a-window.1": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -147,15 +149,52 @@
       "task": null,
       "timestamp": "2026-11-14T20:22:13.789997Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "a88fa77f92167956ca910f6906ce1ddd950dc7703222f7e6f491c6c3cc3dd372",
+      "backend": "codex",
+      "base_sha": "e128491d81ccda004bc8c1d977cca723355e517d",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "e18f56c0bffe8b0d970b0ea55616a1f56d0f97f7",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6.1-sol",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "930eda3f33e24855a0e72440ddc00083",
+      "round_consumed": true,
+      "scope": "impl:gh-99-show-recording-prompts-in-a-window.1",
+      "superseded_by": null,
+      "task": "gh-99-show-recording-prompts-in-a-window.1",
+      "timestamp": "2026-11-15T16:33:00.789016Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-99-show-recording-prompts-in-a-window.1": 1,
     "plan": 3,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-99-show-recording-prompts-in-a-window.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-99-show-recording-prompts-in-a-window.md",
@@ -173,5 +212,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/99"
   },
-  "updated_at": "2026-11-15T15:39:14.261424Z"
+  "updated_at": "2026-11-15T16:33:00.813577Z"
 }
