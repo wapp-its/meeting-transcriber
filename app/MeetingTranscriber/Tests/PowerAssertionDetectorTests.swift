@@ -317,6 +317,23 @@ final class PowerAssertionDetectorTests: XCTestCase {
         XCTAssertNil(detector.checkOnce())
     }
 
+    /// "Record Again" after a stop: the reset cleared the count and started
+    /// the cooldown, and a marked app is returned by the very next poll.
+    func testAMarkedAppIsReturnedByTheNextPollAlsoInsideItsCooldown() {
+        let detector = makeDetector(confirmationCount: 2)
+        detector.assertionProvider = {
+            makeAssertionDict(pid: 1234, processName: "MSTeams", assertName: "Microsoft Teams Call in progress")
+        }
+        XCTAssertNil(detector.checkOnce(), "precondition: one poll is not enough")
+        XCTAssertNotNil(detector.checkOnce(), "precondition: two are")
+        detector.reset(appName: "Microsoft Teams")
+        XCTAssertNil(detector.checkOnce(), "precondition: the cooldown holds it back")
+
+        detector.markConfirmed(appName: "Microsoft Teams")
+
+        XCTAssertEqual(detector.checkOnce()?.pattern.appName, "Microsoft Teams")
+    }
+
     func testCooldownDoesNotAffectOtherApps() {
         let detector = makeDetector()
 
