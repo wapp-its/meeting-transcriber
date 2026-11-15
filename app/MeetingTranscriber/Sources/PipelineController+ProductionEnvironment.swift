@@ -16,7 +16,7 @@ extension PipelineController.QueueEnvironment {
             speakersDB: AppPaths.speakersDB,
             recognitionStatsLog: RecognitionStatsLog.defaultPath,
             stageTimingLog: StageTimingLog.defaultPath,
-            recoverStagedRecordings: PipelineController.recoverStagedRecordings(into:levelBalance:),
+            recoverStagedRecordings: PipelineController.recoverStagedRecordings(into:levelBalance:recordOnly:),
         )
     }
 }
@@ -33,18 +33,22 @@ extension PipelineController {
     /// unsettled, which is why the pass is chained here as well.
     @MainActor private(set) static var stagedRecoveryPass: Task<Void, Never>?
 
-    private static func recoverStagedRecordings(into q: PipelineQueue, levelBalance: Bool) {
-        startStagedRecovery(into: q, levelBalance: levelBalance, diagnostics: OSLogDiagnostics(category: "RecoveredCut"))
+    private static func recoverStagedRecordings(into q: PipelineQueue, levelBalance: Bool, recordOnly: RecordOnlyRecovery) {
+        startStagedRecovery(
+            into: q, levelBalance: levelBalance, recordOnly: recordOnly, diagnostics: OSLogDiagnostics(category: "RecoveredCut"),
+        )
     }
 
     /// Fire-and-forget: dir scan + per-file attr probes run off-main so app
     /// startup (and the first call to `enqueueFiles`) isn't blocked by a slow
-    /// filesystem. Recovered jobs appear in `queue.jobs` once the scan returns.
+    /// filesystem. Recovered jobs appear in `queue.jobs` once the scan returns,
+    /// or in record-only mode the recordings in the output folder.
     /// The pass is returned so a test can wait for it.
     @discardableResult
     static func startStagedRecovery(
         into q: PipelineQueue,
         levelBalance: Bool,
+        recordOnly: RecordOnlyRecovery,
         diagnostics: any DiagnosticsLogging,
     ) -> Task<Void, Never> {
         // Taken here, before any wait for an earlier pass: the age guards that
@@ -71,7 +75,7 @@ extension PipelineController {
             }
             await recoverOrphans(
                 into: q, holdingBack: unsettled.map { staging.appendingPathComponent($0 + RecordingFileSuffix.mix) },
-                recordingsDir: staging,
+                recordingsDir: staging, recordOnly: recordOnly,
             )
         }
         stagedRecoveryPass = pass
@@ -113,15 +117,18 @@ extension PipelineController {
         return RecoveredCut.apply(pendingCuts, in: staging, diagnostics: diagnostics)
     }
 
-    /// The orphan scan, passing over the mixes in `holdingBack`. Each is held
+    /// The orphan scan, passing over the mixes in `holdingBack`, and the
+    /// hand-on of what it found: a job each, or in record-only mode (asked
+    /// here, after the scan) a record-only write each. Each held mix is held
     /// in the queue's run registry, which the scan already skips as audio a
-    /// run is busy with, for as long as the scan runs, and released after
-    /// it, so the next pass, which restores the hidden track first, can
-    /// queue it.
+    /// run is busy with, until the last job or write is handed on, and
+    /// released after it, so the next pass, which restores the hidden track
+    /// first, can take it.
     static func recoverOrphans(
         into q: PipelineQueue,
         holdingBack mixes: [URL],
         recordingsDir: URL,
+        recordOnly: RecordOnlyRecovery,
     ) async {
         let holds = mixes.map { (id: UUID(), mix: $0) }
         for hold in holds {
@@ -132,6 +139,11 @@ extension PipelineController {
                 q.inFlightRuns.end(jobID: hold.id)
             }
         }
-        await q.recoverOrphanedRecordings(recordingsDir: recordingsDir)
+        let scanned = await q.scanForOrphanedRecordings(recordingsDir: recordingsDir)
+        if recordOnly.isOn() {
+            await q.fileOrphanedRecordings(scanned, recordOnly: recordOnly)
+        } else {
+            q.adoptOrphanedRecordings(scanned)
+        }
     }
 }

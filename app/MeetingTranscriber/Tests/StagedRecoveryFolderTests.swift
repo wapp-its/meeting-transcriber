@@ -35,7 +35,7 @@ final class StagedRecoveryFolderTests: XCTestCase {
             stagingDir: staging,
         )
         let recover = try XCTUnwrap(PipelineController.QueueEnvironment.production.recoverStagedRecordings)
-        recover(queue, false)
+        recover(queue, false, .off)
 
         var repaired = false
         let deadline = ContinuousClock.now + .seconds(5)
@@ -79,13 +79,46 @@ final class StagedRecoveryFolderTests: XCTestCase {
         let fixture = try recordingToCut()
         let recover = try XCTUnwrap(PipelineController.QueueEnvironment.production.recoverStagedRecordings)
 
-        try recover(makeQueue(staging: fixture.dir), false)
+        try recover(makeQueue(staging: fixture.dir), false, .off)
         await PipelineController.stagedRecoveryPass?.value
 
         for suffix in RecordingFileSuffix.all {
             XCTAssertEqual(try fixture.frames(suffix), keptFrames, suffix)
         }
         XCTAssertFalse(fixture.storedCutExists)
+    }
+
+    /// In record-only mode the cut comes before the filing: every filed track
+    /// ends at the cut, and so does the sidecar. The fixture's stem is no
+    /// time, so the sidecar starts at the files' creation; it keeps whole
+    /// seconds.
+    func testARecordingWithAStoredCutIsFiledCutInRecordOnlyMode() async throws {
+        let fixture = try recordingToCut()
+        let output = try makeTempDirectory(prefix: "StagedRecoveryCutFiled")
+
+        try await runPass(on: fixture.dir, into: makeQueue(staging: fixture.dir), recordOnly: .writing(into: output))
+
+        let filed = StagedRecordingFixture(dir: output.appendingPathComponent("recordings"), stem: fixture.stem)
+        for suffix in RecordingFileSuffix.all {
+            XCTAssertEqual(try filed.frames(suffix), keptFrames, suffix)
+        }
+        let sidecar = try XCTUnwrap(RecordingSidecar.read(fromDirectory: filed.dir, basename: fixture.stem))
+        XCTAssertEqual(sidecar.stoppedAt.timeIntervalSince(sidecar.startedAt), Double(keptFrames) / 16000, accuracy: 1)
+    }
+
+    /// A cut that fails leaves the recording as recorded, and record-only mode
+    /// files it so, as processing would queue it uncut.
+    func testARecordingWhoseCutFailsIsFiledUncutInRecordOnlyMode() async throws {
+        let fixture = try recordingToCut()
+        try Data("not audio".utf8).write(to: fixture.url(RecordingFileSuffix.mic))
+        try fixture.setWritten(fixture.url(RecordingFileSuffix.mic), at: 0)
+        let output = try makeTempDirectory(prefix: "StagedRecoveryCutFailed")
+
+        try await runPass(on: fixture.dir, into: makeQueue(staging: fixture.dir), recordOnly: .writing(into: output))
+
+        let filed = StagedRecordingFixture(dir: output.appendingPathComponent("recordings"), stem: fixture.stem)
+        XCTAssertEqual(try filed.frames(RecordingFileSuffix.mix), 400_000, "the mix was cut")
+        XCTAssertNotNil(RecordingSidecar.read(fromDirectory: filed.dir, basename: fixture.stem), "not filed")
     }
 
     /// A recording the pass left unsettled (an original track still under its
@@ -102,7 +135,7 @@ final class StagedRecoveryFolderTests: XCTestCase {
         let registry = InFlightRunRegistry()
         let queue = try PipelineQueue(logDir: makeTempDirectory(prefix: "StagedRecoveryLog"), stagingDir: dir, inFlightRuns: registry)
 
-        await PipelineController.recoverOrphans(into: queue, holdingBack: [unsettled], recordingsDir: dir)
+        await PipelineController.recoverOrphans(into: queue, holdingBack: [unsettled], recordingsDir: dir, recordOnly: .off)
 
         XCTAssertEqual(queue.jobs.map(\.meetingTitle), ["Recovered Recording (20260311_110000)"])
         XCTAssertTrue(registry.claimedAudioPaths.isEmpty, "the hold ends with the scan")
@@ -112,10 +145,11 @@ final class StagedRecoveryFolderTests: XCTestCase {
 
     /// One staged recovery pass on `dir`, the steps the production pass runs,
     /// with the orphan scan reading `dir`.
-    private func runPass(on dir: URL, into queue: PipelineQueue) async {
+    private func runPass(on dir: URL, into queue: PipelineQueue, recordOnly: RecordOnlyRecovery = .off) async {
         let unsettled = PipelineController.recoverStagingFolder(dir, levelBalance: false, diagnostics: RecordingDiagnostics())
         await PipelineController.recoverOrphans(
             into: queue, holdingBack: unsettled.map { dir.appendingPathComponent($0 + RecordingFileSuffix.mix) }, recordingsDir: dir,
+            recordOnly: recordOnly,
         )
     }
 
@@ -245,6 +279,7 @@ final class StagedRecoveryFolderTests: XCTestCase {
         let unsettled = PipelineController.recoverStagingFolder(dir, levelBalance: false, diagnostics: RecordingDiagnostics())
         await PipelineController.recoverOrphans(
             into: queue, holdingBack: unsettled.map { dir.appendingPathComponent($0 + RecordingFileSuffix.mix) }, recordingsDir: dir,
+            recordOnly: .off,
         )
 
         for fixture in [old, fresh] {
@@ -264,8 +299,8 @@ final class StagedRecoveryFolderTests: XCTestCase {
         let queue = try makeQueue(staging: fixture.dir)
         let log = RecordingDiagnostics()
 
-        let first = PipelineController.startStagedRecovery(into: queue, levelBalance: false, diagnostics: log)
-        let second = PipelineController.startStagedRecovery(into: queue, levelBalance: false, diagnostics: log)
+        let first = PipelineController.startStagedRecovery(into: queue, levelBalance: false, recordOnly: .off, diagnostics: log)
+        let second = PipelineController.startStagedRecovery(into: queue, levelBalance: false, recordOnly: .off, diagnostics: log)
         await first.value
         await second.value
 
