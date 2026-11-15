@@ -10,9 +10,9 @@
   "id": "gh-171-transcribe-again-and-identify-speakers",
   "impl_review_rounds": {},
   "next_task": 1,
-  "plan_review_rounds": 1,
-  "plan_review_status": "needs_work",
-  "plan_reviewed_at": "2026-11-15T16:12:16.373284Z",
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-11-15T16:20:52.822023Z",
   "ready": true,
   "review_attempts": [
     {
@@ -456,10 +456,70 @@
       "timestamp": "2026-11-15T16:12:16.054585Z",
       "tool_calls": 46,
       "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "fb71ab46f5f490c3446ad26905602bf06921f21e92ca5990cc73aafebdd79899",
+      "backend": "codex",
+      "base_sha": "1d09282725e72ba97c40f83cbf54ada9fccca663",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-ac41be18a86a792ead7a65075bab39f3",
+            "classification": "introduced",
+            "findingId": "finding-ac41be18a86a792ead7a65075bab39f3",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-6ad7798b761d0ac753a1c1452aa57cbd",
+            "classification": "introduced",
+            "findingId": "finding-6ad7798b761d0ac753a1c1452aa57cbd",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-2ebb129a86c0ccc41d4372f61d064412",
+            "classification": "introduced",
+            "findingId": "finding-2ebb129a86c0ccc41d4372f61d064412",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "14a87b7247c42ae40736eb4e887b540ee2a2d945",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 879,
+      "output_sha256": "850db98708d9adbf27b9d0af2c2322fdc245664ad6e000b465afe69b90c7ad87",
+      "reservation_id": "3de3fd059ca84d889de99fb6203da19a",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-15T16:20:52.799227Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
-    "plan": 1,
+    "plan": 2,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
@@ -482,5 +542,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/171"
   },
-  "updated_at": "2026-11-15T16:19:03.820610Z"
+  "updated_at": "2026-11-15T16:20:52.823777Z"
 }
