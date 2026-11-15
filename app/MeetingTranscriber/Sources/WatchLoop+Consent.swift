@@ -126,12 +126,21 @@ extension WatchLoop {
         clearConsentState()
     }
 
-    /// The menu's Record / Ignore for `question`. Answered by the prompt's id,
-    /// as a tap on its notification is, so it can never resolve another
-    /// prompt; the answer then lands through `finishConsent` like any other.
-    /// False when `question` is not the open one (expired, answered elsewhere,
-    /// declined by Stop Watching or a manual start, or replaced, also by a new
-    /// prompt about the same app) or its prompt has not registered yet.
+    /// The menu's and the Record Meeting window's Record / Ignore for
+    /// `question`: `answerParkedConsent(_:answer:protocolOptions:)` with
+    /// `.granted` or `.declined`.
+    func answerParkedConsent(_ question: ConsentQuestion, granted: Bool, protocolOptions: MeetingProtocolOptions? = nil) -> Bool {
+        answerParkedConsent(question, answer: granted ? .granted : .declined, protocolOptions: protocolOptions)
+    }
+
+    /// Answer `question` with any of the notification's answers, the prompt
+    /// window's Never for this app included. Answered by the prompt's id, as a
+    /// tap on its notification is, so it can never resolve another prompt;
+    /// the answer then lands through `finishConsent` like any other, a Never
+    /// on the deny list as from the notification. False when `question` is
+    /// not the open one (expired, answered elsewhere, declined by Stop
+    /// Watching or a manual start, or replaced, also by a new prompt about the
+    /// same app) or its prompt has not registered yet.
     ///
     /// `protocolOptions` comes from "Record with Options…" only, and is kept
     /// for `finishConsent` once this answer is the one that resolved the
@@ -140,9 +149,9 @@ extension WatchLoop {
     /// up) returns false here and must not overwrite the first answer's
     /// options. The resolution never lands synchronously, so nothing reads
     /// them before this line.
-    func answerParkedConsent(_ question: ConsentQuestion, granted: Bool, protocolOptions: MeetingProtocolOptions? = nil) -> Bool {
+    func answerParkedConsent(_ question: ConsentQuestion, answer: ConsentAnswer, protocolOptions: MeetingProtocolOptions? = nil) -> Bool {
         guard pendingConsentQuestion == question,
-              notifier.answerConsentPrompt(id: question.id, granted: granted)
+              notifier.answerConsentPrompt(id: question.id, answer: answer)
         else { return false }
         pendingConsentProtocolOptions = protocolOptions
         return true

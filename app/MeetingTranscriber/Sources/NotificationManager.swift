@@ -315,7 +315,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
     }
 
     /// The consent gate's form: parked and posted under `question.id`, so
-    /// `answerConsentPrompt(id:granted:)` reaches exactly this prompt.
+    /// `answerConsentPrompt(id:answer:)` reaches exactly this prompt.
     @MainActor
     func askToRecord(_ question: ConsentQuestion) async -> ConsentAnswer {
         await askToRecord(promptID: question.id.uuidString, title: question.title, body: question.body)
@@ -370,12 +370,14 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
         consentCoordinator.resolvePending(granted: granted)
     }
 
-    /// The menu's Record / Ignore for the prompt it shows: resolved by id
-    /// through the coordinator, the call a notification tap makes, so it can
-    /// never answer another prompt. Like `resolveBrowserConsent` it touches
-    /// only the lock-guarded coordinator and needs no MainActor hop.
-    func answerConsentPrompt(id: UUID, granted: Bool) -> Bool {
-        consentCoordinator.resolve(id: id.uuidString, granted: granted)
+    /// The menu's Record / Ignore and the prompt window's three answers for
+    /// the prompt they show: resolved by id with the full answer through the
+    /// coordinator, the call a notification tap makes, so it can never answer
+    /// another prompt and a Never lands as the notification's Never. Like
+    /// `resolveBrowserConsent` it touches only the lock-guarded coordinator
+    /// and needs no MainActor hop.
+    func answerConsentPrompt(id: UUID, answer: ConsentAnswer) -> Bool {
+        consentCoordinator.resolve(id: id.uuidString, answer: answer)
     }
 
     /// Post the actionable consent notification (the request-building is the pure
@@ -492,6 +494,17 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, App
         guard let answer = Self.meetingEndAnswer(for: actionIdentifier),
               let handler = meetingEndQuestions.take(id: id) else { return }
         await handler(answer)
+    }
+
+    /// The prompt window's answer: taken from the same registry as a tap, so
+    /// whichever comes first answers and the other finds nothing. The handler
+    /// runs at once. A question that could not be posted registered no
+    /// handler, so it is never answered here either.
+    @MainActor
+    func answerMeetingEndQuestion(id: String, answer: MeetingEndAnswer) -> Bool {
+        guard let handler = meetingEndQuestions.take(id: id) else { return false }
+        handler(answer)
+        return true
     }
 
     // MARK: - Local-model notices

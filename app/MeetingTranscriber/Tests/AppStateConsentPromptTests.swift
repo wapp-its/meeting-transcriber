@@ -11,14 +11,14 @@ final class AppStateConsentPromptTests: XCTestCase {
     private var settings: AppSettings!
     // swiftlint:enable implicitly_unwrapped_optional
 
-    /// Records the menu's answers and asks nothing.
+    /// Records the menu's and the prompt window's answers and asks nothing.
     private final class AnswerRecordingNotifier: AppNotifying {
-        private(set) var answers: [(id: UUID, granted: Bool)] = []
+        private(set) var answers: [(id: UUID, answer: ConsentAnswer)] = []
 
         func notify(title _: String, body _: String, urgency _: NotificationUrgency) {}
 
-        func answerConsentPrompt(id: UUID, granted: Bool) -> Bool {
-            answers.append((id, granted))
+        func answerConsentPrompt(id: UUID, answer: ConsentAnswer) -> Bool {
+            answers.append((id, answer))
             return true
         }
     }
@@ -107,7 +107,7 @@ final class AppStateConsentPromptTests: XCTestCase {
 
         XCTAssertTrue(state.answerConsentQuestion(question, granted: true, protocolOptions: options))
         XCTAssertEqual(notifier.answers.map(\.id), [question.id])
-        XCTAssertEqual(notifier.answers.map(\.granted), [true])
+        XCTAssertEqual(notifier.answers.map(\.answer), [.granted])
         XCTAssertEqual(loop.pendingConsentProtocolOptions, options)
     }
 
@@ -120,5 +120,19 @@ final class AppStateConsentPromptTests: XCTestCase {
         XCTAssertTrue(notifier.answers.isEmpty)
         XCTAssertNil(loop.pendingConsentProtocolOptions)
         XCTAssertFalse(makeState().answerConsentQuestion(makeQuestion(), granted: true), "nothing is watching")
+    }
+
+    /// The prompt window answers the open prompt with any of the
+    /// notification's answers, "Never for this app" included, and only it.
+    func testTheWindowsAnswerReachesTheOpenPromptWithItsFullAnswer() {
+        let (state, loop, notifier) = makeStateWithLoop()
+        let question = makeQuestion()
+        loop.pendingConsentQuestion = question
+
+        XCTAssertFalse(state.answerConsentQuestion(makeQuestion(), answer: .never), "another question")
+        XCTAssertTrue(state.answerConsentQuestion(question, answer: .never))
+        XCTAssertEqual(notifier.answers.map(\.id), [question.id])
+        XCTAssertEqual(notifier.answers.map(\.answer), [.never])
+        XCTAssertFalse(makeState().answerConsentQuestion(question, answer: .never), "nothing is watching")
     }
 }

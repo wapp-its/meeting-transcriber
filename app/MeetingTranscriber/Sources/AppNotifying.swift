@@ -22,7 +22,7 @@ protocol AppNotifying {
     func askToRecord(title: String, body: String) async -> ConsentAnswer
 
     /// The same prompt, posted and parked under `question.id` so that
-    /// `answerConsentPrompt(id:granted:)` can answer exactly this one. The
+    /// `answerConsentPrompt(id:answer:)` can answer exactly this one. The
     /// consent gate asks through this form.
     ///
     /// A requirement next to the title/body form with a default that forwards
@@ -40,12 +40,16 @@ protocol AppNotifying {
     /// (no prompt) for notifiers without a real coordinator.
     func resolveBrowserConsent(granted: Bool) -> Bool
 
-    /// Answer the parked prompt whose id is `id`, as a tap on its notification
-    /// would: the menu's Record / Ignore. Answers only that prompt, never
+    /// Answer the parked prompt whose id is `id` with `answer`, as a tap on
+    /// its notification would: the menu's Record / Ignore, and the prompt
+    /// window's Never for this app as well. Answers only that prompt, never
     /// another one parked beside it. False when that prompt is not waiting
     /// (not registered yet, already resolved, unknown id); defaults to false,
-    /// answering nothing, for notifiers without a real coordinator.
-    func answerConsentPrompt(id: UUID, granted: Bool) -> Bool
+    /// answering nothing, for notifiers without a real coordinator. The
+    /// yes-or-no `answerConsentPrompt(id:granted:)` below is not a
+    /// requirement: a notifier that implements only that spelling is not
+    /// answered through it.
+    func answerConsentPrompt(id: UUID, answer: ConsentAnswer) -> Bool
 
     /// Ask whether a detected meeting whose signal is gone has ended ("Keep
     /// recording" / "Stop now"), returning at once. `onAnswer` runs when an
@@ -57,6 +61,15 @@ protocol AppNotifying {
     /// Take the question back: out of Notification Center, and no answer to
     /// it is delivered afterwards.
     func withdrawMeetingEndQuestion(id: String)
+
+    /// Answer the open question whose id is `id` from outside its
+    /// notification (the prompt window), as a tap on one of its actions
+    /// would, and say whether it was answered. Each question is answered at
+    /// most once, whoever answers first; false for one already answered or
+    /// withdrawn, one that could not be posted, or an unknown id. Defaults in
+    /// `MeetingEndQuestions.swift`.
+    @MainActor
+    func answerMeetingEndQuestion(id: String, answer: MeetingEndAnswer) -> Bool
 
     /// How a posted notification would be presented. On the same seam as
     /// `askToRecord` because it answers whether that prompt could be SEEN, which
@@ -152,7 +165,12 @@ extension AppNotifying {
     }
 
     /// No prompt to answer by default — only `NotificationManager` parks one.
-    func answerConsentPrompt(id _: UUID, granted _: Bool) -> Bool {
+    func answerConsentPrompt(id _: UUID, answer _: ConsentAnswer) -> Bool {
         false
+    }
+
+    /// The yes-or-no form: Record is `.granted`, Ignore `.declined`.
+    func answerConsentPrompt(id: UUID, granted: Bool) -> Bool {
+        answerConsentPrompt(id: id, answer: granted ? .granted : .declined)
     }
 }

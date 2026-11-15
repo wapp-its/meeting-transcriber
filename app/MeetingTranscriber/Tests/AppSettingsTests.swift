@@ -293,6 +293,16 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertTrue(fresh.watchBrowserMeetings)
     }
 
+    // MARK: - promptWindowEnabled (issue #99)
+
+    func testPromptWindowReadsOffWhenItsStoredValueIsMissingOrUnreadable() {
+        XCTAssertFalse(settings.promptWindowEnabled, "missing")
+        for unreadable: Any in ["on", Data([1])] {
+            defaults.set(unreadable, forKey: "promptWindowEnabled")
+            XCTAssertFalse(AppSettings(defaults: defaults, apiKeyAccount: apiKeyAccount).promptWindowEnabled, "stored \(unreadable)")
+        }
+    }
+
     // MARK: - Claude CLI
 
     #if !APPSTORE

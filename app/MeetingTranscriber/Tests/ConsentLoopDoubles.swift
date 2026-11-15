@@ -111,9 +111,9 @@ enum ConsentLoopDoubles {
         }
 
         /// Answers only the prompt parked under `id`, like the real coordinator.
-        func answerConsentPrompt(id: UUID, granted: Bool) -> Bool {
+        func answerConsentPrompt(id: UUID, answer: ConsentAnswer) -> Bool {
             guard isParked, parkedID == id else { return false }
-            answer(granted ? .granted : .declined)
+            self.answer(answer)
             return true
         }
     }

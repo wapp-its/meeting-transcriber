@@ -88,8 +88,10 @@ final class WatchLoopRecordAgainTests: XCTestCase { // swiftlint:disable:this ba
             return true
         }
 
-        func answerConsentPrompt(id _: UUID, granted: Bool) -> Bool {
-            resolveBrowserConsent(granted: granted)
+        func answerConsentPrompt(id _: UUID, answer: ConsentAnswer) -> Bool {
+            guard isParked else { return false }
+            answerPrompt(answer)
+            return true
         }
 
         @MainActor
