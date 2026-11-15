@@ -374,7 +374,9 @@ final class PipelineQueueMeetingFilesLifecycleTests: XCTestCase {
         XCTAssertEqual(try roles(in: .gone, of: job), [.transcript, .segments])
     }
 
-    /// A protocol that failed keeps the only copy of the meeting's text.
+    /// A protocol that failed keeps the only copy of the meeting's text. The
+    /// job is then held for a retry of its notes, which reads the transcript,
+    /// so the segments file and the 16 kHz copies go as for a held export.
     func testARawTranscriptKeptAfterAFailedProtocolStaysListed() async throws {
         let generator = MockProtocolGen()
         generator.shouldThrow = true
@@ -383,7 +385,7 @@ final class PipelineQueueMeetingFilesLifecycleTests: XCTestCase {
 
         await run(job, in: queue)
 
-        XCTAssertEqual(try roles(in: .gone, of: job), [])
+        XCTAssertEqual(try roles(in: .gone, of: job), [.segments, .app16k, .mix16k, .mic16k])
         XCTAssertEqual(try file(.transcript, of: job).state, .present)
     }
 
