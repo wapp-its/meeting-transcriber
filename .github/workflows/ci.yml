@@ -185,7 +185,7 @@ jobs:
       # Xcode 27.0 by its own path rather than /Applications/Xcode.app: the image also
       # ships 27.1 and a 27.2 beta, and a moved default must never reach a build here.
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
-    timeout-minutes: 30
+    timeout-minutes: 45  # Fork-only (30 in the original): fork runs start without caches.
     # No `Cancel run on failure` step, and so no `actions: write`, as in `lint`.
     # A compile error, the one failure this shares with `test`, fails the `test`
     # legs by itself.
