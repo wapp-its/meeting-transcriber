@@ -131,7 +131,13 @@ jobs:
   build:
     needs: check
     if: needs.check.outputs.merge == 'clean'
-    runs-on: macos-26
+    # Same runner and Xcode as ci.yml's build jobs, so the sync judges the code
+    # with the compiler CI uses: an older Xcode reports errors that Xcode 27 does
+    # not, and the sync then flags code that builds in CI.
+    runs-on: xcode-27
+    env:
+      # Pinned by path, as in ci.yml; keep the two in step.
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
     timeout-minutes: 60
     permissions:
       contents: write
