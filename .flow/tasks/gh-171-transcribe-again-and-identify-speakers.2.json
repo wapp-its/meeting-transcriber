@@ -8,7 +8,7 @@
   ],
   "id": "gh-171-transcribe-again-and-identify-speakers.2",
   "priority": null,
-  "review": "codex:gpt-6-astra:xhigh",
+  "review": "codex:gpt-6.1-sol:xhigh",
   "spec": "gh-171-transcribe-again-and-identify-speakers",
   "spec_path": ".flow/tasks/gh-171-transcribe-again-and-identify-speakers.2.md",
   "status": "todo",
