@@ -76,9 +76,10 @@ final class PipelineController {
         var stageTimingLog: URL
         var securityScope: SecurityScopeAccess = .live
         /// Rescues crashed recordings from the staging folder and enqueues
-        /// orphans into the queue it is handed, balancing each rebuilt mix
-        /// when the flag says so; nil skips it.
-        var recoverStagedRecordings: (@MainActor (_ queue: PipelineQueue, _ levelBalance: Bool) -> Void)?
+        /// orphans into the queue it is handed, or in record-only mode files
+        /// them into the output folder, balancing each rebuilt mix when the
+        /// flag says so; nil skips it.
+        var recoverStagedRecordings: (@MainActor (_ queue: PipelineQueue, _ levelBalance: Bool, _ recordOnly: RecordOnlyRecovery) -> Void)?
 
         var resolveOutputDir: @MainActor (OutputDirectoryResolver) -> URL = { $0.resolve() }
         /// The queue the controller starts with; nil builds a bare one on this
@@ -112,6 +113,11 @@ final class PipelineController {
     /// following a folder change its recordings would land in the old folder
     /// through a queue nothing else shows.
     @ObservationIgnored var onQueueReplaced: ((PipelineQueue) -> Void)?
+
+    /// Whether a quit has begun, for the staged recovery's record-only writes
+    /// (`RecordOnlyRecovery.quitHasBegun`). Set by `WatchingController`, which
+    /// runs the quit.
+    @ObservationIgnored var quitHasBegun: () -> Bool = { false }
 
     /// The output-folder bookmark the current queue was built from, so a change
     /// of folder can be noticed without resolving the bookmark again.
@@ -225,7 +231,9 @@ final class PipelineController {
         } else {
             built.loadSnapshot()
         }
-        if recoversStagedRecordings { queueEnvironment.recoverStagedRecordings?(built, settings.levelBalanceEnabled) }
+        if recoversStagedRecordings {
+            queueEnvironment.recoverStagedRecordings?(built, settings.levelBalanceEnabled, recordOnlyRecovery)
+        }
         built.refreshKnownSpeakerNames()
         queue = built
         // Recorded only after an install, so a queue built for inspection and

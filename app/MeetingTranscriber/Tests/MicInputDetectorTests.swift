@@ -163,6 +163,21 @@ final class MicInputDetectorTests: XCTestCase {
         XCTAssertNil(detector.checkOnce(), "cooldown must suppress re-detection")
     }
 
+    /// "Record Again" after a stop: the reset cleared the count and started
+    /// the cooldown, and a marked app is returned by the very next poll.
+    func testAMarkedAppIsReturnedByTheNextPollAlsoInsideItsCooldown() {
+        let detector = makeDetector(confirmationCount: 2)
+        detector.processProvider = { [snapshot("com.tencent.xinWeChat")] }
+        XCTAssertNil(detector.checkOnce(), "precondition: one poll is not enough")
+        XCTAssertNotNil(detector.checkOnce(), "precondition: two are")
+        detector.reset(appName: "WeChat")
+        XCTAssertNil(detector.checkOnce(), "precondition: the cooldown holds it back")
+
+        detector.markConfirmed(appName: "WeChat")
+
+        XCTAssertEqual(detector.checkOnce()?.pattern.appName, "WeChat")
+    }
+
     func testEveryDefaultPatternHasMeetingPattern() {
         // Drift guard, mirroring the assertion detector's: a mic pattern with no
         // AppMeetingPattern would silently fall back to placeholder titles.

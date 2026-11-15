@@ -31,6 +31,9 @@ enum PhaseChangeCause: Equatable {
     /// Leaving `.recording` for a call split: the next call's recording starts
     /// in the same main-actor stretch, so this is not a real stop.
     case callSplit
+    /// Entering `.recording` for the recording a "Record Again" click asked
+    /// for (`WatchLoop+RecordAgain.swift`): started by the person, not detected.
+    case recordAgain
 }
 
 /// How a detected meeting's recording ends, split out of `WatchLoop.swift` to
@@ -98,7 +101,7 @@ extension WatchLoop {
                 // arriving at the same poll does not override the person.
                 if let requestedAt = takeStopByHandRequest() {
                     diagnostics.notice("recording_stopped_by_hand trigger=auto")
-                    holdRedetection(of: meeting)
+                    holdRedetection(of: meeting, offeringRecordAgain: true)
                     // Ends as Stop Watching ends it, but only an answer given
                     // before the stop may settle the question: a Keep
                     // recording tapped after it must not keep the countdown.
@@ -109,7 +112,7 @@ extension WatchLoop {
                 let decision = WatchLoopEndPolicy.step(config: config, startTime: startTime, phase: phase, poll: poll)
                 if let stop = stepSilencePrompt(beside: decision, from: phase) {
                     diagnostics.notice(AutoStopReason.silenceStop.logLine(trigger: .auto, silentFor: stop.silentFor))
-                    holdRedetection(of: meeting)
+                    holdRedetection(of: meeting, offeringRecordAgain: true)
                     return .ended(cutAt: stop.cutAt)
                 }
                 switch decision {

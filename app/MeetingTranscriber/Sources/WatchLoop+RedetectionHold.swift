@@ -13,7 +13,8 @@ import Foundation
 /// detector has, so a hold lasts until the first watching poll that finds the
 /// held meeting's signal gone; the app's next call is then detected as usual.
 /// Any stop that ends a detected meeting while its signal stays can place
-/// one; Stop Watching discards them all, since they live in memory only.
+/// one, and "Record Again" is offered for it (`WatchLoop+RecordAgain.swift`);
+/// Stop Watching discards them all, since they live in memory only.
 extension WatchLoop {
     /// The apps detection passes over until their signal has gone once.
     var appsHeldFromDetection: Set<String> {
@@ -21,9 +22,9 @@ extension WatchLoop {
     }
 
     /// Keep `meeting`'s app out of detection until a watching poll finds the
-    /// meeting's signal gone.
-    func holdRedetection(of meeting: DetectedMeeting) {
-        guard redetectionHolds.hold(meeting) else { return }
+    /// meeting's signal gone, offering "Record Again" for it or not.
+    func holdRedetection(of meeting: DetectedMeeting, offeringRecordAgain: Bool) {
+        guard redetectionHolds.hold(meeting, offered: offeringRecordAgain) else { return }
         // The identity key only: the meeting title stays out of the log.
         diagnostics.notice("redetect_hold_set app=\(meeting.pattern.identityKey)")
     }

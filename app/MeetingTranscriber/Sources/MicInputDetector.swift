@@ -56,20 +56,6 @@ class MicInputDetector: MeetingDetecting {
         /// own, and an added app always asks.
         var requiresRecordingConsent = false
 
-        /// The length of the longest of this pattern's bundle IDs that
-        /// `bundleID` is or is a helper of, nil when the process is not this
-        /// app's. The length ranks patterns that both match one process: an
-        /// added app's bundle ID can be a prefix of another added app's
-        /// (`com.acme.meet` and `com.acme.meet.beta`), and helper matching
-        /// would file the second app's microphone use under the first app's
-        /// key.
-        func matchLength(bundleID: String) -> Int? {
-            bundleIDs.lazy
-                .filter { $0 == bundleID || (matchesHelpers && bundleID.hasPrefix($0 + ".")) }
-                .map(\.count)
-                .max()
-        }
-
         /// Whether `bundleID` is this app's process or one of its helpers.
         func matches(bundleID: String) -> Bool {
             matchLength(bundleID: bundleID) != nil
@@ -439,6 +425,13 @@ class MicInputDetector: MeetingDetecting {
         }
     }
 
+    /// See `MeetingDetecting`. The count goes up again at the next poll that
+    /// finds the signal, so it is over the threshold there.
+    func markConfirmed(appName: String) {
+        consecutiveHits[appName] = confirmationCount
+        cooldownUntil[appName] = nil
+    }
+
     // MARK: - Diagnostics
 
     private func logDeniedOnce(_ appName: String) {
@@ -587,6 +580,12 @@ final class CompositeMeetingDetector: MeetingDetecting {
     func reset(appName: String?) {
         for detector in detectors {
             detector.reset(appName: appName)
+        }
+    }
+
+    func markConfirmed(appName: String) {
+        for detector in detectors {
+            detector.markConfirmed(appName: appName)
         }
     }
 }

@@ -490,6 +490,13 @@ class PowerAssertionDetector: MeetingDetecting {
         }
     }
 
+    /// See `MeetingDetecting`. The count goes up again at the next poll that
+    /// finds the signal, so it is over the threshold there.
+    func markConfirmed(appName: String) {
+        consecutiveHits[appName] = confirmationCount
+        cooldownUntil[appName] = nil
+    }
+
     // MARK: - Window Title Lookup
 
     /// Clean fallback title when no usable window title is found (e.g. Screen

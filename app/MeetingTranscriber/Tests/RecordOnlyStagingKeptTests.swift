@@ -3,7 +3,7 @@ import XCTest
 
 /// A record-only write that committed but could not remove its staging files
 /// tells the user, on both the normal and the quit path: the next launch's
-/// orphan scan finds the mix still in staging and processes the recording
+/// orphan scan finds the mix still in staging and picks the recording up
 /// again, next to its record-only output.
 @MainActor
 final class RecordOnlyStagingKeptTests: XCTestCase {
@@ -38,6 +38,7 @@ final class RecordOnlyStagingKeptTests: XCTestCase {
         loop.stopManualRecording()
 
         XCTAssertEqual(notifier.calls.map(\.title), ["Record-only: files left in staging"])
+        XCTAssertEqual(notifier.calls.map(\.body), [Self.keptBody])
     }
 
     func testAQuitWhoseStagingFileStaysTellsTheUser() async throws {
@@ -47,5 +48,11 @@ final class RecordOnlyStagingKeptTests: XCTestCase {
         await loop.finishForQuit()
 
         XCTAssertEqual(notifier.calls.map(\.title), ["Record-only: files left in staging"])
+        XCTAssertEqual(notifier.calls.map(\.body), [Self.keptBody])
     }
+
+    /// Picks up, not processes: in record-only mode the next launch files the
+    /// recording again rather than processing it.
+    private static let keptBody = "The recording was written, but 1 of its staging files could not be removed. "
+        + "The next launch will pick it up again."
 }

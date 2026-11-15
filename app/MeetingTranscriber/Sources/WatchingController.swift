@@ -74,7 +74,7 @@ final class WatchingController {
     /// a test can reach the four-hour limit without waiting it out.
     @ObservationIgnored var manualRecordingClock: () -> Date = Date.init
 
-    /// Set by `finishForQuit`: a start parked on a permission prompt gives up.
+    /// Set by `finishForQuit`: a start parked on a permission prompt gives up, and a staged recovery starts no record-only write.
     var isQuitting = false
 
     let settings: AppSettings
@@ -205,10 +205,11 @@ final class WatchingController {
         self.makeDetector = makeDetector ?? { [settings] in
             Self.defaultDetector(settings: settings)
         }
-        // See `PipelineController.onQueueReplaced`.
+        // See `PipelineController.onQueueReplaced` and `quitHasBegun`.
         pipeline.onQueueReplaced = { [weak self] queue in
             self?.watchLoop?.pipelineQueue = queue
         }
+        pipeline.quitHasBegun = { [weak self] in self?.isQuitting == true }
         holdLocalModelInRecordOnlyMode()
     }
 
@@ -539,8 +540,8 @@ final class WatchingController {
     /// the microphone controller and post-`.error` notifications. Shared between the auto-detect path
     /// (`toggleWatching`) and the manual-recording path (`startManualRecording`)
     /// so the red-tint indicator + asymmetric-silence notification fire in both.
-    /// `notifyOnRecording` only fires "Meeting Detected" notifications for the
-    /// auto-detect path; manual recording emits its own start notification.
+    /// `notifyOnRecording` fires "Meeting Detected" for the auto-detect path only, and not
+    /// for the recording a "Record Again" click started; manual recording announces itself.
     private func attachStateChangeHandler(to loop: WatchLoop, notifyOnRecording: Bool) {
         loop.onStateChange = { [weak self, weak loop, notifier] oldState, newState, cause in
             self?.recordingActivityChanged()
@@ -557,7 +558,7 @@ final class WatchingController {
             }
             switch newState {
             case .recording:
-                if notifyOnRecording, let meeting = loop?.currentMeeting {
+                if notifyOnRecording, cause != .recordAgain, let meeting = loop?.currentMeeting {
                     notifier.notify(
                         title: "Meeting Detected",
                         body: "Recording: \(meeting.windowTitle)",
