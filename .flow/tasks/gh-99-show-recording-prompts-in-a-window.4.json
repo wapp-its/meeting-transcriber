@@ -10,7 +10,7 @@
   ],
   "id": "gh-99-show-recording-prompts-in-a-window.4",
   "priority": null,
-  "review": "codex:gpt-6-astra:xhigh",
+  "review": "codex:gpt-6.1-sol:xhigh",
   "spec": "gh-99-show-recording-prompts-in-a-window",
   "spec_path": ".flow/tasks/gh-99-show-recording-prompts-in-a-window.4.md",
   "status": "todo",

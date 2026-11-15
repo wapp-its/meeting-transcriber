@@ -59,7 +59,7 @@ None for outside clients: no new automation endpoint, and the `/state`, `/v1/wat
 - **Keyboard.** The window never becomes the key window, so a key pressed in the meeting app can never answer it. [inferred]
 - **Screen sharing.** No public macOS call tells an app that the screen is being shared. The "none" sharing type keeps a window out of some captures, but developer reports say ScreenCaptureKit captures such windows anyway since macOS 15.4, so it is a best effort only, and the help text says so (D4). The window shows only the notification's text, which names the app and never the meeting title. [inferred]
 - **Privacy.** No new log line carries a title or app window name; tests use made-up prompts, no real meeting content. [inferred]
-- **Build gates.** A SwiftUI body that type-checks for over 300 ms fails the build, so the window's view is split into small properties and reads single-member `AppState` accessors. SwiftLint runs with `--strict`, so the `file_length` warning at 600 lines is a hard cap; on 2026-11-14 `WatchLoop.swift` has 595 lines, `AppState.swift` 574 and `MeetingTranscriberApp.swift` 558, so new code goes into new files or extensions (in `WatchLoop.swift` the stored `meetingEndQuestion` only replaces the stored `meetingEndQuestionID`; the computed id goes into an extension file). [inferred]
+- **Build gates.** A SwiftUI body that type-checks for over 300 ms fails the build, so the window's view is split into small properties and reads single-member `AppState` accessors. SwiftLint runs with `--strict`, so the `file_length` warning at 600 lines is a hard cap; on 2026-11-15 (wapp/main 1d092827) `WatchLoop.swift` has 600 lines, `AppState.swift` 583 and `MeetingTranscriberApp.swift` 592, whose `MeetingTranscriberApp` struct body holds about 392 of the 400 code lines `type_body_length` allows, so new code goes into new files or extensions (in `WatchLoop.swift` the stored `meetingEndQuestion` only replaces the stored `meetingEndQuestionID` line for line; the computed id goes into an extension file). [inferred]
 - **Docs and fork rules.** The consent prompt paragraph of `docs/architecture/detection.md` and the file table and menu bar sections of `docs/architecture-macos.md` are updated in the same change; `CLAUDE.md` is not edited. [inferred]
 
 ### Verification
@@ -129,6 +129,11 @@ Mockup gate: accepted by the owner on 2026-11-14. The boards are on a private de
 Upstream check 2026-11-14: the original has no open issue or pull request about showing prompts in a window or about prompts that a Focus mode holds back.
 
 FIT: GO · 2026-11-14 · base f911fcb0 · engine flow-next 9.10.0 · no spec or design doc now claims part of this scope (gh-127, gh-130 and gh-77 only share files); plan facts refreshed: the panel recipe (caption panel plus the naming window's full-screen flags, never key), line counts, two more ways out of the countdown, and the live window assertion
+
+FIT: GO · 2026-11-15 · base 1d092827 · engine flow-next 9.10.0 · merges #237 to #244 claim none of this scope and leave every cited contract unchanged (consent prompt, answer by id, coordinator, meeting-end registry, notifier, panel recipes); plan facts refreshed: line counts and anchors in WatchLoop.swift and MeetingTranscriberApp.swift
+  - What the window lists stays the two questions (D1): the menu's "Needs you" group now also holds jobs whose meeting notes failed (`TranscriptionList.menuSections`), but those are jobs waiting for a retry, with no answer deadline, and their notification is an error notice, which the Boundaries keep out of the window.
+  - Record Again (#240) adds a way out of the countdown only through the existing stop by hand and silence stop (`holdRedetection(of:offeringRecordAgain:)`), both already in task .2's list; it is a menu offer, not a question.
+  - `WatchLoop.swift` is at 600 of 600 lines, so task .2's stored property swap must be line for line; the `MeetingTranscriberApp` struct body is near `type_body_length` (about 392 of 400), and task .4 adds one line there.
 
 ## Quick commands
 
