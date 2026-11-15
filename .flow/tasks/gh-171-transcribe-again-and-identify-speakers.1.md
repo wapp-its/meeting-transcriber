@@ -42,9 +42,33 @@ Adds the run inputs a re-run needs to the meeting's record (R1, A13, A20), writt
 - [ ] The Quick commands' focused tests and `./scripts/lint.sh` pass.
 
 ## Done summary
-TBD
+A re-run of a finished meeting can now start from its own run inputs. The meeting's file record keeps the mic delay, pauses, mic mute spans, notes template, background and Notion page with its database (`MeetingFileRecord.runInputs`), and `MeetingFileRecord.rerunInputs(finished:)` returns them, or the fallbacks for a record without them.
 
+Tier: implementer - opus (explicit invocation) at xhigh effort (requested) (model: claude-opus-5-5)
+
+stage: impl-review - ran [2026-11-15T16:43Z..2026-11-15T16:53Z] (codex gpt-6.1-sol xhigh, three reviewers then one; NEEDS_WORK with one finding, fixed in 65ee1efd, re-review SHIP)
+
+Decisions and assumptions
+- Assumption: `MeetingFileRecord(job:origin:createdBy:)` builds the record with the run inputs, so the create in `PipelineQueue.enqueue(_:origin:)` saves them in the same write, after `stampTranscriptOutputOptions` picked the template. Recovered recordings get them through the same initializer (`PipelineQueue+OrphanRecovery.swift` unchanged). The plan named a separate `update` in `enqueue` for an existing record. No enqueue meets one today, since every enqueued job has a new id and Retry does not enqueue, so none was added. Task 2 writes the inputs at re-run admission if it needs them there.
+- Review fix: the Notion hook (`noteNotionExport`) writes only the page and its database into kept inputs. A Regenerate Notes on a held job changes the job's template and saves the export state again, and the first version copied that template into the record. A record without run inputs (one an older build rewrote) takes all of them from the job.
+- Fallback page: a record without a kept page takes the finished-job entry's export id (`JobStatusDTO.export.id`) with no database. Page and database are written together (`PipelineJob.recordNotionPage`).
+- Each field of `RunInputs` decodes when missing (`decodeIfPresent` with defaults), and the record decodes the whole value with `decodeIfPresent`. No new `MeetingFile.Role`.
+- The background is stored in the owner-only record file and never logged.
+
+Follow-ups (not built)
+- Regenerate Notes on a meeting that has left the queue (`ProtocolRegeneration`) does not write its template into the record, so a re-run uses the template the meeting entered processing with. If a re-run should use the regenerated template, the regeneration would update `runInputs.protocolTemplate`.
+- `TranscriptionsViewTests.testSnapshotOfTheRowMenuWithLongReportNames` (open-menu pixel snapshot, skipped on CI) failed once in the 342-test focused gate run and passed alone on the same build. It passed in the baseline run and in an earlier run on this branch. This change does not touch that menu.
+
+Tests
+- `MeetingFileStoreTests`: round trip with every field including `runInputs`, a record without the field reads `nil`, `runInputs: {}` reads as the defaults, the resolver's fallbacks one assertion per field, stored values win over the entry, stored inputs without a page take the entry's page.
+- `PipelineQueueMeetingFilesRunInputsTests`: a recorded call and an import keep their inputs at entry and the page and normalized database after an export (stub exporter); a record write that fails after the export started leaves the job done with its export completed; a regenerated template on a held job leaves the kept one; an export gives a rewritten record its inputs back.
+- `PipelineQueueMeetingFilesEntryTests`: a recovered recording's record holds the inputs taken after admission.
+- Each production wiring line was removed once and the tests above failed at it (init, decoder, Notion hook, resolver page fallback).
+
+baseline: green (focused Quick-command set, 334 tests, exit 0; lint green per the conductor)
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: ca40a2657288eec1e71757f2ebe082e5541d4f0c, 65ee1efda23a6ed9fc12661a260bd53bd82cd6cc, ffcda9a9e92ebe84d7e289fe225442e0427926d1
+- Tests: cd app/MeetingTranscriber && swift build -j 6 --build-tests (exit 0), CFFIXED_USER_HOME=<scratch> swift test --skip-build --parallel --num-workers 2 --filter 'RecordingRowActionsTests|RowAvailabilityTests|MeetingFileStoreTests|PipelineQueueRetryTests|PipelineQueueMeetingFiles|TerminalJobStoreTests|SpeakerNamingStoreTests|LateRerunCancelTests|TranscriptionsViewTests|RegenerateProtocolViewTests|MeetingNotesRetryTests|LocalModelGateWiringTests|ArtifactRenameReportTests|ProtocolRegenerationMeetingFilesTests|MeetingFileStoreReportTests|PipelineQueueNotion|PipelineControllerNotionExportTests|MenuBarNotionRetryTests|PipelineQueueProtocolTemplateTests|PipelineControllerRetentionTests|MeetingFileRemoverTests|PipelineQueueOrphan' (342 run, exit 1: 341 passed, TranscriptionsViewTests.testSnapshotOfTheRowMenuWithLongReportNames open-menu pixel snapshot failed once, CI skips it), swift test --skip-build --filter TranscriptionsViewTests/testSnapshotOfTheRowMenuWithLongReportNames (same build, exit 0), ./scripts/lint.sh with pinned SwiftFormat and SwiftLint (exit 0, 0 violations)
 - PRs:

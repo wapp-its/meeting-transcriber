@@ -16,7 +16,7 @@ related_to: [bug/data/a-deletions-recovery-mark-went-before-2026-11-06, bug/data
 A meeting's file record gained the run inputs a re-run needs (mic delay, pauses, mute spans, template, background, Notion page and database). The Notion hook that already updates the record (`noteNotionExport`) wrote all of them again from the live job on every export-state save. A job held after a failed export can have its notes regenerated from another template (`recordRegeneratedTemplate`), which saves the export state again, so the record took the regenerated template. A Regenerate Notes on a meeting that had left the queue does not touch the record, so the same action left two different records depending on whether the job was still held.
 
 ## What Didn't Work
-Rewriting the whole value from the live job looked self-healing: it also gave the inputs back to a record an older build had rewritten without them. But the live job is not a frozen copy of what the meeting entered processing with: some of its fields keep changing after admission.
+Rewriting the whole value from the live job looked self-healing, since it also gave the inputs back to a record an older build had rewritten without them. But some of the live job's fields keep changing after admission, so the job no longer holds what the meeting entered processing with.
 
 ## Solution
 The hook writes only the fields it owns, the page and its database, into the kept inputs, and takes all of them from the job only when the record has none (`PipelineQueue+Notion.swift`, `noteNotionExport`). A test regenerates the template of a held job and checks the record keeps the first one.
