@@ -104,21 +104,23 @@ extension PipelineQueue {
         guard let record else { return .drop }
         if let current = record.rerun {
             guard current.runID == marker.runID else { return .drop }
-            return current.isEnding || endDecided ? .finish(merged(marker, into: current)) : .resume
+            return current.isEnding || endDecided ? .finish(merged(marker, into: current, ownIsNewer: false)) : .resume
         }
         if let note = record.rerunNote, note.stamp == marker.stamp, note.committed { return .keep }
         return .finish(marker)
     }
 
-    /// The record's marker with every file the job's copy lists: the job's copy is
-    /// updated first, and a record update that failed leaves the record's behind.
-    /// Where both list a file, the job's identity is the newer one.
+    /// The record's marker with every file either copy lists. Where both list a
+    /// file, the newer copy's identity wins: a live job's copy is newer than the
+    /// record's (it is updated first, and a record update can fail), a saved job's
+    /// is older (its file is written at state changes, the record at each write).
     static func merged(
-        _ own: MeetingFileRecord.RerunMarker, into recorded: MeetingFileRecord.RerunMarker,
+        _ own: MeetingFileRecord.RerunMarker, into recorded: MeetingFileRecord.RerunMarker, ownIsNewer: Bool,
     ) -> MeetingFileRecord.RerunMarker {
         var marker = recorded
-        let listed = Set(own.files.map(\.path))
-        marker.files = own.files + recorded.files.filter { !listed.contains($0.path) }
+        let (newer, older) = ownIsNewer ? (own.files, recorded.files) : (recorded.files, own.files)
+        let listed = Set(newer.map(\.path))
+        marker.files = newer + older.filter { !listed.contains($0.path) }
         return marker
     }
 

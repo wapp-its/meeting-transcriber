@@ -104,7 +104,7 @@ extension PipelineQueue {
         _ own: MeetingFileRecord.RerunMarker, jobID: UUID,
     ) -> MeetingFileRecord.RerunMarker {
         guard let recorded = meetingFileStore?.record(for: jobID)?.rerun, recorded.runID == own.runID else { return own }
-        return Self.merged(own, into: recorded)
+        return Self.merged(own, into: recorded, ownIsNewer: true)
     }
 
     /// What leaving the queue undoes, without the steps `removeJob` runs for a job

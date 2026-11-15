@@ -167,6 +167,24 @@ final class PipelineQueueRerunRecoveryTests: XCTestCase {
         try await assertEndedAtLaunch(parked, fixture)
     }
 
+    func testAnEndFinishedAtLaunchKeepsTheRecordsNewerIdentityOfAFile() async throws {
+        let fixture = try makeFixture()
+        let parked = try await park(fixture, in: fixture.makeQueue(completedJobLifetime: 0))
+        let transcript = try XCTUnwrap(parked.marker.files.first { $0.role == .transcript })
+        // Rewritten in place after the re-run file was saved, as a naming confirm
+        // does, and recorded; then the end began and the app stopped.
+        let url = URL(filePath: transcript.path)
+        try Data("Alice: hello".utf8).write(to: url, options: .atomic)
+        let rewritten = MeetingFile(role: .transcript, url: url, owned: transcript.owned)
+        XCTAssertNotEqual(rewritten.identity, transcript.identity, "test premise: a new identity")
+        XCTAssertTrue(fixture.store.update(jobID: parked.meeting.id) { record in
+            record.rerun?.list(rewritten)
+            record.rerun?.ending = true
+        })
+
+        try await assertEndedAtLaunch(parked, fixture)
+    }
+
     func testAnEndTheRecordCouldNotTakeIsFinishedAtTheNextLaunch() async throws {
         let fixture = try makeFixture()
         let queue = fixture.makeQueue(completedJobLifetime: 0)
