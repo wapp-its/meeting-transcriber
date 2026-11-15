@@ -51,6 +51,8 @@
                 XCTAssertEqual(try fixture.outputFiles(), files, "\(name): the meeting is not as it was")
 
                 try FileManager.default.removeItem(at: block)
+                // Held before its swap, so the re-run's own files can be read when it is done.
+                queue.isRegenerationRunning = { true }
                 XCTAssertEqual(queue.rerunJob(id: meeting.id, mode: .transcribeAgain), .queued, "\(name): the next re-run")
                 await queue.awaitProcessing()
                 XCTAssertTrue(

@@ -90,6 +90,8 @@ final class PipelineQueueRerunRunTests: XCTestCase {
             stagingDir: calls, logDir: logDir, useAITitleForFilenames: true, recordingRetention: retention,
         )
         let filesBefore = try fixture.outputFiles()
+        // Held before its swap, which gives its files the meeting's current names.
+        queue.isRegenerationRunning = { true }
 
         XCTAssertEqual(queue.rerunJob(id: meeting.id, mode: .transcribeAgain), .queued)
         await queue.awaitProcessing()
@@ -111,32 +113,36 @@ final class PipelineQueueRerunRunTests: XCTestCase {
         try assertOnlyFilesOfItsOwn(stem: stem, before: filesBefore, after: fixture.outputFiles())
     }
 
-    func testAConfirmedRerunHandsItsFilesToTheSuccessHookOnceAndSavesTheVoice() async throws {
+    func testAConfirmedRerunSwapsOnlyOnceNoRegenerationRunsAndSavesTheVoice() async throws {
         let fixture = try makeFixture()
         let queue = fixture.makeQueue()
         let meeting = try await fixture.finishedMeeting(in: queue)
-        var handed: [(id: UUID, files: [MeetingFile])] = []
-        queue.onRerunSucceeded = { job, files in handed.append((job.id, files)) }
+        let notesBefore = try XCTUnwrap(queue.job(withID: meeting.id)?.protocolPath, "test premise: notes saved")
+        queue.isRegenerationRunning = { true }
         fixture.parkForNaming(true)
         XCTAssertEqual(queue.rerunJob(id: meeting.id, mode: .transcribeAgain), .queued)
         await queue.awaitProcessing()
         XCTAssertEqual(queue.job(withID: meeting.id)?.state, .speakerNamingPending, "test premise")
-        XCTAssertTrue(handed.isEmpty, "the hook ran before the names were confirmed")
 
         // A recorded call's labels carry their track (`SpeakerKey`).
         let label = try XCTUnwrap(queue.speakerNamingData(forJobID: meeting.id)?.embeddings.keys.min(), "nothing to name")
         queue.completeSpeakerNaming(jobID: meeting.id, result: .confirmed([label: "Alice"]))
-        try await fixture.poll("the success hook") { !handed.isEmpty }
-        try await Task.sleep(for: .milliseconds(200))
+        try await fixture.poll("the re-run done") { queue.job(withID: meeting.id)?.state == .done }
+        try await Task.sleep(for: .milliseconds(400))
 
-        XCTAssertEqual(handed.map(\.id), [meeting.id], "the hook did not run exactly once")
-        let files = try XCTUnwrap(handed.first?.files)
-        XCTAssertTrue(Set(files.map(\.role)).isSuperset(of: [.transcript, .protocol]), "\(files.map(\.role))")
+        // While a regeneration runs, the swap waits with the re-run's files under its stem.
+        let marker = try fixture.marker(meeting.id, in: queue)
+        XCTAssertTrue(Set(marker.files.filter { $0.state != .gone }.map(\.role)).isSuperset(of: [.transcript, .protocol]))
         let stem = try fixture.rerunStem(of: meeting, in: queue)
-        for file in files {
+        for file in marker.files where file.state != .gone {
             XCTAssertTrue(URL(filePath: file.path).lastPathComponent.hasPrefix(stem), file.path)
-            XCTAssertTrue(FileManager.default.fileExists(atPath: file.path), "handed a file that is gone: \(file.path)")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: file.path), "listed a file that is gone: \(file.path)")
         }
+        queue.isRegenerationRunning = { false }
+        try await fixture.poll("the swap") { queue.job(withID: meeting.id)?.rerun == nil }
+
+        XCTAssertEqual(queue.job(withID: meeting.id)?.protocolPath, notesBefore, "the new notes do not hold the current name")
+        XCTAssertEqual(try fixture.record(meeting.id).rerunNote, .init(stamp: marker.stamp, committed: true))
         XCTAssertTrue(SpeakerMatcher(dbPath: fixture.speakersDB).allSpeakerNames().contains("Alice"), "the voice was not saved")
     }
 
@@ -155,8 +161,8 @@ final class PipelineQueueRerunRunTests: XCTestCase {
         await queue.awaitProcessing()
 
         XCTAssertEqual(queue.job(withID: meeting.id)?.state, .done, "\(String(describing: queue.job(withID: meeting.id)?.error))")
-        let transcript = try XCTUnwrap(fixture.marker(meeting.id, in: queue).files.first { $0.role == .transcript }, "no transcript")
-        XCTAssertTrue(try String(contentsOfFile: transcript.path, encoding: .utf8).contains("Hello world"), "the far end's words went")
+        let transcript = try XCTUnwrap(queue.job(withID: meeting.id)?.transcriptPath, "no transcript")
+        XCTAssertTrue(try String(contentsOf: transcript, encoding: .utf8).contains("Hello world"), "the far end's words went")
     }
 
     private func makeController(on queue: PipelineQueue, fixture: PipelineQueueRerunFixture) throws -> PipelineController {

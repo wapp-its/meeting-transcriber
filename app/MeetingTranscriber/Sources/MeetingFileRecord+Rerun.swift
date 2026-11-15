@@ -22,6 +22,10 @@ extension MeetingFileRecord {
         /// the next admission remove the files it still lists, and nothing resumes
         /// it. Nil while it runs, and in a marker from before this field.
         var ending: Bool? // swiftlint:disable:this discouraged_optional_boolean
+        /// The swap's renames, in the order it makes them, written before the first
+        /// one: the next launch completes or undoes the swap from them. Nil until
+        /// the swap starts, and in a marker from before this field.
+        var renames: [Rename]? // swiftlint:disable:this discouraged_optional_collection
 
         var isEnding: Bool {
             ending == true
@@ -31,10 +35,8 @@ extension MeetingFileRecord {
         /// stamp. It never ends in `)` and holds no ` (`, so the additional-report
         /// rule never reads a re-run file as a report of the meeting.
         func stem(base: String) -> String {
-            "\(base).rerun-\(Self.stampFormat.string(from: stamp))"
+            "\(base).rerun-\(DateFormatter.fileVersionStamp.string(from: stamp))"
         }
-
-        private static let stampFormat = DateFormatter.filenameStamp("yyyyMMdd_HHmmss")
 
         /// List a file the re-run wrote; a write to a listed path replaces its entry.
         mutating func list(_ file: MeetingFile) {
@@ -47,6 +49,18 @@ extension MeetingFileRecord {
                 files[index].state = .gone
             }
         }
+    }
+
+    /// One rename of the swap: a current file to its earlier-version name, or a
+    /// file of the re-run to the current name of its role. A rename keeps the file's
+    /// identity, so `identity` finds the file at either end.
+    struct Rename: Codable, Equatable, Sendable {
+        let role: MeetingFile.Role
+        let from: String
+        let to: String
+        let identity: FileIdentity?
+        /// A current file kept as an earlier version, not a file of the re-run.
+        let earlier: Bool
     }
 
     /// How a re-run ended, in the record from its end until the next re-run is
@@ -88,6 +102,26 @@ extension MeetingFileRecord {
             kept.ending = true
             rerun = kept
         }
+    }
+
+    /// The swap's commit point, in one update: each new file listed under its role
+    /// with the identity it has now (`current`), last of its role, so it is the one
+    /// the meeting's current file is read from; the earlier versions and the re-run's
+    /// files it could not remove appended as owned kept files; the marker gone, the
+    /// stamp noted as committed and the outcome finished. A file of the role in
+    /// another output folder stays listed, so a deletion still finds it. False, with
+    /// nothing changed, for a record that carries another re-run's marker or none.
+    mutating func commitRerun(
+        _ marker: RerunMarker, current: [MeetingFile], kept: [MeetingFile], protocolExpected: Bool,
+    ) -> Bool {
+        guard rerun?.runID == marker.runID else { return false }
+        for file in current + kept {
+            appendKept(file)
+        }
+        rerun = nil
+        rerunNote = RerunNote(stamp: marker.stamp, committed: true)
+        outcome = .finished(protocolExpected: protocolExpected)
+        return true
     }
 
     /// The source audio a re-run reads, where the record lists it: the newest

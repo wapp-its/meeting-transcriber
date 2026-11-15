@@ -174,11 +174,13 @@ extension PipelineQueue {
         }
 
         jobs = loaded
-        for job in jobs where job.state == .done && job.hasPendingNotionExport {
+        // A re-run's entry is written by its swap, with the meeting's current names.
+        for job in jobs where job.state == .done && job.hasPendingNotionExport && job.rerun == nil {
             recordTerminalJob(job)
         }
 
         restoreNamingSessions()
+        resumeRerunSwaps()
 
         saveSnapshot()
         cleanupStalePending()

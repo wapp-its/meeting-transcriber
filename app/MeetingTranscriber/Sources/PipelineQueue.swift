@@ -217,9 +217,9 @@ class PipelineQueue {
     /// the expected speakers and VAD as Settings name them now, which this queue
     /// captured when it was built. Nil takes this queue's own values.
     let rerunSettingsProvider: (() -> PipelineJob.RerunSettings)?
-    /// Called once a re-run's speakers are confirmed or skipped and its notes
-    /// saved or not wanted, with the files it wrote that are still there.
-    @ObservationIgnored var onRerunSucceeded: ((PipelineJob, [MeetingFile]) -> Void)?
+    /// Whether a Regenerate Notes runs, which a re-run's swap waits out
+    /// (`rerunSucceeded`). Set by the controller.
+    @ObservationIgnored var isRegenerationRunning: @MainActor () -> Bool = { false }
     /// nil disables JSONL logging. AppState injects a real instance for production;
     /// tests leave it nil unless they explicitly want to assert on the log.
     let recognitionStatsLog: RecognitionStatsLog?
@@ -1073,8 +1073,8 @@ class PipelineQueue {
         if newState == .speakerNamingPending, jobs[index].namingStartedAt == nil {
             jobs[index].namingStartedAt = Date()
         }
-        // A re-run done is not a finished meeting yet: its files go to the success
-        // hook, and none of a finished job's completion runs for it here.
+        // A re-run done is not a finished meeting yet: its swap runs first
+        // (`rerunSucceeded`), and none of a finished job's completion runs for it here.
         if newState == .done, jobs[index].rerun != nil {
             recordStageTransition(from: oldState, to: newState, jobID: id, diarizerMode: diarizerMode)
             eventLog.append(jobID: id, event: "state_change", from: oldState, to: newState)
@@ -1152,7 +1152,7 @@ class PipelineQueue {
     /// has saved a protocol. A failed or disabled protocol generator leaves the
     /// transcript intact so users can recover the meeting content instead of
     /// losing it with no generated minutes to show for it.
-    private func removeRawTranscriptArtifactsIfSafe(for index: Int) {
+    func removeRawTranscriptArtifactsIfSafe(for index: Int) {
         guard !transcriptOutputOptions(forJobID: jobs[index].id).saveRawTranscriptSeparately else { return }
         guard jobs[index].hasSavedProtocol else {
             if jobs[index].transcriptPath != nil {

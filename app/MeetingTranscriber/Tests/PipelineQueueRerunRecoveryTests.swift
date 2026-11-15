@@ -84,6 +84,8 @@ final class PipelineQueueRerunRecoveryTests: XCTestCase {
         let transcribed = fixture.engine.transcribeCallCount
         generator = fixture.protocolGen
         let restarted = fixture.makeQueue(completedJobLifetime: 0)
+        // Held before its swap, so the re-run's own files can be read when it is done.
+        restarted.isRegenerationRunning = { true }
 
         restarted.loadSnapshot()
         await restarted.awaitProcessing()

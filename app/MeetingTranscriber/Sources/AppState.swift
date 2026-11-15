@@ -219,6 +219,7 @@ final class AppState {
         self.pipeline = PipelineController(settings: settings, notifier: notifier, queueEnvironment: pipelineEnvironment)
         self.meetingRecordPruner = MeetingRecordPruner(pipeline: pipeline)
         self.protocolRegenerator = Self.makeProtocolRegenerator(settings: settings, notifier: notifier, pipeline: pipeline)
+        pipeline.isRegenerationRunning = { [weak protocolRegenerator] in protocolRegenerator?.isRunning ?? false }
         self.channelHealth = ChannelHealthController(
             notifier: notifier,
             debounceSeconds: { [settings] in settings.asymmetricSilenceWarningSeconds },

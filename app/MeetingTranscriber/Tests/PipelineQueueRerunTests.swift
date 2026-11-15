@@ -140,6 +140,8 @@ final class PipelineQueueRerunTests: XCTestCase {
             let notion = shape.failsExport
                 ? NotionExportConfiguration(exporter: RetentionNotionExporter(fail: true), databaseID: "database-1") : nil
             let queue = fixture.makeQueue(completedJobLifetime: 1, notion: notion)
+            // Held before its swap, so the re-run's own files can be read when it is done.
+            queue.isRegenerationRunning = { true }
             fixture.protocolGen.shouldThrow = shape.failsNotes
             let meeting = try await fixture.finishedMeeting(in: queue)
             try await fixture.poll("\(shape.name): the export to end") { queue.notionExportTasks[meeting.id] == nil }

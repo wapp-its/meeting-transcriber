@@ -1282,7 +1282,7 @@ extension PipelineQueue {
     /// because the user who switched the export on wants the reason in each.
     @discardableResult
     private func resolveNotionExport(jobID: UUID) -> NotionExportResolution {
-        let resolution = notionExportConfigurationProvider?() ?? .disabled
+        let resolution = notionExportResolution(for: job(withID: jobID))
         if case .unconfigured = resolution {
             addWarning(id: jobID, Self.notionExportUnconfiguredWarning)
         }

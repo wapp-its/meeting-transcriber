@@ -124,8 +124,8 @@ extension PipelineQueue {
     // MARK: - The record and the files
 
     /// The record-side end of the re-run `marker` names: marked as ending with every
-    /// file it lists, those files removed, then one update restoring the outcome
-    /// (A27 for a file left).
+    /// file it lists, the swap's renames it lists moved back, those files removed,
+    /// then one update restoring the outcome (A27 for a file left).
     /// `saved` is whether that last update landed; `left` the files that stayed.
     static func closeRerun(
         _ marker: MeetingFileRecord.RerunMarker, jobID: UUID, in store: MeetingFileStore,
@@ -138,6 +138,7 @@ extension PipelineQueue {
         if !marked {
             logger.error("[\(PipelineJob.shortID(for: jobID), privacy: .public)] rerun_ending_not_recorded")
         }
+        if let renames = marker.renames { undoRenames(renames, jobID: jobID) }
         let left = removeRerunFiles(marker.files, jobID: jobID)
         let saved = store.update(jobID: jobID) { $0.endRerun(marker, leaving: left) }
         return (saved, left)
@@ -147,7 +148,7 @@ extension PipelineQueue {
     /// folder it wrote it to (`MeetingFileRemover.isTheRecordedFile`), and returns
     /// the ones that stayed: replaced at their path, reached through a folder
     /// replaced by a symbolic link, out of reach, or refused by the disk.
-    private static func removeRerunFiles(_ files: [MeetingFile], jobID: UUID) -> [MeetingFile] {
+    static func removeRerunFiles(_ files: [MeetingFile], jobID: UUID) -> [MeetingFile] {
         files.filter { file in
             guard file.state != .gone, let reason = removeRerunFile(file) else { return false }
             logger.warning(

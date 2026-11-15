@@ -119,6 +119,10 @@ final class PipelineController {
     /// runs the quit.
     @ObservationIgnored var quitHasBegun: () -> Bool = { false }
 
+    /// Whether a Regenerate Notes runs, which a re-run's swap waits out. Set by
+    /// `AppState`, which holds the regenerator.
+    @ObservationIgnored var isRegenerationRunning: @MainActor () -> Bool = { false }
+
     /// The output-folder bookmark the current queue was built from, so a change
     /// of folder can be noticed without resolving the bookmark again.
     @ObservationIgnored private var queueBuiltFromBookmark: Data?
@@ -472,6 +476,7 @@ final class PipelineController {
 
     func configureCallbacks(on target: PipelineQueue? = nil) {
         let queue = target ?? queue
+        queue.isRegenerationRunning = { [weak self] in self?.isRegenerationRunning() ?? false }
         queue.onNotionExportFinished = { [notifier] in notifier.notifyNotionExport(job: $0, failureReason: $1) }
         queue.onJobStateChange = { [notifier, settings] job, _, newState in
             switch newState {

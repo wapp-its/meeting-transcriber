@@ -24,6 +24,8 @@
             let generator = bench.generator(helper: helper)
             let localModel: () -> (any ProtocolGenerating)? = { generator }
             let queue = fixture.makeQueue(protocolGenerator: localModel)
+            // Held before its swap, so the re-run's own files can be read when it is done.
+            queue.isRegenerationRunning = { true }
             let meeting = try await fixture.finishedMeeting(in: queue)
             try Data().write(to: block)
 

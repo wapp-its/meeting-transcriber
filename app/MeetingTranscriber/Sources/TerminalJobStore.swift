@@ -47,10 +47,13 @@ final class TerminalJobStore {
     }
 
     /// Upsert `rec` and persist. Best-effort: a write failure is logged but
-    /// never throws into the pipeline (the job itself already succeeded).
-    func record(_ rec: TerminalJobRecord) {
+    /// never throws into the pipeline (the job itself already succeeded). False
+    /// when the write failed, which a re-run's swap waits on before its job turns
+    /// into an ordinary finished job.
+    @discardableResult
+    func record(_ rec: TerminalJobRecord) -> Bool {
         records = Self.upserting(records, with: rec, cap: cap)
-        save()
+        return save()
     }
 
     /// Record a status alone, with none of the history fields.

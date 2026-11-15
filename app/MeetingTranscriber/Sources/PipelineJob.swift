@@ -409,6 +409,10 @@ struct PipelineJob: Identifiable, Codable {
     /// the marker its record carries too, the settings it was admitted with, and the
     /// finished entry it took over. Nil for every other job, and in older snapshots.
     private(set) var rerun: Rerun?
+    /// Set on the finished job a re-run's swap made: its exports and their retries
+    /// go to the database of the page the meeting has, not the one Settings name
+    /// now (A26). Nil for every other job, and in older snapshots.
+    var exportsToPageDatabase: Bool? // swiftlint:disable:this discouraged_optional_boolean
 
     init(
         meetingTitle: String,
@@ -498,6 +502,12 @@ struct PipelineJob: Identifiable, Codable {
 
     mutating func markRerunFilesGone(paths: Set<String>) {
         rerun?.marker.markGone(paths: paths)
+    }
+
+    /// The re-run's swap committed and its finished-job entry is written: the job is
+    /// the meeting's ordinary finished job again, and the entry it took over is gone.
+    mutating func endRerunCommitted() {
+        rerun = nil
     }
 
     /// The muted stretches as the transcript times them: `mergeDualSourceSegments`

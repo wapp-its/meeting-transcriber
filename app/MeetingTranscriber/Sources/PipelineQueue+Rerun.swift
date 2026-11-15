@@ -248,12 +248,4 @@ extension PipelineQueue {
         meetingFileStore?.update(jobID: jobID) { $0.rerun?.markGone(paths: gone) }
         return true
     }
-
-    /// The re-run's speakers are confirmed or skipped and its notes are saved or
-    /// not wanted: its files still there go to the success hook.
-    func rerunSucceeded(id: UUID) {
-        guard let job = job(withID: id), let marker = job.rerun?.marker else { return }
-        logger.info("[\(job.shortID, privacy: .public)] rerun_succeeded files=\(marker.files.count, privacy: .public)")
-        onRerunSucceeded?(job, marker.files.filter { $0.state != .gone })
-    }
 }
