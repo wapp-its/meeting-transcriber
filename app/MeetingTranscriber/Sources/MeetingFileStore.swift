@@ -350,6 +350,26 @@ extension MeetingFileStore {
         }
     }
 
+    /// Admit a re-run of the meeting: its marker and the outcome in progress, in one
+    /// write under the lock the other build takes too, so a second re-run cannot start
+    /// from either. Nil when it was saved; else why nothing was written, the file's copy
+    /// differing from `read`, the record the caller decided on, included.
+    func beginRerun(_ marker: MeetingFileRecord.RerunMarker, unchangedFrom read: MeetingFileRecord) -> RerunRefusal? {
+        var refusal: RerunRefusal? = .recordNotSaved
+        let saved = transact { document in
+            guard let index = document.records.firstIndex(where: { $0.jobID == read.jobID }) else {
+                refusal = .notFinished
+                return false
+            }
+            refusal = document.records[index].rerunRefusal ?? (document.records[index] == read ? nil : .recordNotSaved)
+            guard refusal == nil else { return false }
+            document.records[index].rerun = marker
+            document.records[index].outcome = .inProgress
+            return true
+        }
+        return saved ? nil : refusal ?? .recordNotSaved
+    }
+
     /// Remove a record the caller found nothing left of, as long as the file's copy
     /// still is the one it looked at. `remove(jobID:)` is for a meeting already gone.
     @discardableResult

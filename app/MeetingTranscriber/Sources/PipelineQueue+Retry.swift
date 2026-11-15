@@ -106,8 +106,9 @@ extension PipelineQueue {
     /// another job in this one that has not failed holds the same mix file.
     /// Paired imports without a mix file are compared by the claim alone.
     /// A failed holder does not count: it processes nothing any more, and this
-    /// job is the way back to the recording.
-    private func audioIsHeldElsewhere(for job: PipelineJob) -> Bool {
+    /// job is the way back to the recording. Internal (not private) because a
+    /// re-run's admission asks the same (PipelineQueue+Rerun.swift).
+    func audioIsHeldElsewhere(for job: PipelineJob) -> Bool {
         inFlightRuns.isInFlight(job) || otherJobHoldsAudio(of: job, in: \.mixPaths, includingFailed: false)
     }
 

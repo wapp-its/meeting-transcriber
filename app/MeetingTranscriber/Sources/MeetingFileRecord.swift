@@ -94,6 +94,9 @@ struct MeetingFileRecord: Codable, Equatable, Sendable {
     /// this field, and in one an older build rewrote, which drops fields it does
     /// not know; `rerunInputs(finished:)` then gives the fallbacks.
     var runInputs: RunInputs?
+    /// The re-run of the meeting under way, from its admission until it ends. While
+    /// it is set the outcome reads in progress and no second re-run is admitted.
+    var rerun: RerunMarker?
 }
 
 extension MeetingFileRecord {
@@ -136,6 +139,7 @@ extension MeetingFileRecord {
             savedToNotion: container.decodeIfPresent(Bool.self, forKey: .savedToNotion) ?? false,
             createdBy: container.decodeIfPresent(String.self, forKey: .createdBy),
             runInputs: container.decodeIfPresent(RunInputs.self, forKey: .runInputs),
+            rerun: container.decodeIfPresent(RerunMarker.self, forKey: .rerun),
         )
     }
 

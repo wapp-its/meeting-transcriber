@@ -405,6 +405,11 @@ struct PipelineJob: Identifiable, Codable {
     /// build reading a newer snapshot ignores the key.
     var namingStartedAt: Date?
 
+    /// Set while the job is a re-run of a finished meeting (`PipelineQueue.rerunJob`):
+    /// the marker its record carries too, the settings it was admitted with, and the
+    /// finished entry it took over. Nil for every other job, and in older snapshots.
+    private(set) var rerun: Rerun?
+
     init(
         meetingTitle: String,
         appName: String,
@@ -452,6 +457,47 @@ struct PipelineJob: Identifiable, Codable {
         self.useAITitleForFilenames = useAITitleForFilenames
         self.usedDiarizerMode = nil
         self.autoSkipNaming = autoSkipNaming
+    }
+
+    /// The finished meeting `finished` names, queued again from `audio` and the
+    /// inputs its record kept: the meeting's id, title, app, start time, participants
+    /// and time first added, so the row, the record and the finished entry stay one
+    /// meeting. None of a finished run's results or notes-retry fields come along,
+    /// so it never runs as a notes-only job; the output options are left to the
+    /// admission (`stampTranscriptOutputOptions`), as for any job.
+    init(
+        rerunOf finished: TerminalJobRecord, id: UUID, audio: RelocatedAudioPaths,
+        inputs: MeetingFileRecord.RunInputs, rerun: Rerun,
+    ) {
+        self.id = id
+        meetingTitle = finished.status.meetingTitle
+        appName = finished.appName ?? ""
+        mixPath = audio.mix
+        appPath = audio.app
+        micPath = audio.mic
+        micDelay = inputs.micDelay
+        micMuteIntervals = inputs.micMuteIntervals.sanitized
+        participants = finished.participants
+        enqueuedAt = finished.enqueuedAt ?? rerun.marker.stamp
+        meetingStartTime = finished.meetingStartTime
+        pauses = inputs.pauses.isEmpty ? nil : inputs.pauses
+        state = .waiting
+        warnings = []
+        protocolTemplate = inputs.protocolTemplate
+        protocolBackground = inputs.protocolBackground
+        notionPageID = inputs.notionPageID
+        notionPageURL = finished.status.export?.url.flatMap(Self.trustedNotionURL)
+        notionDatabaseID = inputs.notionDatabaseID
+        self.rerun = rerun
+    }
+
+    /// A file the re-run wrote, listed in its marker.
+    mutating func noteRerunFile(_ file: MeetingFile) {
+        rerun?.marker.list(file)
+    }
+
+    mutating func markRerunFilesGone(paths: Set<String>) {
+        rerun?.marker.markGone(paths: paths)
     }
 
     /// The muted stretches as the transcript times them: `mergeDualSourceSegments`

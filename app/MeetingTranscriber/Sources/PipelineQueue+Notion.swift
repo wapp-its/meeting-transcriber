@@ -417,7 +417,9 @@ extension PipelineQueue {
     /// job's template; a record an older build rewrote without them takes them
     /// from the job.
     private func noteNotionExport(of job: PipelineJob) {
-        guard !isRetired else { return }
+        // A re-run's export starts only once it succeeded; until then the record
+        // keeps the meeting's export as it was.
+        guard !isRetired, job.rerun == nil else { return }
         meetingFileStore?.update(jobID: job.id) { record in
             record.savedToNotion = job.hasCompletedNotionExport
             var inputs = record.runInputs ?? MeetingFileRecord.RunInputs(job: job)

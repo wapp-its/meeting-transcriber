@@ -35,7 +35,9 @@ class PipelineQueue {
     /// in-place field updates, snapshot restore (whole-array assign), and
     /// recovery appends.
     var jobs: [PipelineJob] = []
-    @ObservationIgnored private var completedJobRemovalTokens: [UUID: UUID] = [:]
+    /// Internal (not private) because a re-run that takes over a finished job
+    /// cancels its removal (PipelineQueue+Rerun.swift).
+    @ObservationIgnored var completedJobRemovalTokens: [UUID: UUID] = [:]
     /// Fires for every finished export, first attempt or retry, with the short
     /// failure cause or nil on success.
     @ObservationIgnored var onNotionExportFinished: ((PipelineJob, String?) -> Void)?
@@ -181,6 +183,16 @@ class PipelineQueue {
     let protocolTemplateRulesProvider: () -> [ProtocolTemplateRule]
     let speakerMatcherFactory: () -> SpeakerMatcher
     let vadConfig: VADConfig?
+    /// The engine instance of a kind, for a re-run admitted with an engine other
+    /// than this queue's (`engine`). Nil in a queue built without Settings.
+    let engineForKind: ((TranscriptionEngineSetting) -> (any TranscribingEngine)?)?
+    /// What a re-run admitted now runs with: the engine, speaker identification,
+    /// the expected speakers and VAD as Settings name them now, which this queue
+    /// captured when it was built. Nil takes this queue's own values.
+    let rerunSettingsProvider: (() -> PipelineJob.RerunSettings)?
+    /// Called once a re-run's speakers are confirmed or skipped and its notes
+    /// saved or not wanted, with the files it wrote that are still there.
+    @ObservationIgnored var onRerunSucceeded: ((PipelineJob, [MeetingFile]) -> Void)?
     /// nil disables JSONL logging. AppState injects a real instance for production;
     /// tests leave it nil unless they explicitly want to assert on the log.
     let recognitionStatsLog: RecognitionStatsLog?
@@ -489,6 +501,8 @@ class PipelineQueue {
         self.speakerMatcherFactory = speakerMatcherFactory
         self.snapshotWriter = snapshotWriter
         self.vadConfig = nil
+        engineForKind = nil
+        rerunSettingsProvider = nil
         self.recognitionStatsLog = nil
         terminologyNormalizer = { TerminologyNormalizer() }
         self.stageTimingLog = stageTimingLog
@@ -644,6 +658,8 @@ class PipelineQueue {
         speakerMatcherFactory: @escaping () -> SpeakerMatcher = PipelineQueue.throwawayMatcherFactory(),
         snapshotWriter: @escaping @Sendable ([PipelineJob], URL) throws -> Void = PipelineSnapshot.save,
         vadConfig: VADConfig? = nil,
+        engineForKind: ((TranscriptionEngineSetting) -> (any TranscribingEngine)?)? = nil,
+        rerunSettings: (() -> PipelineJob.RerunSettings)? = nil,
         recognitionStatsLog: RecognitionStatsLog? = nil,
         terminologyNormalizer: @escaping () -> TerminologyNormalizer = { TerminologyNormalizer() },
         stageTimingLog: StageTimingLog? = nil,
@@ -696,6 +712,8 @@ class PipelineQueue {
         self.speakerMatcherFactory = speakerMatcherFactory
         self.snapshotWriter = snapshotWriter
         self.vadConfig = vadConfig
+        self.engineForKind = engineForKind
+        rerunSettingsProvider = rerunSettings
         self.recognitionStatsLog = recognitionStatsLog
         self.terminologyNormalizer = terminologyNormalizer
         self.stageTimingLog = stageTimingLog
@@ -894,7 +912,8 @@ class PipelineQueue {
         // own a local generation to end (see `cancelWork`).
         let wasInWork = jobs.contains { $0.id == id && $0.state != .done && $0.state != .error }
         if let index = jobs.firstIndex(where: { $0.id == id }) {
-            processedLedger.markProcessed(mixPath: jobs[index].mixPath)
+            // A re-run reads a finished meeting's audio and is no recording to mark.
+            if jobs[index].rerun == nil { processedLedger.markProcessed(mixPath: jobs[index].mixPath) }
             // Unconditional, because removing a job has to remove what belongs
             // to it. A job dismissed while still awaiting speaker naming used to
             // strand its sidecars for good: only cancelling cleaned them up, and
@@ -1017,6 +1036,15 @@ class PipelineQueue {
         if newState == .speakerNamingPending, jobs[index].namingStartedAt == nil {
             jobs[index].namingStartedAt = Date()
         }
+        // A re-run done is not a finished meeting yet: its files go to the success
+        // hook, and none of a finished job's completion runs for it here.
+        if newState == .done, jobs[index].rerun != nil {
+            recordStageTransition(from: oldState, to: newState, jobID: id, diarizerMode: diarizerMode)
+            eventLog.append(jobID: id, event: "state_change", from: oldState, to: newState)
+            saveSnapshot()
+            rerunSucceeded(id: id)
+            return
+        }
         if newState == .done {
             // Only now, with the notes saved, is a failure over: a retry that
             // fails again, or finds no provider, keeps it and stays on offer.
@@ -1039,7 +1067,7 @@ class PipelineQueue {
         onJobStateChange?(jobs[index], oldState, newState)
 
         if newState == .done || newState == .error {
-            processedLedger.markProcessed(mixPath: jobs[index].mixPath)
+            if jobs[index].rerun == nil { processedLedger.markProcessed(mixPath: jobs[index].mixPath) }
             recordTerminalJob(jobs[index])
         }
         if newState == .done {
@@ -1493,6 +1521,7 @@ extension PipelineQueue {
         let files = written.compactMap { role, path in
             path.map { MeetingFile(role: role, url: $0, owned: origin.owns(role)) }
         }
+        guard !noteRerunWritten(jobID: jobID, files) else { return }
         meetingFileStore.list(files, jobID: jobID)
     }
 
@@ -1519,7 +1548,9 @@ extension PipelineQueue {
             noteWritten(jobID: jobID, role: .transcript, path: path)
 
         case .sidecarsRemoved:
-            meetingFileStore?.markGone(jobID: jobID, roles: [.naming, .mix16k, .app16k, .mic16k, .segments])
+            let roles: Set<MeetingFile.Role> = [.naming, .mix16k, .app16k, .mic16k, .segments]
+            guard !noteRerunFilesGone(jobID: jobID, roles: roles) else { return }
+            meetingFileStore?.markGone(jobID: jobID, roles: roles)
         }
     }
 
