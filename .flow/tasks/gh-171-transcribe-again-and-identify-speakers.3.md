@@ -55,9 +55,32 @@ Every end of a re-run but success, and every restore of one (R6, A2, A5, A23, A2
 - [ ] On every end the meeting's audio paths and bytes are unchanged.
 - [ ] The Quick commands' focused tests and `./scripts/lint.sh` pass.
 ## Done summary
-TBD
+A re-run that fails, is cancelled or dismissed, or is left unnamed past the wait now ends through one path: the record's marker is marked ending, the re-run's own files that pass the file check go, one record update restores the outcome and notes the stamp as ended, and only then does the job leave the queue. A taken-over finished entry comes back with its export state and notes failure, and the row shows one warning line. Re-run jobs live in this build's own file beside pipeline_queue.json, and the launch applies the spec's table to them, including orphans before any queue exists.
 
+Tier: implementer - opus (explicit invocation) at xhigh effort (requested) (model: claude-opus-5-5)
+baseline: green (312 tests of the focused classes, before any edit)
+
+stage: impl-review - ran [21:44..22:12] (codex gpt-6.1-sol xhigh; round 1 three lenses NEEDS_WORK with 5 merged findings, all fixed; rounds 2 and 3 found one regression each from the fixes, fixed; round 4 SHIP)
+
+Tests (all focused, 2 workers): PipelineQueueRerunEndTests (each R6 end, two-track cases, held entry, files left, row line, a file the record missed), PipelineQueueRerunEndLocalModelTests (Cancel while waiting at and running in the gate), PipelineQueueRerunRecoveryTests (re-run file, cold start, wait never, launch table rows, unreadable file, held entry kept in the snapshot, notes-only resume, unrecorded ends). Gate runs on the final tree: 335 tests and 380 tests green, lint green, App Store variant built with tests. Each new wiring line and each review fix was checked to turn its test red when broken.
+
+Decisions (assumptions, reversible, inside the spec):
+- A re-run's end posts no notification, like Dismiss; onJobStateChange is not called for it.
+- Ends handled at launch set no warning line (the line is in memory only).
+- An engine that returns no timestamps stays a warning for a re-run; the spec lists only the diarize catch and its not-available skip.
+- A restored naming-pending re-run without its naming data ends as failed ("the speakers to name could not be read again after the app restarted") instead of being finished with automatic names.
+- A queue whose re-run file or snapshot did not read admits no re-run (new refusal rerunFileUnreadable); its sheet text comes with the sheet's task.
+- A re-run job saved in .error marks an end decided but not recorded; the launch finishes it.
+
+Notes for later tasks:
+- Task 4 (swap): pipeline_queue.json keeps the finished entry a re-run took over for as long as the re-run job holds it (PipelineQueue.snapshotJobs). The swap must drop that entry when it commits, or the old entry stays in the shared file until the re-run job leaves.
+- RerunRefusal gained filesLeft and rerunFileUnreadable; the admission sheet needs texts for both.
+
+Follow-ups (not built):
+- A re-run cancelled while paused for a recording leaves its meeting id in the local-model paused-job notices (NotificationManager+LocalModel.swift, outside this task's files), so a later re-run of that meeting in the same session gets no paused notice.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: a2aa801c50a5026dd8a6d7ee5980165b5e3e1d87, f76a329f1a52f35813be8b03cdc4e4bf8c5a7d27, 02342328d47c35716b35e861f2526332dd959136, d2c36f501f4cdea9910c6996fe8d1b925a7e5926
+- Tests: cd app/MeetingTranscriber && swift build -j 6 --build-tests && swift test --skip-build --parallel --num-workers 2 --filter "LateRerunCancelTests|LocalModelGateWiringTests|MeetingFileRemoverTests|MeetingFileStoreTests|MeetingNotesRetryTests|PipelineControllerNotionRestoreTests|PipelineControllerRestoreTests|PipelineQueueMeetingFiles|PipelineQueueRerun|PipelineQueueRetryTests|PipelineSnapshotTests|RecordingRowActionsTests|RegenerateProtocolViewTests|RowAvailabilityTests|SpeakerNamingStoreTests|StaleNamingTimeoutTests|TerminalJobStoreTests|TranscriptionsViewTests" (335 passed), cd app/MeetingTranscriber && swift test --skip-build --parallel --num-workers 2 --filter "PipelineQueueTests|PipelineQueueProtocolSaveTests|PipelineQueueRetention|PipelineSnapshotSingleWriterTests|PipelineControllerTranscriptionsTests|PipelineControllerRetentionTests|PipelineControllerNotionExportTests|PipelineControllerTests|SpeakerNamingSessionTests|ProtocolRegeneration" (380 passed), ./scripts/lint.sh (0 violations), swift build --build-tests -Xswiftc -DAPPSTORE (App Store variant, built)
 - PRs:
