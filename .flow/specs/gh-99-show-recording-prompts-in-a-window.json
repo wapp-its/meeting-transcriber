@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-99-show-recording-prompts-in-a-window",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-11-15T19:46:37.760596Z",
   "created_at": "2026-11-12T20:43:18.772986Z",
   "default_impl": null,
   "default_review": null,
@@ -292,6 +292,42 @@
       "task": "gh-99-show-recording-prompts-in-a-window.4",
       "timestamp": "2026-11-15T19:25:54.138733Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "81d5e8309355ab534dd8ab0f3ba55d83fb0ee7afcdc172cf2f518f461d4566a2",
+      "backend": "codex",
+      "base_sha": "1d09282725e72ba97c40f83cbf54ada9fccca663",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "97ecccb68bfdff67efa0249cf80892b59aa4eb45",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 555225,
+      "output_sha256": "d4f09c0bc654bbf3118207e33aa639483e3d3b34a588df3eada273b32a53d252",
+      "reservation_id": "88905fce08a44d1ab4aeb0bc3ebc9e58",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-15T19:46:37.742490Z",
+      "tool_calls": 30,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -300,11 +336,12 @@
     "impl:gh-99-show-recording-prompts-in-a-window.3": 1,
     "impl:gh-99-show-recording-prompts-in-a-window.4": 1,
     "plan": 3,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-99-show-recording-prompts-in-a-window.1": 0,
     "impl:gh-99-show-recording-prompts-in-a-window.2": 0,
     "impl:gh-99-show-recording-prompts-in-a-window.3": 0,
@@ -326,5 +363,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/99"
   },
-  "updated_at": "2026-11-15T19:25:54.158455Z"
+  "updated_at": "2026-11-15T19:46:37.764794Z"
 }
