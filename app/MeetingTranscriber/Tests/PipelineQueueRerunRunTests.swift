@@ -1,3 +1,4 @@
+import AudioTapLib
 @testable import MeetingTranscriber
 import XCTest
 
@@ -137,6 +138,25 @@ final class PipelineQueueRerunRunTests: XCTestCase {
             XCTAssertTrue(FileManager.default.fileExists(atPath: file.path), "handed a file that is gone: \(file.path)")
         }
         XCTAssertTrue(SpeakerMatcher(dbPath: fixture.speakersDB).allSpeakerNames().contains("Alice"), "the voice was not saved")
+    }
+
+    /// Without its mic track a recorded call runs on its mix, which holds the far
+    /// end: the mic's mute times must not take the far end's words out of it.
+    func testARecordedCallsRerunWithoutItsMicTrackKeepsWhatTheFarEndSaidDuringAMute() async throws {
+        let fixture = try makeFixture()
+        let queue = fixture.makeQueue()
+        let recording = try fixture.makeRecording(micMuteIntervals: [MicMuteInterval(start: 0, end: 5)])
+        let meeting = try await fixture.finishedMeeting(in: queue, recording)
+        let record = try fixture.record(meeting.id)
+        XCTAssertFalse(record.runInputs?.micMuteIntervals.isEmpty ?? true, "test premise: no mute kept")
+        try FileManager.default.removeItem(at: XCTUnwrap(record.rerunSourceTracks.mic))
+
+        XCTAssertEqual(queue.rerunJob(id: meeting.id, mode: .transcribeAgain), .queued)
+        await queue.awaitProcessing()
+
+        XCTAssertEqual(queue.job(withID: meeting.id)?.state, .done, "\(String(describing: queue.job(withID: meeting.id)?.error))")
+        let transcript = try XCTUnwrap(fixture.marker(meeting.id, in: queue).files.first { $0.role == .transcript }, "no transcript")
+        XCTAssertTrue(try String(contentsOfFile: transcript.path, encoding: .utf8).contains("Hello world"), "the far end's words went")
     }
 
     private func makeController(on queue: PipelineQueue, fixture: PipelineQueueRerunFixture) throws -> PipelineController {

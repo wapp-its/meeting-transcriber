@@ -101,8 +101,13 @@ extension PipelineQueue {
         let settings = currentRerunSettings()
         // Resolved while Settings names it, so the stages find this instance later.
         if let kind = settings.engine { _ = engineForKind?(kind) }
+        var inputs = record.rerunInputs(finished: finished)
+        // The mute times are the mic track's. A call run on its mix or its call
+        // audio would lose the far end's words in them, so it keeps none, as a
+        // reimport of those tracks does (`RecordingSidecar.micMuteIntervals(app:mic:)`).
+        if audio.app == nil, record.rerunSourceTracks.app != nil { inputs.micMuteIntervals = [] }
         var job = PipelineJob(
-            rerunOf: finished, id: id, audio: audio, inputs: record.rerunInputs(finished: finished),
+            rerunOf: finished, id: id, audio: audio, inputs: inputs,
             rerun: .init(mode: mode, marker: marker, settings: settings, heldEntry: live.map { .job($0) }),
         )
         stampTranscriptOutputOptions(on: &job)

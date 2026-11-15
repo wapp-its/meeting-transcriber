@@ -1,3 +1,4 @@
+import AudioTapLib
 import Foundation
 @testable import MeetingTranscriber
 import XCTest
@@ -120,7 +121,9 @@ final class PipelineQueueRerunFixture {
     }
 
     /// A recorded call's three tracks, as a recorder leaves them in `folder`.
-    func makeRecording(in folder: URL? = nil, title: String = "Google Chrome") throws -> PipelineJob {
+    func makeRecording(
+        in folder: URL? = nil, title: String = "Google Chrome", micMuteIntervals: [MicMuteInterval] = [],
+    ) throws -> PipelineJob {
         let folder = folder ?? stagingDir
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let stem = UUID().uuidString.prefix(8)
@@ -131,7 +134,7 @@ final class PipelineQueueRerunFixture {
         }
         return PipelineJob(
             meetingTitle: title, appName: "Microsoft Teams",
-            mixPath: tracks[0], appPath: tracks[1], micPath: tracks[2], micDelay: 0,
+            mixPath: tracks[0], appPath: tracks[1], micPath: tracks[2], micDelay: 0, micMuteIntervals: micMuteIntervals,
             meetingStartTime: meetingStart,
         )
     }
