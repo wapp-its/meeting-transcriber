@@ -9,7 +9,7 @@ struct MicrophoneDevice: Equatable, Sendable {
 }
 
 /// The microphone list Settings → Audio → Microphone and the menu bar's
-/// Microphone entry share, and the name of the macOS default input.
+/// Microphone entry share, and the macOS default input.
 enum MicrophoneDevices {
     /// Every microphone the app offers, in AVFoundation's discovery order.
     static func available() -> [MicrophoneDevice] {
@@ -21,11 +21,11 @@ enum MicrophoneDevices {
         return session.devices.map { MicrophoneDevice(uid: $0.uniqueID, name: $0.localizedName) }
     }
 
-    /// The macOS default input's name, which is what "System Default" records.
+    /// The macOS default input, which is what "System Default" records.
     /// From Core Audio, never from `AVCaptureDevice.default(for:)` or the
     /// discovery order above: neither is the device the capture engine follows
     /// when nothing is pinned.
-    static func systemDefaultInputName() -> String? {
-        MicInputDevice.systemDefaultInput()?.name
+    static func systemDefaultInput() -> MicInputDevice? {
+        MicInputDevice.systemDefaultInput()
     }
 }

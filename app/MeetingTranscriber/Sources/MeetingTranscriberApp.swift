@@ -124,6 +124,7 @@ struct MeetingTranscriberApp: App {
         recordAppWindow
         transcriptionsWindow
         consentOptionsWindow
+        AudioDevicesScene(appState: appState)
     }
 
     // MARK: - Menu Bar
@@ -171,6 +172,7 @@ struct MeetingTranscriberApp: App {
             } : nil,
             processFiles: processAudioFiles,
             showAllTranscriptions: { bringWindowToFront(id: TranscriptionsView.windowID) },
+            showAudioDevices: { bringWindowToFront(id: AudioDevicesView.windowID) },
             removeFailedJob: { id in appState.pipeline.removeFailedJob(id: id) },
             dismissJob: { id in appState.pipelineQueue.removeJob(id: id) },
             answerConsent: { question, granted in appState.answerConsentQuestion(question, granted: granted) },
@@ -263,6 +265,9 @@ struct MeetingTranscriberApp: App {
         }
         .onReceive(NotificationCenter.default.publisher(for: .closeSettings)) { _ in
             closeWindow(id: "settings")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showAudioDevices)) { _ in
+            bringWindowToFront(id: AudioDevicesView.windowID)
         }
         .task {
             await appState.engines.preloadActiveModel()
@@ -524,23 +529,6 @@ struct MeetingTranscriberApp: App {
         appState.pipeline.enqueueFiles(panel.urls)
     }
 
-    private func bringWindowToFront(id: String) {
-        openWindow(id: id)
-        NSApp.activate(ignoringOtherApps: true)
-        // Ensure the window is brought to front even if already open
-        DispatchQueue.main.async {
-            for window in NSApp.windows where window.identifier?.rawValue == id {
-                window.makeKeyAndOrderFront(nil)
-            }
-        }
-    }
-
-    private func closeWindow(id: String) {
-        for window in NSApp.windows where window.identifier?.rawValue == id {
-            window.close()
-        }
-    }
-
     /// Only asks to terminate: stopping watching and finishing a recording
     /// happen in `AppDelegate`, which every quit path goes through, and this
     /// one alone used to do them.
@@ -559,6 +547,29 @@ struct MeetingTranscriberApp: App {
 
         case .notion:
             Self.openInNotion(target)
+        }
+    }
+}
+
+// MARK: - Window helpers
+
+// In an extension of this file, so they stay private and the struct's body
+// stays under SwiftLint's `type_body_length` limit.
+extension MeetingTranscriberApp {
+    private func bringWindowToFront(id: String) {
+        openWindow(id: id)
+        NSApp.activate(ignoringOtherApps: true)
+        // Ensure the window is brought to front even if already open
+        DispatchQueue.main.async {
+            for window in NSApp.windows where window.identifier?.rawValue == id {
+                window.makeKeyAndOrderFront(nil)
+            }
+        }
+    }
+
+    private func closeWindow(id: String) {
+        for window in NSApp.windows where window.identifier?.rawValue == id {
+            window.close()
         }
     }
 }

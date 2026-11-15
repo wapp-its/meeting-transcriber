@@ -298,6 +298,7 @@ struct MenuBarView: View {
             Section("Audio Devices") {
                 microphoneSection
                 outputSection
+                deviceDetailsItem
             }
         }
     }

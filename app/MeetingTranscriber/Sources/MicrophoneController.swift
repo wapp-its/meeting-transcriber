@@ -61,6 +61,10 @@ final class MicrophoneController {
     /// The macOS default input's name, which "System Default" records.
     private(set) var defaultInputName: String?
 
+    /// The macOS default input's UID, from the same read as its name: the
+    /// Audio Devices window marks that microphone "Default".
+    private(set) var defaultInputUID: String?
+
     /// `<App> uses <devices>` while the latest meeting-app probe found the
     /// meeting app on another microphone (`MicrophoneController+MeetingProbe.swift`).
     var meetingAppHint: String?
@@ -78,7 +82,7 @@ final class MicrophoneController {
     let probeQueue = DispatchQueue(label: "com.meetingtranscriber.meeting-microphone-probe", qos: .utility)
     @ObservationIgnored var meetingProbe = MeetingProbeState()
     private let listDevices: () -> [MicrophoneDevice]
-    private let readDefaultInputName: () -> String?
+    private let readDefaultInput: () -> MicInputDevice?
 
     @ObservationIgnored private var tickTask: Task<Void, Never>?
 
@@ -88,7 +92,7 @@ final class MicrophoneController {
         log: any DiagnosticsLogging = OSLogDiagnostics(category: "MeetingMicrophone"),
         probeReader: @escaping @Sendable ([pid_t]) -> [MeetingInputProcess] = { MeetingMicrophoneProbe.read(pids: $0) },
         listDevices: @escaping () -> [MicrophoneDevice] = MicrophoneDevices.available,
-        readDefaultInputName: @escaping () -> String? = MicrophoneDevices.systemDefaultInputName,
+        readDefaultInput: @escaping () -> MicInputDevice? = MicrophoneDevices.systemDefaultInput,
         notificationCenter: NotificationCenter = .default,
     ) {
         self.settings = settings
@@ -96,7 +100,7 @@ final class MicrophoneController {
         self.log = log
         self.probeReader = probeReader
         self.listDevices = listDevices
-        self.readDefaultInputName = readDefaultInputName
+        self.readDefaultInput = readDefaultInput
         observeMicrophoneChoice()
         refreshDevices()
         observeDeviceChanges(notificationCenter)
@@ -143,13 +147,14 @@ final class MicrophoneController {
         probeMeetingMicrophoneIfDue(recorder)
     }
 
-    /// Read the device list and the default input's name again. Assigns only
-    /// on a change, like `tick()`.
+    /// Read the device list and the default input's name and UID again.
+    /// Assigns only on a change, like `tick()`.
     func refreshDevices() {
         let list = listDevices()
         if devices != list { devices = list }
-        let name = readDefaultInputName()
-        if defaultInputName != name { defaultInputName = name }
+        let input = readDefaultInput()
+        if defaultInputName != input?.name { defaultInputName = input?.name }
+        if defaultInputUID != input?.uid { defaultInputUID = input?.uid }
     }
 
     private func applyMicrophoneChoice() {
