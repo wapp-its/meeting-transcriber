@@ -81,6 +81,9 @@ enum A11yID {
     /// The device picker in the menu bar's Output submenu, for the same reason.
     static let menuOutputPicker = "menuOutputPicker"
 
+    /// The menu bar's "Device Details…", which opens the Audio Devices window.
+    static let menuDeviceDetailsItem = "menuDeviceDetailsItem"
+
     /// Menu bar job row's Remove button on a failed job, addressed by ROW
     /// INDEX for the same reason as `jobRetryButton`.
     static func jobRemoveButton(_ index: Int) -> String {

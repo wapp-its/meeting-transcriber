@@ -378,6 +378,9 @@
                 Self.closeSettings()
                 return HTTPResponse.ok()
 
+            case ("POST", "/action/openAudioDevices"), ("POST", "/action/closeAudioDevices"):
+                return Self.routeAudioDevicesAction(path: request.path)
+
             case ("POST", "/action/skipNaming"):
                 // Skips ALL pending speaker-naming jobs in one shot — driver
                 // scripts (e2e-app.sh) just want to drain the queue without
