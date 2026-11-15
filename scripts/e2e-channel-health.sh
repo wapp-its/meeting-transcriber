@@ -166,7 +166,13 @@ if [ "$TAKE_SCREENSHOT" = true ]; then
     # SwiftUI's MenuBarExtra → NSStatusItem composite can trail RPC readiness
     # by 1-2 frames, so the assertion is polled rather than run once. Cold
     # `swift` invocation per attempt provides the natural pacing.
-    if ! screencapture -R 0,0,3000,30 "$OUT" 2>/dev/null || [ ! -s "$OUT" ]; then
+    #
+    # A locked screen is asked first: screencapture then writes no image, and
+    # the arm below would blame the Screen Recording grant. Whether that grant
+    # is given cannot be told while the screen is locked.
+    if host_skip_if_screen_locked channel-health "the red-pixel assertion"; then
+        rm -f "$OUT"
+    elif ! screencapture -R 0,0,3000,30 "$OUT" 2>/dev/null || [ ! -s "$OUT" ]; then
         # Through host_skip, so a scheduled run that asked for the pixel
         # assertion does not read a skipped one as a pass.
         host_skip channel-health "screencapture produced no image of the menu bar (no display, or this process may not record the screen), so the red-pixel assertion did not run. Fix: $(tcc_fix_hint 'Screen & System Audio Recording')"
@@ -182,8 +188,11 @@ if [ "$TAKE_SCREENSHOT" = true ]; then
                 "$ROOT/scripts/assert-red-pixels.swift" "$OUT"
                 break
             fi
-            if "$ROOT/scripts/assert-red-pixels.swift" "$OUT" >/dev/null 2>&1; then
+            # Captured rather than discarded: a pass prints the count it
+            # measured, so the log shows how far above the threshold it was.
+            if check_output="$("$ROOT/scripts/assert-red-pixels.swift" "$OUT" 2>&1)"; then
                 echo "▸ Menubar screenshot saved to $OUT (attempt $attempt/$max_attempts)"
+                echo "$check_output"
                 break
             fi
             attempt=$((attempt + 1))

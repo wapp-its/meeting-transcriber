@@ -45,6 +45,10 @@ struct TranscriptionEntry: Identifiable, Equatable {
     /// retried; one known only from the history waits for the pipeline to load
     /// it from the snapshot.
     let isLive: Bool
+    /// A finished job in the queue whose meeting notes failed and can be made
+    /// again from its transcript (`PipelineJob.hasRetryableMeetingNotes`).
+    /// False for an entry known only from the history: only the queue retries.
+    let hasRetryableMeetingNotes: Bool
     /// Where the job stands among the finished ones in the order they
     /// finished, higher meaning later: its history record's index. Nil while
     /// it is unfinished, and for a finished job the history holds no record
@@ -84,6 +88,7 @@ struct TranscriptionEntry: Identifiable, Equatable {
         hasNotionPage = job.notionPageID != nil
         liveNotionExport = job.notionExportStatus
         isLive = true
+        hasRetryableMeetingNotes = job.hasRetryableMeetingNotes
         self.finishOrder = job.state.isTerminal ? finishOrder : nil
     }
 
@@ -109,6 +114,7 @@ struct TranscriptionEntry: Identifiable, Equatable {
         hasNotionPage = status.export?.id != nil || status.export?.url != nil
         liveNotionExport = nil
         isLive = false
+        hasRetryableMeetingNotes = false
         self.finishOrder = status.state.isTerminal ? finishOrder : nil
     }
 }
@@ -182,7 +188,8 @@ enum TranscriptionList {
     /// progress") and jobs waiting on the user, for speaker names or because
     /// they failed ("Needs you"). A finished job whose Notion export is still
     /// open counts as one of them: in progress while the export runs, needing
-    /// the user once it failed, since only the menu offers its retry. Other
+    /// the user once it failed, since only the menu offers its retry. So does
+    /// a finished job whose meeting notes failed, for the same reason. Other
     /// finished jobs, with or without warnings, are left to the Transcriptions
     /// window. Each group lists its jobs in the
     /// order they were added (oldest first), so the menu reads top to bottom
@@ -202,6 +209,7 @@ enum TranscriptionList {
             inProgress: oldestFirst.filter { running.contains($0.state) || $0.openNotionExport == .inProgress },
             needsYou: oldestFirst.filter { entry in
                 entry.state == .speakerNamingPending || entry.state == .error || entry.openNotionExport == .failed
+                    || entry.hasRetryableMeetingNotes
             },
         )
     }

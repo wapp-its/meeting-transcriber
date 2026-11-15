@@ -224,6 +224,16 @@ enum A11yID {
     static let consentOptionsRecordButton = "consentOptionsRecordButton"
     static let consentOptionsCancelButton = "consentOptionsCancelButton"
 
+    /// A job's "Retry Meeting Notes", addressed by ROW INDEX for the same
+    /// reason as `jobRetryButton`.
+    static func jobNotesRetryButton(_ index: Int) -> String {
+        "jobNotesRetryButton.\(index)"
+    }
+
+    /// The menu's "Retry All Meeting Notes (N)", shown from two such jobs on.
+    static let retryAllMeetingNotesButton = "retryAllMeetingNotesButton"
+    static let generateNotesFromTranscriptButton = "generateNotesFromTranscriptButton"
+
     static let recordOnlyBanner = "recordOnlyBanner"
     /// Settings → Advanced: the line saying where the diagnostics export went.
     static let diagnosticExportStatus = "diagnosticExportStatus"
@@ -333,6 +343,7 @@ enum A11yID {
     static let regenerateSaveAsReportOption = "regenerateSaveAsReportOption"
     static let regenerateSaveAsReplaceOption = "regenerateSaveAsReplaceOption"
 
+    static let notifyOnMeetingNotesFailureToggle = "notifyOnMeetingNotesFailureToggle"
     static let includeFullTranscriptToggle = "includeFullTranscriptToggle"
     static let saveRawTranscriptToggle = "saveRawTranscriptToggle"
     static let useAITitleForFilenamesToggle = "useAITitleForFilenamesToggle"

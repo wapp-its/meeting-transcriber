@@ -125,6 +125,12 @@ struct OutputSettingsView: View {
                     isOn: $settings.useAITitleForFilenames,
                 )
                 .accessibilityIdentifier(A11yID.useAITitleForFilenamesToggle)
+                HelpfulToggle(
+                    title: "Notify when meeting notes fail",
+                    help: SettingsHelp.notifyOnMeetingNotesFailure,
+                    isOn: $settings.notifyOnMeetingNotesFailure,
+                )
+                .accessibilityIdentifier(A11yID.notifyOnMeetingNotesFailureToggle)
 
                 Picker("LLM Provider", selection: $settings.protocolProvider) {
                     ForEach(ProtocolProvider.allCases, id: \.self) { provider in

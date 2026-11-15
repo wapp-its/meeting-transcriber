@@ -259,7 +259,8 @@ struct MenuBarView: View {
 
     /// A section header is a heading line in the menu, not an item. The two
     /// record items are hidden while a recording runs, when the status block
-    /// offers Stop Recording instead; the import is always there.
+    /// offers Stop Recording instead; the import and the notes from a saved
+    /// transcript are always there.
     private var recordAndImportSection: some View {
         Section("Record & Import") {
             if actions.stopManualRecording == nil, state != .recording {
@@ -289,7 +290,22 @@ struct MenuBarView: View {
             }
             .keyboardShortcut("p")
             .accessibilityIdentifier(A11yID.importFilesMenuItem)
+
+            notesFromTranscriptItem
         }
+    }
+
+    /// Not in the App Store build: the notes are written next to the picked
+    /// file, and the sandbox grants the picked file only, not its folder.
+    @ViewBuilder private var notesFromTranscriptItem: some View {
+        #if !APPSTORE
+            Button {
+                actions.generateNotesFromTranscripts()
+            } label: {
+                Label("Generate Meeting Notes from Transcript…", systemImage: "doc.text")
+            }
+            .accessibilityIdentifier(A11yID.generateNotesFromTranscriptButton)
+        #endif
     }
 
     /// Left out with its heading when neither device entry is shown.

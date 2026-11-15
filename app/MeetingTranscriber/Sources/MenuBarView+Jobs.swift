@@ -16,6 +16,7 @@ extension MenuBarView {
         if !sections.needsYou.isEmpty || actions.nameSpeakers != nil {
             jobGroupHeader("Needs you", systemImage: "exclamationmark.circle")
             nameSpeakersItem
+            retryAllMeetingNotesItem
             jobRows(sections.needsYou, firstIndex: sections.inProgress.count)
         }
     }
@@ -45,6 +46,16 @@ extension MenuBarView {
             }
             .keyboardShortcut("n")
             .accessibilityIdentifier(A11yID.nameSpeakersMenuItem)
+        }
+    }
+
+    /// Offered once more than one meeting is waiting for its notes to be
+    /// retried; with one, that job's own submenu does the same.
+    @ViewBuilder private var retryAllMeetingNotesItem: some View {
+        let count = pipelineQueue.jobsWithRetryableMeetingNotes.count
+        if count > 1 {
+            Button("Retry All Meeting Notes (\(count))") { pipelineQueue.retryAllMeetingNotes() }
+                .accessibilityIdentifier(A11yID.retryAllMeetingNotesButton)
         }
     }
 
@@ -103,6 +114,7 @@ extension MenuBarView {
             Button("Cancel") { pipelineQueue.cancelJob(id: entry.id) }
         }
         retryButton(entry, index: index)
+        meetingNotesActions(entry, index: index)
         if entry.state == .error {
             Button("Remove") { actions.removeFailedJob(entry.id) }
                 .accessibilityIdentifier(A11yID.jobRemoveButton(index))
@@ -111,6 +123,21 @@ extension MenuBarView {
             Button("Dismiss") { actions.dismissJob(entry.id) }
         }
         notionExportActions(entry, index: index)
+    }
+
+    /// A finished job whose meeting notes failed makes them again from its
+    /// saved transcript, or is dismissed, which takes it off the menu. A job
+    /// with notes to retry has no protocol and so no open Notion export with
+    /// a Dismiss of its own.
+    @ViewBuilder
+    private func meetingNotesActions(_ entry: TranscriptionEntry, index: Int) -> some View {
+        if entry.hasRetryableMeetingNotes {
+            Button("Retry Meeting Notes") { pipelineQueue.retryMeetingNotes(id: entry.id) }
+                .accessibilityIdentifier(A11yID.jobNotesRetryButton(index))
+            if entry.openNotionExport == nil {
+                Button("Dismiss") { actions.dismissJob(entry.id) }
+            }
+        }
     }
 
     /// A finished job whose Notion export failed retries it from the local
@@ -171,8 +198,9 @@ extension MenuBarView {
         .font(.caption2)
     }
 
-    /// A finished job is in the menu only while its Notion export is open:
-    /// the export running, else why it failed, which the job's warnings say.
+    /// A finished job is in the menu only while its Notion export is open or
+    /// its meeting notes wait for a retry: the export running, else why it or
+    /// the notes failed, which the job's warnings say.
     private func doneLine(_ entry: TranscriptionEntry) -> String {
         if entry.openNotionExport == .inProgress { return JobMenuSummary.notionExportRunning }
         return entry.warnings.isEmpty ? entry.state.label : entry.warnings.joined(separator: "; ")

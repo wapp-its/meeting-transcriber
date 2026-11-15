@@ -126,6 +126,13 @@ enum SettingsHelp {
         your own template keep the date-based name.
         """
 
+    static let notifyOnMeetingNotesFailure =
+        """
+        Posts a notification when the meeting notes could not be made, saying \
+        why. The transcript is saved either way, and the menu offers Retry \
+        Meeting Notes.
+        """
+
     static let customVocabularyWhisperKit = customVocabulary + "\n\n"
         + "Experimental with WhisperKit: on busy audio it can leave out whole sentences. "
         + "Parakeet is the better engine for vocabulary."
