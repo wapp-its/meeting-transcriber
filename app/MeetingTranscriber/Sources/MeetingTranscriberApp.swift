@@ -306,6 +306,7 @@ struct MeetingTranscriberApp: App {
         .onChange(of: appState.settings.liveCaptionsSize) { _, size in
             captionsWindow?.apply(size: size)
         }
+        .modifier(PromptWindowWiring(appState: appState))
     }
 
     // MARK: - Windows

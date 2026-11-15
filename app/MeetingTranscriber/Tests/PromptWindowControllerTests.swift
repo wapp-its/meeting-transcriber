@@ -60,6 +60,27 @@ final class PromptWindowControllerTests: XCTestCase {
         return controller
     }
 
+    /// Records the window's answers to the recording prompt and asks nothing.
+    private final class AnswerRecordingNotifier: AppNotifying {
+        private(set) var answers: [(id: UUID, answer: ConsentAnswer)] = []
+
+        func notify(title _: String, body _: String, urgency _: NotificationUrgency) {}
+
+        func answerConsentPrompt(id: UUID, answer: ConsentAnswer) -> Bool {
+            answers.append((id, answer))
+            return true
+        }
+    }
+
+    /// Runs the main run loop until `condition` holds or `timeout` passed.
+    private func waitUntil(timeout: TimeInterval = 5, _ condition: () -> Bool) -> Bool {
+        let end = Date(timeIntervalSinceNow: timeout)
+        while !condition(), Date() < end {
+            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+        }
+        return condition()
+    }
+
     private func isShown(_ controller: PromptWindowController) -> Bool {
         controller.panel?.isVisible ?? false
     }
@@ -183,16 +204,55 @@ final class PromptWindowControllerTests: XCTestCase {
         let placements = app.placements.count
 
         app.now += 60
-        let refreshed = Date(timeIntervalSinceNow: 5)
-        while !shows("0:42", in: controller), Date() < refreshed {
-            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.1))
-        }
-        XCTAssertTrue(shows("0:42", in: controller), "refreshed by the controller's own timer")
+        XCTAssertTrue(waitUntil { shows("0:42", in: controller) }, "refreshed by the controller's own timer")
         XCTAssertEqual(app.placements.count, placements, "same size, same place")
 
         app.input.meetingEnd = nil
         controller.update()
         XCTAssertFalse(controller.isCountingDown, "countdown over")
+    }
+
+    /// The app's wiring on the menu bar label: the window follows the setting
+    /// and the current loop's open prompt, and its Never reaches that prompt
+    /// by its id through `AppState`.
+    func testTheAppsWiringFollowsTheSettingAndAnswersThroughTheApp() throws {
+        let state = try AppState(
+            pipelineEnvironment: makeIsolatedPipelineEnvironment(), settings: makeIsolatedSettings(),
+            notifier: SilentNotifier(),
+        )
+        let notifier = AnswerRecordingNotifier()
+        let (loop, _) = makeTestWatchLoop(notifier: notifier)
+        state.watching.watchLoop = loop
+        loop.pendingConsentQuestion = prompt
+        let before = Set(NSApplication.shared.windows.map(ObjectIdentifier.init))
+        let label = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 10, height: 10), styleMask: [.borderless], backing: .buffered, defer: false,
+        )
+        label.contentView = NSHostingView(rootView: Color.clear.modifier(MeetingTranscriberApp.PromptWindowWiring(appState: state)))
+        label.orderFrontRegardless()
+        let panel = {
+            NSApplication.shared.windows.first { window in
+                !before.contains(ObjectIdentifier(window)) && window.identifier == PromptPanel.windowIdentifier
+            } as? PromptPanel
+        }
+        addTeardownBlock { @MainActor in
+            panel()?.orderOut(nil)
+            label.orderOut(nil)
+        }
+
+        XCTAssertFalse(waitUntil(timeout: 0.5) { panel()?.isVisible == true }, "setting off")
+        state.settings.promptWindowEnabled = true
+        XCTAssertTrue(waitUntil { panel()?.isVisible == true }, "setting on")
+        state.settings.promptWindowEnabled = false
+        XCTAssertTrue(waitUntil { panel()?.isVisible == false }, "setting off again")
+        state.settings.promptWindowEnabled = true
+        XCTAssertTrue(waitUntil { panel()?.isVisible == true }, "setting on again")
+
+        try XCTUnwrap(panel()).host.rootView.inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.promptWindowNever).button().tap()
+        XCTAssertEqual(notifier.answers.map(\.id), [prompt.id])
+        XCTAssertEqual(notifier.answers.map(\.answer), [.never])
+        XCTAssertEqual(panel()?.isVisible, false, "answered")
     }
 
     /// The fallback's gap is counted from the menu bar of the screen that

@@ -226,6 +226,17 @@ enum A11yID {
     static let consentOptionsRecordButton = "consentOptionsRecordButton"
     static let consentOptionsCancelButton = "consentOptionsCancelButton"
 
+    /// The prompt window's answers and its ✕ per question. No app name, for
+    /// the reason on `consentDeniedAppRemove`. The window stays off every RPC
+    /// allowlist: the live check answers through `POST /action/confirmBrowserConsent`.
+    static let promptWindowRecord = "promptWindowRecord"
+    static let promptWindowIgnore = "promptWindowIgnore"
+    static let promptWindowNever = "promptWindowNever"
+    static let promptWindowHidePrompt = "promptWindowHidePrompt"
+    static let promptWindowKeepRecording = "promptWindowKeepRecording"
+    static let promptWindowStopNow = "promptWindowStopNow"
+    static let promptWindowHideCountdown = "promptWindowHideCountdown"
+
     /// A job's "Retry Meeting Notes", addressed by ROW INDEX for the same
     /// reason as `jobRetryButton`.
     static func jobNotesRetryButton(_ index: Int) -> String {
