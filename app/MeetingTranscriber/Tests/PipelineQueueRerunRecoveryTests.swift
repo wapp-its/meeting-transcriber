@@ -205,6 +205,38 @@ final class PipelineQueueRerunRecoveryTests: XCTestCase {
         try await assertEndedAtLaunch(parked, fixture)
     }
 
+    func testAnUnrecordedEndKeepsTheLiveIdentityOfAFileItCouldNotRemove() async throws {
+        let fixture = try makeFixture()
+        let queue = fixture.makeQueue(completedJobLifetime: 0)
+        let parked = try await park(fixture, in: queue)
+        let transcript = try XCTUnwrap(parked.marker.files.first { $0.role == .transcript })
+        let (records, protocols) = (fixture.storePath.deletingLastPathComponent(), fixture.protocolsDir)
+        addTeardownBlock {
+            for folder in [records, protocols] {
+                try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
+            }
+        }
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: records.path)
+        // A rewrite the job took and the record did not.
+        let url = URL(filePath: transcript.path)
+        try Data("Alice: hello".utf8).write(to: url, options: .atomic)
+        queue.noteWritten(jobID: parked.meeting.id, role: .transcript, path: url)
+        XCTAssertNotEqual(
+            try fixture.marker(parked.meeting.id, in: queue).files.first { $0.role == .transcript }?.identity, transcript.identity,
+            "test premise: the job took the new identity",
+        )
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: protocols.path)
+
+        queue.removeJob(id: parked.meeting.id)
+        await PipelineSnapshotStore.flush(fixture.logDir)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: transcript.path), "test premise: the removal failed")
+        for folder in [records, protocols] {
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
+        }
+
+        try await assertEndedAtLaunch(parked, fixture)
+    }
+
     func testARecordWithoutMarkerOrNoteWhileItsJobIsInTheFileEndsTheRerun() async throws {
         let fixture = try makeFixture()
         let parked = try await park(fixture, in: fixture.makeQueue(completedJobLifetime: 0))
@@ -292,6 +324,7 @@ final class PipelineQueueRerunRecoveryTests: XCTestCase {
         XCTAssertEqual(
             PipelineQueue.restoreDecision(for: mine, record: running, endDecided: true), .finish(mine), "its end decided, not recorded",
         )
+        XCTAssertEqual(PipelineQueue.restoreDecision(for: mine, record: running, endDecided: false), .resume, "its end not decided")
         XCTAssertEqual(PipelineQueue.restoreDecision(for: mine, record: nil, endDecided: false), .drop, "no record")
     }
 

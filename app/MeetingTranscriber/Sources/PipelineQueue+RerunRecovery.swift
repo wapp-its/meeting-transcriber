@@ -81,11 +81,8 @@ extension PipelineQueue {
                 restored.append(job)
 
             case let .finish(marker):
-                if !Self.closeRerun(marker, jobID: job.id, in: store).saved {
-                    var decided = job
-                    decided.state = .error
-                    rerunJobsAwaitingRecord[job.id] = decided
-                }
+                // Kept as saved: the next launch reads the same row from it again.
+                if !Self.closeRerun(marker, jobID: job.id, in: store).saved { rerunJobsAwaitingRecord[job.id] = job }
                 if case let .job(held) = rerun.heldEntry, held.isHeldAfterCompletion { restored.append(held) }
 
             case .drop:
@@ -97,14 +94,16 @@ extension PipelineQueue {
 
     /// Which row of the launch table a re-run job of this build's file is in.
     /// `endDecided` is a job saved in `.error`, which only a re-run whose end could
-    /// not be recorded is (`endRerun`): it ends, whatever its marker says.
+    /// not be recorded is (`endRerun`): it ends, whatever its marker says, and its
+    /// copy of the marker, saved from the live job then, is the newer one.
     static func restoreDecision(
         for marker: MeetingFileRecord.RerunMarker, record: MeetingFileRecord?, endDecided: Bool,
     ) -> RerunRestore {
         guard let record else { return .drop }
         if let current = record.rerun {
             guard current.runID == marker.runID else { return .drop }
-            return current.isEnding || endDecided ? .finish(merged(marker, into: current, ownIsNewer: false)) : .resume
+            guard current.isEnding || endDecided else { return .resume }
+            return .finish(merged(marker, into: current, ownIsNewer: endDecided))
         }
         if let note = record.rerunNote, note.stamp == marker.stamp, note.committed { return .keep }
         return .finish(marker)
@@ -113,7 +112,8 @@ extension PipelineQueue {
     /// The record's marker with every file either copy lists. Where both list a
     /// file, the newer copy's identity wins: a live job's copy is newer than the
     /// record's (it is updated first, and a record update can fail), a saved job's
-    /// is older (its file is written at state changes, the record at each write).
+    /// is older (its file is written at state changes, the record at each write),
+    /// unless it was saved when its end could not be recorded.
     static func merged(
         _ own: MeetingFileRecord.RerunMarker, into recorded: MeetingFileRecord.RerunMarker, ownIsNewer: Bool,
     ) -> MeetingFileRecord.RerunMarker {
