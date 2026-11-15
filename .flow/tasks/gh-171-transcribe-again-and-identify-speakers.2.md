@@ -51,9 +51,37 @@ The early proof point: `PipelineQueue` admits a finished meeting again, rebuilt 
 - [ ] After naming is confirmed and the notes are saved, the success hook receives the re-run's files once; confirmed names update voice profiles as any naming does (A9).
 - [ ] The Quick commands' focused tests and `./scripts/lint.sh` pass.
 ## Done summary
-TBD
+`PipelineQueue.rerunJob(id:mode:)` queues a finished meeting again under the same id. The job is rebuilt from its finished entry and its record, runs with the settings Settings named when it was admitted, and writes its files under a stem of its own (`<stem>.rerun-<stamp>`) into the marker, never among the meeting's files. A settled finished job of the meeting that is still in the queue is taken over, and every refusal changes nothing.
 
+Tier: implementer - opus (explicit invocation) at xhigh effort (requested) (model: claude-opus-5-5)
+
+stage: impl-review - ran [2026-11-15T19:21:16Z..2026-11-15T19:41:36Z]
+
+Review: codex gpt-6.1-sol at xhigh, three reviewers. Round 1 returned NEEDS_WORK with two findings, which the validator kept. Both were fixed (2e3905b9, e95b47d7), and the re-review returned SHIP.
+- A call re-run on its mix after it lost its mic track kept the mic's mute times. They removed what the far end said during a mute, and a mic muted throughout failed the run. Such a run now keeps no mute times, as a reimport does.
+- A re-run on another engine had its stage timings tagged with the queue's engine. The tag now comes from the job's engine.
+
+Baseline: green (focused Quick commands, 239 tests, exit 0).
+
+Gate:
+- Before the fixes: the focused set (728 tests) ran with exit 1. The one failure, `PipelineQueueTests.testFailedNotionExportJobIsRetainedPastCompletedLifetime`, is a timing flake under machine load. It passed alone on the same build (exit 0).
+- After the fixes: the re-run, stage-timing and mute classes (72 tests) passed with exit 0, and lint passed with exit 0.
+
+Tests per acceptance criterion: `PipelineQueueRerunTests` covers the rebuilt fields and queue order, the settings at admission, the controller's engine per kind, the take-over and the refusals. `PipelineQueueRerunRunTests` covers the two tracks and the stem, the files and record left as they were, no move, retention entry, ledger mark or rename, the success hook and the saved voice, and a mic track gone during a mute. `PipelineQueueRerunLocalModelTests` covers the gate under the marker's run id.
+
+Assumptions:
+- A taken-over meeting joins the end of the queue (A14).
+- With no instance of the named engine kind, the stage uses the queue's engine.
+- A listed track on a drive that is not connected refuses the re-run as unreachable.
+- VAD is checked at the threshold accessor.
+- The success hook fires at `.done`.
+- A re-run reaching `.done` sends no state-change or done notification.
+- A call re-run without one of its tracks shows no `[Mic muted …]` lines.
+
+Follow-ups for tasks 3 and 4: the paused-jobs cleanup in `onJobStateChange` for a re-run, and the pending Notion export entry of a re-run job.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: bd7cdb97eac97d698d781209757bf776c8571f78, 2e3905b92fd6953d1831ace0e7ba3578574202af, e95b47d70c4129424ccbfc7ebcfc3d91d4588472
+- Tests: cd app/MeetingTranscriber && CFFIXED_USER_HOME=<scratch> swift test --skip-build --parallel --num-workers 2 --filter "LateRerunCancelTests|LocalModelGateWiringTests|LocalModelGateTests|LocalModelRecordingPreemptionTests|MeetingFileStoreTests|MeetingNotesRetryTests|PipelineQueue|PipelineController|PipelineSnapshot|PipelineJobTests|RecordingRowActionsTests|RegenerateProtocolViewTests|RowAvailabilityTests|SpeakerNamingStoreTests|SpeakerNamingSessionTests|TerminalJob|TranscriptionsViewTests", cd app/MeetingTranscriber && CFFIXED_USER_HOME=<scratch> swift test --skip-build --parallel --num-workers 2 --filter "PipelineQueueRerun|PipelineQueueStageClockTests|PipelineQueueStageTimingTests|PipelineQueueElapsedTests|MicMutePipelineIntegrationTests|MicMuteReimportTests|MicMuteTranscriptTests|PipelineQueueMeetingFilesRunInputsTests|StageTimingStatsTests|LateRerunCancelTests", ./scripts/lint.sh
 - PRs:
