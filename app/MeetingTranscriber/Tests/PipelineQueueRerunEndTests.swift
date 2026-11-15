@@ -141,6 +141,24 @@ final class PipelineQueueRerunEndTests: XCTestCase {
         }
     }
 
+    func testAFileTheRecordMissedIsRemovedAtTheEnd() async throws {
+        let fixture = try makeFixture()
+        let queue = fixture.makeQueue(completedJobLifetime: 0)
+        let meeting = try await finishedMeeting(fixture, in: queue)
+        fixture.parkForNaming(true)
+        XCTAssertEqual(queue.rerunJob(id: meeting.job.id, mode: .transcribeAgain), .queued)
+        try await fixture.poll("the names") { queue.job(withID: meeting.job.id)?.state == .speakerNamingPending }
+        await queue.awaitProcessing()
+        let stamp = try fixture.marker(meeting.job.id, in: queue).stamp
+        // A record update that failed: the job lists the transcript, the record does not.
+        XCTAssertTrue(fixture.store.update(jobID: meeting.job.id) { $0.rerun?.files.removeAll { $0.role == .transcript } })
+        XCTAssertTrue(try fixture.marker(meeting.job.id, in: queue).files.contains { $0.role == .transcript }, "test premise")
+
+        queue.removeJob(id: meeting.job.id)
+
+        try assertLeftAsItWas(meeting, fixture, stamp: stamp, "a file the record missed")
+    }
+
     // MARK: - Two tracks
 
     func testARerunWhoseMicrophoneHeldNoAudioGoesOnWithTheCallAudio() async throws {

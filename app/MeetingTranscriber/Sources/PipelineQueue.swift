@@ -1515,7 +1515,7 @@ class PipelineQueue {
         }
         ensureLogDir()
         // A re-run job goes to this build's own file only (A24).
-        PipelineSnapshotStore.save(jobs.filter { $0.rerun == nil }, to: logDir, using: snapshotWriter)
+        PipelineSnapshotStore.save(snapshotJobs, to: logDir, using: snapshotWriter)
         saveRerunFile()
     }
 

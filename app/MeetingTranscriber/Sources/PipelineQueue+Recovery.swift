@@ -135,24 +135,16 @@ extension PipelineQueue {
         // is the one field a discard record is worth reading for.
         let interruptedStates = Dictionary(loaded.map { ($0.id, $0.state) }) { _, last in last }
 
-        protocolResumeDispositions = resumeDispositions(for: loaded)
+        // A re-run interrupted in its notes resumes them as a new meeting does.
+        protocolResumeDispositions = resumeDispositions(for: loaded + reruns)
         _ = recoverInterruptedNotionExports(in: &loaded)
 
-        // Reset active states back to waiting
-        for i in loaded.indices {
-            switch loaded[i].state {
-            case .transcribing, .diarizing, .generatingProtocol:
-                loaded[i].state = .waiting
-
-            default:
-                break
-            }
-        }
+        loaded = Self.resettingInterruptedStates(loaded)
 
         discardFinishedJobs(from: &loaded)
 
         discardJobsWithMissingAudio(&loaded, interruptedIn: interruptedStates)
-        loaded += reruns
+        loaded += Self.resettingInterruptedStates(reruns)
 
         // Drop what another queue is still running. This is where issue #558
         // brought the job back: a replacement queue reads the same snapshot,
@@ -195,6 +187,21 @@ extension PipelineQueue {
         // Restored jobs still waiting for names: the window, or with auto-open
         // off a notification, since they never make the transition again.
         announceRestoredSpeakerNaming()
+    }
+
+    /// `jobs` with active states reset back to waiting.
+    private static func resettingInterruptedStates(_ jobs: [PipelineJob]) -> [PipelineJob] {
+        jobs.map { job in
+            var job = job
+            switch job.state {
+            case .transcribing, .diarizing, .generatingProtocol:
+                job.state = .waiting
+
+            default:
+                break
+            }
+            return job
+        }
     }
 
     /// Rebuild the session's naming cache from disk for .speakerNamingPending jobs.

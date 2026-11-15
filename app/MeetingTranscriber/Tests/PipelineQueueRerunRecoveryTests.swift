@@ -43,6 +43,73 @@ final class PipelineQueueRerunRecoveryTests: XCTestCase {
         XCTAssertEqual(mode, 0o600, "the re-run file is not owner-only")
     }
 
+    func testTheSnapshotKeepsTheEntryARerunTookOverUntilItIsBack() async throws {
+        let fixture = try makeFixture()
+        let notion = NotionExportConfiguration(exporter: RetentionNotionExporter(fail: true), databaseID: "database-1")
+        let queue = fixture.makeQueue(notion: notion)
+        let meeting = try await fixture.finishedMeeting(in: queue)
+        try await fixture.poll("the export to end") { queue.notionExportTasks[meeting.id] == nil }
+        XCTAssertEqual(queue.job(withID: meeting.id)?.isHeldAfterCompletion, true, "test premise: a held entry")
+        fixture.parkForNaming(true)
+        XCTAssertEqual(queue.rerunJob(id: meeting.id, mode: .transcribeAgain), .queued)
+        try await fixture.poll("the names") { queue.job(withID: meeting.id)?.state == .speakerNamingPending }
+        await queue.awaitProcessing()
+        await PipelineSnapshotStore.flush(fixture.logDir)
+
+        try assertSnapshotHoldsTheEntry(meeting.id, fixture, "while the re-run runs")
+        let rerunFile = try PipelineSnapshot.load(from: fixture.logDir, named: fixture.rerunFile.lastPathComponent) ?? []
+        XCTAssertNotNil(rerunFile.first { $0.id == meeting.id }?.rerun, "the re-run file does not hold the re-run")
+
+        queue.removeJob(id: meeting.id)
+        await PipelineSnapshotStore.flush(fixture.logDir)
+
+        try assertSnapshotHoldsTheEntry(meeting.id, fixture, "after the re-run ended")
+    }
+
+    func testARerunStoppedInItsNotesAfterTheNamesResumesOnlyTheNotes() async throws {
+        let fixture = try makeFixture()
+        let notes = GatedProtocolGenerator()
+        var generator: any ProtocolGenerating = fixture.protocolGen
+        // The fixture takes several closures; the label says which one this is.
+        // swiftlint:disable:next trailing_closure
+        let queue = fixture.makeQueue(completedJobLifetime: 0, protocolGenerator: { generator })
+        let meeting = try await fixture.finishedMeeting(in: queue, leavingTheQueue: true)
+        fixture.parkForNaming(true)
+        queue.speakerNamingHandler = { data in .confirmed(data.mapping.mapValues { _ in "Alice" }) }
+        generator = notes
+        XCTAssertEqual(queue.rerunJob(id: meeting.id, mode: .transcribeAgain), .queued)
+        try await fixture.poll("the notes") { notes.started }
+        XCTAssertEqual(queue.job(withID: meeting.id)?.state, .generatingProtocol, "test premise")
+        await PipelineSnapshotStore.flush(fixture.logDir)
+        let transcribed = fixture.engine.transcribeCallCount
+        generator = fixture.protocolGen
+        let restarted = fixture.makeQueue(completedJobLifetime: 0)
+
+        restarted.loadSnapshot()
+        await restarted.awaitProcessing()
+
+        XCTAssertEqual(fixture.engine.transcribeCallCount, transcribed, "the re-run was transcribed again")
+        let resumed = try XCTUnwrap(restarted.job(withID: meeting.id))
+        XCTAssertEqual(resumed.state, .done)
+        XCTAssertTrue(resumed.rerun?.marker.files.contains { $0.role == .protocol } ?? false, "no notes")
+        await notes.release()
+        await queue.awaitProcessing()
+    }
+
+    func testAnUnreadableRerunFileRefusesANewRerun() async throws {
+        let fixture = try makeFixture()
+        let meeting = try await fixture.finishedMeeting(in: fixture.makeQueue(completedJobLifetime: 0), leavingTheQueue: true)
+        await PipelineSnapshotStore.flush(fixture.logDir)
+        try Data("{".utf8).write(to: fixture.rerunFile)
+        let queue = fixture.makeQueue(completedJobLifetime: 0)
+        queue.loadSnapshot()
+
+        XCTAssertEqual(queue.rerunJob(id: meeting.id, mode: .transcribeAgain), .refused(.rerunFileUnreadable))
+
+        XCTAssertNil(try fixture.record(meeting.id).rerun)
+        XCTAssertEqual(try Data(contentsOf: fixture.rerunFile), Data("{".utf8))
+    }
+
     func testAColdStartResumesTheRerunWithItsMarkerAndNoAutomaticNames() async throws {
         let fixture = try makeFixture()
         let parked = try await park(fixture, in: fixture.makeQueue(completedJobLifetime: 0))
@@ -96,6 +163,26 @@ final class PipelineQueueRerunRecoveryTests: XCTestCase {
         XCTAssertNotEqual(try fixture.outputFiles(), parked.files, "test premise: the re-run wrote its files")
         // The end marked the marker as ending, then the app stopped.
         XCTAssertTrue(fixture.store.update(jobID: parked.meeting.id) { $0.rerun?.ending = true })
+
+        try await assertEndedAtLaunch(parked, fixture)
+    }
+
+    func testAnEndTheRecordCouldNotTakeIsFinishedAtTheNextLaunch() async throws {
+        let fixture = try makeFixture()
+        let queue = fixture.makeQueue(completedJobLifetime: 0)
+        let parked = try await park(fixture, in: queue)
+        let records = fixture.storePath.deletingLastPathComponent()
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: records.path)
+        addTeardownBlock { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: records.path) }
+
+        queue.removeJob(id: parked.meeting.id)
+        await PipelineSnapshotStore.flush(fixture.logDir)
+
+        let saved = try PipelineSnapshot.load(from: fixture.logDir, named: fixture.rerunFile.lastPathComponent) ?? []
+        XCTAssertEqual(saved.map(\.state), [.error], "the decided end is not in the file")
+        let onDisk = MeetingFileStore(path: fixture.storePath, bundleID: fixture.store.bundleID).record(for: parked.meeting.id)
+        XCTAssertEqual(onDisk?.rerun?.isEnding, false, "test premise: the record took no update")
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: records.path)
 
         try await assertEndedAtLaunch(parked, fixture)
     }
@@ -180,9 +267,14 @@ final class PipelineQueueRerunRecoveryTests: XCTestCase {
             var record = MeetingFileRecord(jobID: UUID(), origin: .recorded, recordingDate: nil, files: [])
             record.rerun = row.rerun
             record.rerunNote = row.note
-            XCTAssertEqual(PipelineQueue.restoreDecision(for: mine, record: record), row.expected, row.name)
+            XCTAssertEqual(PipelineQueue.restoreDecision(for: mine, record: record, endDecided: false), row.expected, row.name)
         }
-        XCTAssertEqual(PipelineQueue.restoreDecision(for: mine, record: nil), .drop, "no record")
+        var running = MeetingFileRecord(jobID: UUID(), origin: .recorded, recordingDate: nil, files: [])
+        running.rerun = mine
+        XCTAssertEqual(
+            PipelineQueue.restoreDecision(for: mine, record: running, endDecided: true), .finish(mine), "its end decided, not recorded",
+        )
+        XCTAssertEqual(PipelineQueue.restoreDecision(for: mine, record: nil, endDecided: false), .drop, "no record")
     }
 
     // MARK: - Helpers
@@ -204,6 +296,15 @@ final class PipelineQueueRerunRecoveryTests: XCTestCase {
         let marker = try fixture.marker(meeting.id, in: queue)
         await PipelineSnapshotStore.flush(fixture.logDir)
         return Parked(meeting: meeting, marker: marker, files: files, record: record)
+    }
+
+    private func assertSnapshotHoldsTheEntry(
+        _ id: UUID, _ fixture: Fixture, _ when: String, file: StaticString = #filePath, line: UInt = #line,
+    ) throws {
+        let entries = try (PipelineSnapshot.load(from: fixture.logDir) ?? []).filter { $0.id == id }
+        XCTAssertEqual(entries.map(\.state), [.done], "\(when): pipeline_queue.json lost the entry", file: file, line: line)
+        XCTAssertNil(entries.first?.rerun, "\(when): pipeline_queue.json holds the re-run", file: file, line: line)
+        XCTAssertEqual(entries.first?.isHeldAfterCompletion, true, when, file: file, line: line)
     }
 
     /// A new queue over the same folders restores the re-run and ends it as R6.

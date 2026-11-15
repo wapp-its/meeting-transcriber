@@ -36,6 +36,9 @@ enum RerunRefusal: Error, Equatable, Sendable {
     /// Files of the meeting's last re-run are still there and could not be
     /// removed now either (A27): "Files of the last re-run could not be removed."
     case filesLeft
+    /// The re-run file or the queue's snapshot did not read when the queue
+    /// restored, so a re-run admitted now could not be kept across a quit.
+    case rerunFileUnreadable
 }
 
 extension PipelineJob {
@@ -89,6 +92,7 @@ extension PipelineQueue {
         guard let meetingFileStore,
               let finished = terminalJobStore?.records.last(where: { $0.status.jobID == id.uuidString })
         else { return .refused(.notFinished) }
+        guard !rerunFileFrozen else { return .refused(.rerunFileUnreadable) }
         meetingFileStore.reload()
         guard var record = meetingFileStore.record(for: id) else { return .refused(.notFinished) }
         // The files an earlier re-run could not remove are tried again first (A27).

@@ -14,9 +14,9 @@ extension PipelineQueue {
         case resume
         /// Its stamp noted as committed: left to the swap's own launch row.
         case keep
-        /// Marked as ending, noted as ended, or no marker and no note (a record an
-        /// older build rewrote): the files left go and the re-run ends as R6, from
-        /// this marker.
+        /// Marked as ending, its end decided in this file, noted as ended, or no
+        /// marker and no note (a record an older build rewrote): the files left go
+        /// and the re-run ends as R6, from this marker.
         case finish(MeetingFileRecord.RerunMarker)
         /// No record, or another run's marker: the job goes, the record stays.
         case drop
@@ -26,6 +26,15 @@ extension PipelineQueue {
     /// admits no re-run.
     var rerunFilename: String? {
         meetingFileStore.map { PipelineSnapshot.rerunFilename(bundleID: $0.bundleID) }
+    }
+
+    /// The jobs `pipeline_queue.json` holds: every job but a re-run, and the
+    /// finished entry each re-run took over, so one saved copy of that entry is
+    /// there whichever of the two files lands first, at admission and at the end.
+    var snapshotJobs: [PipelineJob] {
+        jobs.filter { $0.rerun == nil } + jobs.compactMap { job in
+            if case let .job(held) = job.rerun?.heldEntry { held } else { nil }
+        }
     }
 
     /// Writes the re-run jobs into this build's file, staged and owner-only like the
@@ -43,8 +52,9 @@ extension PipelineQueue {
     }
 
     /// The re-run jobs to put back into the queue at restore, after each job of the
-    /// file was decided by its record (`restoreDecision`): those that resume, reset
-    /// to wait if a stage was running, and those left to the swap's row; the
+    /// file was decided by its record (`restoreDecision`): those that resume, in the
+    /// state they were saved in (the restore resets a running stage after it decided
+    /// whether the notes alone resume), and those left to the swap's row; the
     /// finished job a re-run took over, when an end here brings it back held. An
     /// unreadable file changes nothing and is not written over.
     func restoreRerunJobs() -> [PipelineJob] {
@@ -61,18 +71,21 @@ extension PipelineQueue {
         rerunFileOwed = !saved.isEmpty
         store.reload()
         var restored: [PipelineJob] = []
-        for var job in saved {
+        for job in saved {
             guard let rerun = job.rerun else { continue }
-            switch Self.restoreDecision(for: rerun.marker, record: store.record(for: job.id)) {
-            case .resume:
-                if [.transcribing, .diarizing, .generatingProtocol].contains(job.state) { job.state = .waiting }
-                restored.append(job)
-
-            case .keep:
+            let decision = Self.restoreDecision(
+                for: rerun.marker, record: store.record(for: job.id), endDecided: job.state == .error,
+            )
+            switch decision {
+            case .resume, .keep:
                 restored.append(job)
 
             case let .finish(marker):
-                if !Self.closeRerun(marker, jobID: job.id, in: store).saved { rerunJobsAwaitingRecord[job.id] = job }
+                if !Self.closeRerun(marker, jobID: job.id, in: store).saved {
+                    var decided = job
+                    decided.state = .error
+                    rerunJobsAwaitingRecord[job.id] = decided
+                }
                 if case let .job(held) = rerun.heldEntry, held.isHeldAfterCompletion { restored.append(held) }
 
             case .drop:
@@ -83,16 +96,30 @@ extension PipelineQueue {
     }
 
     /// Which row of the launch table a re-run job of this build's file is in.
+    /// `endDecided` is a job saved in `.error`, which only a re-run whose end could
+    /// not be recorded is (`endRerun`): it ends, whatever its marker says.
     static func restoreDecision(
-        for marker: MeetingFileRecord.RerunMarker, record: MeetingFileRecord?,
+        for marker: MeetingFileRecord.RerunMarker, record: MeetingFileRecord?, endDecided: Bool,
     ) -> RerunRestore {
         guard let record else { return .drop }
         if let current = record.rerun {
             guard current.runID == marker.runID else { return .drop }
-            return current.isEnding ? .finish(current) : .resume
+            return current.isEnding || endDecided ? .finish(merged(marker, into: current)) : .resume
         }
         if let note = record.rerunNote, note.stamp == marker.stamp, note.committed { return .keep }
         return .finish(marker)
+    }
+
+    /// The record's marker with every file the job's copy lists: the job's copy is
+    /// updated first, and a record update that failed leaves the record's behind.
+    /// Where both list a file, the job's identity is the newer one.
+    static func merged(
+        _ own: MeetingFileRecord.RerunMarker, into recorded: MeetingFileRecord.RerunMarker,
+    ) -> MeetingFileRecord.RerunMarker {
+        var marker = recorded
+        let listed = Set(own.files.map(\.path))
+        marker.files = own.files + recorded.files.filter { !listed.contains($0.path) }
+        return marker
     }
 
     /// The launch rows that need no queue (run beside the deletions' reconcile):

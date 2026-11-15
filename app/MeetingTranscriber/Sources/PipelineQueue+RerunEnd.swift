@@ -59,9 +59,12 @@ extension PipelineQueue {
         let recorded = meetingFileStore.map { Self.closeRerun(marker, jobID: id, in: $0) }
         takeOutOfQueue(id)
         if recorded?.saved != true {
-            // The next launch acts on what the record says.
+            // Kept in its file in `.error`, which tells the next launch that its end
+            // was decided (`restoreDecision`).
             logger.error("[\(job.shortID, privacy: .public)] rerun_end_not_recorded: the re-run stays in its file")
-            rerunJobsAwaitingRecord[id] = job
+            var decided = job
+            decided.state = .error
+            rerunJobsAwaitingRecord[id] = decided
         }
         if case let .job(held) = rerun.heldEntry {
             jobs.append(held)
@@ -95,13 +98,13 @@ extension PipelineQueue {
         }
     }
 
-    /// The marker of a re-run as its record has it, which lists every file the
-    /// re-run wrote; the job's own copy when the record holds another run's or none.
+    /// The marker of a re-run as its record has it, with every file the job's copy
+    /// lists (`merged`); the job's own copy when the record holds another run's or none.
     private func recordedMarker(
         _ own: MeetingFileRecord.RerunMarker, jobID: UUID,
     ) -> MeetingFileRecord.RerunMarker {
         guard let recorded = meetingFileStore?.record(for: jobID)?.rerun, recorded.runID == own.runID else { return own }
-        return recorded
+        return Self.merged(own, into: recorded)
     }
 
     /// What leaving the queue undoes, without the steps `removeJob` runs for a job
@@ -120,14 +123,17 @@ extension PipelineQueue {
 
     // MARK: - The record and the files
 
-    /// The record-side end of the re-run `marker` names: marked as ending, its
-    /// files removed, then one update restoring the outcome (A27 for a file left).
+    /// The record-side end of the re-run `marker` names: marked as ending with every
+    /// file it lists, those files removed, then one update restoring the outcome
+    /// (A27 for a file left).
     /// `saved` is whether that last update landed; `left` the files that stayed.
     static func closeRerun(
         _ marker: MeetingFileRecord.RerunMarker, jobID: UUID, in store: MeetingFileStore,
     ) -> (saved: Bool, left: [MeetingFile]) {
         let marked = store.update(jobID: jobID) { record in
-            if record.rerun?.runID == marker.runID { record.rerun?.ending = true }
+            guard record.rerun?.runID == marker.runID else { return }
+            record.rerun?.ending = true
+            record.rerun?.files = marker.files
         }
         if !marked {
             logger.error("[\(PipelineJob.shortID(for: jobID), privacy: .public)] rerun_ending_not_recorded")
