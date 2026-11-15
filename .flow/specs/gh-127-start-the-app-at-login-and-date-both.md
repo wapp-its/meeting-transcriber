@@ -87,6 +87,7 @@ None for outside callers: the `/v1` automation API and the debug RPC server do n
 - **A6 · If R5 finds the item lost after an mt-update install, the agent reports instead of adding a re-register rule.** why: a re-register at launch can fight a user's off switch in System Settings, and the status macOS reports there is not measured · flip at: R5's check fails · test: R5's check · status: active [agent-assumed 2026-11-12]
 - **A7 · The notice dates both times when they fall on different days, instead of naming the length.** why: the smaller change, one date format, no rounding rule for lengths · flip at: the owner prefers the length ("for 2 days") · test: R1's test · status: active [agent-assumed 2026-11-12]
 - **A8 · "Start watching when the app opens" keeps its default (off).** why: the original and the fork both keep it off, and starting detection without a click is a separate choice · flip at: the owner wants both on by default · test: none, unchanged · status: active [agent-assumed 2026-11-12]
+- **A9 · The fork's README gets one bullet under "What this build adds": the app opens at login, not when the original app is installed too, and where in Settings to switch it off.** alternatives: B — no README line; C — a longer note that also names the location and App Store rules · flip at: `.github/README.md`, that bullet (commit f3b1b0e8) · test: none, docs only · status: active [agent-assumed 2026-11-14]
 
 FIT: GO · 2026-11-13 · base 4f4fbb6f · engine flow-next 9.9.1 · #227 brought the original's login item onto wapp/main; anchors hold, #211 wording updated
   - `LoginItemController.swift` and `LoginItemRegistering` exist as cited; the Startup section in `Settings/GeneralSettingsView.swift` holds "Launch at login" and "Start watching when the app opens", the only auto-watch toggle in Sources
@@ -94,3 +95,8 @@ FIT: GO · 2026-11-13 · base 4f4fbb6f · engine flow-next 9.9.1 · #227 brought
   - `AppSettings.autoWatch` still defaults to false; `PreviousExitNotice.swift` and `testAWindowFromAnEarlierDayCarriesTheDate` unchanged since capture, R1 still fails today for its stated reason
   - entry points as cited: `AppLauncher.main()` arms `LivenessMarker`, `MeetingTranscriberApp.init` schedules auto-watch; bundle ids and app names match `scripts/lib/bundle-ids.sh` and mt-update
   - no open spec and no open issue or PR in the original claims the default or the notice date
+
+FIT: GO · 2026-11-14 · base f911fcb0 · engine flow-next 9.10.0 · the upstream merges in #232 and the fix in #233 touch nothing the spec relies on
+  - since 4f4fbb6f the named files changed only in `AppSettings.swift` (new `unloadModelsWhenIdle`), `AppState.swift` (mt-update actions moved to `AppState+Updates.swift`) and the two docs (Accessibility not applicable in the App Store build, idle model unloading); `LoginItemController.swift`, `GeneralSettingsView.swift`, `PreviousExitNotice.swift`, `PreviousExitNoticeTests.swift`, `AppLauncher.swift` and `MeetingTranscriberApp.swift` are unchanged
+  - the spec's own edit after the last receipt is the plan review's R3 wording fix, reviewed to SHIP; specs changed since then on any ref are gh-77 only, which does not touch the login item or the notice
+  - flow-next 9.9.1 to 9.10.0 adds Bitbucket support only; the direct route, completion review and the commands the build uses are unchanged
