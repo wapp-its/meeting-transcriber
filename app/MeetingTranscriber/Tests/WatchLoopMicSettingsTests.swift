@@ -33,6 +33,10 @@ final class WatchLoopMicSettingsTests: XCTestCase {
             },
             pollInterval: 0.05,
             endGracePeriod: 0.1,
+            // The detected-meeting tests end at once, so each would otherwise
+            // wait out the two-minute "meeting seems to have ended" question
+            // on the real clock before `handleMeeting` returns.
+            meetingEndCountdown: 0.05,
             noMic: noMic,
             micDeviceUID: micDeviceUID,
         )
