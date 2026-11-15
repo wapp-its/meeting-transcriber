@@ -214,6 +214,27 @@ final class NotificationManagerSchedulingTests: XCTestCase {
         }
     }
 
+    /// The prompt window's answer carries any of the notification's answers,
+    /// "Never for this app" included, to the prompt with that id, once.
+    func testAnswerConsentPromptWithAFullAnswerResolvesThePromptWithExactlyThatAnswer() async {
+        for expected in [ConsentAnswer.granted, .declined, .never] {
+            let (manager, fake) = makeManager()
+            manager.setUp()
+            let question = makeQuestion()
+            let task = Task { await manager.askToRecord(question) }
+            guard await firstPostedRequest(from: fake) != nil else {
+                XCTFail("\(expected): no consent notification posted")
+                return
+            }
+
+            XCTAssertTrue(manager.answerConsentPrompt(id: question.id, answer: expected), "\(expected)")
+            let answer = await task.value
+            XCTAssertEqual(answer, expected)
+            XCTAssertEqual(fake.removedIdentifiers, [question.id.uuidString], "\(expected): withdrawn")
+            XCTAssertFalse(manager.answerConsentPrompt(id: question.id, answer: expected), "\(expected): answered once")
+        }
+    }
+
     /// Two prompts parked at once, even with the same text: an answer by id
     /// reaches only its own. Resolving whatever is parked would answer a
     /// prompt the user never saw in the menu.
