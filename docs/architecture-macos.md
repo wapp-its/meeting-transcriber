@@ -134,7 +134,9 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `WhisperKitStockModel.swift` | The six stock WhisperKit variants in picker order, each with its label and approximate download size (measured 2026-10-06) for the load offer |
 | `Settings/VocabularySourceSettingsView.swift` | "Vocabulary source" picker (Local file / URL), shown in the Vocabulary section while "Use custom vocabulary" is on; for URL the address, the Keychain-backed access token, "Update now" and the status line from `RemoteVocabularyController` |
 | `Settings/SpeakersSettingsView.swift` | Diarization · Speaker Naming (open the naming window automatically, how long unnamed meetings wait) · Mic Speaker Name · Known Voices · Recognition Stats · Experimental: Diarization Tuning |
-| `Settings/OutputSettingsView.swift` | Output folder · Notion export · Recording Retention · Meeting Notes (transcript options, AI-title file names, notify when meeting notes fail, LLM provider, notes language) · Meeting Notes Templates and Template Rules sections |
+| `Settings/OutputSettingsView.swift` | Output folder · Notion export · Recording Retention · Meeting Notes (transcript options, AI-title file names, notify when meeting notes fail, LLM provider, saved OpenAI-compatible connections, notes language) · Meeting Notes Templates and Template Rules sections |
+| `Settings/OpenAIConnectionControls.swift` | Saved OpenAI-compatible connection picker, name field, Add/Delete |
+| `Settings/OpenAIConnectionPrompts.swift` | State of the Add (name prompt) and Delete confirmation dialogs |
 | `Settings/LocalModelSettingsView.swift` | The local model provider's panel in Settings → Output: the model folder with Choose…, the status line with Check Model (runs the helper's `check` mode, no weights loaded), and the memory and recording notes (`#if !APPSTORE`) |
 | `Settings/ProtocolTemplatesSettingsView.swift` | Meeting Notes Templates section: default template picker, per template file the split button Edit (Open in the editor app, Open With, Show in Finder) and Delete, New Template…, Open Templates Folder; its state and writes live in the `@Observable` `ProtocolTemplatesModel`, also for the New Template window |
 | `Settings/NewProtocolTemplateSheet.swift` | The New Template window: Name field, a note on what Create does, Cancel and Create |
@@ -158,6 +160,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `AppSettings+OutputDirectory.swift` | Everything derived from `customOutputDirBookmark`, split out to keep `AppSettings.swift` under the line cap |
 | `AppSettings+LocalModel.swift` | The local model's folder: the plain path for display and the security-scoped bookmark reads go through, taken by value when a generator is made so a later change never reaches a running protocol (`#if !APPSTORE`) |
 | `AppSettings+Vocabulary.swift` | Custom-vocabulary file selection, sandbox bookmark resolution, and validation state — shared by both ASR engines; `effectiveVocabularyPath` / `effectiveVocabularyBookmark` hand the engines the local file or the URL source's cached copy |
+| `AppSettings+OpenAIConnections.swift` | Add, select, rename and delete saved OpenAI-compatible connections |
 | `AppSettings+TerminologyRules.swift` | Optional terminology-rules file: selection, bookmark, per-job read and the Settings status; the text area remains the default source |
 | `RemoteVocabularyController.swift` | Keeps the URL source's cached copy current (launch, 2 s after a change, "Update now", hourly), adopts only valid downloads, and publishes the `RemoteVocabularyStatus` Settings shows; owned by `AppState` as `remoteVocabulary` |
 | `LegacyDefaultsMigration.swift` | One-shot carry-over of settings from the pre-rename bundle identifier, since `UserDefaults` is scoped per identifier |
@@ -321,6 +324,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `LocalModel/LocalModelCheck.swift` | Settings' Check Model: runs the helper's `check` mode on a folder and decodes its one-line JSON report (`#if !APPSTORE`) |
 | `PipelineQueue+LocalModel.swift` | Where the queue meets the gate: the job a generation runs under, waiting out a recording that ended the helper and then generating again, and a job cancel that reaches its helper |
 | `WatchingController+LocalModel.swift` | Composes the one recording-activity signal (detected meeting, manual recording) and pushes it to the gate whenever an input changes, so a recording never waits for the model |
+| `OpenAIConnection.swift` | One saved OpenAI-compatible connection (key in the Keychain) |
 | `RecordingSidecar.swift` | Metadata sidecar written next to recordings in record-only mode |
 | `RecordingFileSuffix.swift` | Filename suffix constants for dual-source recordings (`_app.wav`, `_mic.wav`, `_mix.wav`) |
 | `SilentRecordingMonitor.swift` | Pure state machine detecting fully-silent recordings (both channels below threshold) |
@@ -1108,7 +1112,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 - `customVocabularyEnabled` hides the vocabulary source picker, the vocabulary file row and the URL controls
 - `vocabularySource` switches between the local vocabulary file row and the URL controls (address, token, "Update now", status)
 - `unloadModelsWhenIdle` (default on) skips the launch ASR load (a missing model is still downloaded at launch) and releases in-memory ASR and batch VAD models at a safe pipeline drain; the toggle sits beside model status and "Load Model". Turning it off restores launch preload and retains models across drains and engine switches. With the setting on, unloaded status reads "Loads when needed" while `/state` continues to report `"unloaded"`.
-- `protocolProvider` switches between Claude CLI / Codex CLI / Custom Command / OpenAI-compatible / Local model / None panels
+- `protocolProvider` switches between Claude CLI / Codex CLI / Custom Command / OpenAI-compatible / Local model / None panels; the OpenAI-compatible panel starts with the saved-connection controls (`OpenAIConnectionControls`, see `docs/architecture/pipeline.md`)
 - `#if APPSTORE` removes the Claude CLI, Codex CLI, Custom Command and Local model provider options entirely
 - `updateChecker == nil` hides the entire Updates section in About
 

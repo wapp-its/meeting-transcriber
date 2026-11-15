@@ -54,6 +54,15 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
 
     let gracePeriod: TimeInterval
 
+    /// Reads the WAV a play button plays from the files and spans to try, best
+    /// first, when the samples are not level-balanced (`balanceSampleLevels`
+    /// reads through `balancedSampleWAVData` instead). Replaced only by the
+    /// tests that check which file and span a button asks for; it runs off
+    /// the main thread.
+    var sampleLoader: @Sendable ([PipelineQueue.SpeakerNamingData.SampleSource]) -> Data? = { sources in
+        Self.sampleWAVData(from: sources)
+    }
+
     init(
         data: PipelineQueue.SpeakerNamingData,
         knownSpeakerNames: [String] = [],
@@ -654,15 +663,15 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
 
         // Pick the longest pure segment to avoid cross-voice contamination,
         // and play it from the speaker's own track where there is one.
-        guard let chosen = Self.selectSampleSegment(for: label, in: data.segments),
-              let source = data.sampleSource(for: chosen) else { return }
+        guard let chosen = Self.selectSampleSegment(for: label, in: data.segments) else { return }
+        let sources = data.sampleSources(for: chosen)
+        let loadSample = sampleLoader
 
         // Perform file I/O off the main thread
-        Task.detached { [source, balanceSampleLevels] in
+        Task.detached { [sources, loadSample, balanceSampleLevels] in
             do {
-                guard let snippet = try await Self.playbackWAVData(
-                    from: source, balanced: balanceSampleLevels,
-                ) else { return }
+                let wav = balanceSampleLevels ? await Self.balancedSampleWAVData(from: sources) : loadSample(sources)
+                guard let snippet = wav else { return }
 
                 let newPlayer = try AVAudioPlayer(data: snippet)
                 let duration = newPlayer.duration
@@ -757,13 +766,27 @@ struct SpeakerNamingView: View { // swiftlint:disable:this type_body_length
         return snippet
     }
 
+    /// `sampleWAVData` with the sample brought to a common speech level: the
+    /// first of `sources` that has audio for its span, or nil when none has.
+    nonisolated static func balancedSampleWAVData(
+        from sources: [PipelineQueue.SpeakerNamingData.SampleSource],
+        scratchDir: URL = FileManager.default.temporaryDirectory,
+    ) async -> Data? {
+        for source in sources {
+            if let wav = try? await playbackWAVData(from: source, balanced: true, scratchDir: scratchDir) {
+                return wav
+            }
+        }
+        return nil
+    }
+
     /// The WAV to play for `source`, held in memory so that no copy of the
     /// meeting's audio stays on disk. Unbalanced, only the played span is
     /// read (`snippetWAVData`). Balanced, the whole track is decoded, because
     /// `playbackSnippet` judges which frames are speech against the noise
     /// floor of the whole file.
     nonisolated static func playbackWAVData(
-        from source: (url: URL, start: TimeInterval, end: TimeInterval),
+        from source: PipelineQueue.SpeakerNamingData.SampleSource,
         balanced: Bool,
         scratchDir: URL = FileManager.default.temporaryDirectory,
     ) async throws -> Data? {
