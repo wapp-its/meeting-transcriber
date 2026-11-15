@@ -120,7 +120,7 @@ final class MicrophoneControllerTests: XCTestCase {
     /// What the providers report when asked; the test changes it between asks.
     private final class DeviceSource {
         var devices: [MicrophoneDevice] = []
-        var defaultInputName: String?
+        var defaultInput: MicInputDevice?
     }
 
     /// A controller reading its list from `source`, observing `center` rather
@@ -130,25 +130,27 @@ final class MicrophoneControllerTests: XCTestCase {
         MicrophoneController(
             settings: settings,
             listDevices: { source.devices },
-            readDefaultInputName: { source.defaultInputName },
+            readDefaultInput: { source.defaultInput },
             notificationCenter: center,
         )
     }
 
-    func testRefreshDevicesPublishesTheListAndTheDefaultInputNameTheProvidersReport() {
+    func testRefreshDevicesPublishesTheListAndTheDefaultInputTheProvidersReport() {
         let source = DeviceSource()
         source.devices = [builtInEntry]
-        source.defaultInputName = "MacBook Pro Microphone"
+        source.defaultInput = builtIn
         let controller = listingController(source, center: NotificationCenter())
         XCTAssertEqual(controller.devices, [builtInEntry], "read at init")
         XCTAssertEqual(controller.defaultInputName, "MacBook Pro Microphone", "read at init")
+        XCTAssertEqual(controller.defaultInputUID, "BuiltInMicrophoneDevice", "read at init")
 
         source.devices = [builtInEntry, headsetEntry]
-        source.defaultInputName = "Headset"
+        source.defaultInput = headset
         controller.refreshDevices()
 
         XCTAssertEqual(controller.devices, [builtInEntry, headsetEntry])
         XCTAssertEqual(controller.defaultInputName, "Headset")
+        XCTAssertEqual(controller.defaultInputUID, "HeadsetUID")
     }
 
     /// A device plugged in or pulled out shows up without restarting the app,

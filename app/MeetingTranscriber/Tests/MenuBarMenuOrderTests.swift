@@ -165,6 +165,7 @@ final class MenuBarMenuOrderTests: XCTestCase {
             .heading("Audio Devices"),
             .item(Self.microphone.title),
             .item(Self.output.title),
+            .item("Device Details…"),
             .divider,
             .label("Needs you"),
             .item("Name Speakers…"),
@@ -193,7 +194,8 @@ final class MenuBarMenuOrderTests: XCTestCase {
         ])
     }
 
-    /// The heading goes with its entries: one entry is enough to show it.
+    /// The heading and "Device Details…" go with the entries: one entry is
+    /// enough to show both, and the item is the section's last line.
     func testTheAudioDevicesHeadingIsLeftOutWithoutADeviceEntry() throws {
         let cases: [(name: String, microphone: MicrophoneMenuState?, output: OutputMenuState?, shown: Bool)] = [
             ("both", Self.microphone, Self.output, true),
@@ -205,8 +207,29 @@ final class MenuBarMenuOrderTests: XCTestCase {
             let menu = try lines(of: makeView(microphoneMenu: testCase.microphone, outputMenu: testCase.output))
 
             XCTAssertEqual(menu.contains(.heading("Audio Devices")), testCase.shown, testCase.name)
+            XCTAssertEqual(menu.contains(.item("Device Details…")), testCase.shown, testCase.name)
             XCTAssertTrue(menu.contains(.heading("Record & Import")), testCase.name)
+            if testCase.shown {
+                let section = try lines(under: .heading("Audio Devices"), of: makeView(
+                    microphoneMenu: testCase.microphone, outputMenu: testCase.output,
+                ))
+                XCTAssertEqual(section.last, .item("Device Details…"), testCase.name)
+            }
         }
+    }
+
+    /// "Device Details…" carries the three-bar level icon and opens the
+    /// Audio Devices window through its action.
+    func testDeviceDetailsShowsTheLevelIconAndOpensTheAudioDevicesWindow() throws {
+        var opened = 0
+        var actions = MenuActions.noop
+        actions.showAudioDevices = { opened += 1 }
+        let sut = try makeView(microphoneMenu: Self.microphone, outputMenu: Self.output, actions: actions)
+
+        let item = try sut.inspect().find(viewWithAccessibilityIdentifier: A11yID.menuDeviceDetailsItem).button()
+        XCTAssertEqual(try item.labelView().label().icon().image().actualImage().name(), "chart.bar")
+        try item.tap()
+        XCTAssertEqual(opened, 1)
     }
 
     // MARK: - Last Recording

@@ -23,7 +23,8 @@ extension MicrophoneMenuState.Item: DeviceMenuItem {}
 extension OutputMenuState: DeviceMenuState {}
 extension OutputMenuState.Item: DeviceMenuItem {}
 
-/// The Microphone and Output entries: the two devices a recording depends on.
+/// The Microphone and Output entries, the two devices a recording depends on,
+/// and the item that opens the Audio Devices window.
 extension MenuBarView {
     /// Which microphone recordings use, switchable in a submenu; with "No
     /// Microphone" on, one disabled line. Choosing one only stores it; nothing
@@ -43,6 +44,17 @@ extension MenuBarView {
             outputMenu, icons: (enabled: outputIcon, disabled: "speaker.slash"),
             pickerLabel: "Output", pickerID: A11yID.menuOutputPicker, select: actions.selectOutput,
         )
+    }
+
+    /// The section's last item, under the two entries: opens the Audio
+    /// Devices window, or brings it to the front. No keyboard shortcut.
+    var deviceDetailsItem: some View {
+        Button {
+            actions.showAudioDevices()
+        } label: {
+            Label("Device Details…", systemImage: "chart.bar")
+        }
+        .accessibilityIdentifier(A11yID.menuDeviceDetailsItem)
     }
 
     /// A warning triangle while the output's hint warns about its routing.

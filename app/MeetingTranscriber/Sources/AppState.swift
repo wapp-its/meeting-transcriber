@@ -86,6 +86,9 @@ final class AppState {
     /// `WatchingController` attaches it on the same transitions as `microphone`.
     let output: OutputDeviceController
 
+    /// The Audio Devices window's readings and level sampling, run only while it is open.
+    let audioDevices: AudioDevicesWindowReader
+
     /// Observable state for the live caption overlay. Always present (the
     /// `LiveCaptionsOverlay` window observes this); content is only populated
     /// when live transcription is on AND a recording is active. Owned here (read
@@ -184,6 +187,7 @@ final class AppState {
     /// `liveControllerFactory` builds the controller the live-caption prewarm
     /// loads. Tests with live captions on pass one that loads no models: the real
     /// load outlives the test, and its CoreML compiles can crash a later class.
+    /// `audioDeviceRead` is the Audio Devices window's Core Audio reading.
     init(
         pipelineEnvironment: PipelineController.QueueEnvironment,
         settings: AppSettings = AppState.makeDefaultSettings(),
@@ -191,6 +195,7 @@ final class AppState {
         updateChecker: UpdateChecker? = nil,
         liveControllerFactory: @escaping LiveTranscriptionCoordinator.ControllerFactory =
             LiveTranscriptionCoordinator.makeDefaultController,
+        audioDeviceRead: @escaping AudioDevicesWindowReader.Read = AudioDevicesWindowReader.coreAudioRead,
     ) {
         // Dependency defaults are resolved through explicitly-typed factory
         // helpers (above) rather than inline `?? SomeType()` expressions (and an
@@ -232,6 +237,9 @@ final class AppState {
         // Labelled: as a trailing closure it would read as a change handler.
         // swiftlint:disable:next trailing_closure
         self.output = OutputDeviceController(notifier: notifier, indicatorEnabled: { [settings] in settings.perChannelIndicatorEnabled })
+        self.audioDevices = Self.makeAudioDevicesReader(
+            channelHealth: channelHealth, microphone: microphone, read: audioDeviceRead,
+        )
         self.watching = WatchingController(
             settings: settings, notifier: notifier, pipeline: pipeline,
             channelHealth: channelHealth, permissions: permissions,
