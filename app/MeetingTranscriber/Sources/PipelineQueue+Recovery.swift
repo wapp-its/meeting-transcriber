@@ -57,7 +57,7 @@ extension PipelineQueue {
         // tracked separately, without comparing every field on PipelineJob.
         let changed = adopted.count != replaced.jobs.count || recoveredNotionExports
         jobs = adopted
-        for job in jobs where job.state == .done && job.hasPendingNotionExport {
+        for job in jobs where job.state == .done && job.hasPendingNotionExport && job.rerun == nil {
             recordTerminalJob(job)
         }
         // Only when this queue's list differs from what the replaced one held.
@@ -67,6 +67,8 @@ extension PipelineQueue {
         if changed { saveSnapshot() }
         // Tasks, so they start after the caller has installed this queue's callbacks.
         resumeHandedOverNotionExports(handedOver)
+        // A re-run done in the replaced queue, whose swap waited there, swaps here.
+        resumeRerunSwaps()
     }
 
     /// Drop finished jobs and let their sidecars go with them.

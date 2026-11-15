@@ -138,8 +138,13 @@ extension PipelineQueue {
         if !marked {
             logger.error("[\(PipelineJob.shortID(for: jobID), privacy: .public)] rerun_ending_not_recorded")
         }
-        if let renames = marker.renames { undoRenames(renames, jobID: jobID) }
-        let left = removeRerunFiles(marker.files, jobID: jobID)
+        // A rename that could not go back keeps the marker, as a file left does, so
+        // the next launch and the next admission try it again.
+        // Nothing at a rename's target is removed: a current file kept there as an
+        // earlier version is the meeting's own.
+        let stuck = marker.renames.map { undoRenames($0, jobID: jobID) } ?? []
+        let targets = Set((marker.renames ?? []).map(\.to))
+        let left = removeRerunFiles(marker.files.filter { !targets.contains($0.path) }, jobID: jobID) + stuck
         let saved = store.update(jobID: jobID) { $0.endRerun(marker, leaving: left) }
         return (saved, left)
     }

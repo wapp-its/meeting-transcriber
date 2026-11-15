@@ -275,6 +275,46 @@ final class PipelineQueueRerunSwapTests: XCTestCase {
         }
     }
 
+    func testARecordWithAPageButNoDatabaseUpdatesThatPageInTheConfiguredDatabase() async throws {
+        let fixture = try makeFixture()
+        let log = RerunExportLog()
+        let first = fixture.makeQueue(completedJobLifetime: 0, notion: RerunLoggingExporter.configuration("db-settings", log))
+        let meeting = try await fixture.finishedMeeting(in: first, leavingTheQueue: true)
+        // A record from before the run inputs named the database.
+        XCTAssertTrue(fixture.store.update(jobID: meeting.id) { $0.runInputs?.notionDatabaseID = nil }, "test premise")
+        let queue = fixture.makeQueue(completedJobLifetime: 0, notion: RerunLoggingExporter.configuration("db-settings", log))
+        let callsBefore = await log.calls.count
+
+        try await rerunToSuccess(meeting, in: queue, fixture)
+        try await fixture.poll("the export to end") { queue.notionExportTasks[meeting.id] == nil }
+
+        let calls = await log.calls.dropFirst(callsBefore)
+        XCTAssertEqual(calls.map(\.database), ["db-settings"])
+        XCTAssertEqual(calls.map(\.page), ["page-1"], "a second page was made")
+    }
+
+    // MARK: - Queue replacement
+
+    func testASwapWaitingInAReplacedQueueRunsInTheQueueThatAdoptedIt() async throws {
+        let fixture = try makeFixture()
+        let meeting = try await fixture.finishedMeeting(in: fixture.makeQueue(completedJobLifetime: 0), leavingTheQueue: true)
+        let queue = fixture.makeQueue()
+        queue.isRegenerationRunning = { true }
+        XCTAssertEqual(queue.rerunJob(id: meeting.id, mode: .transcribeAgain), .queued)
+        await queue.awaitProcessing()
+        let marker = try fixture.marker(meeting.id, in: queue)
+        XCTAssertEqual(queue.job(withID: meeting.id)?.state, .done, "test premise: the re-run succeeded")
+        let replacement = fixture.makeQueue()
+
+        replacement.adoptJobs(of: queue)
+        queue.retire()
+
+        try await fixture.poll("the swap to end") { replacement.job(withID: meeting.id)?.rerun == nil }
+        let transcript = try XCTUnwrap(paths(of: meeting.id, fixture).transcript)
+        XCTAssertEqual(FileIdentity.of(transcript.path), try newFile(.transcript, marker).identity)
+        XCTAssertNil(try fixture.record(meeting.id).rerun)
+    }
+
     // MARK: - Helpers
 
     private func makeController(on queue: PipelineQueue, _ fixture: Fixture) throws -> PipelineController {

@@ -32,17 +32,16 @@ extension PipelineQueue {
     private static let swappedRoles: [MeetingFile.Role] = [.transcript, .protocol, .segments]
 
     /// The re-run's speakers are confirmed or skipped and its notes are saved or not
-    /// wanted: the swap runs, once no regeneration runs (as Move Meeting to Trash
-    /// waits for one).
+    /// wanted: the swap runs once the job's done state, with its marker and its
+    /// queued export, is in the re-run file, so a stop at any step of the swap finds
+    /// it there as done (`resumeRerunSwaps`), and once no regeneration runs (as Move
+    /// Meeting to Trash waits for one).
     func rerunSucceeded(id: UUID) {
         guard let job = job(withID: id), let runID = job.rerun?.marker.runID else { return }
         logger.info("[\(job.shortID, privacy: .public)] rerun_succeeded")
-        guard isRegenerationRunning() else {
-            swapInRerun(id: id)
-            return
-        }
-        logger.info("[\(job.shortID, privacy: .public)] rerun_swap_waits: a regeneration runs")
+        let logDir = logDir
         Task { [weak self] in
+            await PipelineSnapshotStore.flush(logDir)
             while self?.swapWaits(id: id, runID: runID) == true {
                 try? await Task.sleep(for: .milliseconds(250))
             }
@@ -163,23 +162,30 @@ extension PipelineQueue {
         jobs[index].protocolPath = notes.flatMap { $0.state == .gone ? nil : URL(filePath: $0.path) }
         jobs[index].namingSlug = (transcript ?? notes).map { URL(filePath: $0.path).deletingPathExtension().lastPathComponent }
         let madeNotes = rerun.marker.files.contains { $0.role == .protocol }
+        let shortID = jobs[index].shortID
         // With notes off nothing new was saved, so the transcript is what the run made.
-        if madeNotes { removeRawTranscriptArtifactsIfSafe(for: index) }
+        // A current file the record no longer names (replaced while the app was
+        // closed) is left as it is.
+        let current = [transcript, record.files.last { $0.role == .segments }].compactMap(\.self)
+        if madeNotes, current.allSatisfy({ $0.state == .gone || MeetingFilePresence.of($0.path) == .gone || MeetingFileRemover.isTheRecordedFile($0) }) {
+            removeRawTranscriptArtifactsIfSafe(for: index)
+        } else if madeNotes {
+            logger.warning("[\(shortID, privacy: .public)] rerun_raw_transcript_kept: a current file was replaced")
+        }
+        // Queued before a quit, with nothing running it: started once below, after
+        // the entry landed, so a failed write keeps it owed.
         let interrupted = jobs[index].notionExportStatus == .inProgress
             && pendingNotionExports[id] == nil && notionExportTasks[id] == nil
-        if interrupted {
-            // Queued before a quit: marked failed as the launch marks any such export,
-            // then started once below.
-            jobs[index].finishNotionExport(succeeded: false)
-            Self.noteNotionExportFailure(
-                on: &jobs[index], reason: Self.notionExportInterruptedReason, backupSaved: jobs[index].protocolPath != nil,
-            )
-        }
-        let shortID = jobs[index].shortID
         guard terminalJobStore?.record(TerminalJobRecord(job: jobs[index])) ?? true else {
             logger.error("[\(shortID, privacy: .public)] rerun_entry_not_saved: the re-run stays in its file")
             saveSnapshot()
             return
+        }
+        if interrupted {
+            jobs[index].finishNotionExport(succeeded: false)
+            Self.noteNotionExportFailure(
+                on: &jobs[index], reason: Self.notionExportInterruptedReason, backupSaved: jobs[index].protocolPath != nil,
+            )
         }
         jobs[index].endRerunCommitted()
         jobs[index].exportsToPageDatabase = true
@@ -190,7 +196,7 @@ extension PipelineQueue {
         }
         saveSnapshot()
         logger.info("[\(shortID, privacy: .public)] rerun_committed")
-        if interrupted, jobs[index].protocolPath != nil, notionExportResolution(for: jobs[index]).configuration != nil {
+        if interrupted, jobs[index].protocolPath != nil, notionExportResolution(forJobID: id).configuration != nil {
             Task { [weak self] in await self?.exportSavedNotes(id: id) }
         } else {
             startPendingNotionExport(jobID: id)
@@ -277,17 +283,23 @@ extension PipelineQueue {
     }
 
     /// Moves back each of `renames` that was made, the last first; those not made
-    /// stay where they are, and one that is at neither end is logged.
-    static func undoRenames(_ renames: [Rename], jobID: UUID) {
+    /// stay where they are, and one at neither end is logged. Returns the files of
+    /// the renames made that could not go back, at the name they have now.
+    @discardableResult
+    static func undoRenames(_ renames: [Rename], jobID: UUID) -> [MeetingFile] {
+        var stuck: [MeetingFile] = []
         for rename in renames.reversed() {
             let ends = whereRenameIs(rename)
             guard !ends.atSource else { continue }
-            if let reason = ends.atTarget ? move(rename, from: rename.to, to: rename.from) : "missing" {
-                logger.warning(
-                    "[\(PipelineJob.shortID(for: jobID), privacy: .public)] rerun_rename_not_undone reason=\(reason, privacy: .private)",
-                )
+            guard let reason = ends.atTarget ? move(rename, from: rename.to, to: rename.from) : "missing" else { continue }
+            logger.warning(
+                "[\(PipelineJob.shortID(for: jobID), privacy: .public)] rerun_rename_not_undone reason=\(reason, privacy: .private)",
+            )
+            if ends.atTarget {
+                stuck.append(MeetingFile(role: rename.role, path: rename.to, identity: rename.identity, owned: true, state: .present))
             }
         }
+        return stuck
     }
 
     /// Whether the file `rename` names is at its target or at its source, by its

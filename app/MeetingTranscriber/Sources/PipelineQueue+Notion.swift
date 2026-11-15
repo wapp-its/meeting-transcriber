@@ -366,12 +366,22 @@ extension PipelineQueue {
     }
 
     /// The export configuration Settings give, aimed at the database of the page
-    /// the meeting has when `job` is a re-run or a finished job one made (A26); a
-    /// job without a recorded database exports to the configured one (A6).
-    func notionExportResolution(for job: PipelineJob?) -> NotionExportResolution {
+    /// the meeting has when the job `id` is a re-run or a finished job one made
+    /// (A26). Such a job with a page but no recorded database (a record from before
+    /// the run inputs) takes its page as the configured database's, so the page is
+    /// updated, not made again (A6).
+    func notionExportResolution(forJobID id: UUID) -> NotionExportResolution {
         let resolution = notionExportConfigurationProvider?() ?? .disabled
-        guard let job, job.rerun != nil || job.exportsToPageDatabase == true, let databaseID = job.notionDatabaseID,
+        guard let index = liveJobIndex(of: id), jobs[index].rerun != nil || jobs[index].exportsToPageDatabase == true,
               case let .ready(configuration) = resolution else { return resolution }
+        guard let databaseID = jobs[index].notionDatabaseID else {
+            if let page = jobs[index].notionPageID {
+                jobs[index].recordNotionPage(
+                    NotionPageResult(pageID: page, url: jobs[index].notionPageURL?.absoluteString), databaseID: configuration.databaseID,
+                )
+            }
+            return resolution
+        }
         return .ready(configuration.targeting(databaseID: databaseID))
     }
 
@@ -380,7 +390,7 @@ extension PipelineQueue {
     @discardableResult
     func exportSavedNotes(id: UUID) async -> Bool {
         guard let job = jobs.first(where: { $0.id == id }) else { return false }
-        guard let configuration = notionExportResolution(for: job).configuration else {
+        guard let configuration = notionExportResolution(forJobID: job.id).configuration else {
             addWarning(id: id, Self.notionRetryConfigurationWarning)
             persistNotionExportChange(jobID: id)
             return false
