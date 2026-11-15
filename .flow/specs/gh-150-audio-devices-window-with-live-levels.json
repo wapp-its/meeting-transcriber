@@ -1,0 +1,449 @@
+{
+  "branch_name": "gh-150-audio-devices-window-with-live-levels",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-11-14T22:55:50.383002Z",
+  "created_at": "2026-11-14T20:04:08.124186Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "gh-150-audio-devices-window-with-live-levels",
+  "impl_review_rounds": {
+    "gh-150-audio-devices-window-with-live-levels.1": 0
+  },
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-11-14T20:58:23.048981Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "ed688cf3b24c61a74941045c0a9fc816832000f1850739b6fe9c8e346809dc35",
+      "backend": "codex",
+      "base_sha": "f911fcb0a331240d287db28e1880c98fd770bc7c",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-1ab637762bee1adf51fb0fc73daada0f",
+            "classification": "introduced",
+            "findingId": "finding-1ab637762bee1adf51fb0fc73daada0f",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-86706b2a22d807e7b7fd66f30909ed40",
+            "classification": "introduced",
+            "findingId": "finding-86706b2a22d807e7b7fd66f30909ed40",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-2d0c6b0166a77000585058dbd6deb5f5",
+            "classification": "introduced",
+            "findingId": "finding-2d0c6b0166a77000585058dbd6deb5f5",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "13df6a9229cdd9b9ba318480f3fe259a33e28cf6",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 424300,
+      "output_sha256": "c6719e605c8a2d9488c7cebfaa817cd301a90f47530e0652e8b0858d0919363e",
+      "reservation_id": "70f13810bfa647db8e4c743324ed93b8",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T20:52:39.011674Z",
+      "tool_calls": 21,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "b516891f26bdaa6bbc062ef817351a7b677bd3e7afad3dd3ca5369de2318d7d0",
+      "backend": "codex",
+      "base_sha": "f911fcb0a331240d287db28e1880c98fd770bc7c",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-1ab637762bee1adf51fb0fc73daada0f",
+            "classification": "introduced",
+            "findingId": "finding-1ab637762bee1adf51fb0fc73daada0f",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-86706b2a22d807e7b7fd66f30909ed40",
+            "classification": "introduced",
+            "findingId": "finding-86706b2a22d807e7b7fd66f30909ed40",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-6f13c3745665b7a4625bbf288d2e1efd",
+            "classification": "introduced",
+            "findingId": "finding-6f13c3745665b7a4625bbf288d2e1efd",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-2d0c6b0166a77000585058dbd6deb5f5",
+            "classification": "introduced",
+            "findingId": "finding-2d0c6b0166a77000585058dbd6deb5f5",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "19b0094ca2de5bc793738cc90f679456c7cc8aa3",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1810,
+      "output_sha256": "468443c29290f55d98c0045b1f779e9fab889e1dde9a2d597a70ed04e9bcb1b3",
+      "reservation_id": "3eb25434758341a3912d0047d6ff3f24",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T20:56:46.264298Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "4feea2ac12cfb9426ef0d5e35aa28d1c921110b23264340428036577cd229338",
+      "backend": "codex",
+      "base_sha": "f911fcb0a331240d287db28e1880c98fd770bc7c",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-1ab637762bee1adf51fb0fc73daada0f",
+            "classification": "introduced",
+            "findingId": "finding-1ab637762bee1adf51fb0fc73daada0f",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-86706b2a22d807e7b7fd66f30909ed40",
+            "classification": "introduced",
+            "findingId": "finding-86706b2a22d807e7b7fd66f30909ed40",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-6f13c3745665b7a4625bbf288d2e1efd",
+            "classification": "introduced",
+            "findingId": "finding-6f13c3745665b7a4625bbf288d2e1efd",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-2d0c6b0166a77000585058dbd6deb5f5",
+            "classification": "introduced",
+            "findingId": "finding-2d0c6b0166a77000585058dbd6deb5f5",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "39142895efb3029064eedd99ce506b8581df944e",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 876,
+      "output_sha256": "df20f10cbd2e76049474381e60d8111db4c4b1fa38bae09a1a99f3d7b8fdc1be",
+      "reservation_id": "0fcb0881fa8444f5ba2044a63bbc0122",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T20:58:09.731937Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "fc5c1529624d5076f536fd1fda0ce67bcaad23087022980497195303adcf2dec",
+      "backend": "codex",
+      "base_sha": "0a00e3cf01e0484a438c9b8f5f4437712e685251",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-a11d3419f252fc852d990d11d9baa107",
+            "classification": "introduced",
+            "findingId": "finding-a11d3419f252fc852d990d11d9baa107",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-c09ac8e67c63ddef3f93c98ae4602eb9",
+            "classification": "introduced",
+            "findingId": "finding-c09ac8e67c63ddef3f93c98ae4602eb9",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "25898c136469e93ab42f273f24d384b1f815e336",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1902,
+      "output_sha256": "c7657ef8b032d93f511536a0892d184387cb1f60c7eea134cecb9e13c483fe0c",
+      "reservation_id": "70cfcda389c541fe8583771da1dddc4b",
+      "round_consumed": true,
+      "scope": "impl:gh-150-audio-devices-window-with-live-levels.1",
+      "superseded_by": null,
+      "task": "gh-150-audio-devices-window-with-live-levels.1",
+      "timestamp": "2026-11-14T21:59:30.593903Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "0b9fb5a504a0b693b1eb7e0dd4700c64f8bce6be1eb64e4a9c43e95ec26d64f8",
+      "backend": "codex",
+      "base_sha": "0a00e3cf01e0484a438c9b8f5f4437712e685251",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-a11d3419f252fc852d990d11d9baa107",
+            "classification": "introduced",
+            "findingId": "finding-a11d3419f252fc852d990d11d9baa107",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-c09ac8e67c63ddef3f93c98ae4602eb9",
+            "classification": "introduced",
+            "findingId": "finding-c09ac8e67c63ddef3f93c98ae4602eb9",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "b7736de9aa9da88d2ed7e906d8d96e67ee514c01",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 1199,
+      "output_sha256": "9a72f22efee7e89bf595bfd4e72642b4be0d874e99a3d61b364a1277d14a0db9",
+      "reservation_id": "1f186cdc46214ec68aeb8f2177bc8884",
+      "round_consumed": true,
+      "scope": "impl:gh-150-audio-devices-window-with-live-levels.1",
+      "superseded_by": null,
+      "task": "gh-150-audio-devices-window-with-live-levels.1",
+      "timestamp": "2026-11-14T22:06:12.801282Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "c95e21f074dba3c161dbe66990775996d29e1073ccda6c73ece61517bb0f46b1",
+      "backend": "codex",
+      "base_sha": "f911fcb0a331240d287db28e1880c98fd770bc7c",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-5658d1e8f0c6d79134b4b9390d223d2f",
+            "classification": "introduced",
+            "findingId": "finding-5658d1e8f0c6d79134b4b9390d223d2f",
+            "firstSeenThisRound": true,
+            "severity": "P3",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "b59e349adf481191bc712e0f7797b5547a3da183",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 455595,
+      "output_sha256": "302284254c5942e8c57eaaae21db0b1e8f3a1683f749740693ca74faada7f5d0",
+      "reservation_id": "739e2bb8923540fe948f39c44462c85d",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T22:39:01.630860Z",
+      "tool_calls": 32,
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "adcc2d587b01c8ae59831300974f0c709cbe1017812dfbefde03f462bdcf34b0",
+      "backend": "codex",
+      "base_sha": "322dd8b7457d234def6e2c575e1dfc24a5819b31",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-5658d1e8f0c6d79134b4b9390d223d2f",
+            "classification": "introduced",
+            "findingId": "finding-5658d1e8f0c6d79134b4b9390d223d2f",
+            "firstSeenThisRound": false,
+            "severity": "P3",
+            "status": "not_fixed"
+          },
+          {
+            "chainRoot": "finding-f73b5f8378b489d8d9bcb05914c21f96",
+            "classification": "introduced",
+            "findingId": "finding-f73b5f8378b489d8d9bcb05914c21f96",
+            "firstSeenThisRound": true,
+            "severity": "P3",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "48c9522bfbddaf0dbf00ad0439b587dd031861f3",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 6889,
+      "output_sha256": "bd99be61caaac2d09bc1b63800f8573548bf99f6d76c0198b23eda9f37e1d711",
+      "reservation_id": "6f422d77483d40f0a1584c902fad1f0c",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-14T22:55:50.352984Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "impl:gh-150-audio-devices-window-with-live-levels.1": 1,
+    "plan": 1,
+    "plan#completion": 2
+  },
+  "review_pending_rounds": {},
+  "review_phase_leases": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-150-audio-devices-window-with-live-levels.1": 0,
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-150-audio-devices-window-with-live-levels.md",
+  "status": "done",
+  "title": "Audio devices window with live levels",
+  "tracker": {
+    "baseHashFlow": "98b2273b637eba409155af5e3913e2c66e95f6b91656592bad809971fec6feab",
+    "baseHashTracker": "2ae744d979435cbe11e06059c95327d711bb737ea86369b47cfb588586f6af39",
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABXMHKFA",
+    "identifier": "#150",
+    "lastSyncedAt": "2026-11-14T22:47:01.709360Z",
+    "linkState": "linked",
+    "mergeBaseFlow": "# Audio devices window with live levels\n\n## Conversation Evidence\n\nThe fork is public, so the owner's turns are paraphrased, not quoted.\n\n> owner (paraphrased, gh-148 conversation, 2026-10-14): asked for a level indicator per device, so the right microphone or output can be found when a track comes out silent.\n> owner (selected, gh-148 D2, 2026-10-14): the Output entry and its switch come first; level meters per device go to a later build.\n> owner (paraphrased, issue #150, 2026-10-14): when a track comes out silent, it is hard to tell which microphone or output device carries the sound; a live level indicator per device, for microphones and outputs, would show the right one to pick. Levels of devices that are not recorded need extra capture, so probably more permissions and a privacy indicator.\n> owner (paraphrased, 2026-11-14): in the app's audio devices area, a new window with a detail view of the audio devices. For each device it also shows the current recording level as a graphic, so it is easy to see which device is in use right now and which one carries a signal.\n> owner (paraphrased, 2026-11-14): took the recommended answer to each of the five questions put to them: where the window opens, when levels show, which devices are listed, how use is marked, and whether the window switches devices (D2 to D6).\n> owner (paraphrased, 2026-11-14): accepted this spec's three mockup boards as drawn: the \"Device Details\u2026\" item in the menu, the window during a recording and the window without a recording (D7 to D10).\n\n## Goal & Context\n\n<!-- Source: 60% [paraphrase] / 40% [inferred] -->\n\nWhen a recording's track comes out silent, or a call sounds wrong, it is hard to tell which microphone or output the meeting app uses and which one carries sound. The menu bar's Audio Devices section names only the chosen microphone and the Mac's output (gh-148). After this spec, a window **Audio Devices**, opened by a new item \"Device Details\u2026\" in that section, lists every microphone and every output. Each row says whether the app records it, whether the meeting app uses it, whether any app is running audio on it right now, and whether it is the Mac's default. While a recording runs, the recorded microphone and the recorded meeting audio show their live level as a bar. Switching stays in the menu.\n\nThe first build stays within what the app captures already, plus read-only device status from Core Audio. Opening a device only to meter it would show the orange microphone indicator, would switch a Bluetooth headset to its call profile and, during a recording, can stall the app-audio capture (`docs/architecture/recording.md`, start order). Levels for devices the app does not record are therefore a later step the owner can ask for (D3).\n\n## Architecture & Data Models\n\n- **One new window, \"Audio Devices\"**, a window scene like All Recordings (`Window(\"All Recordings\", id: TranscriptionsView.windowID)` in `MeetingTranscriberApp.swift`), opened by a new last item \"Device Details\u2026\" in the menu bar's Audio Devices section (`MenuBarView.audioDevicesSection`), under the Microphone and Output entries (D2, D7). Choosing the item opens the window or brings it to the front, as \"All Recordings\u2026\" does through `bringWindowToFront(id:)`. [paraphrase]\n- **The accepted layout and wording** (the boards, D7 to D10):\n  - *Menu item:* \"Device Details\u2026\" with a three-bar level icon, the last item of Audio Devices, no keyboard shortcut. The Microphone and Output entries above it stay as they are.\n  - *Window:* titled \"Audio Devices\". Top to bottom: the heading \"Microphones\" and its list; under that list, while the Microphone entry shows its hint about the meeting app's microphone, that hint as a grey line, word for word (`MeetingMicrophoneWarningPolicy.hint`, \"<App> uses <devices>\", for example \"Teams uses USB Headset\"); the heading \"Outputs\" and its list; while the recording taps an app, the heading \"Meeting audio\" and its one row; then a grey footer line. Each list is a rounded box with one row per device and thin lines between rows.\n  - *Row:* the device name at the left, then its marks as small capsules, then, only while a recording runs, a level column at the right edge. In that column a recorded row shows the level bar and every other row the grey text \"no level\". Without a recording the rows have no level column.\n  - *Marks,* in this order and with these words: \"Recording\" (red, with a red dot), \"Used by <App>\" (blue, for example \"Used by Teams\"), \"In use\" (grey), \"Default\" (outlined). The Meeting audio row is named after the recorded app (for example \"Teams\") and carries \"Recording\".\n  - *Level bar:* 12 segments in a row, lit segments green, unlit ones grey (A9 maps the level to segments).\n  - *Footer:* during a recording \"Levels show for what this recording captures. To switch a device, use Microphone or Output in the menu bar.\"; without a recording \"Levels show while a recording runs. To switch a device, use Microphone or Output in the menu bar.\"\n  - *States the boards do not draw* (paused, not connected, unknown, the routing warning, an empty group) take A8's words.\n- **One pure value decides what the window shows**, in the way `MicrophoneMenuState` and `OutputMenuState` decide the menu entries: the rows of each group, every mark, every string, and whether a row shows a level bar. The window only renders it, so every arm is tested without the window. [inferred]\n- **Its inputs are values the app already holds:** the microphone list and the default input (the list the Microphone entry offers, `MicrophoneController.devices`; the default input's UID comes from `MicInputDevice.systemDefaultInput()`, as the controller keeps only its name today), the output list and the default output (`OutputDeviceController.devices` and `current`), the configured microphone (`AppSettings.micDeviceUID`, for the not-connected row; the \"No Microphone\" setting is not an input, see Edge Cases), the device the running recording captures (`MicrophoneController.recordedDevice`) and whether its microphone track is active (the recorder's `microphoneTrackActive`), the recorded app's name (`MicrophoneController.Attachment.meetingAppName`), the Microphone entry's hint (`MicrophoneController.meetingAppHint`), whether a recording runs, whether it taps an app (`RecordingSource.capturesAppAudio`) and whether it is paused, and the two recorded levels in dBFS. [inferred]\n- **Two readings are new:** per device, Core Audio's \"device is running somewhere\" flag; and, during a recording that taps an app, which input and output devices the tapped processes use. The meeting microphone probe does not cover the second: it runs only while the microphone is recorded and keeps only its mismatch hint. So the window's reader reads the tapped processes' devices itself (the input side as `MeetingMicrophoneProbe.read` does, plus the output-scope counterpart), on the probe's cadence (A7). [inferred]\n- **Levels come only from the running recording** (D3): the microphone track's level on the recorded microphone's row, and the app-audio track's level on its own \"Meeting audio\" row named after the recorded app (D4). The app-audio tap records the meeting app's sound whatever output it plays to, so that level belongs to the app, not to an output row. `ChannelHealthController` keeps the two levels unobserved on purpose (a bound view would redraw ten times a second for ever), so the window samples them on its own timer while it is visible. [inferred]\n- **New readings run off the main thread**, one at a time, only while the window is open, because coreaudiod can stop answering (`docs/architecture/recording.md`, capture-restart bounding). [inferred]\n\n## API Contracts\n\n- The debug `/state` snapshot gains `audioDevicesWindow`: `{ \"open\": true, \"rows\": [ { \"group\": \"microphone\", \"name\": \"USB Headset\", \"marks\": [\"meetingApp\", \"inUse\"], \"meetingApp\": \"Teams\", \"levelBar\": false }, { \"group\": \"meetingAudio\", \"name\": \"Teams\", \"marks\": [\"recording\"], \"meetingApp\": null, \"levelBar\": true, \"litSegments\": 7 } ], \"selfRunningInput\": false }`. `group` is `microphone`, `output` or `meetingAudio`; `marks` holds any of `recording`, `meetingApp`, `inUse`, `default`, `notConnected`, `routingWarning`, `paused`, `unknown`; `meetingApp` is null unless `marks` holds `meetingApp`; `levelBar` says whether the row shows a level bar and `litSegments` how many of its 12 segments are lit (absent without a bar); `selfRunningInput` is whether Core Audio reports this app's own process running audio input, for the no-capture check: the window's reader reads it (the process-object read `MeetingMicrophoneProbe.read` makes, on the app's own process id) with its other readings, off the main thread and one at a time, and the snapshot reports the reader's last result; null while the window is closed, before the first reading returns and when a reading failed or is overdue. Building the snapshot makes no Core Audio call: `/state` is built on the main actor, and a hanging read there would freeze the app. Not part of the `/v1` automation API. [inferred]\n- Two debug actions, `POST /action/openAudioDevices` and `POST /action/closeAudioDevices`, open and close the window like `/action/openSettings` and `/action/closeSettings`, so live checks can reach it without the menu. They share one route case and one handler in an extension file, as the speaker actions share theirs, so `DebugRPCServer.route` gains one branch. Debug RPC only, `#if !APPSTORE` like the server. [inferred]\n- No new setting, and no change to `/v1`. [inferred]\n\n## Edge Cases & Constraints\n\n- **No recording running:** no level column and no Meeting audio group; the footer says levels show while a recording runs. Marks other than \"Recording\" and \"Used by <App>\" still show. [paraphrase]\n- **A microphone-only recording:** no Meeting audio group, since no app is recorded; the recorded microphone's row shows its bar. [inferred]\n- **A recording that does not capture the microphone** (an app-only recording, started with \"No Microphone (app audio only)\" on, or one whose microphone track gave up): no microphone row is marked as recorded and no microphone bar shows; the Meeting audio row still does. [inferred]\n- **The running recording decides, never the setting:** a microphone row's \"Recording\" mark and bar follow the device the recording reports it captures while its microphone track is active. \"No Microphone\" takes effect only at the next recording start, so turning it on or off during a recording changes neither that recording's marks nor its bars. The microphone list stays shown with \"No Microphone\" on. [inferred]\n- **Recording paused:** bars show no lit segment, and the Meeting audio row says \"Paused\" (A8). [inferred]\n- **A device with both input and output** (a USB headset) appears once in each group. [paraphrase]\n- **The app's own capture counts as running:** the recorded microphone and the output the app-audio tap is built on report \"running\" because of this app. So the `inUse` mark, shown as \"In use\", says only that some app, this one included, runs audio on the device; no string claims \"another app\". [paraphrase]\n- **A configured microphone that is not connected** is listed in the microphone group as not connected, as in the Microphone entry; the Mac's default output that the Mac does not offer (the Teams device) is listed with the menu's routing warning (both worded by A8). [inferred]\n- **A failed or late read** shows the mark `unknown` on that row, never \"not running\": \"not in use\" and \"could not ask\" must stay apart. A read that has not returned within two seconds leaves the window responsive and its rows `unknown`. [inferred]\n- **Devices come and go:** the lists refresh while the window is open when a device is added or removed or a default changes, as the menu entries do. [inferred]\n- **Privacy:** the window shows device names and the meeting app's name, never the meeting title and never a device UID (a USB UID carries the serial number). An output whose name Core Audio did not return is listed as \"Unnamed device\" in the window and in `/state`, because `OutputDevices.device` then uses its UID as its name. Nothing new is logged. Others may see the window during a screen share. [inferred]\n- **Both build variants** get the window; a read the App Store sandbox refuses shows as `unknown`. [inferred]\n\n## Acceptance Criteria\n\n- **R1:** The menu bar's Audio Devices section ends with the item \"Device Details\u2026\" (a three-bar level icon, no keyboard shortcut), which opens the Audio Devices window, or brings it to the front when it is open. The window's layout and wording are the accepted boards' (Architecture, the accepted layout and wording; D7 to D10), and no row holds a control. Errors: the item shows exactly when the section shows; no second window opens on a second choice. [paraphrase]\n- **R2:** The window lists every microphone of the Microphone entry's list (`MicrophoneController.devices`, also while \"No Microphone\" is on) and every output the Output entry offers, under the headings \"Microphones\" and \"Outputs\" and in the menus' order, each by its name, and refreshes while open when a device is added or removed or a default changes. Errors: an empty group shows one \"None found\" row; a configured microphone that is not connected is listed as not connected; a device with both input and output appears in both groups; an output without a readable name is listed as \"Unnamed device\", never by its UID, in the window and in `/state`. [paraphrase]\n- **R3:** Each row shows its marks, in the order \"Recording\", \"Used by <App>\", \"In use\", \"Default\": `recording` on the microphone the running recording reports it captures while its microphone track is active, and on the Meeting audio row; `meetingApp`, shown as \"Used by <App>\", on a microphone or an output the tapped meeting app uses during a recording; `inUse` while Core Audio reports the device running for any process; `default` on the Mac's default input and default output. When the Microphone entry shows its hint about the meeting app's microphone, the window shows the same text as a line under the Microphones list. Errors: a failed or late read shows `unknown` on that row, never \"not running\"; outside a recording no row carries `recording` or `meetingApp`. [paraphrase]\n- **R4:** While a recording runs and is not paused, the recorded microphone's row and, while the recording taps an app, a \"Meeting audio\" row named after the recorded app show a live 12-segment level bar from the recording's microphone and app-audio tracks (A9), updated at least ten times a second while the window is visible; every other row shows \"no level\" in the level column, and the footer reads \"Levels show for what this recording captures. To switch a device, use Microphone or Output in the menu bar.\" Errors: no recording \u2192 no level column, no Meeting audio group, and the footer \"Levels show while a recording runs. To switch a device, use Microphone or Output in the menu bar.\"; a recording that does not capture the microphone (app-only, or its microphone track gave up) \u2192 no microphone bar; \"No Microphone\" turned on or off during a recording \u2192 that recording's marks and bars unchanged; a microphone-only recording \u2192 no Meeting audio group; paused \u2192 no lit segment and the Meeting audio row says \"Paused\"; a track that stops delivering \u2192 its bar falls to no lit segment within one second. [paraphrase]\n- **R5:** Opening, showing and closing the window opens no audio input, installs no audio tap and starts no capture, with or without a recording: the window adds no orange microphone indicator and changes no Bluetooth headset's profile. Errors: no error surface beyond R3's `unknown`. [paraphrase]\n- **R6:** The new Core Audio readings run off the main thread, at most one at a time, only while the window is open, and stop when it closes; the window stays responsive while a reading hangs. Errors: a reading that has not returned within two seconds \u2192 the rows it would answer show `unknown` until a later reading returns. [inferred]\n- **R7:** The debug `/state` snapshot carries `audioDevicesWindow` as in API Contracts, built from the window's state and its reader's last results with no Core Audio call of its own, and `docs/architecture-macos.md` lists the window and where it gets each mark and level. Errors: window closed \u2192 `open: false` and `rows: []`. [inferred]\n\n## Validation\n\nIn this order; each step passes before the next one is built on it.\n\n1. **State value** (pure tests, no window): every mark and string of R2 to R4 and A8, the order of the marks, the groups with and without a recording, a microphone-only and an app-only recording, a microphone track that gave up, \"No Microphone\" turned on and off during a microphone-only and during an app-and-microphone recording (marks and bars unchanged), an output whose name equals its UID (\"Unnamed device\" in the rows and in their `/state` projection, the UID in neither), and A9's level-to-segments table, -120 dBFS included (the level a track reports half a second after it stops delivering). [inferred]\n2. **Reader** (injected Core Audio reads, no hardware): readings run off the main thread and one at a time; a read held past two seconds turns the rows it would answer `unknown` while the window's state stays current; nothing is read while the window is closed, and closing it stops the reads; opening and closing the window during a recording calls nothing on a recorder double that records every call; with a reader held blocked, `/state` still answers at once and `audioDevicesWindow` carries `unknown` rows and `selfRunningInput: null` (R5, R6, R7). [inferred]\n3. **Window and menu wiring** (ViewInspector, `docs/architecture/gui-testing.md`): the menu item's label, icon and place, and that choosing it twice leaves one window; the window renders the state value's groups, rows and footer, and no row holds a control; the level sampling runs every 100 ms or faster only while the window is visible (R1, R4). [inferred]\n4. **Debug snapshot:** `/state.audioDevicesWindow` with the window open and closed, reached through the two debug actions (R7). [inferred]\n5. **Both build variants** build and pass their tests: the repository's test command, and `./scripts/pre-push.sh --with-appstore` for the App Store variant. [inferred]\n6. **Live, in the running dev app with the debug RPC on:** without a recording, open the window with `/action/openAudioDevices` and read `/state` for five seconds: `selfRunningInput` stays false and the rows show no bar (R4, R5). During a meeting-simulator recording, the recorded microphone's row and the Meeting audio row show `levelBar: true` with lit segments while the simulator plays; closing the window turns `open` false (R4, R7). [inferred]\n\n## Boundaries\n\n- No levels for devices the app does not record: that needs opening each microphone or a tap per output, with the orange indicator, the grants and the Bluetooth profile switch (D3). [paraphrase]\n- No switching devices in the window; the menu's Microphone and Output entries stay the place to switch (D6). [paraphrase]\n- No change to what or how the app records, and no new setting. [inferred]\n- No change to the menu's Microphone and Output entries beyond the new item. [paraphrase]\n\n## Decision Context\n\n- **D1 \u00b7 A window opened from the app's audio devices area lists the audio devices and shows, per device, its current recording level as a graphic, so it is easy to see which device is in use right now and which one carries a signal.** why: the owner's wish of 2026-11-14 (paraphrased), continuing issue #150, which gh-148 deferred (its D2: level meters per device in a later build) \u00b7 status: active [owner-stated 2026-11-14]\n- **A1 \u00b7 The window opens from a new last item in the menu bar's Audio Devices section.** flip at: the owner's answer \u00b7 test: R1's menu wiring test \u00b7 alternatives: B a button in Settings \u2192 Audio; C both \u00b7 status: superseded by D2 [agent-assumed 2026-11-14]\n- **A2 \u00b7 Levels only for the two tracks a running recording captures; every other row shows status only, and the window opens no device.** flip at: the owner's answer \u00b7 test: R4's state tests and R5's no-capture test \u00b7 alternatives: B every microphone metered while the window is open (orange indicator, Bluetooth headsets in call quality, can stall a running recording's app audio); C as A plus a Test button per microphone outside a recording, as a follow-up spec \u00b7 status: superseded by D3 [agent-assumed 2026-11-14]\n- **A3 \u00b7 Microphones and outputs are both listed, and the meeting audio level sits on its own \"Meeting audio\" row named after the recorded app, not on an output row.** flip at: the owner's answer \u00b7 test: R2's and R4's state tests \u00b7 alternatives: B microphones only; C a level per output from a tap on each output device \u00b7 status: superseded by D4 [agent-assumed 2026-11-14]\n- **A4 \u00b7 \"In use\" shows as separate marks: recording (this app records it), the meeting app's name (during a recording), in use (Core Audio reports it running for any app, this one included), default.** flip at: the owner's answer \u00b7 test: R3's state tests \u00b7 alternatives: B one dot for any use, without saying who; C every app's name on every device, outside a recording too \u00b7 status: superseded by D5 [agent-assumed 2026-11-14]\n- **A5 \u00b7 The window is read-only; switching stays in the menu.** flip at: the owner's answer \u00b7 test: R1's view test finds no control in a device row \u00b7 alternatives: B a Use button per row that does what the menu's choice does (an output choice changes the Mac's output system-wide) \u00b7 status: superseded by D6 [agent-assumed 2026-11-14]\n- **A6 \u00b7 An ordinary window like All Recordings, not one that floats above other apps.** flip at: the window scene \u00b7 test: R1's window test \u00b7 alternatives: B a floating panel while a recording runs \u00b7 status: active [agent-assumed 2026-11-14]\n- **A7 \u00b7 The running flag is read per device while the window is open, refreshed about once a second or on Core Audio's change notice, and the tapped processes' input and output devices every five seconds, the meeting microphone probe's cadence, by the window's own reader.** flip at: the device status reader \u00b7 test: R6's reader tests \u00b7 status: active [agent-assumed 2026-11-14]\n- **D2 \u00b7 The window opens from a new last item \"Device Details\u2026\" in the menu bar's Audio Devices section.** why: devices are already chosen there, and the window can stay open beside the call; the owner took this pick (paraphrased) \u00b7 alternatives: B a button in Settings \u2192 Audio; C both \u00b7 status: active [owner-stated 2026-11-14]\n- **D3 \u00b7 Levels show only for the two tracks a running recording captures; every other row shows status only, and the window opens no device.** why: no new capture, no extra orange microphone indicator and no headset switch to call quality; the owner took this pick (paraphrased) \u00b7 alternatives: B every microphone metered while the window is open; C as D3 plus a Test button per microphone outside a recording \u00b7 status: active [owner-stated 2026-11-14]\n- **D4 \u00b7 Microphones and outputs are both listed, and the meeting audio level sits on its own \"Meeting audio\" row named after the recorded app, not on an output row.** why: both sides of a recording in one view, so a silent meeting track shows as a flat bar; the owner took this pick (paraphrased) \u00b7 alternatives: B microphones only; C a level per output from a tap on each output \u00b7 status: active [owner-stated 2026-11-14]\n- **D5 \u00b7 Use shows as separate marks: Recording (this app records it), Used by <App> (during a recording), In use (macOS reports it running for any app, this one included), Default.** why: shows the common mismatch directly, the recorded microphone next to the one the meeting app uses; the owner took this pick (paraphrased) \u00b7 alternatives: B one dot for any use; C every app's name on every device, outside a recording too \u00b7 status: active [owner-stated 2026-11-14]\n- **D6 \u00b7 The window is read-only; switching stays in the menu's Microphone and Output entries.** why: one place to switch, with the menu's rules, and no wrong click in the window moves the Mac's output during a call; the owner took this pick (paraphrased) \u00b7 alternatives: B a Use button per row \u00b7 status: active [owner-stated 2026-11-14]\n- **D7 \u00b7 The menu item reads \"Device Details\u2026\" with a three-bar level icon, sits last in Audio Devices under Microphone and Output, and has no keyboard shortcut.** why: the accepted menu board (the owner's acceptance of the boards, paraphrased) \u00b7 status: active [owner-stated 2026-11-14]\n- **D8 \u00b7 The window \"Audio Devices\" shows, top to bottom, \"Microphones\" with its list and the meeting-app hint line under it, \"Outputs\" with its list, \"Meeting audio\" with one row named after the recorded app while a recording taps an app, and a footer line; a row holds the device name, its marks and, only while a recording runs, a level column (layout in Architecture).** why: the accepted window boards \u00b7 status: active [owner-stated 2026-11-14]\n- **D9 \u00b7 Marks are small capsules in the order Recording (red, with a dot), Used by <App> (blue), In use (grey), Default (outlined); the level column shows a 12-segment bar (lit green, unlit grey) on a recorded row and the grey text \"no level\" on every other row.** why: the accepted window boards \u00b7 status: active [owner-stated 2026-11-14]\n- **D10 \u00b7 The footer reads \"Levels show for what this recording captures. To switch a device, use Microphone or Output in the menu bar.\" during a recording and \"Levels show while a recording runs. To switch a device, use Microphone or Output in the menu bar.\" otherwise; the hint line is the Microphone entry's hint, word for word.** why: the accepted window boards \u00b7 status: active [owner-stated 2026-11-14]\n- **A8 \u00b7 States the boards do not draw use the boards' capsules and these words: \"Paused\" after \"Recording\" on the Meeting audio row during a pause; \"Not connected\" on a configured microphone that is not connected, its row named \"Selected microphone\" as the menu's item; \"Status unknown\" for a failed or late read; an orange \"Warning\" capsule on the Teams output, with the Output entry's hint line under the Outputs list; one grey \"None found\" row in an empty group.** flip at: the window's state value and its row view \u00b7 test: R2's and R3's state tests \u00b7 status: active [agent-assumed 2026-11-14]\n- **A9 \u00b7 The bar lights one segment per 5 dB above -60 dBFS, the channel-health silence threshold: -60 dBFS or less (and the -120 a stopped track reports) lights none, 0 dBFS lights all 12.** flip at: the level-to-segments function \u00b7 test: -120 and -60 light 0, -30 lights 6, 0 lights 12 \u00b7 status: active [agent-assumed 2026-11-14]\n- **A10 \u00b7 When the recording reports no app name, the Meeting audio row is named \"Meeting app\" and the mark reads \"Used by the meeting app\".** alternatives: B \u2014 the tapped app's bundle name; C \u2014 \"Unknown app\" \u00b7 flip at: `AudioDevicesWindowState.meetingAudioRow` and `Mark.label(meetingApp:)` \u00b7 test: `AudioDevicesWindowStateTests.testTheRecordingDecidesTheMeetingAudioGroupAndTheMicrophoneBar` \u00b7 status: active [agent-assumed 2026-11-14]\n- **A11 \u00b7 The capsules A8 names without a colour are grey: Paused, Not connected and Status unknown; Warning stays orange as A8 says.** alternatives: B \u2014 Paused yellow; C \u2014 Not connected red \u00b7 flip at: `AudioDeviceMarkView.tint` \u00b7 test: `AudioDevicesViewTests.testTheWindowRendersItsGroupsRowsMarksAndFooterWithNoControl` \u00b7 status: active [agent-assumed 2026-11-14]\n- **A12 \u00b7 The window is 520 points wide and takes its height from its content.** alternatives: B \u2014 a resizable window; C \u2014 the width of the longest device name \u00b7 flip at: `AudioDevicesView.body` (`.frame(width:)`) and the scene's `.windowResizability(.contentSize)` \u00b7 test: `AudioDevicesViewTests.testTheWindowRendersItsGroupsRowsMarksAndFooterWithNoControl` \u00b7 status: active [agent-assumed 2026-11-14]\n\nMockup gate: accepted by the owner on 2026-11-14. The boards are on a private design canvas, so this spec writes out their layout and wording (Architecture, the accepted layout and wording; D7 to D10); the device names in them (MacBook Pro Microphone, USB Headset, Studio Display Microphone, MacBook Pro Speakers, Studio Display Speakers), the app name (Teams), the menu bar's clock and the levels drawn are examples.\n\nFIT: GO \u00b7 2026-11-14 \u00b7 base f911fcb0 \u00b7 engine flow-next 9.10.0 \u00b7 no other spec owns part of this scope; anchors confirmed and named in Architecture\n  - open specs gh-5, gh-6, gh-77, gh-99, gh-130 and gh-171 claim neither the device window, the Audio Devices section nor the device readings; gh-4 (done) left a live per-source level meter as a follow-up, which D3 covers for the two recorded tracks\n  - the original has no open issue or PR for a device window or level meters; its open PR 713 (recover silent app audio by trying another output device) can build the app tap on an output other than the default, which the In use edge case already allows for, and if it lands first its per-output running-I/O reading can serve this spec's running flag\n  - anchors confirmed at f911fcb0: `MicrophoneMenuState`, `OutputMenuState`, `MenuBarView.audioDevicesSection`, the All Recordings `Window` scene and `bringWindowToFront(id:)`, `MicrophoneController.meetingAppHint` and `Attachment.meetingAppName`, `MeetingMicrophoneWarningPolicy.hint`, the probe's five-tick cadence and its gate on a recorded microphone (so the window reads the meeting app's devices itself), `ChannelHealthController.micLevelDBFS` and `appLevelDBFS`, `MicInputDevice.systemDefaultInput()`, `RecordingSource.capturesAppAudio`, and the two cited sections of `docs/architecture/recording.md`\n\nMaintainability (plan review): duplication - none identified; structure - the two new debug actions add branches to `DebugRPCServer.route`, which already disables the cyclomatic-complexity check (the spec now gives them one shared case and an extension-file handler)\nMaintainability (plan review): duplication - none identified; structure - the debug actions add one shared case to `DebugRPCServer.route`, which already disables the cyclomatic-complexity check; advisory only\n",
+    "mergeBaseTracker": "## BACKGROUND\n\nWhen a track comes out silent, it's hard to tell which microphone or output device carries the sound. A small live level indicator per device in the menu (microphones and outputs) would show the right one to pick. Follow-up to #148, which adds the Output entry to the menu.\n\n## NOTES\n\n- Levels of the recorded channels exist already while recording. Levels of devices that are not recorded need extra capture, so probably more permissions and a privacy indicator.\n\n## TASKS\n\n- [ ] Find out what a per-device level costs (permissions, CPU, privacy indicator)\n- [ ] Implement it for the menu, or close it",
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/150"
+  },
+  "updated_at": "2026-11-14T22:55:50.384452Z"
+}
