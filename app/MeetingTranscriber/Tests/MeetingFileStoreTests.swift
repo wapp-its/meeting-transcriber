@@ -1,3 +1,4 @@
+import AudioTapLib
 @testable import MeetingTranscriber
 import XCTest
 
@@ -49,6 +50,7 @@ final class MeetingFileStoreTests: XCTestCase {
         record.excludedFromAutomaticDeletion = true
         record.savedToNotion = true
         record.createdBy = "com.example.meetingtranscriber"
+        record.runInputs = storedRunInputs
 
         let store = MeetingFileStore(path: path)
         XCTAssertTrue(store.create(record))
@@ -129,6 +131,77 @@ final class MeetingFileStoreTests: XCTestCase {
         XCTAssertFalse(record.excludedFromAutomaticDeletion)
         XCTAssertFalse(record.savedToNotion)
         XCTAssertNil(record.createdBy, "a record from before the field, never deleted automatically")
+        XCTAssertNil(record.runInputs, "a record from before the field, or one an older build rewrote")
+    }
+
+    // MARK: - Run inputs
+
+    private let storedRunInputs = MeetingFileRecord.RunInputs(
+        micDelay: 0.25,
+        pauses: [RecordingPause(
+            startedAt: Date(timeIntervalSinceReferenceDate: 780_000_600),
+            endedAt: Date(timeIntervalSinceReferenceDate: 780_000_660), offsetSeconds: 600,
+        )],
+        micMuteIntervals: [MicMuteInterval(start: 12, end: 30)],
+        protocolTemplate: .file(name: "Board"),
+        protocolBackground: "Budget review",
+        notionDatabaseID: "database-1",
+        notionPageID: "page-1",
+    )
+
+    private func finishedEntry(exportedTo pageID: String?) -> TerminalJobRecord {
+        TerminalJobRecord(status: JobStatusDTO(
+            jobID: UUID().uuidString, state: .done, meetingTitle: "Standup", transcriptPath: nil, protocolPath: nil,
+            error: nil, warnings: [],
+            export: pageID.map { JobExportDTO(status: NotionExportStatus.completed.rawValue, id: $0, url: nil) },
+        ))
+    }
+
+    /// Like the record's own later fields: a value a later version writes with
+    /// fewer of them still reads, and leaves the record file readable.
+    func testRunInputsWithoutTheirFieldsReadAsNone() throws {
+        let id = UUID()
+        let json = #"{"jobID":"\#(id.uuidString)","origin":"recorded","files":[],"runInputs":{}}"#
+
+        let record = try JSONDecoder().decode(MeetingFileRecord.self, from: Data(json.utf8))
+
+        XCTAssertEqual(record.runInputs, MeetingFileRecord.RunInputs())
+    }
+
+    /// A meeting from before the field, or one whose record an older build rewrote.
+    func testARerunOfARecordWithoutRunInputsTakesTheFallbacks() {
+        let inputs = makeRecord().rerunInputs(finished: finishedEntry(exportedTo: "page-9"))
+
+        XCTAssertEqual(inputs.micDelay, 0)
+        XCTAssertEqual(inputs.pauses, [])
+        XCTAssertEqual(inputs.micMuteIntervals, [])
+        XCTAssertNil(inputs.protocolTemplate, "the rules pick one by the title")
+        XCTAssertNil(inputs.protocolBackground)
+        XCTAssertEqual(inputs.notionPageID, "page-9", "the page the finished-job entry names")
+        XCTAssertNil(inputs.notionDatabaseID, "nothing says which database that page is in")
+    }
+
+    func testARerunTakesTheStoredRunInputsOverTheFinishedEntry() {
+        var record = makeRecord()
+        record.runInputs = storedRunInputs
+
+        XCTAssertEqual(record.rerunInputs(finished: finishedEntry(exportedTo: "page-9")), storedRunInputs)
+    }
+
+    /// The record's write after the export can fail while the finished-job entry
+    /// still names the page.
+    func testStoredRunInputsWithoutAPageTakeTheFinishedEntrysPage() {
+        var record = makeRecord()
+        record.runInputs = storedRunInputs
+        record.runInputs?.notionPageID = nil
+        record.runInputs?.notionDatabaseID = nil
+
+        let inputs = record.rerunInputs(finished: finishedEntry(exportedTo: "page-9"))
+
+        XCTAssertEqual(inputs.notionPageID, "page-9")
+        XCTAssertNil(inputs.notionDatabaseID)
+        XCTAssertEqual(inputs.protocolBackground, storedRunInputs.protocolBackground, "the other inputs stay")
+        XCTAssertNil(record.rerunInputs(finished: finishedEntry(exportedTo: nil)).notionPageID, "no page anywhere")
     }
 
     func testAudioRolesAreTheThreeTracksAndTheirCopies() {
