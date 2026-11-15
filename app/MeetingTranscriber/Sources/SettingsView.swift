@@ -40,6 +40,7 @@ struct SettingsView: View {
     var legacyWhisperModels: LegacyWhisperModelsState?
     /// Where a tab another part of the app asks for arrives.
     var navigation: SettingsNavigation = .shared
+    var captionWarmup: LiveCaptionsWarmup = .idle
 
     @State private var selection: SettingsTab = .general
     /// Owned here rather than by the Transcription tab, so a pending load offer
@@ -98,6 +99,7 @@ struct SettingsView: View {
                 parakeetEngine: parakeetEngine,
                 remoteVocabulary: remoteVocabulary,
                 modelChoice: whisperKitModelChoice,
+                captionWarmup: captionWarmup,
                 legacyModels: legacyWhisperModels,
             )
 
