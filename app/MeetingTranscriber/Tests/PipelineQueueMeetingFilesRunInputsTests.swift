@@ -23,6 +23,10 @@ final class PipelineQueueMeetingFilesRunInputsTests: XCTestCase {
         dir.appendingPathComponent("records/meeting_files.json")
     }
 
+    private func configuration(_ exporter: any NotionExporting) -> NotionExportConfiguration {
+        NotionExportConfiguration(exporter: exporter, databaseID: "https://www.notion.so/team/\(databaseID)?v=1")
+    }
+
     /// A queue that runs a job straight to `.done` and exports it, whose default
     /// template is "Board".
     private func makeQueue(in dir: URL, exporter: any NotionExporting) throws -> (PipelineQueue, MeetingFileStore) {
@@ -32,9 +36,7 @@ final class PipelineQueueMeetingFilesRunInputsTests: XCTestCase {
         let store = MeetingFileStore(path: storePath(in: dir))
         let engine = MockEngine()
         engine.segmentsToReturn = [TimestampedSegment(start: 0, end: 5, text: "Hello world")]
-        let configuration = NotionExportConfiguration(
-            exporter: exporter, databaseID: "https://www.notion.so/team/\(databaseID)?v=1",
-        )
+        let notion = configuration(exporter)
         let queue = PipelineQueue(
             engine: engine,
             diarizationFactory: { MockDiarization() },
@@ -45,7 +47,7 @@ final class PipelineQueueMeetingFilesRunInputsTests: XCTestCase {
             echoDedupEnabled: false,
             defaultProtocolTemplateProvider: { .file(name: "Board") },
             protocolTemplateStore: templates,
-            notionExportConfigurationProvider: { .ready(configuration) },
+            notionExportConfigurationProvider: { .ready(notion) },
             meetingFileStore: store,
         )
         return (queue, store)
@@ -118,5 +120,43 @@ final class PipelineQueueMeetingFilesRunInputsTests: XCTestCase {
         XCTAssertEqual(finished.notionPageID, "page-1")
         let onDisk = MeetingFileStore(path: storePath(in: dir)).record(for: job.id)
         XCTAssertEqual(onDisk?.runInputs, inputsAtEntry, "the file keeps what the last write that landed left")
+    }
+
+    /// A finished job whose export failed, which the queue holds for Retry Notion Export.
+    private func runHeldForANotionRetry(in dir: URL) async throws -> (PipelineQueue, MeetingFileStore, PipelineJob) {
+        let (queue, store) = try makeQueue(in: dir, exporter: RetentionNotionExporter(fail: true))
+        let job = try makeJob(in: dir)
+        queue.enqueue(job, origin: .recorded)
+        await queue.awaitProcessing()
+        XCTAssertEqual(queue.job(withID: job.id)?.notionExportStatus, .failed, "test premise")
+        return (queue, store, job)
+    }
+
+    /// Regenerate Notes on a held job changes its template, and its export state
+    /// is saved again; a re-run still takes the one the meeting entered processing with.
+    func testARegeneratedTemplateLeavesTheKeptOne() async throws {
+        let (queue, store, job) = try await runHeldForANotionRetry(in: makeTempDirectory(prefix: "run_inputs_regenerated"))
+
+        queue.recordRegeneratedTemplate(jobID: job.id, template: .file(name: "Daily"))
+
+        XCTAssertEqual(queue.job(withID: job.id)?.protocolTemplate, .file(name: "Daily"), "test premise")
+        XCTAssertEqual(store.record(for: job.id)?.runInputs, inputsAtEntry)
+    }
+
+    /// An older build drops the field when it rewrites the record file.
+    func testAnExportGivesARecordAnOlderBuildRewroteItsRunInputsBack() async throws {
+        let (queue, store, job) = try await runHeldForANotionRetry(in: makeTempDirectory(prefix: "run_inputs_rewritten"))
+        store.update(jobID: job.id) { $0.runInputs = nil }
+
+        let exported = await queue.exportToNotion(
+            jobID: job.id, protocolMD: "# Notes", transcript: nil, speakerNames: [],
+            configuration: configuration(RetentionNotionExporter(fail: false)),
+        )
+
+        XCTAssertTrue(exported, "test premise")
+        var expected = inputsAtEntry
+        expected.notionDatabaseID = databaseID
+        expected.notionPageID = "page-1"
+        XCTAssertEqual(store.record(for: job.id)?.runInputs, expected)
     }
 }

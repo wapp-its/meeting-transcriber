@@ -411,15 +411,19 @@ extension PipelineQueue {
     /// page may leave that page in any state. So the mark goes off when one starts,
     /// also one still queued, which a quit ends failed without it having run.
     ///
-    /// The run inputs are written with it, so they name the job's page and its
-    /// database, which a re-run updates instead of making a second page. All of
-    /// them, from the job, so a record an older build rewrote without them has
-    /// them again.
+    /// The run inputs get the job's page and its database with it, which a re-run
+    /// updates instead of making a second page. The other inputs stay as the job
+    /// entered processing with them, also after a Regenerate Notes changed the
+    /// job's template; a record an older build rewrote without them takes them
+    /// from the job.
     private func noteNotionExport(of job: PipelineJob) {
         guard !isRetired else { return }
         meetingFileStore?.update(jobID: job.id) { record in
             record.savedToNotion = job.hasCompletedNotionExport
-            record.runInputs = MeetingFileRecord.RunInputs(job: job)
+            var inputs = record.runInputs ?? MeetingFileRecord.RunInputs(job: job)
+            inputs.notionDatabaseID = job.notionDatabaseID
+            inputs.notionPageID = job.notionPageID
+            record.runInputs = inputs
         }
     }
 
