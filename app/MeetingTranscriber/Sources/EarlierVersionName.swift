@@ -19,16 +19,18 @@ enum EarlierVersionName {
     /// avoiding every name in `taken` (folded with `MeetingReportFolder.folded`).
     /// Nil once every name up to `maxAttempt` is taken.
     static func name(for current: String, stamp: Date, taken: Set<String>) -> String? {
+        names(for: current, stamp: stamp).first { !taken.contains(MeetingReportFolder.folded($0)) }
+    }
+
+    /// Every name `name(for:stamp:taken:)` can give `current` for `stamp`, in the
+    /// order it tries them.
+    static func names(for current: String, stamp: Date) -> [String] {
         let url = URL(filePath: current, directoryHint: .notDirectory)
         let ext = url.pathExtension
         let base = url.deletingPathExtension().lastPathComponent
         let suffix = ext.isEmpty ? "" : ".\(ext)"
         let stamped = "\(base).until-\(DateFormatter.fileVersionStamp.string(from: stamp))"
-        for attempt in 1 ... maxAttempt {
-            let name = attempt == 1 ? stamped + suffix : "\(stamped)-\(attempt)\(suffix)"
-            if !taken.contains(MeetingReportFolder.folded(name)) { return name }
-        }
-        return nil
+        return (1 ... maxAttempt).map { $0 == 1 ? stamped + suffix : "\(stamped)-\($0)\(suffix)" }
     }
 
     /// The names in `folder` as the taken check compares them; nil when the folder

@@ -149,8 +149,9 @@ extension PipelineQueue {
     // MARK: - After the commit point
 
     /// After the commit point, live and at launch, and safe to repeat: the job takes
-    /// the current names the record lists, the raw-transcript setting is applied as
-    /// a new meeting's `.done` applies it, and the finished-job entry is written.
+    /// the current names the record lists, the earlier segments file goes, the
+    /// raw-transcript setting is applied as a new meeting's `.done` applies it, and
+    /// the finished-job entry is written.
     /// Only once that write landed does the job turn into an ordinary finished job,
     /// leave the re-run file and start its Notion export; until then it stays there.
     func finishCommittedRerun(id: UUID) {
@@ -163,6 +164,7 @@ extension PipelineQueue {
         jobs[index].namingSlug = (transcript ?? notes).map { URL(filePath: $0.path).deletingPathExtension().lastPathComponent }
         let madeNotes = rerun.marker.files.contains { $0.role == .protocol }
         let shortID = jobs[index].shortID
+        removeEarlierSegments(of: record, stamp: rerun.marker.stamp, jobID: id)
         // With notes off nothing new was saved, so the transcript is what the run made.
         // A current file the record no longer names (replaced while the app was
         // closed) is left as it is.
@@ -207,13 +209,39 @@ extension PipelineQueue {
         }
     }
 
+    /// The meeting's segments file from before the re-run goes once the swap
+    /// committed (A22), since only the current transcript is offered for Identify
+    /// Speakers Again. The swap moved it to its earlier-version name, so an undo
+    /// could put it back, and the commit lists it there as an earlier version, so a
+    /// stop before this step leaves it where a deletion of the meeting finds it.
+    /// Safe to repeat: a file already gone counts as removed.
+    private func removeEarlierSegments(of record: MeetingFileRecord, stamp: Date, jobID: UUID) {
+        guard let segments = record.files.last(where: { $0.role == .segments }) else { return }
+        let names = Set(EarlierVersionName.names(for: segments.path, stamp: stamp))
+        let earlier = record.files.filter { file in
+            file.role == .previousProtocol && file.state != .gone && names.contains(URL(filePath: file.path).lastPathComponent)
+        }
+        guard !earlier.isEmpty else { return }
+        let left = Set(Self.removeRerunFiles(earlier, jobID: jobID).map(\.path))
+        let removed = Set(earlier.map(\.path)).subtracting(left)
+        guard !removed.isEmpty else { return }
+        meetingFileStore?.update(jobID: jobID) { record in
+            for index in record.files.indices where removed.contains(record.files[index].path) {
+                record.files[index].state = .gone
+            }
+        }
+    }
+
     // MARK: - The plan, the renames and the commit
 
     /// The swap's renames in the order it makes them: each current file of a role
-    /// the re-run wrote to its earlier-version name, then each file of the re-run to
-    /// the current name of its role. A role without a current file takes the name
-    /// the meeting's files have by its current transcript's stem, or its notes' when
-    /// the transcript is gone; a gone current file keeps no earlier version. A
+    /// the re-run wrote to its earlier-version name (the segments file only until
+    /// the commit, `removeEarlierSegments`), then each file of the re-run to the
+    /// current name of its role. A role without a current file takes the name the
+    /// meeting's files have by its current transcript's stem, or its notes' when the
+    /// transcript is gone, in their folder, and a segments file in the folder the
+    /// re-run wrote it to, where the speaker naming reads it by that stem; a gone
+    /// current file keeps no earlier version. A
     /// refusal, with no rename made, when a current file is out of reach, is no
     /// longer the file the record names, or has no earlier name left.
     static func swapRenames(
@@ -230,8 +258,8 @@ extension PipelineQueue {
         for role in swappedRoles {
             guard let new = marker.files.last(where: { $0.role == role && $0.state != .gone }) else { continue }
             let newFolder = URL(filePath: new.path).deletingLastPathComponent()
-            let target = current(role)?.path ?? (anchor?.deletingLastPathComponent() ?? newFolder)
-                .appendingPathComponent(currentName(of: role, stem: stem)).path
+            let targetFolder = role == .segments ? newFolder : anchor?.deletingLastPathComponent() ?? newFolder
+            let target = current(role)?.path ?? targetFolder.appendingPathComponent(currentName(of: role, stem: stem)).path
             if let file = current(role), file.state != .gone {
                 switch MeetingFilePresence.of(file.path) {
                 case .unreachable:
