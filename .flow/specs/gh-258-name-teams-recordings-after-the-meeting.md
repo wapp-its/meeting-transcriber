@@ -56,7 +56,7 @@ Upstream: the original project's open pull request pasrom/meeting-transcriber#97
 
 ## Boundaries
 
-- No change to recordings that already exist: their titles and file names stay (A4). [inferred]
+- No change to recordings that already exist: their titles and file names stay (D4). [owner-stated 2026-11-16]
 - No new setting, and no way to rename a recording by hand. [inferred]
 - No title from the Accessibility API or from the calendar. [inferred]
 - No change to how meetings are detected or when a recording ends. [inferred]
@@ -65,9 +65,13 @@ Upstream: the original project's open pull request pasrom/meeting-transcriber#97
 
 - **D1 · A detected meeting gets the title that best describes it, every time; the meeting window's "<meeting> | <organisation> | <account>" form is the most useful one.** why: the owner's report of 2026-11-16 (paraphrased), issue #258 · status: active [owner-stated 2026-11-16]
 - **A1 · Teams windows are ranked: the meeting window shape, then the compact call window without its prefix, then other windows with the Teams suffix, then any other window; ties go to list order.** flip at: the owner's answer, or an R6 log line showing a meeting window in another shape · test: R1's ranking tests · alternatives: B rank only by the Teams suffix as today and fix the order alone · status: active [agent-assumed 2026-11-16]
-- **A2 · The title follows a better-ranked window while the call runs, never a weaker one.** flip at: the owner's answer · test: R3's watch-loop test · alternatives: B read the title once more when recording starts, then never; C read it once at the stop · status: active [agent-assumed 2026-11-16]
-- **A3 · The organisation and account parts stay in the title.** flip at: the owner's answer · test: R2's text tests · alternatives: B keep only the meeting name, the part before the first " | " · status: active [agent-assumed 2026-11-16]
-- **A4 · Recordings that already exist keep their titles and file names.** flip at: the owner's answer · test: none, no migration · alternatives: B strip "Meeting compact view | " from stored titles once, file names unchanged · status: active [agent-assumed 2026-11-16]
+- **A2 · The title follows a better-ranked window while the call runs, never a weaker one.** flip at: the owner's answer · test: R3's watch-loop test · alternatives: B read the title once more when recording starts, then never; C read it once at the stop · status: superseded by D2 [agent-assumed 2026-11-16]
+- **A3 · The organisation and account parts stay in the title.** flip at: the owner's answer · test: R2's text tests · alternatives: B keep only the meeting name, the part before the first " | " · status: superseded by D3 [agent-assumed 2026-11-16]
+- **A4 · Recordings that already exist keep their titles and file names.** flip at: the owner's answer · test: none, no migration · alternatives: B strip "Meeting compact view | " from stored titles once, file names unchanged · status: superseded by D4 [agent-assumed 2026-11-16]
 - **A5 · Only Teams gets the ranking and the refresh.** flip at: the owner's answer, or a report of the same problem for another app · test: R5's unchanged tests · alternatives: B the refresh for every app with meeting patterns (Zoom, Webex) · status: active [agent-assumed 2026-11-16]
-- **A6 · When no window looks like the meeting window, another Teams window's title still names the recording before the placeholder does.** flip at: the owner's answer · test: R1's rank-4 test · alternatives: B the placeholder "Microsoft Teams Call" until a ranked window appears · status: active [agent-assumed 2026-11-16]
+- **A6 · When no window looks like the meeting window, another Teams window's title still names the recording before the placeholder does.** flip at: the owner's answer · test: R1's rank-4 test · alternatives: B the placeholder "Microsoft Teams Call" until a ranked window appears · status: superseded by D5 [agent-assumed 2026-11-16]
 - **A7 · A diagnostics line with the rank and part count only records which window named the recording.** flip at: the owner's answer · test: R6's log test · status: active [agent-assumed 2026-11-16]
+- **D2 · The title may change while the recording runs: a better-ranked window replaces it, an equal or weaker one never does.** why: the owner's answer to A2 on 2026-11-16 (paraphrased) · status: active [owner-stated 2026-11-16]
+- **D3 · Teams titles keep the " | <organisation> | <account>" part.** why: the owner's answer to A3 on 2026-11-16 (paraphrased) · status: active [owner-stated 2026-11-16]
+- **D4 · Recordings that already exist keep their titles and file names; no migration.** why: the owner's answer to A4 on 2026-11-16 (paraphrased) · status: active [owner-stated 2026-11-16]
+- **D5 · When no window looks like the meeting window, another Teams window's title names the recording before the placeholder "Microsoft Teams Call" does, as today.** why: the owner's answer to A6 on 2026-11-16 (paraphrased) · status: active [owner-stated 2026-11-16]
