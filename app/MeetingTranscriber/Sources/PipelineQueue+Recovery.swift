@@ -430,7 +430,7 @@ extension PipelineQueue {
     private func removeNamingDataOfDiscardedJobs(_ discarded: [PipelineJob]) {
         for job in discarded where !inFlightRuns.isInFlight(job) {
             naming.removeNamingData(
-                jobID: job.id, slug: job.namingSlug, in: allSidecarDirs(of: job),
+                jobID: job.id, slug: job.namingSlug, in: allSidecarDirs(of: job), keepingWordTimings: keepsWordTimings(of: job),
             )
         }
     }

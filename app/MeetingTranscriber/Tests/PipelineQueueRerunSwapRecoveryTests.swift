@@ -68,7 +68,8 @@ final class PipelineQueueRerunSwapRecoveryTests: XCTestCase {
         record.list(listed)
         let notes = held.transcript.deletingPathExtension().appendingPathExtension("md")
         try Data("notes from the transcript".utf8).write(to: notes)
-        var expected = held.files
+        // By resolved path: the folder walk spells the kept file with `/private` or without.
+        var expected = resolved(held.files)
         expected[segments.path] = Data("earlier word timings".utf8)
         expected[notes.path] = Data("notes from the transcript".utf8)
         let undone = Held(meeting: held.meeting, queue: held.queue, marker: held.marker, files: expected, record: record, transcript: held.transcript)

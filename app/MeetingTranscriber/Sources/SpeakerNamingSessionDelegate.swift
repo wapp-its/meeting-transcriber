@@ -61,6 +61,9 @@ protocol SpeakerNamingSessionDelegate: AnyObject {
     /// Enter the diarizing stage for a late re-run that diarizes in `mode`,
     /// the mode its expected finish is read from.
     func startDiarizing(jobID: UUID, mode: DiarizerMode)
+    /// Whether the job's transcript segments file stays when its naming is
+    /// resolved: the meeting keeps its word timings for Identify Speakers Again.
+    func keepsWordTimings(jobID: UUID) -> Bool
 }
 
 extension SpeakerNamingSessionDelegate {
@@ -75,6 +78,12 @@ extension SpeakerNamingSessionDelegate {
     /// itself and also starts the clock for `mode`.
     func startDiarizing(jobID: UUID, mode _: DiarizerMode) {
         updateJobState(id: jobID, to: .diarizing)
+    }
+
+    /// False, so the segments file goes with the naming files as before, for a
+    /// delegate that keeps no record of the meeting's files (a test double).
+    func keepsWordTimings(jobID _: UUID) -> Bool {
+        false
     }
 
     /// Whether a job's work goes on: the task doing it was not cancelled and

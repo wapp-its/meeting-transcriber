@@ -812,7 +812,14 @@ class PipelineQueue {
     /// snapshots from versions before per-job settings compatible.
     /// Internal because pipeline stages in sibling files use it.
     func transcriptOutputOptions(forJobID jobID: UUID) -> TranscriptOutputOptions {
-        guard let job = jobs.first(where: { $0.id == jobID }) else {
+        transcriptOutputOptions(of: jobs.first { $0.id == jobID })
+    }
+
+    /// The output policy `job` was admitted with, also for a job no longer in the
+    /// list (a restore discarding it); the fallback's for nil and for a field the
+    /// job lacks.
+    func transcriptOutputOptions(of job: PipelineJob?) -> TranscriptOutputOptions {
+        guard let job else {
             return fallbackTranscriptOutputOptions
         }
         return TranscriptOutputOptions(
@@ -962,6 +969,7 @@ class PipelineQueue {
             } else {
                 naming.removeNamingData(
                     jobID: id, slug: jobs[index].namingSlug, in: allSidecarDirs(of: jobs[index]),
+                    keepingWordTimings: jobs[index].state == .done && keepsWordTimings(of: jobs[index]),
                 )
             }
             noteLeftQueue(jobID: id)
@@ -1125,7 +1133,10 @@ class PipelineQueue {
             // the transcript, never from the audio sidecars, and either may be
             // held for as long as the user leaves it.
             if jobs[index].isHeldAfterCompletion {
-                naming.removeNamingData(jobID: id, slug: jobs[index].namingSlug, in: allSidecarDirs(of: jobs[index]))
+                naming.removeNamingData(
+                    jobID: id, slug: jobs[index].namingSlug, in: allSidecarDirs(of: jobs[index]),
+                    keepingWordTimings: keepsWordTimings(of: jobs[index]),
+                )
             }
         }
     }

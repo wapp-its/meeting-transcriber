@@ -192,7 +192,7 @@ final class SpeakerNamingSession {
             && delegate?.job(withID: jobID)?.transcriptPath != nil
 
         let speakerNames = speakerNamingDataByJob[jobID].map { Array($0.mapping.values) } ?? []
-        removeNamingData(jobID: jobID, slug: slug)
+        removeResolvedNamingData(jobID: jobID, slug: slug)
 
         // `canGenerateProtocol == true` implies the delegate was alive above
         // (it resolved the job's transcriptPath); binding it here lets the Task
@@ -409,16 +409,25 @@ final class SpeakerNamingSession {
     /// own store. They can, because that store is always built on the folder
     /// the queue writes to, so the only way to reach it with an empty list is a
     /// queue with no output folder, whose store is a no-op anyway.
-    func removeNamingData(jobID: UUID, slug: String?, in outputDirs: [URL] = []) {
+    ///
+    /// `keepingWordTimings` leaves the transcript segments file where it is, for a
+    /// finished meeting that keeps them (`SpeakerNamingSessionDelegate.keepsWordTimings`).
+    func removeNamingData(jobID: UUID, slug: String?, in outputDirs: [URL] = [], keepingWordTimings: Bool = false) {
         forgetNamingData(jobID: jobID)
         let resolved = outputDirs.isEmpty
             ? (delegate?.job(withID: jobID)?.sidecarOutputDirs ?? [])
             : outputDirs
         for store in stores(in: resolved) {
             store.deleteNamingJSON(slug: slug)
-            store.cleanupSidecarFiles(slug: slug)
+            store.cleanupSidecarFiles(slug: slug, keepingSegments: keepingWordTimings)
         }
         onFilesChanged?(jobID, .sidecarsRemoved)
+    }
+
+    /// The naming files of a job whose naming is resolved and which goes on to
+    /// finish: its word timings stay when the meeting keeps them.
+    func removeResolvedNamingData(jobID: UUID, slug: String?) {
+        removeNamingData(jobID: jobID, slug: slug, keepingWordTimings: delegate?.keepsWordTimings(jobID: jobID) ?? false)
     }
 
     /// The in-memory half of `removeNamingData`: the naming data and the

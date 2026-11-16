@@ -152,7 +152,7 @@ extension SpeakerNamingSession {
               let saved = try? String(contentsOf: transcriptPath, encoding: .utf8)
         else {
             delegate.addWarning(id: jobID, Self.missingTranscriptWarning)
-            removeNamingData(jobID: jobID, slug: slug)
+            removeResolvedNamingData(jobID: jobID, slug: slug)
             delegate.updateJobState(id: jobID, to: .done)
             return
         }
@@ -175,7 +175,7 @@ extension SpeakerNamingSession {
             // synchronous and therefore says nothing about the transcript.
             // Idempotent, and the unconditional call at the end still covers
             // the paths that never reach this line.
-            removeNamingData(jobID: jobID, slug: slug)
+            removeResolvedNamingData(jobID: jobID, slug: slug)
 
             try await delegate.generateProtocol(
                 jobID: jobID,
@@ -197,7 +197,7 @@ extension SpeakerNamingSession {
             delegate.addWarning(id: jobID, "Protocol not generated: rewriting the transcript with the speaker names failed")
         }
 
-        removeNamingData(jobID: jobID, slug: slug)
+        removeResolvedNamingData(jobID: jobID, slug: slug)
         delegate.updateJobState(id: jobID, to: .done)
     }
 

@@ -200,7 +200,10 @@ final class PipelineQueueRerunSwapTests: XCTestCase {
         XCTAssertEqual(FileIdentity.of(notes.path), try newFile(.protocol, marker).identity)
         XCTAssertEqual(try paths(of: meeting.id, fixture).notes, notes)
         XCTAssertFalse(FileManager.default.fileExists(atPath: earlier(notes, marker).path))
-        XCTAssertEqual(try fixture.record(meeting.id).files.filter { $0.role == .previousProtocol }.count, 1, "one earlier transcript")
+        // The earlier word timings are listed too, as gone (A22).
+        XCTAssertEqual(
+            try fixture.record(meeting.id).files.filter { $0.role == .previousProtocol && $0.state != .gone }.count, 1, "one earlier transcript",
+        )
     }
 
     func testTheNewSegmentsFileTakesTheCurrentNameAndTheEarlierOneIsDeleted() async throws {
@@ -215,6 +218,8 @@ final class PipelineQueueRerunSwapTests: XCTestCase {
                 try Data("earlier word timings".utf8).write(to: segments)
                 XCTAssertTrue(fixture.store.update(jobID: meeting.id) { $0.list(MeetingFile(role: .segments, url: segments, owned: true)) })
             } else {
+                // A meeting from before word timings were kept.
+                try FileManager.default.removeItem(at: segments)
                 XCTAssertTrue(fixture.store.update(jobID: meeting.id) { $0.files.removeAll { $0.role == .segments } })
             }
             let queue = fixture.makeQueue()
