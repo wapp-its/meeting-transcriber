@@ -101,6 +101,65 @@ final class PipelineQueueRerunIdentifyTests: XCTestCase {
         XCTAssertFalse(names.contains { $0.contains("_segments.until-") }, "\(names)")
     }
 
+    /// A meeting with its call audio gone runs on its mix, and with its mix gone too
+    /// on the microphone's track alone, where a transcription keeps no mute times.
+    /// The kept words keep their mute lines, and the microphone's track alone is
+    /// diarized on the meeting's timeline, `micDelay` after its start.
+    func testOnWhatIsLeftOfItsAudioItKeepsTheMuteLinesAndTheMeetingsTimeline() async throws {
+        let rows: [(gone: Set<MeetingFile.Role>, frames: Int)] = [([.appTrack], 8000), ([.appTrack, .mix], 8000 + 4000)]
+        for row in rows {
+            let fixture = try makeFixture()
+            let recording = try fixture.makeRecording(micMuteIntervals: [MicMuteInterval(start: 0.1, end: 0.2)], micDelay: 0.25)
+            let meeting = try await fixture.finishedMeeting(in: fixture.makeQueue(completedJobLifetime: 0), recording, leavingTheQueue: true)
+            let before = try currentTranscript(meeting.id, fixture)
+            XCTAssertFalse(muteLines(of: before).isEmpty, "test premise: a mute line")
+            for file in try fixture.record(meeting.id).files where row.gone.contains(file.role) {
+                try FileManager.default.removeItem(at: URL(filePath: file.path))
+            }
+            let queue = fixture.makeQueue(completedJobLifetime: 0)
+            diarizeTwoVoices(fixture)
+
+            XCTAssertEqual(queue.rerunJob(id: meeting.id, mode: .identifySpeakersAgain), .queued, "\(row.gone)")
+            await queue.awaitProcessing()
+
+            XCTAssertEqual(queue.job(withID: meeting.id)?.state, .speakerNamingPending, "\(row.gone)")
+            let names = try FileManager.default.contentsOfDirectory(atPath: fixture.recordingsDir.path)
+            let mix = try XCTUnwrap(names.first { $0.hasSuffix(SpeakerNamingStore.mixSuffix) && !$0.hasSuffix("app_16k.wav") && !$0.hasSuffix("mic_16k.wav") })
+            XCTAssertEqual(AudioMixer.frameCount(of: fixture.recordingsDir.appendingPathComponent(mix)), row.frames, "\(row.gone)")
+            let mapping = try XCTUnwrap(queue.speakerNamingDataByJob[meeting.id]?.mapping)
+            XCTAssertNil(queue.completeSpeakerNaming(jobID: meeting.id, result: .confirmed(mapping.mapValues { _ in "Alice" })))
+            try await fixture.poll("the swap to end") { queue.job(withID: meeting.id)?.rerun == nil }
+            let after = try currentTranscript(meeting.id, fixture)
+            XCTAssertEqual(words(of: after), words(of: before), "\(row.gone)")
+            XCTAssertEqual(muteLines(of: after), muteLines(of: before), "\(row.gone)")
+        }
+    }
+
+    /// A first run whose call audio's speakers failed kept the microphone's lines
+    /// labelled apart; two lines that start at once keep their order when both
+    /// tracks are labelled again.
+    func testTwoLinesStartingAtOnceKeepTheirOrderWhenBothTracksAreLabelledAgain() async throws {
+        let fixture = try makeFixture()
+        fixture.engine.segmentsByPathSuffix = [
+            "app_16k.wav": [TimestampedSegment(start: 0, end: 2, text: "Welcome to the call")],
+            "mic_16k.wav": [TimestampedSegment(start: 0, end: 2, text: "Thanks for having me")],
+        ]
+        fixture.diarization.throwOnPathSuffix = "app_16k.wav"
+        let meeting = try await fixture.finishedMeeting(in: fixture.makeQueue(completedJobLifetime: 0), leavingTheQueue: true)
+        let before = try currentTranscript(meeting.id, fixture)
+        fixture.diarization.throwOnPathSuffix = nil
+        diarizeTwoVoices(fixture)
+        let queue = fixture.makeQueue(completedJobLifetime: 0)
+        queue.speakerNamingHandler = { .confirmed($0.mapping.mapValues { _ in "Alice" }) }
+
+        XCTAssertEqual(queue.rerunJob(id: meeting.id, mode: .identifySpeakersAgain), .queued)
+        await queue.awaitProcessing()
+        try await fixture.poll("the swap to end") { queue.job(withID: meeting.id)?.rerun == nil }
+
+        let after = try currentTranscript(meeting.id, fixture)
+        XCTAssertEqual(words(of: after), words(of: before), "the words changed:\n\(before)\n---\n\(after)")
+    }
+
     func testItDiarizesWithTheChosenMethodAndCountAndTranscribesOnlyWithoutKeptWordTimings() async throws {
         for keptTimings in [true, false] {
             let fixture = try makeFixture()

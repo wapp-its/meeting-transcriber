@@ -135,7 +135,11 @@ extension PipelineQueue {
         // The mute times are the mic track's. A call run on its mix or its call
         // audio would lose the far end's words in them, so it keeps none, as a
         // reimport of those tracks does (`RecordingSidecar.micMuteIntervals(app:mic:)`).
-        if audio.app == nil, record.rerunSourceTracks.app != nil { inputs.micMuteIntervals = [] }
+        // Identify Speakers Again on kept word timings transcribes nothing: its words
+        // are the first run's, the mute times already taken out, so it keeps them for
+        // the mute lines (A20).
+        let reusesWords = mode == .identifySpeakersAgain && Self.keptWordTimings(of: record) != nil
+        if audio.app == nil, record.rerunSourceTracks.app != nil, !reusesWords { inputs.micMuteIntervals = [] }
         var job = PipelineJob(
             rerunOf: finished, id: id, audio: audio, inputs: inputs,
             rerun: .init(mode: mode, marker: marker, settings: settings, heldEntry: live.map { .job($0) }),

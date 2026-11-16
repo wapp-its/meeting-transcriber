@@ -723,6 +723,7 @@ extension PipelineQueue {
             guard let mixPath = ctx.mixPath else { throw PipelineError.missingMixPath }
             let mix16k = workDir.appendingPathComponent("mix_16k.wav")
             try await AudioMixer.resampleFile(from: mixPath, to: mix16k)
+            try moveOntoTheMeetingsTimeline(mix16k, of: mixPath, jobID: ctx.jobID, micDelay: ctx.micDelay)
             recordAudioDuration(jobID: ctx.jobID, frames: AudioMixer.frameCount(of: mix16k))
         }
         if isStillQueued(ctx.jobID) { jobAudioSeconds[ctx.jobID] = segments.last?.end ?? 0 }
@@ -1071,7 +1072,7 @@ extension PipelineQueue {
             return nil
         }
         guard let topology else { return nil }
-        let labeled = DiarizationProcess.labelSegments(topology, autoNames: autoNames)
+        let labeled = Self.inKeptOrder(DiarizationProcess.labelSegments(topology, autoNames: autoNames), kept: cachedSegments)
         return DiarizationProcess.mergeConsecutiveSpeakers(labeled, breakingAt: annotations.pauses.map(\.offsetSeconds))
             .transcriptText(note: annotations.note, pauses: annotations.pauses, micMuted: annotations.micMuted)
     }

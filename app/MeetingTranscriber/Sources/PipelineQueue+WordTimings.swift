@@ -21,8 +21,13 @@ extension PipelineQueue {
     /// other run, and for a file gone, replaced, unreadable or empty, which the run
     /// then transcribes again.
     func keptWordTimings(for job: PipelineJob) -> [TimestampedSegment]? { // swiftlint:disable:this discouraged_optional_collection
-        guard job.rerun?.mode == .identifySpeakersAgain,
-              let file = meetingFileStore?.record(for: job.id)?.keptWordTimings,
+        guard job.rerun?.mode == .identifySpeakersAgain, let record = meetingFileStore?.record(for: job.id) else { return nil }
+        return Self.keptWordTimings(of: record)
+    }
+
+    /// `record`'s word timings, read as `keptWordTimings(for:)` reads them.
+    static func keptWordTimings(of record: MeetingFileRecord) -> [TimestampedSegment]? { // swiftlint:disable:this discouraged_optional_collection
+        guard let file = record.keptWordTimings,
               MeetingFileRemover.isTheRecordedFile(file),
               let data = try? Data(contentsOf: URL(filePath: file.path)),
               let segments = try? JSONDecoder().decode([TimestampedSegment].self, from: data),
@@ -36,6 +41,36 @@ extension PipelineQueue {
     /// (`DiarizationProcess.labelSegments`): Settings' mic name may have changed
     /// since the meeting ran. Every segment not tagged as the call audio's is the
     /// microphone's, as the mic name never reads as the call audio's tag.
+    /// A run on the microphone's track alone, the call audio and the mix being gone,
+    /// diarizes it with `micDelay` of silence before it: the kept words are on the
+    /// meeting's timeline, which starts that much before the microphone's, and a
+    /// diarization on the track's own would put each voice that much early.
+    func moveOntoTheMeetingsTimeline(_ mix16k: URL, of source: URL, jobID: UUID, micDelay: TimeInterval) throws {
+        guard micDelay != 0, meetingFileStore?.record(for: jobID)?.rerunSourceTracks.mic?.path == source.path else { return }
+        let samples = try AudioMixer.loadAudioFileAsFloat32(url: mix16k)
+        let offset = Int((micDelay * Double(AudioConstants.targetSampleRate)).rounded())
+        let moved = offset > 0 ? [Float](repeating: 0, count: offset) + samples : Array(samples.dropFirst(-offset))
+        try AudioMixer.saveWAV(samples: moved, sampleRate: AudioConstants.targetSampleRate, url: mix16k)
+    }
+
+    /// `labeled` by start, and the segments that start at the same moment in the
+    /// order of `kept`, the segments they were labelled from. The labelling breaks
+    /// such a tie by its topology (the one for a failed call audio puts the
+    /// microphone first), so a run that labels a meeting's kept words again
+    /// would otherwise swap two of their lines.
+    static func inKeptOrder(_ labeled: [TimestampedSegment], kept: [TimestampedSegment]) -> [TimestampedSegment] {
+        func key(_ segment: TimestampedSegment) -> String {
+            "\(segment.start)|\(segment.end)|\(segment.text)"
+        }
+        var rank: [String: Int] = [:]
+        for (index, segment) in kept.enumerated() where rank[key(segment)] == nil {
+            rank[key(segment)] = index
+        }
+        return labeled.enumerated().sorted { lhs, rhs in
+            (lhs.element.start, rank[key(lhs.element)] ?? .max, lhs.offset) < (rhs.element.start, rank[key(rhs.element)] ?? .max, rhs.offset)
+        }.map(\.element)
+    }
+
     func retaggedForThisQueue(_ segments: [TimestampedSegment]) -> [TimestampedSegment] {
         segments.map { segment in
             guard segment.speaker != DiarizationProcess.remoteSpeakerLabel else { return segment }

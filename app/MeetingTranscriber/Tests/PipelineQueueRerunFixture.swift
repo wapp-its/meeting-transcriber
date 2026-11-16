@@ -146,7 +146,7 @@ final class PipelineQueueRerunFixture {
 
     /// A recorded call's three tracks, as a recorder leaves them in `folder`.
     func makeRecording(
-        in folder: URL? = nil, title: String = "Google Chrome", micMuteIntervals: [MicMuteInterval] = [],
+        in folder: URL? = nil, title: String = "Google Chrome", micMuteIntervals: [MicMuteInterval] = [], micDelay: TimeInterval = 0,
     ) throws -> PipelineJob {
         let folder = folder ?? stagingDir
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -158,7 +158,7 @@ final class PipelineQueueRerunFixture {
         }
         return PipelineJob(
             meetingTitle: title, appName: "Microsoft Teams",
-            mixPath: tracks[0], appPath: tracks[1], micPath: tracks[2], micDelay: 0, micMuteIntervals: micMuteIntervals,
+            mixPath: tracks[0], appPath: tracks[1], micPath: tracks[2], micDelay: micDelay, micMuteIntervals: micMuteIntervals,
             meetingStartTime: meetingStart,
         )
     }
