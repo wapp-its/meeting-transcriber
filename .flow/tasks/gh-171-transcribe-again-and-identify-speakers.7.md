@@ -36,9 +36,73 @@ No `DESIGN.md`. The look is the accepted board written out in Architecture (D7):
 - [ ] The Quick commands' focused tests and `./scripts/lint.sh` pass.
 - [ ] Both build variants build in release (`./scripts/pre-push.sh --with-appstore`), and the fork's CI run (both variants' tests) is requested on the final head before the merge (R11).
 ## Done summary
-TBD
+A finished meeting's row in All Recordings now lists "Identify Speakers Again…" right after "Transcribe Again…" in both menus, between D5's separators. It is listed, left out and greyed out by the same rule as Transcribe Again (R8). It opens D7's sheet: the method radio list, the count, A17's hint and note, and A21's orange line. The default button "Identify Speakers" hands the picked method and count to `PipelineController.rerunJob(id:mode: .identifySpeakersAgain, speakers:)`, which now has a `speakers:` parameter (R9).
 
+stage: impl-review - ran (codex:gpt-6.1-sol:xhigh, three lenses, SHIP, no findings; the receipt names gpt-6.1-sol at xhigh)
+
+Tier: implementer - opus (explicit invocation) at xhigh effort (requested) (model: claude-opus-5-5)
+
+Baseline: green. Before any edit, the build passed and 260 focused tests passed (the Quick filter plus RerunSheetTextTests and TranscribeAgainSheetTests).
+
+### Verification on the committed head (6ec8f0b0)
+- `swift build -j 6 --build-tests`: exit 0. No new warnings in the changed files.
+- Focused tests: the Quick filter plus RerunSheetTextTests, TranscribeAgainSheetTests and IdentifySpeakersAgainSheetTests, run with `--num-workers 2`. Exit 0, 271 tests; all 11 new tests ran.
+- `./scripts/lint.sh` with the pinned SwiftFormat 0.64.6 and SwiftLint 0.65.1: 0 violations. `TranscriptionsView.swift` is at 597 lines, under the 600-line limit.
+- Release builds, the variant steps of `pre-push.sh --with-appstore`, run with `-j 6`:
+  - `swift build -c release`: exit 0.
+  - `swift build -c release -Xswiftc -DAPPSTORE --scratch-path .build-appstore`: exit 0.
+  - Both printed one warning in `Settings/Notification+SettingsWindow.swift`, a file this task did not touch.
+  - The script's local-model-helper step was not run: this change does not touch the helper.
+- Wiring check: each of these five changes made a named test fail for the stated reason, and every line was restored afterwards:
+  - the view's enabled switch treating the item as always enabled;
+  - the confirm passing a fixed count;
+  - the word timings flag set to a constant;
+  - the Settings read replaced by the defaults;
+  - the sheet modifier removed.
+
+### Tests per acceptance criterion
+- **Row decision (R8):** `RecordingRowActionsTests`
+  - `testTheReRunItemsFollowRegenerateBetweenSeparators` checks the order and separators, also with reports and while the meeting runs.
+  - `testTheReRunItemsAreAbsentWhereNoReRunCanStart` and `testTheReRunItemsAreDisabledWhileAReRunWouldBeRefused` check both items against every case of R2.
+- **Both menus:** `TranscriptionsViewTests.testBothMenusListTheReRunItemsAsTheRowDecides` checks that Identify Speakers Again comes right after Transcribe Again. `testTheItemFollowsRecordOnlyModeAndARunningRegeneration` covers both items.
+- **Sheet texts:** `RerunSheetTextTests`
+  - `testTheIdentifySheetsDrawnCaseWordForWord`: D7, including the method names and descriptions.
+  - `testTheIdentifySheetWithoutWordTimingsAndWithoutNotes`: A21, A16, and both together.
+  - `testWhatStandsUnderTheMethodListPerMethodAndTrackLayout`: A17, with the hint and note given as literal strings, for 3 methods × 2 track layouts.
+  - `testTheCountStartsAtSettingsExpectedSpeakers`: Auto starts at 2.
+  - `testTheMeetingIsWhatTheRowShowed`: the word timings flag comes from the record's segments entry.
+- **ViewInspector by `A11yID`:** `IdentifySpeakersAgainSheetTests`
+  - `testPickingAMethodShowsTheCountOrTheMethodsHint`
+  - `testTheSheetStartsAtSettingsMethodAndCount`
+  - `testTheDefaultButtonPassesTheChosenMethodAndCount`: picker and stepper driven, then the button.
+  - `testCancelClosesTheSheetAndQueuesNothing`
+  - `testARefusalKeepsTheSheetOpenWithItsLine`
+  - `testTheSheetShowsItsTexts`
+- **Window:** `TranscriptionsViewTests.testIdentifySpeakersAgainOpensItsSheetForItsRowAndQueuesTheSpeakersPicked`.
+
+Tests changed by declared intent (R8 adds an item where the old tests expected none):
+- The three Transcribe Again row-decision tests are renamed. They now expect both items, which makes them stronger.
+- `TranscriptionsViewTests+MeetingFiles.isDisabled` gains the new case.
+
+Snapshot updated deliberately: `testSnapshotOfTheRowMenuWithLongReportNames` was re-recorded in record mode. The new image shows "Identify Speakers Again…" after "Transcribe Again…" and before the separator above Keep. It was checked by eye against D5 and passed against itself in the focused run.
+
+### Decisions and assumptions (reversible)
+1. **Word timings:** the sheet treats them as kept when the record lists a segments file that is not gone (`MeetingFileRecord.keptWordTimings`), as the task spec says. The run also checks the file on disk. A segments file removed or replaced by hand would therefore show "The text stays." while the run transcribes again.
+2. **Count control:** it follows Settings' pattern, the number next to a Stepper, over the naming dialog's range of 1 to 10. For Sortformer and Nemotron 3 the count is still passed to the queue, where the method ignores it, as the naming dialog's Re-run does.
+3. **Refusal texts:** they are Transcribe Again's. `alreadyRerunning` reads "The meeting is already being transcribed again." in this sheet too.
+4. **Sheet file:** the sheet is presented by a `View` extension in its own file, because `TranscriptionsView.swift` is at the file-length limit.
+5. **Method picker label:** "Speaker method" is hidden visually and kept for accessibility; the grey heading shows it.
+
+### Not covered by a test
+- The pass-through of `speakers:` in `PipelineController.rerunJob` and the `identifySpeakersAgain` closure in `MeetingTranscriberApp`: both were checked by compiling only, because `PipelineControllerTests` is outside this task's Touches.
+- The orange colour of the A21 line: it is visual.
+
+### Follow-ups
+- `docs/automation-api.md` names only Transcribe Again as making a finished job live again; Identify Speakers Again does too. The docs are outside this task's Touches.
+- R11's fork CI run on the final head belongs to the merge step.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 6ec8f0b0ef8ac44185c116e16016c7bfb181311f
+- Tests: cd app/MeetingTranscriber && swift build -j 6 --build-tests (exit 0), CFFIXED_USER_HOME=<scratch> swift test --skip-build --parallel --num-workers 2 --filter <Quick filter>|RerunSheetTextTests|TranscribeAgainSheetTests|IdentifySpeakersAgainSheetTests (exit 0, 271 tests), ./scripts/lint.sh with pinned SwiftFormat 0.64.6 and SwiftLint 0.65.1 (0 violations), swift build -c release -j 6 (exit 0), swift build -c release -j 6 -Xswiftc -DAPPSTORE --scratch-path .build-appstore (exit 0)
 - PRs:
