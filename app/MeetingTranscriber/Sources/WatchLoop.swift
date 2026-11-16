@@ -501,14 +501,6 @@ class WatchLoop {
         return false
     }
 
-    private func returnToWatching(cause: PhaseChangeCause = .regular) {
-        update(cause: cause) { next in
-            next.phase = .watching
-            next.currentMeeting = nil
-            next.detail = "Polling for meetings..."
-        }
-    }
-
     // MARK: - Meeting Handling
 
     @discardableResult

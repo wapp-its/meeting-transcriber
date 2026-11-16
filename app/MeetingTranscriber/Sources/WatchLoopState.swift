@@ -68,3 +68,16 @@ extension WatchLoop {
         )
     }
 }
+
+/// The move back to watching, for `start()` and after every meeting. It
+/// writes only through `update`, so it moved here out of `WatchLoop.swift` to
+/// keep that file under the line cap.
+extension WatchLoop {
+    func returnToWatching(cause: PhaseChangeCause = .regular) {
+        update(cause: cause) { next in
+            next.phase = .watching
+            next.currentMeeting = nil
+            next.detail = "Polling for meetings..."
+        }
+    }
+}
