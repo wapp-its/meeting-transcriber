@@ -107,4 +107,28 @@ final class BrowserConsentPolicyTests: XCTestCase {
         )
         XCTAssertEqual(policy.decision(app: "Google Chrome", now: t0.addingTimeInterval(10)), .ask)
     }
+
+    // MARK: - "Record (<App>)" after an Ignore ends one app's quiet time
+
+    /// Ending one app's suppression asks that app again at once and leaves
+    /// every other app's quiet time, and every denial, as they were.
+    func testEndingOneAppsSuppressionLeavesOtherAppsAndDenialsAsTheyWere() {
+        var policy = BrowserConsentPolicy(declineCooldown: 600, expiryCooldown: 60)
+        policy.recordDecline(app: "Microsoft Teams", now: t0)
+        policy.recordDecline(app: "Zoom", now: t0)
+        policy.recordExpiry(app: "Google Chrome", now: t0)
+        let soon = t0.addingTimeInterval(5)
+
+        policy.endSuppression(app: "Microsoft Teams")
+
+        XCTAssertEqual(policy.decision(app: "Microsoft Teams", now: soon), .ask)
+        XCTAssertEqual(policy.decision(app: "Microsoft Teams", now: soon, isDenied: true), .denied, "a denial stands")
+        XCTAssertEqual(policy.decision(app: "Zoom", now: soon), .suppressed(until: t0.addingTimeInterval(600)))
+        XCTAssertEqual(policy.decision(app: "Google Chrome", now: soon), .suppressed(until: t0.addingTimeInterval(60)))
+        XCTAssertEqual(policy.decision(app: "Zoom", now: soon, isDenied: true), .denied)
+
+        policy.endSuppression(app: "Webex")
+        XCTAssertEqual(policy.decision(app: "Webex", now: soon), .ask, "an app without a quiet time is unchanged")
+        XCTAssertEqual(policy.decision(app: "Zoom", now: soon), .suppressed(until: t0.addingTimeInterval(600)))
+    }
 }

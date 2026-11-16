@@ -213,8 +213,9 @@ struct MenuBarView: View {
         micMuteItem
     }
 
-    /// One "Record Again (<App>)" line per held call, directly under the
-    /// status line and above the watch toggle; no keyboard shortcut.
+    /// One line per offer, directly under the status line and above the
+    /// watch toggle: "Record Again (<App>)" for a held call, "Record (<App>)"
+    /// for an ignored one; no keyboard shortcut.
     private var recordAgainItems: some View {
         ForEach(recordAgainOffers, id: \.identityKey) { offer in
             Button {
@@ -222,13 +223,16 @@ struct MenuBarView: View {
             } label: {
                 Label(recordAgainLabel(offer), systemImage: "record.circle")
             }
-            .accessibilityIdentifier(A11yID.recordAgainMenuItem)
+            .accessibilityIdentifier(offer.kind == .ignoredCall ? A11yID.recordIgnoredMenuItem : A11yID.recordAgainMenuItem)
         }
     }
 
     /// Hoisted out of the `ViewBuilder`, as `meetingLabel` is.
     private func recordAgainLabel(_ offer: RecordAgainOffer) -> String {
-        "Record Again (\(offer.appName))"
+        switch offer.kind {
+        case .heldCall: "Record Again (\(offer.appName))"
+        case .ignoredCall: "Record (\(offer.appName))"
+        }
     }
 
     /// The line under "Stop Recording", for every kind of recording.
