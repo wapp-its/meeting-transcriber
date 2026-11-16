@@ -1,14 +1,16 @@
 {
   "branch_name": "gh-255-record-a-call-after-answering-ignore",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "not_required",
+  "completion_reviewed_at": "2026-11-16T09:59:58.352393Z",
   "created_at": "2026-11-16T08:44:37.506425Z",
   "default_impl": null,
   "default_review": null,
   "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-255-record-a-call-after-answering-ignore",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-255-record-a-call-after-answering-ignore.1": 0
+  },
   "next_task": 1,
   "no_plan": true,
   "plan_review_rounds": 0,
@@ -104,15 +106,52 @@
       "task": null,
       "timestamp": "2026-11-16T09:00:12.235368Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "4b0a8c585f6c05d0407bd68126c25e6afba0b02c8855903bfba4d7b2da1ef652",
+      "backend": "codex",
+      "base_sha": "7c96411172c1690740e3e66a8a877c22153cbb7a",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "3c89ade902e7c66d679137c0dcdba968d0354f7f",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6.1-sol",
+      "outcome": "verdict",
+      "output_bytes": 158,
+      "output_sha256": "6ff70da3d83706800ca3cabc6ba62603ba0485fcf5259d27f1be54ce68686975",
+      "reservation_id": "38ac021e1060430a8ba30514a7ef2c6e",
+      "round_consumed": true,
+      "scope": "impl:gh-255-record-a-call-after-answering-ignore.1",
+      "superseded_by": null,
+      "task": "gh-255-record-a-call-after-answering-ignore.1",
+      "timestamp": "2026-11-16T09:59:17.067038Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-255-record-a-call-after-answering-ignore.1": 1,
     "plan": 1,
     "plan#completion": 0
   },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-255-record-a-call-after-answering-ignore.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-255-record-a-call-after-answering-ignore.md",
@@ -130,5 +169,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nWhen the app asks \"Record <App> meeting?\" and I answer \"Ignore\", I sometimes change my mind while the call still goes on. Then there is no easy way to record the rest of that call. The app does not ask again for ten minutes.\n\nThe only obvious way is \"Record with Options\u2026\" and picking the meeting app again. That is a manual recording, so it does not stop when the call ends. It only stops when the app quits, on the silence question or at the maximum length.\n\n## NOTES\n\n- Idea: after \"Ignore\", while that call still runs, show \"Record (<App>)\" in the menu at the same place as \"Record Again (<App>)\" from #130. One click records the rest of the call like a detected meeting, so the recording ends with the call.\n- \"Ignore\" in the notification, in the menu and in the prompt window (#99) should all work the same.\n- Not after \"Never for this app\".\n\n## TASKS\n\n- [ ] Add a one-click item that records an ignored call that still runs\n- [ ] Test that this recording ends with the call",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/255"
   },
-  "updated_at": "2026-11-16T09:00:39.401349Z"
+  "updated_at": "2026-11-16T09:59:58.352837Z"
 }
