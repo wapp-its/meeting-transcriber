@@ -75,27 +75,57 @@ extension PipelineQueue {
     /// meeting's current transcript has their words, where it has them all. An
     /// earlier build rendered such a tie by the labelling's topology rather than
     /// by the kept order (`inKeptOrder`), so its transcript may have them the
-    /// other way round.
+    /// other way round. The words of each run are looked for only after those of
+    /// the runs before it, so the same words said earlier in the meeting are never
+    /// taken for a later line. A segment left out of the transcript as the
+    /// loudspeaker coming back is not looked for and keeps its place in its run.
     func inTheTranscriptsOrder(_ segments: [TimestampedSegment], jobID: UUID) -> [TimestampedSegment] {
         guard let file = meetingFileStore?.record(for: jobID)?.files.last(where: { $0.role == .transcript && $0.state != .gone }),
               let transcript = try? String(contentsOf: URL(filePath: file.path), encoding: .utf8)
         else { return segments }
         var ordered: [TimestampedSegment] = []
+        var cursor = transcript.startIndex
         var first = segments.startIndex
         while first < segments.endIndex {
             let end = segments[first...].firstIndex { $0.start != segments[first].start } ?? segments.endIndex
             let tie = segments[first ..< end]
-            let found = tie.compactMap { transcript.range(of: $0.text)?.lowerBound }
-            if tie.count > 1, found.count == tie.count {
-                ordered += zip(tie, found).enumerated()
-                    .sorted { ($0.element.1, $0.offset) < ($1.element.1, $1.offset) }
-                    .map(\.element.0)
+            let rendered = tie.filter { !$0.suppressed }
+            let places = Self.places(of: rendered, in: transcript, from: cursor)
+            if rendered.count > 1, let places {
+                var inPlace = zip(rendered, places).enumerated()
+                    .sorted { ($0.element.1.lowerBound, $0.offset) < ($1.element.1.lowerBound, $1.offset) }
+                    .map(\.element.0).makeIterator()
+                ordered += tie.map { $0.suppressed ? $0 : inPlace.next() ?? $0 }
             } else {
                 ordered += tie
             }
+            cursor = places?.map(\.upperBound).max() ?? cursor
             first = end
         }
         return ordered
+    }
+
+    /// Where the words of each of `segments` are in `transcript` from `cursor` on,
+    /// no two in one place, so two lines with the same words each find their own;
+    /// nil when the words of one are not there.
+    private static func places(
+        of segments: [TimestampedSegment], in transcript: String, from cursor: String.Index,
+    ) -> [Range<String.Index>]? { // swiftlint:disable:this discouraged_optional_collection
+        var taken: [Range<String.Index>] = []
+        for segment in segments {
+            var from = cursor
+            var place: Range<String.Index>?
+            while let found = transcript.range(of: segment.text, range: from ..< transcript.endIndex) {
+                guard let claimed = taken.first(where: { $0.overlaps(found) }) else {
+                    place = found
+                    break
+                }
+                from = claimed.upperBound
+            }
+            guard let place else { return nil }
+            taken.append(place)
+        }
+        return taken
     }
 
     func retaggedForThisQueue(_ segments: [TimestampedSegment]) -> [TimestampedSegment] {
