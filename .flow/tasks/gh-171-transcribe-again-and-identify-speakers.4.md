@@ -49,9 +49,31 @@ Fills task 2's success hook (R5, A7, A8, A12, A15, A6): the pure earlier-version
 - [ ] `docs/architecture/pipeline.md` and `docs/automation-api.md` describe the re-run, the swap and the readback.
 - [ ] The Quick commands' focused tests and `./scripts/lint.sh` pass.
 ## Done summary
-TBD
+A successful re-run now swaps its transcript, notes and segments file in under the meeting's current names and keeps the current transcript and notes beside them as `<name>.until-<yyyyMMdd_HHmmss>.<ext>`; the earlier segments file is deleted after the commit point (A22). The swap starts only once the re-run's done state is in the re-run file, a failed or stopped swap is undone or completed (also at launch), and a file of the re-run that a later undo moves back is removed before the marker goes.
 
+Tier: implementer - opus (explicit invocation) at xhigh effort (requested) (model: claude-opus-5-5)
+baseline: not recorded (the task was started by an earlier worker; its handover gave no pre-edit baseline)
+
+stage: impl-review - ran [round 2 05:10..06:58, round 3 08:02..08:04] (codex gpt-6.1-sol xhigh, one receipt; round 1 three lenses NEEDS_WORK with 6 findings, all fixed; round 2 NEEDS_WORK: finding 1 not fixed, new finding 7; round 3 SHIP, prior findings all fixed)
+
+Round 3 fix pass (each test committed alone first, red for the stated reason, then the fix):
+- Finding 1, `PipelineQueue+RerunSwap.swift` `rerunSucceeded`: after the flush, the swap starts only when no write of the re-run file is still owed (`PipelineSnapshotStore.existing(for:named:)` is nil); otherwise the re-run ends as R6 before any rename, with the row line "failed: the re-run could not be saved to disk". Test `PipelineQueueRerunSwapRecoveryTests.testADoneStateTheRerunFileDidNotTakeEndsTheRerunBeforeAnyRename` (a folder at the re-run file's staging name from the notes stage on). Red on 9f6e6745: "done not saved: the meeting is not as it was", the record differed, "no failure line". Green on 1948d63a.
+- Finding 7, `PipelineQueue+RerunEnd.swift` `closeRerun`: the cleanup also removes, by the identity each rename recorded, the re-run's own name of every rename of a re-run file the marker no longer lists. Test `testAFileOfTheRerunALaterTryMovesBackIsRemovedBeforeTheMarkerGoes` (the first undo blocked by a folder that takes no file). Red on 1948d63a: the `.rerun-` transcript and notes left untracked. Green on c2f85e91.
+- `docs/architecture/pipeline.md` says the swap starts only once the done state is saved.
+
+Gate on c2f85e91 (measured): `swift build -j 6 --build-tests` exit 0; the focused set (the spec's Quick-command classes plus PipelineQueueRerun*, EarlierVersionName, PipelineQueueNotion, ProtocolRegeneration, PipelineControllerNotionExportTests) 347 tests, exit 0, two workers; `./scripts/lint.sh` 0 violations in 1286 files. The two known load flakes did not fail.
+
+Decisions (reversible, inside the spec):
+- Finding 1 fixed by starting the renames only after the done state is confirmed written, not by recovering the swap from the record's marker whatever the saved job state. The spec's commit point clears the marker (Swap order), and its launch row for a committed stamp needs what only the saved job holds: whether the re-run made notes and owes an export.
+- A store left after the flush counts as a failed write. This can only err toward ending the re-run, never toward a rename; the re-run file is the last of the two files the flush waits on, so no newer write can arrive between its flush and the check.
+- A done re-run restored at launch is checked the same way, so a re-run file that cannot be written at launch ends that re-run as R6.
+- Kept from the earlier workers: the earlier segments file is found after the commit by its exact earlier-version names for the re-run's stamp (no new record field); the re-run's naming data and 16 kHz copies go before the renames; an orphan marker with renames is undone; the swap polls every 250 ms while a regeneration runs; the raw-transcript removal runs only when the re-run made notes; an interrupted export starts once from the saved notes; a successful re-run posts no done notification; a failed finished-job write keeps the job in the re-run file until the next launch.
+- Deviations from Touches, accepted by the conductor: `PipelineJob.swift` (`endRerunCommitted`, `exportsToPageDatabase`) and `AppState.swift` (one wiring line).
+
+Follow-up (inferred, not tested): when the job turns into an ordinary finished job, it moves from the re-run file to `pipeline_queue.json` in two writes. If only the re-run file's write lands and the app then stops, neither file holds the job, so an export it still owed is neither started nor offered for retry at the next launch.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 41f92e6528da8fa8fdbcf54d977a04efaed65eb1, a936391db5624424600d29b0fa585e7b61c78e4a, 0dd228f184a9a3b86b129029fee7f4daf3074c91, aebd3048d00ca73aa57b2bc79d0eb21dd65d8c49, 11f5401c7fb1378a4f537e7c0c623222900fd978, de1ef0b247dbc89c7528ea29729abe640dd6b3c6, 9f6e6745e62cc24fafd23b25bd515342f72214f8, 1948d63a8a1f2cd5e254ccfc7e1db84a24d00ebb, 9dae03ddff35d3d0c58a130a889c70b2fe1ebf31, c2f85e91b98728d40f45ec40867ec743285c0457
+- Tests: cd app/MeetingTranscriber && swift build -j 6 --build-tests (exit 0), CFFIXED_USER_HOME=<scratch> swift test --skip-build --parallel --num-workers 2 --filter 'RecordingRowActionsTests|RowAvailabilityTests|MeetingFileStoreTests|PipelineQueueRetryTests|PipelineQueueMeetingFiles|TerminalJobStoreTests|SpeakerNamingStoreTests|LateRerunCancelTests|TranscriptionsViewTests|RegenerateProtocolViewTests|MeetingNotesRetryTests|LocalModelGateWiringTests|PipelineQueueRerun|EarlierVersionName|PipelineQueueNotion|ProtocolRegeneration|PipelineControllerNotionExportTests' (347 tests, exit 0), ./scripts/lint.sh (0 violations)
 - PRs:
