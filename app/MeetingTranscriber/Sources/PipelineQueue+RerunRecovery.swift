@@ -64,7 +64,7 @@ extension PipelineQueue {
             guard let decoded = try PipelineSnapshotStore.latestJobs(in: logDir, named: name) else { return [] }
             saved = decoded
         } catch {
-            logger.error("rerun_file_unreadable error=\(error.localizedDescription, privacy: .public)")
+            logger.error("rerun_file_unreadable error=\(error.localizedDescription, privacy: .private)")
             rerunFileFrozen = true
             return []
         }
@@ -137,7 +137,7 @@ extension PipelineQueue {
                 in: logDir, named: PipelineSnapshot.rerunFilename(bundleID: store.bundleID),
             ) ?? []
         } catch {
-            logger.error("rerun_file_unreadable error=\(error.localizedDescription, privacy: .public): every marker stays")
+            logger.error("rerun_file_unreadable error=\(error.localizedDescription, privacy: .private): every marker stays")
             return
         }
         let inFile = Set(saved.compactMap { $0.rerun?.marker.runID })
