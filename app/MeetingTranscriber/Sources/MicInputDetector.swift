@@ -588,4 +588,9 @@ final class CompositeMeetingDetector: MeetingDetecting {
             detector.markConfirmed(appName: appName)
         }
     }
+
+    /// The first strategy's answer: only the assertion channel ranks titles.
+    func rankedWindowTitle(for meeting: DetectedMeeting) -> RankedWindowTitle? {
+        detectors.lazy.compactMap { $0.rankedWindowTitle(for: meeting) }.first
+    }
 }

@@ -111,6 +111,8 @@ class WatchLoop {
     var silencePrompt: SilencePromptRuntime
     /// The recording's pauses, from its capture start to its stop (`WatchLoop+Pause.swift`).
     var recordingPauses: RecordingPauseRecord?
+    /// The running detected recording's meeting under the best title seen so far (`WatchLoop+MeetingTitle.swift`).
+    var titledMeeting: DetectedMeeting?
 
     /// Wall-clock source. Defaults to `Date()`; tests inject a `TestClock`
     /// so timing-sensitive paths become deterministic instead of racing

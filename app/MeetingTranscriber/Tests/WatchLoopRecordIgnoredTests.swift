@@ -417,7 +417,10 @@ final class WatchLoopRecordIgnoredTests: XCTestCase { // swiftlint:disable:this 
         XCTAssertEqual(harness.detector.confirmedMarks, ["Microsoft Teams"])
         XCTAssertTrue(loop.ignoredCalls.ignoredApps.isEmpty, "the entry is lifted")
         XCTAssertTrue(loop.recordAgainOffers.isEmpty)
-        XCTAssertEqual(harness.noticeLines, ["ignore_offer_set app=Microsoft Teams", "record_ignored app=Microsoft Teams"])
+        XCTAssertEqual(
+            harness.noticeLines,
+            ["ignore_offer_set app=Microsoft Teams", "record_ignored app=Microsoft Teams", "meeting_title_rank at=detection rank=4 parts=1"],
+        )
         loop.stop()
     }
 }

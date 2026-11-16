@@ -12,7 +12,7 @@ final class TeamsWindowTitleRankTests: XCTestCase {
     private static let meetingWindow = "Sprint Review | Contoso | user@contoso.com | Microsoft Teams"
     private static let compactWindow = "Meeting compact view | Meeting in General | Microsoft Teams"
 
-    private func win(owner: String = "Microsoft Teams", title: String?, pid: Int32 = 1438) -> [String: Any] {
+    private func win(title: String?, owner: String = "Microsoft Teams", pid: Int32 = 1438) -> [String: Any] {
         var w: [String: Any] = ["kCGWindowOwnerName": owner, "kCGWindowOwnerPID": pid]
         if let title { w["kCGWindowName"] = title }
         return w
@@ -137,8 +137,33 @@ final class TeamsWindowTitleRankTests: XCTestCase {
             makeAssertionDict(pid: 2020, processName: "zoom.us", assertName: "Zoom Video Communication")
         }
         detector.windowListProvider = {
-            [self.win(owner: "zoom.us", title: "A | B | C", pid: 2020), self.win(owner: "zoom.us", title: "Zoom Meeting", pid: 2020)]
+            [self.win(title: "A | B | C", owner: "zoom.us", pid: 2020), self.win(title: "Zoom Meeting", owner: "zoom.us", pid: 2020)]
         }
         XCTAssertEqual(detector.checkOnce()?.windowTitle, "Zoom Meeting")
+    }
+
+    // MARK: - The read a running recording's refresh makes
+
+    func testTheDetectorAnswersTheBestTeamsWindowForATeamsMeetingOnly() {
+        let detector = PowerAssertionDetector(confirmationCount: 1)
+        detector.windowListProvider = {
+            [self.win(title: "Jane Doe | Microsoft Teams"), self.win(title: Self.meetingWindow), self.win(title: "Zoom Meeting", owner: "zoom.us", pid: 2020)]
+        }
+        let teams = DetectedMeeting(pattern: .teams, windowTitle: "Some Popup", ownerName: "MSTeams", windowPID: 1438)
+        let zoom = DetectedMeeting(pattern: .zoom, windowTitle: "Zoom Meeting", ownerName: "zoom.us", windowPID: 2020)
+
+        XCTAssertEqual(detector.rankedWindowTitle(for: teams), RankedWindowTitle(title: Self.meetingWindow, rank: .meetingWindow))
+        XCTAssertNil(detector.rankedWindowTitle(for: zoom), "other apps keep their detection title")
+        detector.windowListProvider = { [self.win(title: nil)] }
+        XCTAssertNil(detector.rankedWindowTitle(for: teams), "no titles without the Screen Recording grant")
+    }
+
+    func testTheCompositeDetectorPassesTheAssertionChannelsAnswerOn() {
+        let assertions = PowerAssertionDetector(confirmationCount: 1)
+        assertions.windowListProvider = { [self.win(title: Self.compactWindow)] }
+        let composite = CompositeMeetingDetector([ImmediatelyInactiveDetector(), assertions])
+        let teams = DetectedMeeting(pattern: .teams, windowTitle: "Some Popup", ownerName: "MSTeams", windowPID: 1438)
+
+        XCTAssertEqual(composite.rankedWindowTitle(for: teams), RankedWindowTitle(title: Self.compactWindow, rank: .compactCallWindow))
     }
 }

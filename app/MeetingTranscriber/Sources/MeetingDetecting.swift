@@ -75,6 +75,13 @@ protocol MeetingDetecting {
     /// count still standing (`WatchLoop.runMeeting`). `appName` carries the
     /// identity key, as for `reset(appName:)`.
     func markConfirmed(appName: String)
+
+    /// The best title `meeting`'s app windows offer right now, with its rank,
+    /// for an app whose window titles are ranked (Teams, `TeamsWindowTitle`);
+    /// nil for any other app and when no window is usable. Read-only. The
+    /// watch loop asks on each poll of a running recording whose call signal
+    /// is there and keeps a better-ranked title (`WatchLoop+MeetingTitle.swift`).
+    func rankedWindowTitle(for meeting: DetectedMeeting) -> RankedWindowTitle?
 }
 
 extension MeetingDetecting {
@@ -105,5 +112,12 @@ extension MeetingDetecting {
     /// the production detector. It lists nothing, so a resume holds nothing.
     func signallingMeetings() -> [DetectedMeeting] {
         []
+    }
+
+    /// For a detector that ranks no titles: the test doubles, the microphone
+    /// channel and the window-title `MeetingDetector`. A recording keeps its
+    /// detection title.
+    func rankedWindowTitle(for _: DetectedMeeting) -> RankedWindowTitle? {
+        nil
     }
 }

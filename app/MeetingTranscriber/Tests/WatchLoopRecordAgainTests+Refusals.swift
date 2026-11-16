@@ -28,7 +28,7 @@ extension WatchLoopRecordAgainTests {
         XCTAssertEqual(harness.recorderStarts, 1, "nothing records")
         XCTAssertNil(loop.recordAgainRequest)
         XCTAssertEqual(harness.noticeLines, [
-            "recording_stopped_by_hand trigger=auto", "redetect_hold_set app=Microsoft Teams",
+            "meeting_title_rank at=detection rank=4 parts=1", "recording_stopped_by_hand trigger=auto", "redetect_hold_set app=Microsoft Teams",
             "redetect_hold_released app=Microsoft Teams", "record_again_dropped app=Microsoft Teams",
         ])
         loop.stop()

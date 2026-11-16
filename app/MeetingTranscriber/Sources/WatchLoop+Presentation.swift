@@ -5,13 +5,13 @@ extension WatchLoop {
         manualRecordingInfo != nil
     }
 
-    /// Strip app suffixes from meeting titles for cleaner display.
+    /// Strip app suffixes from meeting titles for cleaner display, and Teams'
+    /// compact call window prefix ("Meeting compact view | Meeting in General"
+    /// reads "Meeting in General"; `TeamsWindowTitle`).
     static func cleanTitle(_ title: String) -> String {
         let suffixes = [" | Microsoft Teams", " - Zoom", " - Webex"]
-        for suffix in suffixes where title.hasSuffix(suffix) {
-            return String(title.dropLast(suffix.count))
-        }
-        return title
+        let suffix = suffixes.first { title.hasSuffix($0) }
+        return TeamsWindowTitle.withoutCompactPrefix(suffix.map { String(title.dropLast($0.count)) } ?? title)
     }
 
     /// Map WatchLoop state to TranscriberState for compatibility with existing UI.
