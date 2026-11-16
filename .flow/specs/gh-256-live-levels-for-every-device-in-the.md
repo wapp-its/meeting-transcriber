@@ -140,6 +140,9 @@ FIT: GO · 2026-11-16 · base 3b236a80 · engine flow-next 9.10.0 · origin/wapp
 
 Mockup gate: accepted by the owner on 2026-11-16. The boards are on a private design canvas, so this spec writes out their layout and wording (D6 to D8); the device names in them (MacBook Pro Microphone, USB Headset, Studio Display Microphone, MacBook Pro Speakers, Studio Display Speakers), the app name (Teams), the hint line "Teams uses USB Headset", the marks shown on each row and the levels drawn are examples.
 
+FIT: GO · 2026-11-16 · base 3b236a80 · engine flow-next 9.12.0 · origin/wapp/main has not moved; the spec moved only by its own plan and plan review (SHIP, round 4); gh-255, gh-171, gh-257, gh-258 and gh-259 claim none of its scope; 9.12.0 leaves work, worker and impl-review unchanged
+  - gh-255's "Record (<App>)" start goes through `runMeeting` → `handleMeeting` and the production recorder factory, so the gate in `makeRecorderFactory()` covers it; gh-255 and gh-258 also edit `WatchLoop`, which this spec leaves untouched (text overlap at merge only)
+
 ## Quick commands
 
 Not run at plan time. `DeviceLevelMeter`, `DeviceLevelMeters` and `CaptureGateStart` match test classes the tasks add; the rest exist today. Send the output to a file and read it there; never pipe a test run into `tail` or `grep`.
