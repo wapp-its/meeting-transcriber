@@ -90,7 +90,7 @@ extension WatchLoop {
         var callIDsSeen: Set<String> = []
         var capWarned = false
         // The held title, which a better Teams window replaces while the call runs (`WatchLoop+MeetingTitle.swift`).
-        var title = Self.cleanTitle(meeting.windowTitle)
+        var title = Self.cleanTitle(of: meeting)
         holdTitle(of: meeting)
         defer {
             withdrawMeetingEndQuestion()
@@ -169,7 +169,7 @@ extension WatchLoop {
         protocolOptions: MeetingProtocolOptions? = nil,
     ) async throws {
         // The title the recording held at its stop, not the detection title (`WatchLoop+MeetingTitle.swift`).
-        let title = Self.cleanTitle(takeTitled(meeting).windowTitle)
+        let title = Self.cleanTitle(of: takeTitled(meeting))
         if end.cutAt == nil { clearStoredCut(of: recorder) }
         let stoppedAt = nowProvider()
         let recording: RecordingResult = if finishingForQuit {

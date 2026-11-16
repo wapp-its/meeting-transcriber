@@ -18,6 +18,10 @@ final class TeamsWindowTitleRankTests: XCTestCase {
         return w
     }
 
+    private func teamsMeeting(_ title: String) -> DetectedMeeting {
+        DetectedMeeting(pattern: .teams, windowTitle: title, ownerName: "MSTeams", windowPID: 1438)
+    }
+
     /// The title a Teams call detected with `titles` open, in that list order.
     private func teamsTitle(_ titles: [String]) -> String? {
         let detector = PowerAssertionDetector(confirmationCount: 1)
@@ -106,7 +110,7 @@ final class TeamsWindowTitleRankTests: XCTestCase {
     func testTheCompactCallWindowAloneNamesTheMeetingWithoutItsPrefix() {
         let title = teamsTitle([Self.compactWindow])
         XCTAssertEqual(title, Self.compactWindow)
-        XCTAssertEqual(title.map(WatchLoop.cleanTitle), "Meeting in General")
+        XCTAssertEqual(title.map { WatchLoop.cleanTitle(of: teamsMeeting($0)) }, "Meeting in General")
     }
 
     func testTheCompactCallWindowInFrontOfTheMeetingWindowLosesToIt() {
@@ -123,8 +127,14 @@ final class TeamsWindowTitleRankTests: XCTestCase {
             ("Jane Doe | Microsoft Teams", "Jane Doe"),
         ]
         for row in rows {
-            XCTAssertEqual(WatchLoop.cleanTitle(row.raw), row.expected, row.raw)
+            XCTAssertEqual(WatchLoop.cleanTitle(of: teamsMeeting(row.raw)), row.expected, row.raw)
         }
+    }
+
+    /// The compact prefix is Teams' own: another app's title keeps it.
+    func testAnotherAppsTitleKeepsTheCompactPrefix() {
+        let zoom = DetectedMeeting(pattern: .zoom, windowTitle: "Meeting compact view | Q4 planning - Zoom", ownerName: "zoom.us", windowPID: 2020)
+        XCTAssertEqual(WatchLoop.cleanTitle(of: zoom), "Meeting compact view | Q4 planning")
     }
 
     // MARK: - Other apps keep today's pick
@@ -165,5 +175,41 @@ final class TeamsWindowTitleRankTests: XCTestCase {
         let teams = DetectedMeeting(pattern: .teams, windowTitle: "Some Popup", ownerName: "MSTeams", windowPID: 1438)
 
         XCTAssertEqual(composite.rankedWindowTitle(for: teams), RankedWindowTitle(title: Self.compactWindow, rank: .compactCallWindow))
+    }
+
+    /// Each ask reads a fresh window list, so the composite asks the strategy
+    /// that answers once: a second read could find the window gone.
+    func testTheCompositeDetectorAsksTheAnsweringStrategyOnce() {
+        let answer = RankedWindowTitle(title: Self.compactWindow, rank: .compactCallWindow)
+        let once = AnsweringOnce(answer)
+        let composite = CompositeMeetingDetector([ImmediatelyInactiveDetector(), once])
+
+        XCTAssertEqual(composite.rankedWindowTitle(for: teamsMeeting("Some Popup")), answer)
+        XCTAssertEqual(once.asks, 1)
+    }
+}
+
+/// A strategy whose window closes right after its first answer.
+private final class AnsweringOnce: MeetingDetecting {
+    private let answer: RankedWindowTitle
+    private(set) var asks = 0
+
+    init(_ answer: RankedWindowTitle) {
+        self.answer = answer
+    }
+
+    func checkOnce() -> DetectedMeeting? {
+        nil
+    }
+
+    func isMeetingActive(_: DetectedMeeting) -> Bool {
+        true
+    }
+
+    func reset(appName _: String?) {}
+
+    func rankedWindowTitle(for _: DetectedMeeting) -> RankedWindowTitle? {
+        asks += 1
+        return asks == 1 ? answer : nil
     }
 }

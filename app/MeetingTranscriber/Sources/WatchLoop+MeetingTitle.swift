@@ -56,7 +56,7 @@ extension WatchLoop {
         if let heldRank, offered.rank >= heldRank { return nil }
         let retitled = meeting.retitled(offered.title)
         titledMeeting = retitled
-        let title = Self.cleanTitle(offered.title)
+        let title = Self.cleanTitle(of: retitled)
         if state == .recording, currentMeeting == held {
             update { next in
                 next.currentMeeting = retitled

@@ -518,7 +518,7 @@ class WatchLoop {
         defer { stopByHandRequestedAt = nil }
         onMeetingCapture?(true)
         defer { onMeetingCapture?(false) }
-        let title = Self.cleanTitle(meeting.windowTitle)
+        let title = Self.cleanTitle(of: meeting)
 
         // --- Recording ---
         let source = RecordingSource.forApp(pid: meeting.windowPID, noMic: noMic())

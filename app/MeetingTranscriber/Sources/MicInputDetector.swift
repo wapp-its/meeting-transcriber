@@ -589,8 +589,11 @@ final class CompositeMeetingDetector: MeetingDetecting {
         }
     }
 
-    /// The first strategy's answer: only the assertion channel ranks titles.
+    /// The first strategy's answer, each asked once: an ask reads a fresh window list (only the assertion channel answers).
     func rankedWindowTitle(for meeting: DetectedMeeting) -> RankedWindowTitle? {
-        detectors.lazy.compactMap { $0.rankedWindowTitle(for: meeting) }.first
+        for detector in detectors {
+            if let ranked = detector.rankedWindowTitle(for: meeting) { return ranked }
+        }
+        return nil
     }
 }
