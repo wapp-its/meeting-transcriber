@@ -154,6 +154,24 @@ final class ProtocolTemplatesOpeningTests: XCTestCase {
         XCTAssertEqual(model.openWithEntries, [.other])
     }
 
+    /// The app lookups ask LaunchServices, and SwiftUI evaluates the section's
+    /// body far more often than the apps change: they run when the folder is
+    /// read and when the editor app changes, never per body evaluation.
+    func testTheSectionsBodyLooksUpNoApps() throws {
+        let fixture = try ProtocolTemplatesFixture(self, templates: ["Board", "Retro"])
+        let model = fixture.makeModel()
+        let view = ProtocolTemplatesSettingsView(model: model)
+        let afterReload = fixture.apps.lookups
+        XCTAssertGreaterThan(afterReload, 0, "test premise: reload looks the apps up")
+
+        let help = TemplateEditor.app(Fake.textEdit).helpText
+        for _ in 0 ..< 3 {
+            XCTAssertNoThrow(try view.inspect().find(HelpBadge.self) { try $0.actualView().text == help })
+        }
+
+        XCTAssertEqual(fixture.apps.lookups, afterReload)
+    }
+
     /// Finder cannot show the file either: the line names Finder's error.
     func testWhenFinderCannotShowTheTemplateEitherTheLineNamesTheError() async throws {
         let fixture = try ProtocolTemplatesFixture(self, templates: ["Board"])

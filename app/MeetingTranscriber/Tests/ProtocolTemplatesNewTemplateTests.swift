@@ -40,6 +40,35 @@ final class ProtocolTemplatesNewTemplateTests: XCTestCase {
         """)
     }
 
+    /// A name typed with the extension loses it, in the note as in the file.
+    func testANameTypedWithTheExtensionCreatesTheTemplateWithoutIt() throws {
+        let fixture = try ProtocolTemplatesFixture(self)
+        let model = fixture.makeModel()
+        model.showNewTemplate()
+        model.newTemplateName = "Board.md"
+
+        XCTAssertEqual(model.newTemplateNote, ProtocolTemplatesModel.newTemplateNote(name: "Board"))
+        model.createTemplate()
+
+        XCTAssertEqual(fixture.files, ["Board.md"])
+        XCTAssertEqual(model.names, ["Board"])
+    }
+
+    /// "Board.MD" is the template "Board", so the name is taken: the window
+    /// says so instead of failing the write.
+    func testAFileWhoseExtensionDiffersInCaseTakesItsName() throws {
+        let fixture = try ProtocolTemplatesFixture(self)
+        try "Board".write(to: fixture.store.directory.appendingPathComponent("Board.MD"), atomically: true, encoding: .utf8)
+        let model = fixture.makeModel()
+        model.showNewTemplate()
+
+        model.newTemplateName = "Board"
+
+        XCTAssertEqual(model.names, ["Board"])
+        XCTAssertEqual(model.nameProblem, ProtocolTemplateName.Refusal.duplicate.errorDescription)
+        XCTAssertFalse(model.canCreate)
+    }
+
     func testARefusedNameShowsTheStoresMessageAndDisablesCreate() throws {
         let fixture = try ProtocolTemplatesFixture(self, templates: ["Board"])
         let model = fixture.makeModel()

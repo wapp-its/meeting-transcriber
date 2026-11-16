@@ -52,10 +52,11 @@ final class ProtocolTemplatesModel {
     private let trashItem: (URL) throws -> Void
 
     /// `openFile` opens the templates folder; templates open through `opener`.
+    /// No default for `opener`: the app passes `.live`, tests a fake.
     init(
         store: ProtocolTemplateStore,
         settings: AppSettings,
-        opener: TemplateOpener = .live,
+        opener: TemplateOpener,
         openFile: @escaping (URL) -> Void = { _ = NSWorkspace.shared.open($0) },
         trashItem: @escaping (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) },
     ) {
@@ -74,22 +75,35 @@ final class ProtocolTemplatesModel {
         set { settings.defaultProtocolTemplate = newValue }
     }
 
-    /// The app Edit opens a template in.
-    var editor: TemplateEditor {
-        TemplateEditor.resolve(
-            remembered: settings.templateEditorBundleIdentifier,
-            installedApp: opener.installedApp,
-            defaultApp: opener.defaultMarkdownApp,
-        )
-    }
+    /// The app Edit opens a template in, as of the last `reload()` or change
+    /// of the editor app. The app lookups ask LaunchServices, so they run
+    /// then, never each time SwiftUI evaluates the section's body.
+    private(set) var editor: TemplateEditor = .noApp
+    /// Every template's Open With submenu, as of the last `reload()`.
+    private(set) var openWithEntries: [TemplateOpenWithEntry] = []
 
-    /// Every template's Open With submenu.
-    var openWithEntries: [TemplateOpenWithEntry] {
-        TemplateOpenWithEntry.entries(defaultApp: opener.defaultMarkdownApp(), offered: opener.markdownApps())
-    }
-
+    /// Reads the folder and looks the apps up again: the section calls it when
+    /// it appears and when the app becomes active, after the user may have
+    /// changed files or apps elsewhere.
     func reload() {
         names = store.names()
+        let defaultApp = opener.defaultMarkdownApp()
+        openWithEntries = TemplateOpenWithEntry.entries(defaultApp: defaultApp, offered: opener.markdownApps())
+        resolveEditor(defaultApp: defaultApp)
+    }
+
+    private func resolveEditor(defaultApp: TemplateEditorApp?) {
+        editor = TemplateEditor.resolve(
+            remembered: settings.templateEditorBundleIdentifier,
+            installedApp: opener.installedApp,
+        ) { defaultApp }
+    }
+
+    /// Remembers `bundleIdentifier` as the editor app, nil for the default
+    /// app, and resolves the editor again.
+    private func rememberEditor(_ bundleIdentifier: String?) {
+        settings.templateEditorBundleIdentifier = bundleIdentifier
+        resolveEditor(defaultApp: opener.defaultMarkdownApp())
     }
 
     /// `id` spelt as the folder lists it. A Finder rename that changes only
@@ -176,7 +190,7 @@ final class ProtocolTemplatesModel {
     /// The note for `typed`. It names no app: Create only writes the file, and
     /// Edit opens it in the editor app, as it does every template.
     static func newTemplateNote(name typed: String) -> String {
-        let name = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = ProtocolTemplateName.normalized(typed)
         let file = name.isEmpty ? "a Markdown file" : "“\(name).md”"
         return "Creates \(file) in the templates folder from the built-in template. To change it, click Edit in "
             + "its row; the arrow beside Edit lets you pick the app."
@@ -210,7 +224,7 @@ final class ProtocolTemplatesModel {
     /// Opens the template in `app` and makes it the editor app for every
     /// template.
     func openWith(_ app: TemplateEditorApp, template name: String) {
-        settings.templateEditorBundleIdentifier = app.bundleIdentifier
+        rememberEditor(app.bundleIdentifier)
         open(store.fileURL(named: name), in: app)
     }
 
@@ -235,7 +249,7 @@ final class ProtocolTemplatesModel {
             open(file, in: app)
 
         case let .missing(bundleIdentifier):
-            settings.templateEditorBundleIdentifier = nil
+            rememberEditor(nil)
             showInFinder(file, because: .notFound(app: bundleIdentifier))
 
         case .noApp:

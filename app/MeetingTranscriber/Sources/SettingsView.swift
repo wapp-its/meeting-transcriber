@@ -97,7 +97,7 @@ struct SettingsView: View {
             )
 
         case .output:
-            OutputSettingsView(settings: settings, templateStore: .production)
+            OutputSettingsView(settings: settings, templateStore: .production, templateOpener: .live)
 
         case .advanced:
             AdvancedSettingsView(settings: settings)

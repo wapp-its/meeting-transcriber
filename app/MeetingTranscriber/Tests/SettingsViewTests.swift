@@ -480,7 +480,9 @@ final class SettingsViewTests: XCTestCase { // swiftlint:disable:this type_body_
     /// The single custom prompt's controls gave way to the templates section.
     func testOutputShowsMeetingNotesTemplatesInsteadOfThePromptControls() throws {
         let store = try ProtocolTemplateStore(directory: makeTempDirectory(prefix: "settings-templates"))
-        let body = try OutputSettingsView(settings: makeSettings(), templateStore: store).inspect()
+        let body = try OutputSettingsView(
+            settings: makeSettings(), templateStore: store, templateOpener: FakeTemplateOpener().opener,
+        ).inspect()
         for identifier in [A11yID.protocolTemplateDefaultPicker, A11yID.protocolTemplatesOpenFolderButton] {
             XCTAssertNoThrow(try body.find(viewWithAccessibilityIdentifier: identifier), identifier)
         }

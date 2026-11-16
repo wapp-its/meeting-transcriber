@@ -38,14 +38,26 @@ final class FakeTemplateOpener {
     var chosen: TemplateEditorApp?
 
     private(set) var opened: [Opened] = []
+    /// How often the section asked which apps there are: the default
+    /// Markdown app, the Markdown apps or an app by bundle identifier.
+    private(set) var lookups = 0
     private(set) var revealed: [URL] = []
     private(set) var pickerShown = 0
 
     var opener: TemplateOpener {
         TemplateOpener(
-            defaultMarkdownApp: { self.defaultApp },
-            markdownApps: { self.offered },
-            installedApp: { id in self.installed.first { $0.bundleIdentifier == id } },
+            defaultMarkdownApp: {
+                self.lookups += 1
+                return self.defaultApp
+            },
+            markdownApps: {
+                self.lookups += 1
+                return self.offered
+            },
+            installedApp: { id in
+                self.lookups += 1
+                return self.installed.first { $0.bundleIdentifier == id }
+            },
             open: { file, app in
                 if self.failing.contains(app.bundleIdentifier) { throw OpenFailure() }
                 self.opened.append(Opened(file: file, app: app.bundleIdentifier))
