@@ -188,6 +188,49 @@ final class MenuBarViewSessionControlsTests: XCTestCase {
         XCTAssertEqual(taps.toggles, 0)
     }
 
+    // MARK: - Record after an Ignore
+
+    private static let ignoredOffers = [
+        RecordAgainOffer(identityKey: "Google Chrome", appName: "Google Chrome", kind: .ignoredCall),
+        RecordAgainOffer(identityKey: "Microsoft Teams", appName: "Microsoft Teams", kind: .ignoredCall),
+    ]
+
+    private func recordIgnoredItems(of view: MenuBarView) throws -> [InspectableView<ViewType.ClassifiedView>] {
+        try view.inspect().findAll { (try? $0.accessibilityIdentifier()) == A11yID.recordIgnoredMenuItem }
+    }
+
+    /// "Record (<App>)" per ignored call, at the place of "Record Again", in
+    /// the order the loop lists the offers, then the watch toggle on the next
+    /// line; no keyboard shortcut, and none while a recording runs.
+    func testRecordLinesAfterAnIgnoreComeBetweenTheStatusAndTheWatchToggle() throws {
+        let sut = try makeView(state: .watching, isWatching: true, offers: Self.ignoredOffers + [Self.offers[1]])
+
+        XCTAssertEqual(try Array(lines(of: sut, state: .watching).prefix(5)), [
+            .status, .button("Record (Google Chrome)"), .button("Record (Microsoft Teams)"),
+            .button("Record Again (Zoom)"), .button(Self.stopWatching),
+        ])
+        XCTAssertEqual(try recordIgnoredItems(of: sut).count, 2, "one line per offer, under its own identifier")
+        XCTAssertEqual(try recordAgainItems(of: sut).count, 1)
+        let shortcuts = try shortcutKeys(of: sut)
+        XCTAssertNil(shortcuts["Record (Google Chrome)"], "no keyboard shortcut")
+
+        let recording = try makeView(state: .recording, isWatching: true, recording: true, offers: Self.ignoredOffers)
+        XCTAssertTrue(try recordIgnoredItems(of: recording).isEmpty)
+    }
+
+    func testATapOnRecordAfterAnIgnorePassesTheOfferItShows() throws {
+        let taps = Taps()
+        let sut = try makeView(state: .watching, isWatching: true, offers: Self.ignoredOffers, taps: taps)
+
+        let items = try recordIgnoredItems(of: sut)
+        XCTAssertEqual(items.count, 2)
+        guard items.count == 2 else { return }
+        try items[1].button().tap()
+
+        XCTAssertEqual(taps.recordAgain, [Self.ignoredOffers[1]])
+        XCTAssertEqual(taps.toggles, 0)
+    }
+
     /// After a stop by hand the record items stay in the menu.
     func testTheRecordItemsShowBesideARecordAgainOffer() throws {
         let body = try makeView(state: .watching, isWatching: true, offers: Self.offers).inspect()

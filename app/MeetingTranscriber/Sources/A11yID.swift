@@ -228,6 +228,9 @@ enum A11yID {
     /// The menu's "Record Again (<App>)", one line per held app, all under
     /// this one identifier. No app name, for the reason on `consentDeniedAppRemove`.
     static let recordAgainMenuItem = "recordAgainMenuItem"
+    /// The menu's "Record (<App>)" after an Ignore, one line per ignored app,
+    /// all under this one identifier, for the same reason.
+    static let recordIgnoredMenuItem = "recordIgnoredMenuItem"
 
     /// The Record Meeting window's buttons. The window shows background text
     /// and stays off every RPC allowlist.

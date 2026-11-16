@@ -72,4 +72,11 @@ struct BrowserConsentPolicy {
     mutating func recordExpiry(app: String, now: Date) {
         suppressedUntil[app] = now.addingTimeInterval(expiryCooldown)
     }
+
+    /// End `app`'s quiet time, so its next detection is asked about again:
+    /// "Record (<App>)" after an Ignore was the person's answer for that call
+    /// only. A denial is not kept here (see `decision`), so it stands.
+    mutating func endSuppression(app: String) {
+        suppressedUntil[app] = nil
+    }
 }
