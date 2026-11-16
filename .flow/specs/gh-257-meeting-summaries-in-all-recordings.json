@@ -13,9 +13,10 @@
   "impl_review_rounds": {},
   "next_task": 1,
   "no_plan": true,
-  "plan_review_rounds": 1,
-  "plan_review_status": "needs_work",
-  "plan_reviewed_at": "2026-11-16T13:11:35.014113Z",
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-11-16T13:15:27.790459Z",
+  "ready": true,
   "review_attempts": [
     {
       "artifact_sha256": "3a150c4dc08ed9e616dd610cdf0ea408119fbc62435ff52ebd6876417c8f9e97",
@@ -77,9 +78,72 @@
       "timestamp": "2026-11-16T13:11:34.215739Z",
       "tool_calls": 25,
       "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "e930c642bcbd238f785c2bc8adc4670b53c0776ba0db2d090efa02501d496e5a",
+      "backend": "codex",
+      "base_sha": "3b236a800c34709e7ea146b82d79e62337281e2e",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-12bc4687e2fd189bc5e50f115c08f34f",
+            "classification": "introduced",
+            "findingId": "finding-12bc4687e2fd189bc5e50f115c08f34f",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-baf6fc672715426d19ba93b8d5fe3517",
+            "classification": "introduced",
+            "findingId": "finding-baf6fc672715426d19ba93b8d5fe3517",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-5382999d9663a5e00ae8e6be02be4583",
+            "classification": "introduced",
+            "findingId": "finding-5382999d9663a5e00ae8e6be02be4583",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "182e791e75bfac66a1a155bb1d67a87502d719f5",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 710,
+      "output_sha256": "36ab573df06ca568e5cd68752d2cf6d66d6568441c43ba1e2b650c8c3538ecb8",
+      "reservation_id": "5767c9bae8344cc8b109d266b13b46d5",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-16T13:15:26.714593Z",
+      "verdict": "SHIP"
     }
   ],
-  "review_hash_epoch": {},
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
@@ -100,5 +164,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nAll Recordings lists each meeting with its title, app, date and length. Many titles are generic (the app name, a file name or \"Recovered Recording\"), so the list does not show which meeting is which. Today you have to open the notes to find out.\n\n## NOTES\n\n- Each row shows a short summary of what the meeting was about. It comes from the meeting notes, or from the transcript when there are no notes.\n- The summary can be edited. New notes for the meeting never replace a summary that was edited by hand.\n- Builds on the rows and the row menu of #171 (Transcribe Again).\n- Related: #126 (the search finds no participants), #201 (no file reads while the list is drawn).\n\n## TASKS\n\n- [ ] Mockup of the rows with summaries and of the edit state\n- [ ] Spec",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/257"
   },
-  "updated_at": "2026-11-16T13:13:28.550474Z"
+  "updated_at": "2026-11-16T13:16:01.117604Z"
 }
