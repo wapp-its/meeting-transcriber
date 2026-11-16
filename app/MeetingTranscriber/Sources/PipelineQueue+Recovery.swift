@@ -50,7 +50,11 @@ extension PipelineQueue {
         // started again below, so a slow Notion never keeps the old queue (and
         // the settings it captured) alive.
         let handedOver = replaced.handOverRunningNotionExports()
-        let recoveredNotionExports = recoverInterruptedNotionExports(in: &adopted, keeping: Set(handedOver.keys))
+        // A committed re-run the replaced queue had not handed over yet starts its
+        // export once its hand-off lands here (`resumeRerunSwaps`).
+        let recoveredNotionExports = recoverInterruptedNotionExports(
+            in: &adopted, keeping: Set(handedOver.keys).union(rerunJobsAwaitingRecord.keys),
+        )
         discardFinishedJobs(from: &adopted)
         discardJobsWithMissingAudio(&adopted, interruptedIn: [:])
         // Discards change the count; interrupted-export normalization is

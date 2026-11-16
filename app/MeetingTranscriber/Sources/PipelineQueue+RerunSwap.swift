@@ -141,7 +141,9 @@ extension PipelineQueue {
 
     /// The re-run jobs restored done, by their record: a stamp noted as committed
     /// finishes after the commit point, a marker with a list of renames completes or
-    /// undoes the swap, and a marker without one starts the swap.
+    /// undoes the swap, and a marker without one starts the swap. A committed job
+    /// still kept in the re-run file, which a replaced queue had not handed over,
+    /// is handed over here.
     func resumeRerunSwaps() {
         let done = jobs.filter { $0.state == .done && $0.rerun != nil }
         for job in done {
@@ -155,6 +157,11 @@ extension PipelineQueue {
                     rerunSucceeded(id: job.id)
                 }
             }
+        }
+        for (id, kept) in rerunJobsAwaitingRecord {
+            guard let marker = kept.rerun?.marker, let note = meetingFileStore?.record(for: id)?.rerunNote,
+                  note.committed, note.stamp == marker.stamp else { continue }
+            handOverCommittedRerun(id: id, runID: marker.runID)
         }
     }
 
@@ -220,7 +227,7 @@ extension PipelineQueue {
     /// there knows the export never started and starts it once (`resumeRerunSwaps`;
     /// the re-run file's job wins over the snapshot's). A write that fails again on
     /// the flush's retry, as at the swap's start, leaves the job in the re-run file
-    /// and the export to the next launch.
+    /// and the export to the next launch, or to a queue that adopts the jobs.
     private func handOverCommittedRerun(id: UUID, runID: UUID) {
         saveSnapshot()
         guard let name = rerunFilename else { return }
