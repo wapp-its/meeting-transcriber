@@ -7,6 +7,7 @@
 > owner 2026-11-16, decision (paraphrased option text): "A — Smaller model + retry (Recommended)": use a smaller model during the day, and let a refused job wait and try again by itself instead of failing; lowering the safety margin and retry alone were not chosen.
 > cross-check 2026-11-16 (Codex), paraphrased: free plus inactive memory falls about one for one while a model loads, so a start margin as small as the stop floor would end runs midway; keep the margin; let a refused job wait in a visible state, try again every 5 minutes and on wake, idle or screen lock, never bypassing the start check; stop automatic tries after 24 hours; after a stop mid-run wait 30 minutes, and stop after two such stops.
 > test run 2026-11-16 (synthetic meeting, content-free figures): a model with 12.4 GiB of weights passed the start check at 20.0 GiB of free plus inactive memory; while it loaded, that figure fell to 11.4 GiB within 6 seconds and memory pressure went to warning, so the watchdog ended it after 17 seconds; memory recovered at once. Before the run the Mac held about 37 GiB of compressed memory in 16 GiB of RAM, with no swap in use, and 13.3 GiB of its pages were file-backed.
+> test run 2026-11-16 (synthetic meeting, content-free figures): right after, a model with 7.5 GiB of weights ran through at the same load in 113 seconds; pressure stayed normal and free plus inactive memory never fell below 13.5 GiB.
 
 ## Goal & Context
 
@@ -55,7 +56,7 @@ This spec makes a refused job wait and try again by itself, so the notes get wri
 - **R8:** Several waiting jobs are tried one at a time, oldest first, and later meetings are recorded, transcribed and diarized meanwhile as usual. No error surface beyond R2. [inferred]
 - **R9:** "Regenerate Notes…" refused for memory says in the sheet how much memory is missing and suggests closing apps or choosing a smaller model in Settings → Output; it does not wait by itself. No error surface beyond the message. [inferred]
 - **R10:** The fork's updater can restart the app while jobs wait for memory, and the automation API reports a waiting job as not finished with its reason and missing amount (see API Contracts). Errors: none beyond R7. [inferred]
-- **R11:** The start check counts inactive memory as available only as far as it is file-backed, which macOS can drop without compressing; free and purgeable memory count as today. Calibration test: the readings of the 2026-11-16 test run (free 0.07, inactive 20.2, file-backed 13.3, purgeable 1.3 GiB, pressure normal) refuse a model with 12.4 GiB of weights, while a reading with 30 GiB free admits it. Errors: a counter that cannot be read fails closed, as today. [inferred]
+- **R11:** The start check counts inactive memory as available only as far as it is file-backed, which macOS can drop without compressing; free and purgeable memory count as today. Calibration test: the readings of the 2026-11-16 test run (free 0.07, inactive 20.2, file-backed 13.3, purgeable 1.3 GiB, pressure normal) refuse a model with 12.4 GiB of weights and admit one with 7.5 GiB, while a reading with 30 GiB free admits both. Errors: a counter that cannot be read fails closed, as today. [inferred]
 
 ## Boundaries
 
