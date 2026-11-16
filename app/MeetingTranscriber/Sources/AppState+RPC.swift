@@ -123,7 +123,7 @@
                 notifications: notificationsSnapshot(),
                 // Built inside AppSettings (single-hop `self.` reads) to stay
                 // under the type-check budget — see `rpcSettingsSnapshot`.
-                settings: settings.rpcSettingsSnapshot(),
+                settings: settings.rpcSettingsSnapshot(templateStore: pipeline.queueEnvironment.protocolTemplateStore),
                 badge: currentBadge,
                 updateStatus: updateStatusSnapshot(),
                 windows: windowsSnapshot(),

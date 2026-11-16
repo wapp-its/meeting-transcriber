@@ -133,6 +133,23 @@ final class ProtocolTemplateMigrationTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: key), "Custom Prompt")
     }
 
+    /// A launch that copied the prompt but could not write the marker leaves
+    /// the copy behind. The next launch adopts it instead of adding
+    /// "Custom Prompt 2", and writes the marker.
+    func testACopyLeftWithoutAMarkerIsAdoptedInsteadOfCopiedAgain() throws {
+        try legacyText.write(to: legacyPrompt, atomically: true, encoding: .utf8)
+        let defaults = try makeDefaults()
+        migrate(defaults)
+        try FileManager.default.removeItem(at: marker)
+        defaults.removeObject(forKey: key)
+
+        migrate(defaults)
+
+        XCTAssertEqual(store.names(), ["Custom Prompt"])
+        XCTAssertEqual(try markerText(), "Custom Prompt")
+        XCTAssertEqual(defaults.string(forKey: key), "Custom Prompt")
+    }
+
     // MARK: - The other build
 
     /// The second build finds the marker: it adopts the migrated default

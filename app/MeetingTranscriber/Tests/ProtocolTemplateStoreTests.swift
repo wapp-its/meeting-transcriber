@@ -34,6 +34,18 @@ final class ProtocolTemplateStoreTests: XCTestCase {
         XCTAssertEqual(store.names(), ["A", "a2", "a10", "b"])
     }
 
+    /// An extension that differs only in case is still Markdown: "Board.MD"
+    /// is the template "Board", which takes the name for a new one too.
+    func testListsAndReadsAMarkdownFileWhateverTheCaseOfItsExtension() throws {
+        try "Board template".write(to: store.directory.appendingPathComponent("Board.MD"), atomically: true, encoding: .utf8)
+
+        XCTAssertEqual(store.names(), ["Board"])
+        XCTAssertEqual(store.text(for: .file(name: "Board")), "Board template")
+        XCTAssertThrowsError(try store.create(name: "Board")) { error in
+            XCTAssertEqual(error as? ProtocolTemplateName.Refusal, .duplicate)
+        }
+    }
+
     func testAMissingFolderListsNoTemplates() {
         let missing = ProtocolTemplateStore(directory: store.directory.appendingPathComponent("never-created"))
         XCTAssertEqual(missing.names(), [])
@@ -110,6 +122,14 @@ final class ProtocolTemplateStoreTests: XCTestCase {
         XCTAssertEqual(folder.names(), ["Board"])
     }
 
+    /// The extension is the store's to add: a name typed with it loses it.
+    func testCreateDropsATypedMarkdownExtension() throws {
+        let url = try store.create(name: "Board.md")
+
+        XCTAssertEqual(url.lastPathComponent, "Board.md")
+        XCTAssertEqual(store.names(), ["Board"])
+    }
+
     func testCreateRefusesATakenNameAndWritesNothing() throws {
         try write("Board template", as: "Board")
 
@@ -138,6 +158,9 @@ final class ProtocolTemplateStoreTests: XCTestCase {
         typealias Refusal = ProtocolTemplateName.Refusal
         let cases: [(raw: String, name: String?, refusal: Refusal?)] = [
             ("  Board meeting  ", "Board meeting", nil),
+            ("Board.md", "Board", nil),
+            (" Board.MD ", "Board", nil),
+            (".md", nil, .empty),
             (String(repeating: "x", count: 80), String(repeating: "x", count: 80), nil),
             (" \n ", nil, .empty),
             (String(repeating: "x", count: 81), nil, .tooLong),

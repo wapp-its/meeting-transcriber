@@ -16,14 +16,17 @@
         /// enum raw values, and paths are exposed. This is the localhost,
         /// token-authed debug surface that already exposes job titles and
         /// screenshots, so home-directory paths are acceptable; secrets are not.
-        func rpcSettingsSnapshot() -> RPCStateSnapshot.Settings {
+        ///
+        /// `templateStore` is the meeting-notes templates folder the default
+        /// template is looked up in.
+        func rpcSettingsSnapshot(templateStore: ProtocolTemplateStore) -> RPCStateSnapshot.Settings {
             RPCStateSnapshot.Settings(
                 detection: rpcDetectionSettings(),
                 recording: rpcRecordingSettings(),
                 transcription: rpcTranscriptionSettings(),
                 diarization: rpcDiarizationSettings(),
                 protocolGeneration: rpcProtocolSettings(),
-                output: rpcOutputSettings(),
+                output: rpcOutputSettings(templateStore: templateStore),
                 diagnostics: rpcDiagnosticsSettings(),
                 updates: rpcUpdatesSettings(),
             )
@@ -93,11 +96,12 @@
             )
         }
 
-        private func rpcOutputSettings() -> RPCStateSnapshot.Settings.Output {
+        private func rpcOutputSettings(templateStore: ProtocolTemplateStore) -> RPCStateSnapshot.Settings.Output {
             RPCStateSnapshot.Settings.Output(
                 directory: rpcOutputDirPath(),
                 hasCustomDirectory: customOutputDirBookmark != nil,
-                hasCustomPrompt: defaultProtocolTemplate != .builtIn,
+                // A default whose file is gone runs the built-in template.
+                hasCustomPrompt: templateStore.effectiveDefault(defaultProtocolTemplate) != .builtIn,
                 includeFullTranscriptInProtocol: includeFullTranscriptInProtocol,
                 saveRawTranscriptSeparately: saveRawTranscriptSeparately,
                 useAITitleForFilenames: useAITitleForFilenames,

@@ -61,15 +61,24 @@ enum ProtocolTemplateName {
         }
     }
 
-    /// `raw` trimmed, when it can name a new template beside `existing`.
+    /// `raw` as `normalized` spells it, when it can name a new template
+    /// beside `existing`.
     static func validate(_ raw: String, existing: [String]) throws -> String {
-        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = normalized(raw)
         if name.isEmpty { throw Refusal.empty }
         if name.count > maxLength { throw Refusal.tooLong }
         if name.contains("/") || name.contains(":") { throw Refusal.forbiddenCharacter }
         if name.hasPrefix(".") { throw Refusal.leadingDot }
         if isTaken(name, in: existing) { throw Refusal.duplicate }
         return name
+    }
+
+    /// `raw` trimmed and without a typed Markdown extension in any case, which
+    /// the store adds itself: "Board.md" names the template "Board".
+    static func normalized(_ raw: String) -> String {
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard name.lowercased().hasSuffix(".md") else { return name }
+        return String(name.dropLast(3)).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Case-insensitive, because the default macOS volume treats `Board.md`
@@ -79,8 +88,8 @@ enum ProtocolTemplateName {
     }
 }
 
-/// The templates folder: every `*.md` file directly inside it is a template
-/// named after the file. Every call reads the folder anew, so files added,
+/// The templates folder: every `*.md` file directly inside it, the extension
+/// in any case, is a template named after the file. Every call reads the folder anew, so files added,
 /// renamed or removed in Finder show up without a restart.
 struct ProtocolTemplateStore {
     let directory: URL
@@ -103,12 +112,12 @@ struct ProtocolTemplateStore {
     /// Template names, in Finder's order. Hidden files, other extensions and
     /// folders are not templates.
     func names() -> [String] {
-        let entries = (try? FileManager.default.contentsOfDirectory(
-            at: directory, includingPropertiesForKeys: nil, options: .skipsHiddenFiles,
-        )) ?? []
-        return entries
-            .filter { $0.pathExtension == Self.fileExtension && Self.isFile($0) }
+        // A case-sensitive volume can hold "Board.md" and "Board.MD" at once:
+        // one template, listed once.
+        var listed: Set<String> = []
+        return templateFiles()
             .map { $0.deletingPathExtension().lastPathComponent }
+            .filter { listed.insert($0).inserted }
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
@@ -190,7 +199,21 @@ struct ProtocolTemplateStore {
     private func existingFile(named name: String) -> URL? {
         guard !name.isEmpty, !name.contains("/"), !name.hasPrefix(".") else { return nil }
         let url = fileURL(named: name)
-        return Self.isFile(url) ? url : nil
+        if Self.isFile(url) { return url }
+        // "Board.MD" is the template "Board" too. A case-insensitive volume
+        // finds it by the path above; a case-sensitive one needs the listing.
+        return templateFiles().first { $0.deletingPathExtension().lastPathComponent == name }
+    }
+
+    /// The visible files directly in the folder whose extension is `md` in
+    /// any case. Hidden files, other extensions and folders are not templates.
+    private func templateFiles() -> [URL] {
+        let entries = (try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: nil, options: .skipsHiddenFiles,
+        )) ?? []
+        return entries.filter { entry in
+            entry.pathExtension.caseInsensitiveCompare(Self.fileExtension) == .orderedSame && Self.isFile(entry)
+        }
     }
 
     private static func isFile(_ url: URL) -> Bool {
@@ -235,16 +258,30 @@ enum ProtocolTemplateMigration {
 
     /// Step 1: copy a usable legacy prompt under the first free name, then
     /// write the marker. The marker comes last, so a failed copy leaves none.
+    /// A copy whose marker could not be written is still there at the next
+    /// launch, which adopts it rather than adding "Custom Prompt 2".
     private static func copyLegacyPrompt(_ legacyPrompt: URL, into store: ProtocolTemplateStore, marker: URL) throws {
         try FileManager.default.createDirectory(at: store.directory, withIntermediateDirectories: true)
         var migratedName = ""
         if let prompt = try usablePrompt(at: legacyPrompt) {
-            let name = freeName(in: store)
-            try prompt.write(to: store.fileURL(named: name), options: .atomic)
-            migratedName = name
-            logger.info("protocol_template_migrated")
+            if let copy = existingCopy(of: prompt, in: store) {
+                migratedName = copy
+                logger.info("protocol_template_migration_adopted_copy")
+            } else {
+                let name = freeName(in: store)
+                try prompt.write(to: store.fileURL(named: name), options: .atomic)
+                migratedName = name
+                logger.info("protocol_template_migrated")
+            }
         }
         try Data(migratedName.utf8).write(to: marker, options: .atomic)
+    }
+
+    /// A template whose text is the legacy prompt's, byte for byte.
+    private static func existingCopy(of prompt: Data, in store: ProtocolTemplateStore) -> String? {
+        store.names().first { name in
+            store.text(for: .file(name: name)).map { Data($0.utf8) } == prompt
+        }
     }
 
     /// The legacy prompt's bytes when the code before templates would have used

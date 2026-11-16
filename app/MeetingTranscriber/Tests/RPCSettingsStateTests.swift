@@ -15,6 +15,9 @@
         private var settings: AppSettings!
         // swiftlint:disable:next implicitly_unwrapped_optional
         private var testSuiteName: String!
+        // A templates folder in a temp directory, never the app's own.
+        // swiftlint:disable:next implicitly_unwrapped_optional
+        private var templateStore: ProtocolTemplateStore!
 
         override func setUp() async throws {
             try await super.setUp()
@@ -25,6 +28,11 @@
             }
             defaults = suite
             settings = AppSettings(defaults: defaults)
+            templateStore = try ProtocolTemplateStore(directory: makeTempDirectory(prefix: "rpc-settings-templates"))
+        }
+
+        private func snapshot() -> RPCStateSnapshot.Settings {
+            settings.rpcSettingsSnapshot(templateStore: templateStore)
         }
 
         override func tearDown() async throws {
@@ -38,7 +46,7 @@
         // MARK: - Snapshot mirrors defaults
 
         func test_snapshot_mirrorsDefaultSettings() {
-            let s = settings.rpcSettingsSnapshot()
+            let s = snapshot()
 
             // A representative default from each sub-object — enough to prove
             // the projection reads live values, not hardcoded zeros.
@@ -86,7 +94,7 @@
             settings.customVocabularyEnabled = true
             settings.unloadModelsWhenIdle = false
 
-            let s = settings.rpcSettingsSnapshot()
+            let s = snapshot()
 
             XCTAssertTrue(s.detection.autoWatch)
             XCTAssertTrue(s.recording.recordOnly)
@@ -115,7 +123,7 @@
             settings.diarizerMode = .sortformer
             settings.protocolProvider = .openAICompatible
 
-            let s = settings.rpcSettingsSnapshot()
+            let s = snapshot()
 
             // Wire value IS the enum raw value — pin the exact strings AND the
             // fact they equal the source enums' rawValues, so a case rename
@@ -130,32 +138,37 @@
         }
 
         func test_snapshot_openAISamplingOverrides() {
-            XCTAssertNil(settings.rpcSettingsSnapshot().protocolGeneration.openAITemperature)
-            XCTAssertNil(settings.rpcSettingsSnapshot().protocolGeneration.openAITopP)
+            XCTAssertNil(snapshot().protocolGeneration.openAITemperature)
+            XCTAssertNil(snapshot().protocolGeneration.openAITopP)
 
             settings.openAITemperature = 0.3
             settings.openAITopP = 0.9
-            let s = settings.rpcSettingsSnapshot()
+            let s = snapshot()
             XCTAssertEqual(s.protocolGeneration.openAITemperature, 0.3)
             XCTAssertEqual(s.protocolGeneration.openAITopP, 0.9)
         }
 
         func test_snapshot_protocolProviderNone_mapsToNoneRawValue() {
             settings.protocolProvider = .none
-            let s = settings.rpcSettingsSnapshot()
+            let s = snapshot()
             XCTAssertEqual(s.protocolGeneration.provider, "none")
         }
 
         // MARK: - Output projection
 
         /// `hasCustomPrompt` keeps its key and now says whether the default
-        /// template is one of the user's own rather than the built-in one.
-        func test_snapshot_output_hasCustomPromptFollowsTheDefaultTemplate() {
-            XCTAssertFalse(settings.rpcSettingsSnapshot().output.hasCustomPrompt)
+        /// template is one of the user's own rather than the built-in one. A
+        /// default whose file is gone runs the built-in one, so it is not.
+        func test_snapshot_output_hasCustomPromptFollowsTheDefaultTemplate() throws {
+            XCTAssertFalse(snapshot().output.hasCustomPrompt)
+            try templateStore.create(name: "Board")
+
+            settings.defaultProtocolTemplate = .file(name: "Gone")
+            XCTAssertFalse(snapshot().output.hasCustomPrompt, "the default's file is gone")
 
             settings.defaultProtocolTemplate = .file(name: "Board")
 
-            XCTAssertTrue(settings.rpcSettingsSnapshot().output.hasCustomPrompt)
+            XCTAssertTrue(snapshot().output.hasCustomPrompt)
             XCTAssertEqual(
                 AppSettings(defaults: defaults).defaultProtocolTemplate, .file(name: "Board"),
                 "the default template did not persist",
@@ -163,7 +176,7 @@
         }
 
         func test_snapshot_output_reflectsDefaultDirAndNoCustomBookmark() {
-            let s = settings.rpcSettingsSnapshot()
+            let s = snapshot()
             // Fresh suite → no custom bookmark → effective dir is the default.
             XCTAssertFalse(s.output.hasCustomDirectory)
             XCTAssertEqual(s.output.directory, AppPaths.downloadsProtocolsDir.path)
@@ -178,7 +191,7 @@
             // snapshot's `.withoutUI/.withoutMounting` read-only options.
             settings.customOutputDirBookmark = try dir.bookmarkData()
 
-            let s = settings.rpcSettingsSnapshot()
+            let s = snapshot()
 
             XCTAssertTrue(s.output.hasCustomDirectory)
             let reported = try XCTUnwrap(s.output.directory)
@@ -193,7 +206,7 @@
             let garbage = Data([0xDE, 0xAD, 0xBE, 0xEF])
             settings.customOutputDirBookmark = garbage
 
-            let s = settings.rpcSettingsSnapshot()
+            let s = snapshot()
 
             XCTAssertTrue(s.output.hasCustomDirectory)
             XCTAssertNil(s.output.directory, "unresolvable custom dir must report null, not a wrong fallback")
@@ -227,7 +240,7 @@
                 ),
                 speakerDB: .init(count: 0, recentNames: [], knownSpeakerNames: []),
                 pendingNamingJobs: [],
-                settings: settings.rpcSettingsSnapshot(),
+                settings: snapshot(),
             )
             let json = try XCTUnwrap(String(bytes: snapshot.jsonData(), encoding: .utf8))
 
@@ -248,7 +261,7 @@
             // Optional fields are omitted while nil; set them so they are counted.
             settings.openAITemperature = 0.5
             settings.openAITopP = 0.5
-            let data = try JSONEncoder().encode(settings.rpcSettingsSnapshot())
+            let data = try JSONEncoder().encode(snapshot())
             let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
             var keys = Set<String>()
@@ -309,7 +322,7 @@
                 ),
                 speakerDB: .init(count: 0, recentNames: [], knownSpeakerNames: []),
                 pendingNamingJobs: [],
-                settings: settings.rpcSettingsSnapshot(),
+                settings: snapshot(),
             )
             let decoded = try JSONDecoder().decode(
                 RPCStateSnapshot.self, from: snapshot.jsonData(),
