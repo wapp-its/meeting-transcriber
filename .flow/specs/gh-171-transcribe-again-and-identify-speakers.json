@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-171-transcribe-again-and-identify-speakers",
   "completion_review_status": "ship",
-  "completion_reviewed_at": "2026-11-16T13:47:01.555194Z",
+  "completion_reviewed_at": "2026-11-16T23:45:12.688190Z",
   "created_at": "2026-11-12T20:44:44.633550Z",
   "default_impl": null,
   "default_review": null,
@@ -1723,6 +1723,66 @@
       "task": null,
       "timestamp": "2026-11-16T13:47:01.536665Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "a779ef0f156551f5f56b7425ade67bdb88e08e53fb702c6b4fc86bc6ed5161f2",
+      "backend": "codex",
+      "base_sha": "4d3574870c6c03804baa97b37b26376a5f8e78e6",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-b45e0203067826e1a34f27c5c4bc717b",
+            "classification": "introduced",
+            "findingId": "finding-b45e0203067826e1a34f27c5c4bc717b",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-ef2534e294871d2dbdb2ef5599bfb927",
+            "classification": "introduced",
+            "findingId": "finding-ef2534e294871d2dbdb2ef5599bfb927",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-1a8c9be3c2b5022728392e5bbffa1ab4",
+            "classification": "introduced",
+            "findingId": "finding-1a8c9be3c2b5022728392e5bbffa1ab4",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 3,
+      "head_sha": "9f21fadf3c5ae58b015b8e2f4f5bdf5b23af4252",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 4519,
+      "output_sha256": "3db2b37db32bf8ceebcbab3c6b9e19ed89dc2a17116d790a4217083bd24783e1",
+      "reservation_id": "2745b17c6fcb4686874e8e3ed32e3364",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-16T23:45:12.624792Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -1734,7 +1794,7 @@
     "impl:gh-171-transcribe-again-and-identify-speakers.6": 1,
     "impl:gh-171-transcribe-again-and-identify-speakers.7": 1,
     "plan": 2,
-    "plan#completion": 3
+    "plan#completion": 4
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
@@ -1765,5 +1825,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nFor a finished recording you can open the result or make a new protocol. To transcribe it again (another engine, model or vocabulary) you have to find the audio and import it by hand. Identifying the speakers again works only while the Name Speakers dialog is still open.\n\n## NOTES\n\n- Second part of the All Recordings window (#170): two more actions in a row's \"\u2026\" menu, \"Transcribe Again\u2026\" and \"Identify Speakers Again\u2026\". The accepted mockup shows them greyed out as later work.\n- Both need the audio file of each recording. The list does not store that path today (see the comment on #97), so plan it together with #97.\n- The two dialogs need their own mockup before planning.\n\n## TASKS\n\n- [ ] Draw the mockup for the two dialogs\n- [ ] Capture one spec together with #97 once #170 is merged",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/171"
   },
-  "updated_at": "2026-11-16T13:59:44.772116Z"
+  "updated_at": "2026-11-16T23:45:12.690326Z"
 }
