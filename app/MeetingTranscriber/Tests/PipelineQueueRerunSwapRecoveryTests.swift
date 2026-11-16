@@ -242,6 +242,28 @@ final class PipelineQueueRerunSwapRecoveryTests: XCTestCase {
         XCTAssertNil(try fixture.record(stopped.held.meeting.id).rerun)
     }
 
+    func testAFileOfTheRerunALaterTryMovesBackIsRemovedBeforeTheMarkerGoes() async throws {
+        let fixture = try makeFixture()
+        let stopped = try await stoppedSwap(fixture, after: .max) // every rename made
+        let id = stopped.held.meeting.id
+        let own = stopped.renames.filter { !$0.earlier }
+        let folder = try URL(filePath: XCTUnwrap(own.first?.from)).deletingLastPathComponent()
+        // The folder the re-run wrote to takes no file for a while, so its files
+        // cannot go back to their own names.
+        let marker = try XCTUnwrap(fixture.record(id).rerun)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        _ = PipelineQueue.closeRerun(marker, jobID: id, in: fixture.store)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
+        let kept = try Set(XCTUnwrap(fixture.record(id).rerun, "test premise: the marker went with renames not undone").files.map(\.path))
+        XCTAssertTrue(kept.isDisjoint(with: own.map(\.from)), "test premise: the marker lists a file at the re-run's own name")
+
+        // A later try moves them back and ends the re-run.
+        _ = try PipelineQueue.closeRerun(XCTUnwrap(fixture.record(id).rerun), jobID: id, in: fixture.store)
+
+        XCTAssertEqual(try resolved(fixture.outputFiles()), resolved(stopped.held.files), "the meeting is not as it was")
+        XCTAssertNil(try fixture.record(id).rerun)
+    }
+
     // MARK: - A stop between two steps
 
     func testALaunchAfterAStopAtEachStepCompletesTheSwap() async throws {
