@@ -91,6 +91,35 @@ final class PipelineQueueRerunSwapRecoveryTests: XCTestCase {
         try await assertEnded(held, fixture, files: expected, "no name")
     }
 
+    func testADoneStateTheRerunFileDidNotTakeEndsTheRerunBeforeAnyRename() async throws {
+        let fixture = try makeFixture()
+        let queue = fixture.makeQueue(completedJobLifetime: 0)
+        let meeting = try await fixture.finishedMeeting(in: queue, leavingTheQueue: true)
+        let (files, record) = try (fixture.outputFiles(), fixture.record(meeting.id))
+        let transcript = try URL(filePath: XCTUnwrap(fixture.finishedEntry(meeting.id)?.status.transcriptPath))
+        // From the notes on, no write of the re-run file lands, its retry included:
+        // its staging name is taken by a folder.
+        let staging = fixture.rerunFile.deletingPathExtension().appendingPathExtension("tmp")
+        queue.onJobStateChange = { _, _, state in
+            guard state == .generatingProtocol else { return }
+            try? FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        }
+        XCTAssertEqual(queue.rerunJob(id: meeting.id, mode: .transcribeAgain), .queued)
+        let marker = try fixture.marker(meeting.id, in: queue)
+        await queue.awaitProcessing()
+        let held = Held(meeting: meeting, queue: queue, marker: marker, files: files, record: record, transcript: transcript)
+
+        try await assertEnded(held, fixture, files: files, "done not saved")
+
+        let saved = try PipelineSnapshot.load(from: fixture.logDir, named: fixture.rerunFile.lastPathComponent) ?? []
+        XCTAssertNotEqual(saved.first { $0.id == meeting.id }?.state, .done, "test premise: the done state landed")
+        // The next launch reads the job as the file kept it and leaves the meeting as it was.
+        try FileManager.default.removeItem(at: staging)
+        await restart(fixture)
+        XCTAssertEqual(try resolved(fixture.outputFiles()), resolved(files), "the launch changed the meeting")
+        XCTAssertNil(try fixture.record(meeting.id).rerun)
+    }
+
     // MARK: - After the commit point
 
     func testAFailedEntryWriteKeepsTheJobInTheRerunFileAndAColdStartFinishesItOnce() async throws {
@@ -307,16 +336,18 @@ final class PipelineQueueRerunSwapRecoveryTests: XCTestCase {
         return Held(meeting: meeting, queue: queue, marker: marker, files: files, record: record, transcript: transcript)
     }
 
+    /// `files` by the path the disk resolves: a record lists a path that way, and
+    /// the folder walk may spell it with `/private`.
+    private func resolved(_ files: [String: Data]) -> [String: Data] {
+        Dictionary(files.map { (MeetingFile.resolvedPath(URL(filePath: $0.key)), $0.value) }) { first, _ in first }
+    }
+
     /// The swap released and run to its end, which leaves the meeting as `files`.
     private func assertEnded(
         _ held: Held, _ fixture: Fixture, files: [String: Data], _ name: String, file: StaticString = #filePath, line: UInt = #line,
     ) async throws {
         held.queue.isRegenerationRunning = { false }
         try await fixture.poll("\(name): the re-run to end") { held.queue.job(withID: held.meeting.id) == nil }
-        // A record lists a path as the disk resolves it, the folder walk may spell it with `/private`.
-        func resolved(_ files: [String: Data]) -> [String: Data] {
-            Dictionary(files.map { (MeetingFile.resolvedPath(URL(filePath: $0.key)), $0.value) }) { first, _ in first }
-        }
         XCTAssertEqual(try resolved(fixture.outputFiles()), resolved(files), "\(name): the meeting is not as it was", file: file, line: line)
         var expected = held.record
         expected.rerunNote = .init(stamp: held.marker.stamp, committed: false)
