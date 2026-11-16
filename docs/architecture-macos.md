@@ -836,7 +836,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 | **Audio** | Microphone · VAD · Echo · Per-Channel Indicator | `settings` | `audioDevices` |
 | **Transcription** | Engine + per-engine options + status + idle-model retention | `settings`, three engines | — |
 | **Speakers** | Diarization · Speaker Identity · Known Voices · Recognition Stats · Experimental: Diarization Tuning | `settings`, `recognitionStatsLog`, `enrollmentDiarizerFactory` | `knownVoicesSheet` |
-| **Output** | Output Folder · Notion · Recording Retention · Meeting Notes (language, output toggles) · Meeting Notes Templates · AI Provider · Connection Settings (endpoint, key, Advanced) | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel` |
+| **Output** | Output Folder · Notion · Recording Retention · Meeting Notes (language, output toggles) · Meeting Notes Templates · AI Provider · Connection Settings (endpoint, key, Advanced) | `settings`, `templateStore`, `templateOpener` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel` |
 | **Advanced** | Permissions · Diagnostics | — | `micPermission`, `screenRecordingOK`, `accessibilityOK` |
 | **About** | Build identity · Dependencies · Updates | `settings`, `updateChecker?` | — |
 
