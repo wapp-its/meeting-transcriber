@@ -10,6 +10,7 @@ extension RerunFailure {
     static let noEarlierName = "no free name was left for an earlier version"
     static let swapFailed = "the new files could not take the current names"
     static let swapNotRecorded = "the meeting's record could not be updated"
+    static let notSaved = "the re-run could not be saved to disk"
 }
 
 /// A re-run's success (R5): its transcript and notes take the meeting's current
@@ -35,13 +36,23 @@ extension PipelineQueue {
     /// wanted: the swap runs once the job's done state, with its marker and its
     /// queued export, is in the re-run file, so a stop at any step of the swap finds
     /// it there as done (`resumeRerunSwaps`), and once no regeneration runs (as Move
-    /// Meeting to Trash waits for one).
+    /// Meeting to Trash waits for one). When that write fails again on the flush's
+    /// retry, no rename starts and the re-run ends as R6: after the commit point only
+    /// the job in that file says what is left to do.
     func rerunSucceeded(id: UUID) {
-        guard let job = job(withID: id), let runID = job.rerun?.marker.runID else { return }
+        guard let job = job(withID: id), let runID = job.rerun?.marker.runID, let name = rerunFilename else { return }
         logger.info("[\(job.shortID, privacy: .public)] rerun_succeeded")
         let logDir = logDir
         Task { [weak self] in
             await PipelineSnapshotStore.flush(logDir)
+            // A flush leaves a store only for a write that failed again on its retry.
+            guard PipelineSnapshotStore.existing(for: logDir, named: name) == nil else {
+                if let self, isDueForSwap(id: id, runID: runID) {
+                    logger.error("[\(PipelineJob.shortID(for: id), privacy: .public)] rerun_done_not_saved: no rename starts")
+                    endRerun(id: id, because: .failed(RerunFailure.notSaved))
+                }
+                return
+            }
             while self?.swapWaits(id: id, runID: runID) == true {
                 try? await Task.sleep(for: .milliseconds(250))
             }
