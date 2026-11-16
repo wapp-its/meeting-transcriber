@@ -94,50 +94,123 @@ final class PipelineQueueRerunSwapRecoveryTests: XCTestCase {
     // MARK: - After the commit point
 
     func testAFailedEntryWriteKeepsTheJobInTheRerunFileAndAColdStartFinishesItOnce() async throws {
+        // One row each: the first launch writes the entry, or its write fails too and
+        // the export stays owed to the launch after it.
+        for failedLaunches in [0, 1] {
+            let row = "failed launches \(failedLaunches)"
+            let fixture = try makeFixture()
+            let log = RerunExportLog()
+            let notion = RerunLoggingExporter.configuration("db-record", log)
+            let first = fixture.makeQueue(completedJobLifetime: 0, notion: notion)
+            let meeting = try await fixture.finishedMeeting(in: first, leavingTheQueue: true)
+            let callsBefore = await log.calls.count
+            let queue = fixture.makeQueue(completedJobLifetime: 0, notion: notion)
+            queue.isRegenerationRunning = { true }
+            XCTAssertEqual(queue.rerunJob(id: meeting.id, mode: .transcribeAgain), .queued)
+            await queue.awaitProcessing()
+            let marker = try fixture.marker(meeting.id, in: queue)
+            // The finished-job history cannot be written: its staging name is taken by a folder.
+            let staging = fixture.tmpDir.appendingPathComponent("records/terminal_jobs.json.tmp")
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+
+            queue.isRegenerationRunning = { false }
+            try await fixture.poll("the commit") { (try? fixture.record(meeting.id).rerunNote?.committed) == true }
+            try await Task.sleep(for: .milliseconds(300))
+            await PipelineSnapshotStore.flush(fixture.logDir)
+
+            XCTAssertNotNil(queue.job(withID: meeting.id)?.rerun, "\(row): the job turned ordinary before its entry landed")
+            var saved = try PipelineSnapshot.load(from: fixture.logDir, named: fixture.rerunFile.lastPathComponent) ?? []
+            XCTAssertEqual(saved.map(\.id), [meeting.id], "\(row): the re-run file let go of the job")
+            let callsAtCommit = await log.calls.count
+            XCTAssertEqual(callsAtCommit, callsBefore, "\(row): the export started before the entry landed")
+            for _ in 0 ..< failedLaunches {
+                PipelineQueue.reconcileOrphanedReruns(in: fixture.store, logDir: fixture.logDir) { _ in false }
+                let failed = fixture.makeQueue(completedJobLifetime: 0, notion: notion)
+                failed.loadSnapshot()
+                try await Task.sleep(for: .milliseconds(300))
+                await PipelineSnapshotStore.flush(fixture.logDir)
+                XCTAssertNotNil(failed.job(withID: meeting.id)?.rerun, "\(row): the job turned ordinary before its entry landed")
+            }
+            try FileManager.default.removeItem(at: staging)
+
+            // A cold start: the launch rows that need no queue, then the first queue.
+            PipelineQueue.reconcileOrphanedReruns(in: fixture.store, logDir: fixture.logDir) { _ in false }
+            let restarted = fixture.makeQueue(completedJobLifetime: 0, notion: notion)
+            restarted.loadSnapshot()
+            try await fixture.poll("the export") {
+                restarted.notionExportTasks[meeting.id] == nil && restarted.job(withID: meeting.id)?.rerun == nil
+            }
+            try await Task.sleep(for: .milliseconds(300))
+            await PipelineSnapshotStore.flush(fixture.logDir)
+
+            let calls = await log.calls.dropFirst(callsBefore)
+            XCTAssertEqual(calls.map(\.page), ["page-1"], "\(row): not one update of the recorded page")
+            XCTAssertEqual(calls.map(\.database), ["db-record"], row)
+            let entry = try XCTUnwrap(fixture.finishedEntry(meeting.id), row)
+            let notes = try XCTUnwrap(entry.status.protocolPath, "\(row): the entry names no notes")
+            XCTAssertEqual(FileIdentity.of(notes), marker.files.last { $0.role == .protocol }?.identity, "\(row): the entry is not the new result")
+            XCTAssertEqual(fixture.terminal.records.last?.status.jobID, meeting.id.uuidString, row)
+            saved = try PipelineSnapshot.load(from: fixture.logDir, named: fixture.rerunFile.lastPathComponent) ?? []
+            XCTAssertTrue(saved.isEmpty, "\(row): the re-run file still holds the job")
+        }
+    }
+
+    func testALaunchAfterTheCommitLeavesACurrentTranscriptReplacedMeanwhile() async throws {
         let fixture = try makeFixture()
-        let log = RerunExportLog()
-        let notion = RerunLoggingExporter.configuration("db-record", log)
-        let first = fixture.makeQueue(completedJobLifetime: 0, notion: notion)
-        let meeting = try await fixture.finishedMeeting(in: first, leavingTheQueue: true)
-        let callsBefore = await log.calls.count
-        let queue = fixture.makeQueue(completedJobLifetime: 0, notion: notion)
+        let meeting = try await fixture.finishedMeeting(in: fixture.makeQueue(completedJobLifetime: 0), leavingTheQueue: true)
+        // Admitted with "Save raw transcript separately" off.
+        let queue = fixture.makeQueue(saveRawTranscriptSeparately: false, completedJobLifetime: 0)
         queue.isRegenerationRunning = { true }
         XCTAssertEqual(queue.rerunJob(id: meeting.id, mode: .transcribeAgain), .queued)
         await queue.awaitProcessing()
-        let marker = try fixture.marker(meeting.id, in: queue)
-        // The finished-job history cannot be written: its staging name is taken by a folder.
-        let staging = fixture.tmpDir.appendingPathComponent("records/terminal_jobs.json.tmp")
-        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
-
-        queue.isRegenerationRunning = { false }
-        try await fixture.poll("the commit") { (try? fixture.record(meeting.id).rerunNote?.committed) == true }
-        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(queue.job(withID: meeting.id)?.state, .done, "test premise: the re-run succeeded")
+        // A stop right after the commit point: every rename made and the record committed.
+        let record = try fixture.record(meeting.id)
+        var marker = try XCTUnwrap(record.rerun)
+        let base = PipelineQueue.namingSlug(title: meeting.meetingTitle, jobID: meeting.id, startTime: fixture.meetingStart)
+        let plan = PipelineQueue.swapRenames(marker: marker, record: record, base: base)
+        XCTAssertNil(plan.refusal)
+        XCTAssertNil(PipelineQueue.performRenames(plan.renames, jobID: meeting.id))
+        marker.renames = plan.renames
+        let current = plan.renames.filter { !$0.earlier }.map { MeetingFile(role: $0.role, url: URL(filePath: $0.to), owned: true) }
+        let earlier = plan.renames.filter(\.earlier).map { MeetingFile(role: .previousProtocol, url: URL(filePath: $0.to), owned: true) }
+        XCTAssertTrue(fixture.store.update(jobID: meeting.id) { _ = $0.commitRerun(marker, current: current, kept: earlier, protocolExpected: true) })
+        // The current transcript is replaced while the app is closed.
+        let transcript = try URL(filePath: XCTUnwrap(plan.renames.first { $0.role == .transcript && !$0.earlier }).to)
+        try Data("changed by hand".utf8).write(to: transcript, options: .atomic)
         await PipelineSnapshotStore.flush(fixture.logDir)
 
-        XCTAssertNotNil(queue.job(withID: meeting.id)?.rerun, "the job turned ordinary before its entry landed")
-        var saved = try PipelineSnapshot.load(from: fixture.logDir, named: fixture.rerunFile.lastPathComponent) ?? []
-        XCTAssertEqual(saved.map(\.id), [meeting.id], "the re-run file let go of the job")
-        let callsAtCommit = await log.calls.count
-        XCTAssertEqual(callsAtCommit, callsBefore, "the export started before the entry landed")
-        try FileManager.default.removeItem(at: staging)
+        await restart(fixture)
 
-        // A cold start: the launch rows that need no queue, then the first queue.
+        XCTAssertEqual(try fixture.record(meeting.id).rerunNote, .init(stamp: marker.stamp, committed: true), "test premise")
+        XCTAssertEqual(try? Data(contentsOf: transcript), Data("changed by hand".utf8), "the replaced transcript was removed")
+    }
+
+    func testARenameThatCannotGoBackKeepsTheMarkerAndItsFileUntilALaterTryMovesItBack() async throws {
+        let fixture = try makeFixture()
+        let stopped = try await stoppedSwap(fixture, after: 1)
+        let moved = try XCTUnwrap(stopped.renames.first)
+        XCTAssertTrue(moved.earlier && moved.role == .transcript, "test premise: the current transcript moves first")
+        let transcriptBytes = try Data(contentsOf: URL(filePath: moved.to))
+        // Its name is taken meanwhile, and a file of the re-run is gone, so the launch undoes the swap.
+        try Data("taken".utf8).write(to: URL(filePath: moved.from))
+        let gone = try XCTUnwrap(stopped.renames.last)
+        try FileManager.default.removeItem(atPath: gone.from)
+
+        await restart(fixture)
+
+        let record = try fixture.record(stopped.held.meeting.id)
+        XCTAssertEqual(record.rerun?.isEnding, true, "the marker went with a rename not undone")
+        XCTAssertEqual(record.rerun?.files.map(\.path), [moved.to])
+        XCTAssertEqual(record.rerunRefusal, .filesLeft)
+        // The next try leaves the file at the rename's target: it is the meeting's own.
         PipelineQueue.reconcileOrphanedReruns(in: fixture.store, logDir: fixture.logDir) { _ in false }
-        let restarted = fixture.makeQueue(completedJobLifetime: 0, notion: notion)
-        restarted.loadSnapshot()
-        try await fixture.poll("the export") { restarted.notionExportTasks[meeting.id] == nil && restarted.job(withID: meeting.id)?.rerun == nil }
-        try await Task.sleep(for: .milliseconds(300))
-        await PipelineSnapshotStore.flush(fixture.logDir)
-
-        let calls = await log.calls.dropFirst(callsBefore)
-        XCTAssertEqual(calls.map(\.page), ["page-1"], "not one update of the recorded page")
-        XCTAssertEqual(calls.map(\.database), ["db-record"])
-        let entry = try XCTUnwrap(fixture.finishedEntry(meeting.id))
-        let notes = try XCTUnwrap(entry.status.protocolPath, "the entry names no notes")
-        XCTAssertEqual(FileIdentity.of(notes), marker.files.last { $0.role == .protocol }?.identity, "the entry is not the new result")
-        XCTAssertEqual(fixture.terminal.records.last?.status.jobID, meeting.id.uuidString)
-        saved = try PipelineSnapshot.load(from: fixture.logDir, named: fixture.rerunFile.lastPathComponent) ?? []
-        XCTAssertTrue(saved.isEmpty, "the re-run file still holds the job")
+        XCTAssertEqual(try? Data(contentsOf: URL(filePath: moved.to)), transcriptBytes, "the meeting's transcript was removed")
+        // Once its name is free, a later try moves it back and the re-run ends.
+        try FileManager.default.removeItem(atPath: moved.from)
+        PipelineQueue.reconcileOrphanedReruns(in: fixture.store, logDir: fixture.logDir) { _ in false }
+        XCTAssertEqual(try? Data(contentsOf: URL(filePath: moved.from)), transcriptBytes)
+        XCTAssertNil(try fixture.record(stopped.held.meeting.id).rerun)
     }
 
     // MARK: - A stop between two steps
