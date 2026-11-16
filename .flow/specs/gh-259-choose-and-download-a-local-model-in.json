@@ -21,5 +21,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nThe local model for meeting notes (#138) needs a model folder picked by hand. Users can't tell which MLX model runs on their Mac, and they download it outside the app.\n\n## NOTES\n\n- Wanted (paraphrased): the list shows first which models run on this Mac. It is ordered by how the base model ranks on a public leaderboard. The rank is only a hint. So the app suggests trying a few models on your own meetings and templates, and looking again from time to time.\n- Download in the app with consent, size and progress, like the transcription models (#9).\n- Takes the download part of #145. The XPC service and the App Store variant stay there.\n- Related: #159 (the model check accepts folders that can't load), #103 (default provider for other users).\n\n## TASKS\n\n- [ ] Spec and mockups\n- [ ] Build it",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/259"
   },
-  "updated_at": "2026-11-16T09:58:25.583599Z"
+  "updated_at": "2026-11-16T09:59:10.217425Z"
 }

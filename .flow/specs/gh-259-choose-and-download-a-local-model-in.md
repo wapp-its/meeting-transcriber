@@ -95,9 +95,12 @@ It takes over the download part of #145; the XPC service and the App Store varia
 - **A8 · One download at a time, paused while a recording runs.** alternatives: B — parallel downloads; C — keep downloading during recordings · flip at: the download queue · test: a download test where a recording starts and ends mid-download · status: active [agent-inferred 2026-11-16]
 - **A9 · Downloads fetch only data files of one pinned revision and verify each against Hugging Face's hash.** alternatives: B — whole repository snapshot without verification · flip at: the downloader's file filter · test: a downloader test that skips a code file and rejects a file with a wrong hash · status: active [agent-inferred 2026-11-16; Codex cross-check proposed it]
 - **A10 · The helper uses a model's own generation configuration for sampling when it ships one.** alternatives: B — keep the Qwen-tuned defaults for every model · flip at: the helper's generation settings · test: a helper test that reads a model folder's generation configuration and one without it · status: active [agent-inferred 2026-11-16]
-- Rejected bigger design: rank by a mix of benchmarks from Hugging Face eval results; the benchmarks are not comparable and cover too few models.
-- Related: #145 (XPC service and App Store variant), #159 (the model check accepts folders that cannot load; the test run in R7 catches those in practice), #160 and #162 (provider seam and helper contract), #9 (the transcription models' Hugging Face browser, whose catalog and token handling this reuses), #103 (default provider for other users).
-- Mockup gate: five screens are drawn on the project's private design canvas (Settings → Output with "Find Models…", the model list with its row states, the download confirmation with the reasons a download cannot start, the testing advice popup, the regenerate sheet with the model in the report name); acceptance pending.
+
+Rejected bigger design: rank by a mix of benchmarks from Hugging Face eval results; the benchmarks are not comparable and cover too few models.
+
+Related: #145 (XPC service and App Store variant), #159 (the model check accepts folders that cannot load; the test run in R7 catches those in practice), #160 and #162 (provider seam and helper contract), #9 (the transcription models' Hugging Face browser, whose catalog and token handling this reuses), #103 (default provider for other users).
+
+Mockup gate: five screens are drawn on the project's private design canvas (Settings → Output with "Find Models…", the model list with its row states, the download confirmation with the reasons a download cannot start, the testing advice popup, the regenerate sheet with the model in the report name); acceptance pending.
 
 ## Requirement coverage
 
