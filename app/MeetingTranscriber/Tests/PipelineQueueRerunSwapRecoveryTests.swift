@@ -165,10 +165,15 @@ final class PipelineQueueRerunSwapRecoveryTests: XCTestCase {
 
             // A cold start: the launch rows that need no queue, then the first queue.
             PipelineQueue.reconcileOrphanedReruns(in: fixture.store, logDir: fixture.logDir) { _ in false }
-            let restarted = fixture.makeQueue(completedJobLifetime: 0, notion: notion)
+            // The app's lifetime of a finished job: with none, the job could leave the
+            // list before its hand-off starts the export, which the app's minute
+            // does not allow.
+            let restarted = fixture.makeQueue(notion: notion)
             restarted.loadSnapshot()
+            // The job turns ordinary before its hand-off starts the export, so the
+            // export's own end is what to wait for.
             try await fixture.poll("the export") {
-                restarted.notionExportTasks[meeting.id] == nil && restarted.job(withID: meeting.id)?.rerun == nil
+                restarted.job(withID: meeting.id)?.rerun == nil && restarted.job(withID: meeting.id)?.notionExportStatus == .completed
             }
             try await Task.sleep(for: .milliseconds(300))
             await PipelineSnapshotStore.flush(fixture.logDir)
