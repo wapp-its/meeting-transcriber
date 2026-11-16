@@ -8,27 +8,6 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Speaker
 /// happens after the pipeline already reached `.speakerNamingPending`. Split
 /// out of `SpeakerNamingSession.swift` to keep both files under the lint cap.
 extension SpeakerNamingSession {
-    // MARK: - Late work tracking
-
-    /// Run `work` on a task of its own, tracked under `jobID` until it returns
-    /// so `cancelLateWork` can reach it.
-    func startLateWork(jobID: UUID, _ work: @escaping () async -> Void) {
-        let token = UUID()
-        lateWork[jobID, default: [:]][token] = Task {
-            await work()
-            lateWork[jobID]?[token] = nil
-            if lateWork[jobID]?.isEmpty == true { lateWork[jobID] = nil }
-        }
-    }
-
-    /// Cancel every late-naming task still running for `jobID`. Called when
-    /// the job is removed or cancelled. The tasks still re-check the job after
-    /// each await, because a step that ignores cancellation returns all the
-    /// same.
-    func cancelLateWork(jobID: UUID) {
-        lateWork.removeValue(forKey: jobID)?.values.forEach { $0.cancel() }
-    }
-
     // MARK: - Protocol for accepted auto-names
 
     /// Matched by /v1 clients and persisted jobs; keep the text stable.
