@@ -4,13 +4,6 @@ import SwiftUI
 
 private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Launch")
 
-extension Notification.Name {
-    static let autoWatchStart = Notification.Name("autoWatchStart")
-    static let showSpeakerNaming = Notification.Name("showSpeakerNaming")
-    static let showSettings = Notification.Name("showSettings")
-    static let closeSettings = Notification.Name("closeSettings")
-}
-
 /// Bridges a SwiftUI `Window` scene down to its hosting `NSWindow` so
 /// window-level AppKit properties can be configured. macOS 14 (our deployment
 /// target) has no scene-level `.windowLevel` / collection-behavior modifiers
