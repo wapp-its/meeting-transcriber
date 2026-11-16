@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-258-name-teams-recordings-after-the-meeting",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "not_required",
+  "completion_reviewed_at": "2026-11-16T15:32:37.086549Z",
   "created_at": "2026-11-16T09:19:59.858574Z",
   "default_impl": null,
   "default_review": null,
@@ -9,7 +9,7 @@
   "depends_on_epics": [],
   "id": "gh-258-name-teams-recordings-after-the-meeting",
   "impl_review_rounds": {
-    "gh-258-name-teams-recordings-after-the-meeting.1": 1
+    "gh-258-name-teams-recordings-after-the-meeting.1": 0
   },
   "next_task": 1,
   "no_plan": true,
@@ -174,9 +174,62 @@
       "task": "gh-258-name-teams-recordings-after-the-meeting.1",
       "timestamp": "2026-11-16T15:17:20.593914Z",
       "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "0d18c8244903cd71e3c186a1431fb1d5ecbbb2576bc59eb323294271a2200a80",
+      "backend": "codex",
+      "base_sha": "e0653ad929d024632c442bfdf63ec83260f4d3f4",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-58d6badd2bd6fff3c9a6aaf340d26728",
+            "classification": "introduced",
+            "findingId": "finding-58d6badd2bd6fff3c9a6aaf340d26728",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-dcb395c24c98e1a665b5d2ab05168685",
+            "classification": "introduced",
+            "findingId": "finding-dcb395c24c98e1a665b5d2ab05168685",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "678b6bcb26337aef17ae5c4c6f498d954dc498b7",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6.1-sol",
+      "outcome": "verdict",
+      "output_bytes": 1027,
+      "output_sha256": "e3cde2ee0726e5e63f82f686be5109ac768da8b2bbdf9268ce0c3ed6f02b30d6",
+      "reservation_id": "3fde5783154641e2a7cf057187b5a135",
+      "round_consumed": true,
+      "scope": "impl:gh-258-name-teams-recordings-after-the-meeting.1",
+      "superseded_by": null,
+      "task": "gh-258-name-teams-recordings-after-the-meeting.1",
+      "timestamp": "2026-11-16T15:24:29.539741Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:gh-258-name-teams-recordings-after-the-meeting.1": 1,
     "plan": 1,
     "plan#completion": 0
   },
@@ -201,5 +254,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nA detected Teams meeting gets its title from one Teams window, read once when the meeting is detected. The app takes the first Teams window that isn't a Calendar, Chat or other tab. So the title depends on which Teams window is in front at that moment. A call can be named \"Sprint Review | Contoso | user@contoso.com\" (the meeting window). It can also be named \"Meeting compact view | Meeting in General\" (the small call window), or after an unrelated Teams window. It should get the meeting's own title every time.\n\n## NOTES\n\n- The pick is in `MeetingTitleMatcher.selectWindowTitle`. Teams ends most window titles with \" | Microsoft Teams\", so the preference for that pattern probably doesn't single out the meeting window.\n- The title never changes during the recording. So a call detected while another Teams window was in front keeps that title. All Recordings, the file names and the meeting notes all use it.\n\n## TASKS\n\n- [ ] Rank the Teams windows by how much they look like the meeting window\n- [ ] Decide if the title should also follow a better window during the recording\n- [ ] Add tests with window lists in and the title out",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/258"
   },
-  "updated_at": "2026-11-16T15:17:21.211522Z"
+  "updated_at": "2026-11-16T15:32:37.086737Z"
 }
