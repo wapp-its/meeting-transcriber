@@ -44,12 +44,27 @@ so the gap stays small and the original's audio-capture fixes keep merging in.
   original's version and remove ours**, unless ours covers a case it misses (say
   which). Known cases are open fork issues labelled `upstream-overlap`; read them
   before resolving an `upstream-sync` conflict.
-- **Generic fixes and small features go to the original one at a time:** one focused
+- **A new generic feature is built to stand on the original** (owner, 2026-11-16).
+  When it needs nothing that only the fork has, its spec says "stands on the original:
+  yes" and carries this acceptance criterion, checked before the fork PR merges:
+  `submit.sh <branch>` (without `--go`) rebuilds its code commits on `upstream/main`,
+  and the resulting `submit/<name>` branch builds and passes the feature's tests there.
+  The script only rebuilds the commits and checks the diff, so build and test that
+  branch yourself. The feature merges into `wapp/main` like any fork PR and is then
+  ready to send. A feature that stands on generic fork code the original does not have
+  yet is built as before: its spec says "stands on the original: no" and names that
+  fork feature, which is sent to the original before it. Nothing here waits for the
+  original: the fork merges and installs as always. Why: a feature written on code only
+  the fork has needs a rewrite before it can be sent, and the fork grew faster than the
+  original took our work.
+- **Generic fixes and features go to the original, each as its own PR:** one focused
   change with its tests, preferring ones that answer an issue someone filed there,
   prepared with `submit.sh` and posted only after the owner saw the exact title and body
-  (the "go" rule below). Fork-only work (mt-update, in-app self-update, university
-  defaults) never goes. The candidate list stays in the session or in
-  `docs/plans/.local/`, never in a public issue.
+  (the "go" rule below). **At most two of our PRs are open there at once: one feature
+  and one small fix** (one bug or one text correction, no new setting or screen; owner,
+  2026-11-16). Fork-only work (mt-update, in-app self-update, the consent reminder,
+  university defaults) never goes. The candidate list and its order stay in the session
+  or in `docs/plans/.local/`, never in a public issue.
 - A merged fork PR's branch is gone (auto-delete), and `submit.sh` finds no commits on
   a branch already inside `wapp/main`. Rebuild it first: cherry-pick the PR's code
   commits onto `upstream/main` into a new local branch, then run `submit.sh` on that.
