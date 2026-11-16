@@ -1691,7 +1691,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-171-transcribe-again-and-identify-speakers.md",
-  "status": "open",
+  "status": "done",
   "title": "Transcribe again and identify speakers again for a finished recording",
   "tracker": {
     "baseHashFlow": null,
@@ -1705,5 +1705,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/171"
   },
-  "updated_at": "2026-11-16T12:54:58.853067Z"
+  "updated_at": "2026-11-16T12:56:59.504815Z"
 }

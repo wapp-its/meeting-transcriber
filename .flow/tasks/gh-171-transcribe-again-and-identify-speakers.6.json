@@ -12,7 +12,7 @@
   "review": "codex:gpt-6.1-sol:xhigh",
   "spec": "gh-171-transcribe-again-and-identify-speakers",
   "spec_path": ".flow/tasks/gh-171-transcribe-again-and-identify-speakers.6.md",
-  "status": "todo",
+  "status": "done",
   "title": "Keep word timings and identify speakers again without transcribing",
   "updated_at": "2026-11-14T20:38:11.809025Z"
 }

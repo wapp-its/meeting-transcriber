@@ -11,7 +11,7 @@
   "review": "codex:gpt-6.1-sol:xhigh",
   "spec": "gh-171-transcribe-again-and-identify-speakers",
   "spec_path": ".flow/tasks/gh-171-transcribe-again-and-identify-speakers.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "End a re-run that fails, is cancelled or stays unnamed, and bring it back after a quit",
   "updated_at": "2026-11-14T20:45:50.151283Z"
 }
