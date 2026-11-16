@@ -115,3 +115,5 @@ FIT: GO · 2026-11-16 · base 3b236a80 · engine flow-next 9.10.0 · captured to
   - `origin/wapp/main` is still 3b236a80; specs and design docs changed since capture only for gh-256 (device live levels), gh-171 (diarization doc) and an upstream docs branch, none of which touch the consent gate, Record Again or the menu
   - every code anchor checked at 3b236a80: `finishConsent`, `declineParkedConsent`, `BrowserConsentPolicy` (600 s / 60 s), `consentPromptTimeout` 300 s, `RecordAgainOffer`, `recordAgainOffers`, `recordAgain(identityKey:)`, `takeRecordAgain()`, `releaseEndedRedetectionHolds()`, `markConfirmed(appName:)`, `stop()`, `A11yID.recordAgainMenuItem`, the named test classes, and the line counts (600 / 598 / 585 / 583 against a `file_length` warning at 600)
   - the original project has no open issue or pull request about recording a call after declining its consent question
+
+FIT: GO · 2026-11-16 · base 3b236a80 · engine flow-next 9.10.0 · build start; since the last check only this spec's own plan-review fix (R4) and a diarization.md line on the gh-171 branch moved, neither touches the consent gate, Record Again or the menu
