@@ -1,0 +1,25 @@
+{
+  "branch_name": "gh-256-live-levels-for-every-device-in-the",
+  "created_at": "2026-11-16T08:49:52.316335Z",
+  "depends_on_epics": [],
+  "id": "gh-256-live-levels-for-every-device-in-the",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/gh-256-live-levels-for-every-device-in-the.md",
+  "status": "open",
+  "title": "Live levels for every device in the Audio Devices window",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": "I_kwDOUvyDOc8AAAABfoNylw",
+    "identifier": "#256",
+    "lastSyncedAt": null,
+    "linkState": "linked",
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/256"
+  },
+  "updated_at": "2026-11-16T08:49:52.329352Z"
+}
