@@ -851,7 +851,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 - `updateChecker == nil` hides the entire Updates section in About
 
 **Cross-cutting concerns owned by sub-views:**
-- `OutputSettingsView` owns OpenAI-endpoint connection testing (`testConnection()`) and custom-prompt I/O (`openCustomPrompt`, `importCustomPrompt`, reset confirmation)
+- `OutputSettingsView` owns OpenAI-endpoint connection testing (`testConnection()`) and the Meeting Notes Templates section, whose state and writes live in `ProtocolTemplatesModel`
 - `AdvancedSettingsView` owns permission live-probing (`refreshPermissions()`)
 - `AboutSettingsView` owns version/build/ffmpeg status and update-check controls
 
