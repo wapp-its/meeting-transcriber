@@ -664,9 +664,10 @@ final class AppSettings { // swiftlint:disable:this type_body_length
     }
 
     /// The template a job is stamped with when it enters the queue. May name a
-    /// file that is gone: readers that need a usable value go through
-    /// `ProtocolTemplateStore.effectiveDefault`, which leaves this alone, so
-    /// restoring the file restores the default.
+    /// file that is gone: a job is stamped with the name all the same and falls
+    /// back to the built-in template with a warning when its notes are made.
+    /// `ProtocolTemplateStore.effectiveDefault` reads such a default as the
+    /// built-in one without changing this, so restoring the file restores it.
     var defaultProtocolTemplate: ProtocolTemplateID {
         didSet { defaults.set(defaultProtocolTemplate.storedValue, forKey: Self.defaultProtocolTemplateKey) }
     }

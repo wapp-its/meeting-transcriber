@@ -64,6 +64,27 @@ final class NotesOnlyProtocolTemplateTests: XCTestCase {
         XCTAssertEqual(generator.capturedInstructions, ProtocolInstructions(template: boardText))
     }
 
+    /// A retry reads the recorded template again. One deleted since falls back
+    /// to the built-in one with the warning, which is no notes failure: the
+    /// notes are saved and the job is not held for another retry.
+    func testARetryWhoseTemplateWasDeletedMeanwhileUsesTheBuiltInWithAWarning() async throws {
+        let generator = MockProtocolGen()
+        let queue = makeQueue(generator: generator)
+        let id = try await failNotes(in: queue, generator: generator)
+        try FileManager.default.removeItem(at: store.fileURL(named: "Board"))
+
+        XCTAssertTrue(queue.retryMeetingNotes(id: id))
+        await queue.awaitProcessing()
+
+        let job = try XCTUnwrap(queue.jobs.first { $0.id == id })
+        XCTAssertEqual(generator.capturedInstructions, ProtocolInstructions(template: ProtocolGenerator.protocolPrompt))
+        XCTAssertNotNil(job.protocolPath)
+        XCTAssertEqual(
+            job.warnings, ["Meeting notes template \"Board\" was not found or is empty, so the built-in template was used"],
+        )
+        XCTAssertFalse(queue.canRetryMeetingNotes(id: id))
+    }
+
     /// The snapshot keeps the template of a job held for a retry, so the
     /// retry after a relaunch asks for it, not for the next launch's default.
     func testFailedNotesKeepTheirTemplateAcrossARelaunch() async throws {

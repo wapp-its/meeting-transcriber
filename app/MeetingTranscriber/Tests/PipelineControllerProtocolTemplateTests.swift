@@ -36,8 +36,9 @@ final class PipelineControllerProtocolTemplateTests: XCTestCase {
     }
 
     /// The default template reaches a job through the queue the controller
-    /// builds, read at enqueue time and checked against the environment's
-    /// templates folder: a default whose file is gone stamps the built-in one.
+    /// builds, read at enqueue time. A default whose file is gone is stamped
+    /// by its name too: the job falls back to the built-in one when its notes
+    /// are made, with a warning that says so.
     func testAJobTakesTheDefaultTemplateFromTheQueueTheControllerBuilds() throws {
         var environment = IsolatedQueueEnvironment.make(logDir: tmpDir)
         environment.protocolTemplateStore = try ProtocolTemplateStore(directory: makeTempDirectory(prefix: "templates"))
@@ -58,6 +59,6 @@ final class PipelineControllerProtocolTemplateTests: XCTestCase {
         settings.defaultProtocolTemplate = .file(name: "Board")
         XCTAssertEqual(enqueuedJob()?.protocolTemplate, .file(name: "Board"))
         settings.defaultProtocolTemplate = .file(name: "Gone")
-        XCTAssertEqual(enqueuedJob()?.protocolTemplate, .builtIn)
+        XCTAssertEqual(enqueuedJob()?.protocolTemplate, .file(name: "Gone"))
     }
 }
