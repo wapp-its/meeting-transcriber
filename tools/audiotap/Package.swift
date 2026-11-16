@@ -35,11 +35,20 @@ let package = Package(
             name: "CExceptionCatcher",
             path: "Sources/CExceptionCatcher"
         ),
+        // Lock-free level cell the device meters' real-time callbacks write
+        // (`DeviceLevelMeter`). C11 atomics, because `Synchronization.Atomic`
+        // needs macOS 15. The flag turns a blocking call inside a function
+        // marked nonblocking into a build error. See header.
+        .target(
+            name: "CLevelCell",
+            path: "Sources/CLevelCell",
+            cSettings: [.unsafeFlags(["-Werror=function-effects"])]
+        ),
         .target(
             name: "AudioTapLib",
-            dependencies: ["CExceptionCatcher"],
+            dependencies: ["CExceptionCatcher", "CLevelCell"],
             path: "Sources",
-            exclude: ["CExceptionCatcher"],
+            exclude: ["CExceptionCatcher", "CLevelCell"],
             swiftSettings: strictSwiftSettings
         ),
         .testTarget(
