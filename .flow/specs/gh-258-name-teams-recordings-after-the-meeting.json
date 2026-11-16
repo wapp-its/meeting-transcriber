@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-258-name-teams-recordings-after-the-meeting",
-  "completion_review_status": "not_required",
-  "completion_reviewed_at": "2026-11-16T15:32:37.086549Z",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-11-16T15:39:41.159714Z",
   "created_at": "2026-11-16T09:19:59.858574Z",
   "default_impl": null,
   "default_review": null,
@@ -226,16 +226,53 @@
       "task": "gh-258-name-teams-recordings-after-the-meeting.1",
       "timestamp": "2026-11-16T15:24:29.539741Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "859297f1a1e560adc2d0ef5d4cc2064611b9c1d392670eb518b61d84ea16407e",
+      "backend": "codex",
+      "base_sha": "eecf7184905a498bf70f21821b37ae473e9d4e17",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "2084a784ae9ced99f38dc8cc7fda3ac40c6aa331",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 459507,
+      "output_sha256": "f2958c00e67ea24ced43a6099e427bb31dc3c1eb2426957ad47837b96f7360dc",
+      "reservation_id": "3bf3935e03fe4bc2baab4947e45d0153",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-16T15:39:41.117888Z",
+      "tool_calls": 26,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-258-name-teams-recordings-after-the-meeting.1": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-258-name-teams-recordings-after-the-meeting.1": 0,
     "plan": 0
   },
@@ -254,5 +291,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nA detected Teams meeting gets its title from one Teams window, read once when the meeting is detected. The app takes the first Teams window that isn't a Calendar, Chat or other tab. So the title depends on which Teams window is in front at that moment. A call can be named \"Sprint Review | Contoso | user@contoso.com\" (the meeting window). It can also be named \"Meeting compact view | Meeting in General\" (the small call window), or after an unrelated Teams window. It should get the meeting's own title every time.\n\n## NOTES\n\n- The pick is in `MeetingTitleMatcher.selectWindowTitle`. Teams ends most window titles with \" | Microsoft Teams\", so the preference for that pattern probably doesn't single out the meeting window.\n- The title never changes during the recording. So a call detected while another Teams window was in front keeps that title. All Recordings, the file names and the meeting notes all use it.\n\n## TASKS\n\n- [ ] Rank the Teams windows by how much they look like the meeting window\n- [ ] Decide if the title should also follow a better window during the recording\n- [ ] Add tests with window lists in and the title out",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/258"
   },
-  "updated_at": "2026-11-16T15:32:37.086737Z"
+  "updated_at": "2026-11-16T15:39:41.164971Z"
 }
