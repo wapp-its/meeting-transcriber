@@ -50,6 +50,32 @@ final class PipelineQueueRerunSwapRecoveryTests: XCTestCase {
         try await assertEnded(held, fixture, files: expected, "notes taken")
     }
 
+    func testACurrentSegmentsFileStaysAsItWasWhenTheSwapIsUndone() async throws {
+        let fixture = try makeFixture()
+        var generator: (any ProtocolGenerating)?
+        // swiftlint:disable:next trailing_closure
+        let held = try await hold(fixture, fixture.makeQueue(completedJobLifetime: 0, protocolGenerator: { generator })) {
+            generator = fixture.protocolGen
+        }
+        // Word timings the meeting kept, renamed out of the way by the swap before
+        // the notes rename below fails.
+        let entry = try XCTUnwrap(held.record.files.last { $0.role == .segments }, "test premise: no segments entry")
+        let segments = URL(filePath: entry.path)
+        try Data("earlier word timings".utf8).write(to: segments)
+        let listed = MeetingFile(role: .segments, url: segments, owned: true)
+        XCTAssertTrue(fixture.store.update(jobID: held.meeting.id) { $0.list(listed) })
+        var record = held.record
+        record.list(listed)
+        let notes = held.transcript.deletingPathExtension().appendingPathExtension("md")
+        try Data("notes from the transcript".utf8).write(to: notes)
+        var expected = held.files
+        expected[segments.path] = Data("earlier word timings".utf8)
+        expected[notes.path] = Data("notes from the transcript".utf8)
+        let undone = Held(meeting: held.meeting, queue: held.queue, marker: held.marker, files: expected, record: record, transcript: held.transcript)
+
+        try await assertEnded(undone, fixture, files: expected, "segments")
+    }
+
     func testNoEarlierNameLeftEndsTheRerun() async throws {
         let fixture = try makeFixture()
         let held = try await hold(fixture)

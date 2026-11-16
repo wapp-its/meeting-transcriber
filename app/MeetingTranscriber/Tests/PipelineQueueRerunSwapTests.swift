@@ -203,6 +203,28 @@ final class PipelineQueueRerunSwapTests: XCTestCase {
         XCTAssertEqual(try fixture.record(meeting.id).files.filter { $0.role == .previousProtocol }.count, 1, "one earlier transcript")
     }
 
+    func testTheNewSegmentsFileTakesTheCurrentNameAndTheEarlierOneIsDeleted() async throws {
+        let fixture = try makeFixture()
+        let meeting = try await fixture.finishedMeeting(in: fixture.makeQueue(completedJobLifetime: 0), leavingTheQueue: true)
+        // Word timings the meeting kept from its first run.
+        let entry = try XCTUnwrap(fixture.record(meeting.id).files.last { $0.role == .segments }, "test premise: no segments entry")
+        let segments = URL(filePath: entry.path)
+        try Data("earlier word timings".utf8).write(to: segments)
+        XCTAssertTrue(fixture.store.update(jobID: meeting.id) { $0.list(MeetingFile(role: .segments, url: segments, owned: true)) })
+        let queue = fixture.makeQueue()
+
+        let marker = try await rerunToSuccess(meeting, in: queue, fixture)
+
+        let new = try newFile(.segments, marker)
+        XCTAssertEqual(FileIdentity.of(segments.path), new.identity, "the new segments file is not current")
+        let names = try FileManager.default.contentsOfDirectory(atPath: segments.deletingLastPathComponent().path)
+        XCTAssertFalse(names.contains { $0.contains("_segments.until-") }, "the earlier segments file is kept: \(names)")
+        let record = try fixture.record(meeting.id)
+        XCTAssertEqual(record.files.last { $0.role == .segments }?.identity, new.identity)
+        let listed = record.files.filter { $0.role == .previousProtocol && $0.state != .gone }.map { URL(filePath: $0.path).lastPathComponent }
+        XCTAssertFalse(listed.contains { $0.contains("_segments") }, "the earlier segments file is listed: \(listed)")
+    }
+
     // MARK: - The raw transcript setting
 
     func testTheRawTranscriptSettingAtTheClickDecidesTheCurrentTranscript() async throws {
