@@ -14,6 +14,7 @@
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
   "plan_reviewed_at": "2026-11-16T12:56:58.288272Z",
+  "ready": true,
   "review_attempts": [
     {
       "artifact_sha256": "c20f6b947b66322bcbd2c9d2ff09753f447bfc20eac641e9297ffb052b132add",
@@ -145,5 +146,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nA detected Teams meeting gets its title from one Teams window, read once when the meeting is detected. The app takes the first Teams window that isn't a Calendar, Chat or other tab. So the title depends on which Teams window is in front at that moment. A call can be named \"Sprint Review | Contoso | user@contoso.com\" (the meeting window). It can also be named \"Meeting compact view | Meeting in General\" (the small call window), or after an unrelated Teams window. It should get the meeting's own title every time.\n\n## NOTES\n\n- The pick is in `MeetingTitleMatcher.selectWindowTitle`. Teams ends most window titles with \" | Microsoft Teams\", so the preference for that pattern probably doesn't single out the meeting window.\n- The title never changes during the recording. So a call detected while another Teams window was in front keeps that title. All Recordings, the file names and the meeting notes all use it.\n\n## TASKS\n\n- [ ] Rank the Teams windows by how much they look like the meeting window\n- [ ] Decide if the title should also follow a better window during the recording\n- [ ] Add tests with window lists in and the title out",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/258"
   },
-  "updated_at": "2026-11-16T12:56:58.311641Z"
+  "updated_at": "2026-11-16T12:57:13.671850Z"
 }
