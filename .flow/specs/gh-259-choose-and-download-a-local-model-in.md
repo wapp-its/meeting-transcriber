@@ -73,8 +73,8 @@ It takes over the download part of #145; the XPC service and the App Store varia
 ## Boundaries
 
 - No XPC service and no App Store variant; both stay in #145. [paraphrase]
-- No model picker inside the "Regenerate Notes…" sheet; the user switches the model in Settings. [inferred]
-- No notice when a new or better-ranked model fits this Mac. [inferred]
+- No model picker inside the "Regenerate Notes…" sheet; the user switches the model in Settings. Filed as #261. [inferred]
+- No notice when a new or better-ranked model fits this Mac. Filed as #260. [inferred]
 - No models from organisations other than mlx-community, no GGUF models, no conversion inside the app. [inferred]
 - The app makes no quality judgement of its own; the rank is LMArena's general one. [paraphrase]
 - No change to the default protocol provider for new users (#103). [inferred]
@@ -97,7 +97,7 @@ It takes over the download part of #145; the XPC service and the App Store varia
 - **A10 · The helper uses a model's own generation configuration for sampling when it ships one.** alternatives: B — keep the Qwen-tuned defaults for every model · flip at: the helper's generation settings · test: a helper test that reads a model folder's generation configuration and one without it · status: active [agent-inferred 2026-11-16]
 - Rejected bigger design: rank by a mix of benchmarks from Hugging Face eval results; the benchmarks are not comparable and cover too few models.
 - Related: #145 (XPC service and App Store variant), #159 (the model check accepts folders that cannot load; the test run in R7 catches those in practice), #160 and #162 (provider seam and helper contract), #9 (the transcription models' Hugging Face browser, whose catalog and token handling this reuses), #103 (default provider for other users).
-- Mockup gate: the new screens (model list, download confirmation and progress, testing advice popup) are drawn on the project's private design canvas; acceptance pending.
+- Mockup gate: five screens are drawn on the project's private design canvas (Settings → Output with "Find Models…", the model list with its row states, the download confirmation with the reasons a download cannot start, the testing advice popup, the regenerate sheet with the model in the report name); acceptance pending.
 
 ## Requirement coverage
 
