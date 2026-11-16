@@ -19,6 +19,7 @@ extension TranscriptionsView {
     static func rerunWarningLine(_ warning: RerunWarning) -> String {
         let action = switch warning.mode {
         case .transcribeAgain: "Transcribe Again"
+        case .identifySpeakersAgain: "Identify Speakers Again"
         }
         return switch warning.cause {
         case let .failed(reason): "\(action) failed: \(reason)"

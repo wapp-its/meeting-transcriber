@@ -7,6 +7,17 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Pipelin
 enum RerunMode: String, Codable, Sendable {
     /// The whole processing, with the current settings.
     case transcribeAgain = "transcribe_again"
+    /// The speakers only, with the method and count its sheet chose (R10): with the
+    /// meeting's word timings kept, the kept segments are labelled again and nothing
+    /// is transcribed; without them, the whole processing with the current settings.
+    case identifySpeakersAgain = "identify_speakers_again"
+}
+
+/// The speaker method and count Identify Speakers Again's sheet chose.
+struct RerunSpeakers: Equatable, Sendable {
+    let method: DiarizerMode
+    /// 0 lets the method find the count, as Settings' Expected speakers does.
+    let count: Int
 }
 
 /// What `PipelineQueue.rerunJob(id:mode:)` did.
@@ -62,6 +73,9 @@ extension PipelineJob {
         let numSpeakers: Int
         /// Nil with voice activity detection off.
         let vadThreshold: Float?
+        /// The method Identify Speakers Again's sheet chose; nil diarizes with the
+        /// queue's own method.
+        var diarizerMode: DiarizerMode?
     }
 
     /// A finished job kept whole, so every end of the re-run but success can put it
@@ -85,8 +99,11 @@ extension PipelineQueue {
     /// has a deletion pending or incomplete or carries a re-run already (also one
     /// another build wrote: the record is read under its lock), a job of the meeting
     /// that is not settled, audio another run holds, and audio gone or out of reach.
+    ///
+    /// Identify Speakers Again always identifies speakers, with `speakers` when its
+    /// sheet chose them and else with Settings' method and count.
     @discardableResult
-    func rerunJob(id: UUID, mode: RerunMode) -> RerunAdmission {
+    func rerunJob(id: UUID, mode: RerunMode, speakers: RerunSpeakers? = nil) -> RerunAdmission {
         let live = job(withID: id)
         if let live, !isSettled(live) { return .refused(.meetingBusy) }
         guard let meetingFileStore,
@@ -111,7 +128,7 @@ extension PipelineQueue {
             stamp: Date(), outcomeBefore: record.outcome, bundleID: meetingFileStore.bundleID,
             process: .current, runID: UUID(),
         )
-        let settings = currentRerunSettings()
+        let settings = currentRerunSettings(mode: mode, speakers: speakers)
         // Resolved while Settings names it, so the stages find this instance later.
         if let kind = settings.engine { _ = engineForKind?(kind) }
         var inputs = record.rerunInputs(finished: finished)
@@ -155,9 +172,14 @@ extension PipelineQueue {
         return .success(RelocatedAudioPaths(mix: first, app: nil, mic: nil))
     }
 
-    private func currentRerunSettings() -> PipelineJob.RerunSettings {
-        rerunSettingsProvider?() ?? .init(
+    private func currentRerunSettings(mode: RerunMode, speakers: RerunSpeakers?) -> PipelineJob.RerunSettings {
+        let current = rerunSettingsProvider?() ?? .init(
             engine: nil, diarize: diarizeEnabled, numSpeakers: numSpeakers, vadThreshold: vadConfig?.threshold,
+        )
+        guard mode == .identifySpeakersAgain else { return current }
+        return .init(
+            engine: current.engine, diarize: true, numSpeakers: speakers?.count ?? current.numSpeakers,
+            vadThreshold: current.vadThreshold, diarizerMode: speakers?.method,
         )
     }
 
@@ -196,6 +218,23 @@ extension PipelineQueue {
     /// its admission, else this queue's.
     func stageEngine(for job: PipelineJob) -> (any TranscribingEngine)? {
         job.rerun?.settings.engine.flatMap { engineForKind?($0) } ?? engine
+    }
+
+    /// Whether `jobID` is an Identify Speakers Again run.
+    func identifiesSpeakersAgain(_ jobID: UUID) -> Bool {
+        job(withID: jobID)?.rerun?.mode == .identifySpeakersAgain
+    }
+
+    /// The diarizer a re-run's chosen method names, else the queue's own. Without
+    /// a factory for a chosen method, the queue's own, as the naming dialog's Re-run
+    /// falls back.
+    func stageDiarizer(_ jobID: UUID, queueFactory: () -> any DiarizationProvider) -> any DiarizationProvider {
+        guard let mode = job(withID: jobID)?.rerun?.settings.diarizerMode else { return queueFactory() }
+        guard let diarizationFactoryWithMode else {
+            logger.warning("[\(PipelineJob.shortID(for: jobID), privacy: .public)] rerun_method_unavailable mode=\(mode.rawValue, privacy: .public)")
+            return queueFactory()
+        }
+        return diarizationFactoryWithMode(mode)
     }
 
     func diarizes(_ jobID: UUID) -> Bool {

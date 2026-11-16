@@ -472,7 +472,7 @@ extension SpeakerNamingSession {
             // queue alive; the guard is defensive for any future non-flow
             // caller → `notAvailable` rolls back to `.speakerNamingPending`.
             guard let delegate else { throw DiarizationError.notAvailable }
-            return try await delegate.runDualTrackDiarization(
+            let run = try await delegate.runDualTrackDiarization(
                 diarizeProcess: diarizer,
                 tracks: (
                     app: recordingsDir.appendingPathComponent("\(slug)_app_16k.wav"),
@@ -482,6 +482,9 @@ extension SpeakerNamingSession {
                 ),
                 speakerCount: speakerCount, title: title, jobID: jobID,
             )
+            // Inside a re-run a failed track fails this Re-run as a whole (A25).
+            guard run.failedTrack == nil || delegate.job(withID: jobID)?.rerun == nil else { throw DiarizationError.notAvailable }
+            return run
         }
         let mix16k = recordingsDir.appendingPathComponent("\(slug)_16k.wav")
         let diarization = try await diarizer.run(

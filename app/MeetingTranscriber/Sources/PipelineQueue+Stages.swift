@@ -268,7 +268,10 @@ extension PipelineQueue {
             defer { try? FileManager.default.removeItem(at: workDir) }
 
             let transcription = try await stage(ctx.jobID) {
-                try await transcribe(ctx, engine: engine, workDir: workDir)
+                if let kept = keptWordTimings(for: job) {
+                    return try await reuseWordTimings(kept, ctx: ctx, engine: engine, workDir: workDir)
+                }
+                return try await transcribe(ctx, engine: engine, workDir: workDir)
             }
 
             // The transcript WITHOUT its recording-level note, its pause
@@ -690,6 +693,53 @@ extension PipelineQueue {
         )
     }
 
+    /// Stage 1 of Identify Speakers Again for a meeting with its word timings kept
+    /// (R10): the 16 kHz copies the diarization reads, the track verdict and the
+    /// echo measure as `transcribe` takes them (the naming reads the measure to keep
+    /// the far end's voice out of the voice profiles), and the kept segments in
+    /// place of a transcription, so every word stays as it is. Nothing is
+    /// transcribed, so the job waits until the diarization starts.
+    private func reuseWordTimings(
+        _ kept: [TimestampedSegment], ctx: JobContext, engine: any TranscribingEngine, workDir: URL,
+    ) async throws -> TranscriptionOutput {
+        logger.info("[\(ctx.shortID, privacy: .public)] word_timings_reused segments=\(kept.count, privacy: .public)")
+        var segments = kept
+        let isDualSource = ctx.appPath != nil && ctx.micPath != nil
+        if let appAudioPath = ctx.appPath, let micAudioPath = ctx.micPath {
+            let app16k = workDir.appendingPathComponent("app_16k.wav")
+            let mic16k = workDir.appendingPathComponent("mic_16k.wav")
+            async let appResample: Void = resample(appAudioPath, to: app16k, track: "app", ctx: ctx)
+            async let micResample: Void = resample(micAudioPath, to: mic16k, track: "mic", ctx: ctx)
+            await appResample
+            await micResample
+            let appFrames = AudioMixer.frameCount(of: app16k)
+            let micFrames = AudioMixer.frameCount(of: mic16k)
+            recordAudioDuration(jobID: ctx.jobID, frames: max(appFrames, micFrames))
+            if resolveTrackViability(ctx, engine: engine, appFrames: appFrames, micFrames: micFrames) == .both {
+                _ = await measureEchoBleed(jobID: ctx.jobID, appURL: app16k, micURL: mic16k, micDelay: ctx.micDelay)
+            }
+            segments = retaggedForThisQueue(kept)
+        } else {
+            guard let mixPath = ctx.mixPath else { throw PipelineError.missingMixPath }
+            let mix16k = workDir.appendingPathComponent("mix_16k.wav")
+            try await AudioMixer.resampleFile(from: mixPath, to: mix16k)
+            recordAudioDuration(jobID: ctx.jobID, frames: AudioMixer.frameCount(of: mix16k))
+        }
+        if isStillQueued(ctx.jobID) { jobAudioSeconds[ctx.jobID] = segments.last?.end ?? 0 }
+        let micMuted = job(withID: ctx.jobID)?.micMuteSpansOnTranscript ?? []
+        return TranscriptionOutput(
+            transcript: segments.transcriptText(
+                note: transcriptNote(ctx.jobID), pauses: transcriptPauses(ctx.jobID), micMuted: micMuted,
+            ),
+            note: transcriptNote(ctx.jobID),
+            pauses: transcriptPauses(ctx.jobID),
+            micMuted: micMuted,
+            cachedSegments: segments,
+            isDualSource: isDualSource,
+            terminologyNormalizer: TerminologyNormalizer(),
+        )
+    }
+
     /// Stage 2 — optional speaker diarization. Returns the labeled transcript
     /// with its structured speaker names, or the original transcript and no names
     /// when diarization is disabled, unavailable, or fails. Drives the speaker-naming
@@ -723,10 +773,13 @@ extension PipelineQueue {
             )
             return output
         }
-        let diarizeProcess = diarizationFactory()
+        let diarizeProcess = stageDiarizer(ctx.jobID, queueFactory: diarizationFactory)
+        let identifies = identifiesSpeakersAgain(ctx.jobID)
         guard diarizeProcess.isAvailable else {
             // A re-run swaps in no transcript without speakers (A25).
-            if isRerun(ctx.jobID) { throw failRerun(ctx.jobID, RerunFailure.speakersNotAvailable) }
+            if isRerun(ctx.jobID) {
+                throw failRerun(ctx.jobID, identifies ? RerunFailure.diarizerNotAvailable : RerunFailure.speakersNotAvailable)
+            }
             logger.info("[\(ctx.shortID, privacy: .public)] diarization_skipped")
             return output
         }
@@ -749,6 +802,10 @@ extension PipelineQueue {
             // A re-run whose offered track failed ends instead of falling back to the other (A25).
             if isRerun(ctx.jobID), let track = run.failedTrack {
                 throw failRerun(ctx.jobID, track == .callAudio ? RerunFailure.callAudioSpeakersFailed : RerunFailure.microphoneSpeakersFailed)
+            }
+            // Identify Speakers Again exists to name the speakers it found.
+            if identifies, run.combined?.embeddings?.isEmpty ?? true {
+                throw failRerun(ctx.jobID, RerunFailure.foundNoVoices)
             }
             // Match against the speaker DB and park the job for the (possibly
             // late) naming dialog. A speaker-count/mode re-run is no longer an
@@ -921,7 +978,8 @@ extension PipelineQueue {
                 logger.warning(
                     "[\(sid, privacy: .public)] mic_diarization_failed error=\(micError?.localizedDescription ?? "unknown", privacy: .public) — falling back to app-only diarization",
                 )
-                addWarning(id: jobID, "Mic track diarization failed — speaker labels reflect remote audio only")
+                // A re-run fails instead of falling back (A25), so the line would not hold.
+                if !isRerun(jobID) { addWarning(id: jobID, "Mic track diarization failed — speaker labels reflect remote audio only") }
             }
             combined = app
 
@@ -932,7 +990,7 @@ extension PipelineQueue {
                 logger.warning(
                     "[\(sid, privacy: .public)] app_diarization_failed error=\(appError?.localizedDescription ?? "unknown", privacy: .public) — falling back to mic-only diarization",
                 )
-                addWarning(id: jobID, "App track diarization failed — speaker labels reflect local mic only")
+                if !isRerun(jobID) { addWarning(id: jobID, "App track diarization failed — speaker labels reflect local mic only") }
             }
             combined = mic
 

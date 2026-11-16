@@ -29,6 +29,9 @@ struct RerunWarning: Equatable, Sendable {
 enum RerunFailure {
     static let unknown = "an unknown error"
     static let speakersNotAvailable = "speaker identification is not available"
+    /// Identify Speakers Again's, in the naming dialog's words for its own Re-run.
+    static let diarizerNotAvailable = SpeakerNamingRefusal.diarizerUnavailableReason
+    static let foundNoVoices = SpeakerNamingRefusal.foundNoVoicesReason
     static let speakersFailed = "speaker identification failed"
     static let callAudioSpeakersFailed = "speaker identification failed on the call audio"
     static let microphoneSpeakersFailed = "speaker identification failed on the microphone"

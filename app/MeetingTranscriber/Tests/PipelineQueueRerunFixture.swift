@@ -95,10 +95,12 @@ final class PipelineQueueRerunFixture {
 
     func makeQueue(
         engine: (any TranscribingEngine)? = nil,
+        diarizationFactoryWithMode: ((DiarizerMode) -> any DiarizationProvider)? = nil,
         stagingDir: URL? = nil,
         logDir: URL? = nil,
         diarizeEnabled: Bool = true,
         numSpeakers: Int = 0,
+        micLabel: String = "Me",
         vadConfig: VADConfig? = nil,
         engineForKind: ((TranscriptionEngineSetting) -> (any TranscribingEngine)?)? = nil,
         rerunSettings: (() -> PipelineJob.RerunSettings)? = nil,
@@ -115,6 +117,7 @@ final class PipelineQueueRerunFixture {
         return PipelineQueue(
             engine: engine ?? self.engine,
             diarizationFactory: { diarization },
+            diarizationFactoryWithMode: diarizationFactoryWithMode,
             protocolGeneratorFactory: protocolGenerator ?? { protocolGen },
             outputDir: outputDir,
             logDir: logDir ?? self.logDir,
@@ -123,6 +126,7 @@ final class PipelineQueueRerunFixture {
             staleNamingMaxAge: staleNamingMaxAge,
             echoDedupEnabled: false,
             numSpeakers: numSpeakers,
+            micLabel: micLabel,
             saveRawTranscriptSeparately: saveRawTranscriptSeparately,
             useAITitleForFilenames: useAITitleForFilenames,
             protocolTemplateStore: templates,

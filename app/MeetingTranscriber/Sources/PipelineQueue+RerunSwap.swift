@@ -175,7 +175,7 @@ extension PipelineQueue {
         jobs[index].namingSlug = (transcript ?? notes).map { URL(filePath: $0.path).deletingPathExtension().lastPathComponent }
         let madeNotes = rerun.marker.files.contains { $0.role == .protocol }
         let shortID = jobs[index].shortID
-        removeEarlierSegments(of: record, stamp: rerun.marker.stamp, jobID: id)
+        removeEarlierSegments(of: record, marker: rerun.marker, jobID: id)
         // With notes off nothing new was saved, so the transcript is what the run made.
         // A current file the record no longer names (replaced while the app was
         // closed) is left as it is.
@@ -225,12 +225,22 @@ extension PipelineQueue {
     /// Speakers Again. The swap moved it to its earlier-version name, so an undo
     /// could put it back, and the commit lists it there as an earlier version, so a
     /// stop before this step leaves it where a deletion of the meeting finds it.
+    /// A re-run that kept no segments file of its own (its option was off, or the
+    /// write failed) renamed none in, so the current one is still the earlier run's,
+    /// which goes too: its words are no longer the current transcript's. The job's
+    /// marker lists each file the re-run wrote before its done state was saved, which
+    /// the swap waits for, so a current file with none of their identities is not one
+    /// (and with an identity of theirs unknown, nothing is taken for the earlier run's).
     /// Safe to repeat: a file already gone counts as removed.
-    private func removeEarlierSegments(of record: MeetingFileRecord, stamp: Date, jobID: UUID) {
+    private func removeEarlierSegments(of record: MeetingFileRecord, marker: MeetingFileRecord.RerunMarker, jobID: UUID) {
         guard let segments = record.files.last(where: { $0.role == .segments }) else { return }
-        let names = Set(EarlierVersionName.names(for: segments.path, stamp: stamp))
-        let earlier = record.files.filter { file in
+        let names = Set(EarlierVersionName.names(for: segments.path, stamp: marker.stamp))
+        var earlier = record.files.filter { file in
             file.role == .previousProtocol && file.state != .gone && names.contains(URL(filePath: file.path).lastPathComponent)
+        }
+        let written = marker.files.filter { $0.role == .segments }.map(\.identity)
+        if segments.state != .gone, let identity = segments.identity, !written.contains(nil), !written.contains(identity) {
+            earlier.append(segments)
         }
         guard !earlier.isEmpty else { return }
         let left = Set(Self.removeRerunFiles(earlier, jobID: jobID).map(\.path))
