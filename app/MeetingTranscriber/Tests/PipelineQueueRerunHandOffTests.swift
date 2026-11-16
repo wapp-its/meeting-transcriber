@@ -57,6 +57,33 @@ final class PipelineQueueRerunHandOffTests: XCTestCase {
         }
     }
 
+    /// A queue that replaces the one whose hand-off did not land (a folder change, a
+    /// watch start) finishes it once the snapshot's write lands, and the export runs
+    /// there once instead of waiting for the next launch.
+    func testAQueueThatAdoptsTheJobsFinishesAHandOffTheReplacedQueueLeftAndExportsOnce() async throws {
+        let fixture = try Fixture(tmpDir: makeTempDirectory(prefix: "rerun_hand_off_adopted"))
+        let log = RerunExportLog()
+        let notion = RerunLoggingExporter.configuration("db-record", log)
+        let meeting = try await fixture.finishedMeeting(in: fixture.makeQueue(completedJobLifetime: 0, notion: notion), leavingTheQueue: true)
+        let callsBefore = await log.calls.count
+        let queue = fixture.makeQueue(completedJobLifetime: 0, notion: notion)
+        _ = try await commitWhileTheSnapshotFails(meeting, in: queue, fixture, "adopted")
+        let replacement = fixture.makeQueue(notion: notion)
+
+        replacement.adoptJobs(of: queue)
+        queue.retire()
+
+        try await fixture.poll("the export") { replacement.job(withID: meeting.id)?.notionExportStatus == .completed }
+        try await Task.sleep(for: .milliseconds(300))
+        await PipelineSnapshotStore.flush(fixture.logDir)
+        let calls = await log.calls.dropFirst(callsBefore)
+        XCTAssertEqual(calls.map(\.page), ["page-1"], "not one update of the recorded page")
+        XCTAssertEqual(calls.map(\.database), ["db-record"])
+        let saved = try PipelineSnapshot.load(from: fixture.logDir, named: fixture.rerunFile.lastPathComponent) ?? []
+        XCTAssertTrue(saved.isEmpty, "the re-run file still holds the job")
+        XCTAssertEqual(try snapshotHolds(meeting.id, fixture), [true], "the snapshot does not hold the finished job")
+    }
+
     // MARK: - Helpers
 
     /// `meeting`'s re-run in `queue` run to its commit point while no write of the
