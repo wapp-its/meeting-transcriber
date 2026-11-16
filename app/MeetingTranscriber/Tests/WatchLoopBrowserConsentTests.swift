@@ -458,4 +458,81 @@ final class WatchLoopBrowserConsentTests: XCTestCase {
         XCTAssertEqual(spy.resolutions, [false], "stopping must decline, never grant")
         XCTAssertFalse(recorder.startCalled)
     }
+
+    // MARK: - Answered by id with the notification's full answer
+
+    /// The real notifier, so an answer by id goes through the coordinator a
+    /// notification tap uses.
+    private func makeManager() -> (NotificationManager, FakeNotificationScheduler) {
+        let fake = FakeNotificationScheduler()
+        let canDeliver: @Sendable () -> Bool = { true }
+        let manager = NotificationManager(scheduler: fake, canDeliver: canDeliver)
+        manager.setUp()
+        return (manager, fake)
+    }
+
+    /// The open prompt once its notification is posted, which is when the
+    /// coordinator can answer it.
+    private func parkedQuestion(_ loop: WatchLoop, _ fake: FakeNotificationScheduler) async throws -> ConsentQuestion {
+        await waitFor(!fake.added.isEmpty, timeout: .seconds(2))
+        return try XCTUnwrap(loop.pendingConsentQuestion, "precondition: a prompt is parked")
+    }
+
+    /// "Never for this app" by the prompt's id lands as the notification's
+    /// Never: the app goes on the deny list with no decline cooldown beside
+    /// it, nothing records, and the notification is withdrawn.
+    func testNeverByIdDeniesTheAppAsTheNotificationsNever() async throws {
+        let ways: [(name: String, answer: @MainActor (WatchLoop, NotificationManager, ConsentQuestion) -> Void)] = [
+            ("by id", { loop, _, question in XCTAssertTrue(loop.answerParkedConsent(question, answer: .never)) }),
+            ("notification", { _, manager, question in
+                manager.resolveConsent(responseIdentifier: question.id.uuidString, actionIdentifier: NotificationManager.neverActionID)
+            }),
+        ]
+        for way in ways {
+            let (manager, fake) = makeManager()
+            let store = InMemoryConsentDenyListStore()
+            let (loop, recorder) = try makeLoop(
+                detector: FixedDetector(browserMeeting(process: "Fjordfox")), spy: manager, denyListStore: store,
+            )
+            loop.start()
+            let question = try await parkedQuestion(loop, fake)
+
+            way.answer(loop, manager, question)
+            await waitFor(store.denyList.isDenied("Fjordfox"), timeout: .seconds(2))
+
+            XCTAssertTrue(store.denyList.isDenied("Fjordfox"), way.name)
+            XCTAssertEqual(loop.consentPolicy.decision(app: "Fjordfox", now: Date()), .ask, "\(way.name): a cooldown beside it")
+            XCTAssertFalse(recorder.startCalled, way.name)
+            XCTAssertEqual(fake.removedIdentifiers, [question.id.uuidString], "\(way.name): left in Notification Center")
+            loop.stop()
+        }
+    }
+
+    /// Record and Ignore by id act as the menu's: Record starts the
+    /// recording, Ignore starts the decline cooldown. Answered, the prompt is
+    /// no longer open, and a later answer to it, Never included, changes
+    /// nothing (R3 errors).
+    func testRecordAndIgnoreByIdActAsTheMenusAndALaterAnswerChangesNothing() async throws {
+        for (answer, records) in [(ConsentAnswer.granted, true), (.declined, false)] {
+            let (manager, fake) = makeManager()
+            let store = InMemoryConsentDenyListStore()
+            let (loop, recorder) = try makeLoop(
+                detector: FixedDetector(browserMeeting(process: "Fjordfox")), spy: manager, denyListStore: store,
+            )
+            loop.start()
+            let question = try await parkedQuestion(loop, fake)
+
+            XCTAssertTrue(loop.answerParkedConsent(question, answer: answer), "\(answer)")
+            await waitFor(loop.pendingConsentQuestion == nil, timeout: .seconds(2))
+            await waitFor(recorder.startCalled == records, timeout: .seconds(2))
+            XCTAssertEqual(recorder.startCalled, records, "\(answer): the recording")
+            let decision = loop.consentPolicy.decision(app: "Fjordfox", now: Date())
+            XCTAssertEqual(decision != .ask, !records, "\(answer): the decline cooldown")
+
+            XCTAssertFalse(loop.answerParkedConsent(question, answer: .never), "\(answer): answered again")
+            XCTAssertEqual(store.denyList.denied, [], "\(answer): denied after all")
+            XCTAssertEqual(loop.consentPolicy.decision(app: "Fjordfox", now: Date()), decision, "\(answer): cooldown changed")
+            loop.stop()
+        }
+    }
 }

@@ -29,6 +29,8 @@ enum A11yID {
     static let watchBrowserToggle = "watchBrowserToggle"
     static let silencePromptToggle = "silencePromptToggle"
     static let silencePromptMinutesStepper = "silencePromptMinutesStepper"
+    static let promptWindowToggle = "promptWindowToggle"
+    static let promptWindowHelp = "promptWindowHelp"
     static let watchSlackToggle = "watchSlackToggle"
     static let browserConsentWarning = "browserConsentWarning"
     static let consentDenyListSection = "consentDenyListSection"
@@ -232,6 +234,17 @@ enum A11yID {
     static let consentOptionsRecordButton = "consentOptionsRecordButton"
     static let consentOptionsCancelButton = "consentOptionsCancelButton"
 
+    /// The prompt window's answers and its ✕ per question. No app name, for
+    /// the reason on `consentDeniedAppRemove`. The window stays off every RPC
+    /// allowlist: the live check answers through `POST /action/confirmBrowserConsent`.
+    static let promptWindowRecord = "promptWindowRecord"
+    static let promptWindowIgnore = "promptWindowIgnore"
+    static let promptWindowNever = "promptWindowNever"
+    static let promptWindowHidePrompt = "promptWindowHidePrompt"
+    static let promptWindowKeepRecording = "promptWindowKeepRecording"
+    static let promptWindowStopNow = "promptWindowStopNow"
+    static let promptWindowHideCountdown = "promptWindowHideCountdown"
+
     /// A job's "Retry Meeting Notes", addressed by ROW INDEX for the same
     /// reason as `jobRetryButton`.
     static func jobNotesRetryButton(_ index: Int) -> String {
@@ -368,6 +381,10 @@ enum A11yID {
     static let saveRawTranscriptToggle = "saveRawTranscriptToggle"
     static let useAITitleForFilenamesToggle = "useAITitleForFilenamesToggle"
     static let openAIAPIKeyField = "openAIAPIKeyField"
+    static let openAIConnectionPicker = "openAIConnectionPicker"
+    static let openAIConnectionNameField = "openAIConnectionNameField"
+    static let openAIConnectionAddButton = "openAIConnectionAddButton"
+    static let openAIConnectionDeleteButton = "openAIConnectionDeleteButton"
     static let claudeAPIKeyField = "claudeAPIKeyField"
     static let openAIAPIKeyPlacementPicker = "openAIAPIKeyPlacementPicker"
     static let openAIAPIKeyHeaderNameField = "openAIAPIKeyHeaderNameField"
@@ -402,6 +419,8 @@ enum A11yID {
     static let liveTranscriptionSection = "liveTranscriptionSection"
     static let liveCaptionsOverlayToggle = "liveCaptionsOverlayToggle"
     static let liveCaptionsSizePicker = "liveCaptionsSizePicker"
+    static let liveCaptionsWarmupStatus = "liveCaptionsWarmupStatus"
+    static let liveCaptionsWarmupElapsed = "liveCaptionsWarmupElapsed"
     static let channelIndicatorSection = "channelIndicatorSection"
     static let silentTrackWatchdogToggle = "silentTrackWatchdogToggle"
     static let levelBalanceToggle = "levelBalanceToggle"

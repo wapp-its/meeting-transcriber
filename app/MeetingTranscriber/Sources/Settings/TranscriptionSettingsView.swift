@@ -15,6 +15,7 @@ struct TranscriptionSettingsView: View {
     var isModelOnDisk: (WhisperKitModelSelection) -> Bool
     /// Makes the catalog the Hugging Face browser searches; tests replace it.
     var makeHubCatalog: () -> any HuggingFaceModelCataloging
+    var captionWarmup: LiveCaptionsWarmup = .idle
 
     /// Set when the user flips live captions on while a first-use Nemotron model
     /// download is pending — defers the actual enable to the consent alert.
@@ -39,6 +40,7 @@ struct TranscriptionSettingsView: View {
         modelChoice: WhisperKitModelChoice? = nil,
         isModelOnDisk: @escaping (WhisperKitModelSelection) -> Bool = WhisperKitModelChoice.isOnDiskInProduction,
         makeHubCatalog: @escaping () -> any HuggingFaceModelCataloging = { HuggingFaceModelCatalog() },
+        captionWarmup: LiveCaptionsWarmup = .idle,
         legacyModels: LegacyWhisperModelsState? = nil,
     ) {
         self.settings = settings
@@ -48,6 +50,7 @@ struct TranscriptionSettingsView: View {
         self.modelChoice = modelChoice ?? WhisperKitModelChoice()
         self.isModelOnDisk = isModelOnDisk
         self.makeHubCatalog = makeHubCatalog
+        self.captionWarmup = captionWarmup
         // Created here, not as a default value: for an `@Observable` type the
         // default-value form creates the object only once the view is installed,
         // so a view inspected outside a hierarchy, as the view tests do, would get
@@ -279,6 +282,7 @@ struct TranscriptionSettingsView: View {
                 )
             }
 
+            if settings.liveTranscriptionEnabled { CaptionWarmupStatus(warmup: captionWarmup) }
             captionOverlayToggle
             captionSizePicker
 

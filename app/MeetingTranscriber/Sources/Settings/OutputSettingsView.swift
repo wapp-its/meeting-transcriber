@@ -253,6 +253,8 @@ struct OutputSettingsView: View {
 
     @ViewBuilder
     private var openAIConfigView: some View { // swiftlint:disable:this attributes
+        OpenAIConnectionControls(settings: settings, switchConnection: switchConnection)
+
         VStack(alignment: .leading, spacing: 4) {
             Text("Endpoint")
             TextField("http://localhost:1234/v1", text: $settings.openAIEndpoint)
@@ -376,10 +378,22 @@ struct OutputSettingsView: View {
 
     // MARK: - Helpers
 
+    /// A typed key is handed to the connection being left before the change,
+    /// and the key field then shows the selected connection's key.
+    private func switchConnection(_ change: () -> Void) {
+        apiKeyDrafts.commitPending(to: settings)
+        change()
+        apiKeyDrafts.reloadOpenAI(from: settings)
+        availableModels = []
+        connectionTestResult = nil
+        testingConnection = false
+    }
+
     func testConnection() {
         testingConnection = true
         didAttemptConnectionTest = true
         connectionTestResult = nil
+        let connectionID = settings.activeOpenAIConnectionID
         Task {
             let apiKey = settings.openAIAPIKey.isEmpty ? nil : settings.openAIAPIKey
             let result = await OpenAIProtocolGenerator.testConnection(
@@ -389,6 +403,9 @@ struct OutputSettingsView: View {
                 apiKeyPlacement: settings.openAIAPIKeyPlacement,
                 apiKeyHeaderName: settings.openAIAPIKeyHeaderName,
             )
+            // Another connection was selected meanwhile: its model must not be
+            // replaced by this one's list.
+            guard settings.activeOpenAIConnectionID == connectionID else { return }
             testingConnection = false
             switch result {
             case let .success(models):

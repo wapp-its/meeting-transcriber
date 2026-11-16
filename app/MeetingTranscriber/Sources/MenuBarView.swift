@@ -48,6 +48,8 @@ struct MenuBarView: View {
     /// was turned off is still the fallback when no local file exists;
     /// `JobOpenTarget` owns that rule.
     var notionExportEnabled = false
+    /// Whether the live-caption models are still loading.
+    var captionsPreparing = false
     /// What the menu's items do; a nil optional action hides or disables its
     /// item (see `MenuActions`).
     let actions: MenuActions
@@ -152,6 +154,12 @@ struct MenuBarView: View {
 
             if let detail = status?.detail, !detail.isEmpty {
                 Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if captionsPreparing {
+                Text(LiveCaptionsWarmup.preparingMenuText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

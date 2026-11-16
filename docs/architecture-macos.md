@@ -119,11 +119,19 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `MicrophoneMenuState.swift` | Pure decision for the menu bar's Microphone entry: its title (the device a recording reports, otherwise the chosen device or `System Default (<name>)`, a chosen device that is not connected, no microphone available, the "No Microphone" off line), the items (`System Default (<name>)` then the Settings list) and the checked choice, and every string the entry shows |
 | `ProtocolOpener.swift` | Opens local protocols with the default handler and prefers an already-running Notion desktop app for Notion pages, falling back to the default handler |
 | `MenuBarIcon.swift` | Renders the animated waveform icon + badge overlays (watching dot, question mark while a recording prompt is open, pulse while a meeting-end countdown runs, permission, record-only, channel-silent) |
+| `PromptWindowContent.swift` | Pure decision for the prompt window below the menu bar icon (issue #99): the open questions, the countdown first, less those closed with ✕, none while the setting is off; the countdown's time left as `m:ss` |
+| `PromptWindowView.swift` | The prompt window's content: per question its title and body as posted, ✕ ("Hide this question") and the answers, Never for this app / Ignore / Record or Stop now / Keep recording with "Ends in m:ss" |
+| `PromptWindowController.swift` | Owns the `PromptPanel`: renders the decision from the input read at that moment, places the panel whenever it is shown or resized, orders it out when empty, hides a question the app took an answer for at once, and refreshes the time left every second while a countdown shows |
+| `PromptPanel.swift` | The prompt window's never-key, non-activating panel at status-bar level on every Space, sharing type none, whose hosting view accepts the first mouse |
+| `PromptWindowPlacement.swift` | Pure placement of the prompt window: centred 6 pt below the menu bar icon and kept inside its screen, else at the top right below the menu bar |
+| `MenuBarIconFrame.swift` | The menu bar icon's frame, read from the app's own visible `NSStatusBarWindow`, since `MenuBarExtra` does not hand out its status item |
+| `AppState+PromptWindow.swift` | The prompt window's input: the setting and the current watch loop's two open questions |
+| `MeetingTranscriberApp+PromptWindow.swift` | `MeetingTranscriberApp.PromptWindowWiring`, the menu bar label's view modifier that creates the prompt window's controller once and renders it on every change of its input |
 | `AppPickerView.swift` | App picker sheet for manual recording of any running app |
 | `AudioImportTypes.swift` | File types offered by the batch-import and voice-enrollment `NSOpenPanel`s — single source of truth so the ffmpeg-gated vs. natively-decoded format lists stay pinned and testable |
 | `A11yID.swift` | Shared accessibility-identifier namespace — one constant per control, referenced by the view modifier, ViewInspector tests, and the `/ui/press` allowlist |
 | `SettingsView.swift` | Settings window — `NavigationSplitView` shell (sidebar of tabs) hosting seven topic-grouped sub-views in `Sources/Settings/` |
-| `Settings/GeneralSettingsView.swift` | Startup (Launch at login, Start watching when the app opens = `AppSettings.autoWatch`) · Mode (Record-only) · Apps to Watch (Teams/Zoom/Webex/Browser/WeChat/Tencent Meeting/FaceTime/WhatsApp/Slack) · Record Without Asking (per native/mic-input app) · Detection (Poll Interval, Grace Period) |
+| `Settings/GeneralSettingsView.swift` | Startup (Launch at login, Start watching when the app opens = `AppSettings.autoWatch`) · Mode (Record-only) · Apps to Watch (Teams/Zoom/Webex/Browser/WeChat/Tencent Meeting/FaceTime/WhatsApp/Slack) · Record Without Asking (per native/mic-input app) · Prompts (Show prompts below the menu bar icon = `AppSettings.promptWindowEnabled`) · Detection (Poll Interval, Grace Period) |
 | `Settings/AudioSettingsView.swift` | Microphone device (the `MicrophoneDevices` list the menu bar's Microphone entry also shows) · VAD (enabled + threshold) · Per-Channel Indicator |
 | `Settings/TranscriptionSettingsView.swift` | ASR engine picker · engine-specific options · model status · Vocabulary section · Live transcription (PoC) toggle |
 | `Settings/TranscriptionSettingsView+HuggingFaceToken.swift` | The optional Hugging Face token row below the WhisperKit model picker: a write-only field with Save and Remove that shows whether a token is saved, never the token; the token itself lives in the Keychain (`AppSettings+HuggingFaceToken.swift`) |
@@ -134,7 +142,9 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `WhisperKitStockModel.swift` | The six stock WhisperKit variants in picker order, each with its label and approximate download size (measured 2026-10-06) for the load offer |
 | `Settings/VocabularySourceSettingsView.swift` | "Vocabulary source" picker (Local file / URL), shown in the Vocabulary section while "Use custom vocabulary" is on; for URL the address, the Keychain-backed access token, "Update now" and the status line from `RemoteVocabularyController` |
 | `Settings/SpeakersSettingsView.swift` | Diarization · Speaker Naming (open the naming window automatically, how long unnamed meetings wait) · Mic Speaker Name · Known Voices · Recognition Stats · Experimental: Diarization Tuning |
-| `Settings/OutputSettingsView.swift` | Output folder · Notion export · Recording Retention · Meeting Notes (transcript options, AI-title file names, notify when meeting notes fail, LLM provider, notes language) · Meeting Notes Templates and Template Rules sections |
+| `Settings/OutputSettingsView.swift` | Output folder · Notion export · Recording Retention · Meeting Notes (transcript options, AI-title file names, notify when meeting notes fail, LLM provider, saved OpenAI-compatible connections, notes language) · Meeting Notes Templates and Template Rules sections |
+| `Settings/OpenAIConnectionControls.swift` | Saved OpenAI-compatible connection picker, name field, Add/Delete |
+| `Settings/OpenAIConnectionPrompts.swift` | State of the Add (name prompt) and Delete confirmation dialogs |
 | `Settings/LocalModelSettingsView.swift` | The local model provider's panel in Settings → Output: the model folder with Choose…, the status line with Check Model (runs the helper's `check` mode, no weights loaded), and the memory and recording notes (`#if !APPSTORE`) |
 | `Settings/ProtocolTemplatesSettingsView.swift` | Meeting Notes Templates section: default template picker, per template file the split button Edit (Open in the editor app, Open With, Show in Finder) and Delete, New Template…, Open Templates Folder; its state and writes live in the `@Observable` `ProtocolTemplatesModel`, also for the New Template window |
 | `Settings/NewProtocolTemplateSheet.swift` | The New Template window: Name field, a note on what Create does, Cancel and Create |
@@ -158,6 +168,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `AppSettings+OutputDirectory.swift` | Everything derived from `customOutputDirBookmark`, split out to keep `AppSettings.swift` under the line cap |
 | `AppSettings+LocalModel.swift` | The local model's folder: the plain path for display and the security-scoped bookmark reads go through, taken by value when a generator is made so a later change never reaches a running protocol (`#if !APPSTORE`) |
 | `AppSettings+Vocabulary.swift` | Custom-vocabulary file selection, sandbox bookmark resolution, and validation state — shared by both ASR engines; `effectiveVocabularyPath` / `effectiveVocabularyBookmark` hand the engines the local file or the URL source's cached copy |
+| `AppSettings+OpenAIConnections.swift` | Add, select, rename and delete saved OpenAI-compatible connections |
 | `AppSettings+TerminologyRules.swift` | Optional terminology-rules file: selection, bookmark, per-job read and the Settings status; the text area remains the default source |
 | `RemoteVocabularyController.swift` | Keeps the URL source's cached copy current (launch, 2 s after a change, "Update now", hourly), adopts only valid downloads, and publishes the `RemoteVocabularyStatus` Settings shows; owned by `AppState` as `remoteVocabulary` |
 | `LegacyDefaultsMigration.swift` | One-shot carry-over of settings from the pre-rename bundle identifier, since `UserDefaults` is scoped per identifier |
@@ -321,6 +332,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `LocalModel/LocalModelCheck.swift` | Settings' Check Model: runs the helper's `check` mode on a folder and decodes its one-line JSON report (`#if !APPSTORE`) |
 | `PipelineQueue+LocalModel.swift` | Where the queue meets the gate: the job a generation runs under, waiting out a recording that ended the helper and then generating again, and a job cancel that reaches its helper |
 | `WatchingController+LocalModel.swift` | Composes the one recording-activity signal (detected meeting, manual recording) and pushes it to the gate whenever an input changes, so a recording never waits for the model |
+| `OpenAIConnection.swift` | One saved OpenAI-compatible connection (key in the Keychain) |
 | `RecordingSidecar.swift` | Metadata sidecar written next to recordings in record-only mode |
 | `RecordingFileSuffix.swift` | Filename suffix constants for dual-source recordings (`_app.wav`, `_mic.wav`, `_mix.wav`) |
 | `SilentRecordingMonitor.swift` | Pure state machine detecting fully-silent recordings (both channels below threshold) |
@@ -499,6 +511,8 @@ The icon is rendered as a SwiftUI `Image` template (auto-tinted by AppKit for li
 While a "Record <App> meeting?" prompt waits for an answer, a **question mark** replaces the watching dot at the top right (`MenuBarIcon.image(..., questionOverlay:)`, driven by `AppState.awaitingUserAnswer`), so a detected meeting that is not being recorded yet shows on the icon even when the notification was missed. Like the dot it is drawn in the icon's own colour and keeps the template path, and it stays in the top half: the waveform state, the red tints and the bottom-right badges are drawn as without the prompt. Once the prompt is answered, expires or is declined, the dot is back. `BadgeKind` and the `badge` value do not change; automation clients read the open question from `pendingConsentApp`.
 
 While a "meeting seems to have ended" countdown runs, the icon **pulses**: the whole icon, overlays included, is drawn at 30 % alpha on frames 3 to 5 of the 6-frame cycle and as usual on frames 0 to 2 (`MenuBarIcon.image(..., meetingEndCountdownOverlay:)`, driven by `AppState.meetingEndCountdownOverlay`, which is on exactly while `WatchLoop.meetingEndQuestionID` is set). It reads the loop's state alone, so the countdown shows whatever the notification permission, alert style or Focus, and it stops on every way out of the countdown. The fade is alpha only, so the icon stays a template wherever it was one. The countdown only runs while a detected meeting records, so `badge` stays `recording` and `BadgeKind` does not change. The pulse pauses while the menu is open, like every animation (`MenuBarIcon.animationRunLoopMode`).
+
+With Settings → General → "Show prompts below the menu bar icon" on, both questions also show in a **prompt window** directly below the icon (issue #99; how it answers and closes: `architecture/detection.md`, the consent prompt). `PromptWindowController` hosts `PromptWindowView` in a `PromptPanel`, places it with `PromptWindowPlacement` from the frame `MenuBarIconFrame` reads, and refreshes the countdown's time left every second in the run loop's common modes, so it keeps counting while the menu is open. Its controls draw as in an active window (`controlActiveState` `.key`): measured, a never-key panel of an inactive app draws `.borderedProminent` like a plain button, and Record and Keep recording would lose their accent colour. `PromptWindowWiring` attaches it to the menu bar label next to the caption panel.
 
 ### Permission problem badge
 
@@ -1092,7 +1106,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 
 | Tab | Sections | Bindings | Local state |
 |---|---|---|---|
-| **General** | Startup · Mode · Apps to Watch · Record Without Asking · Detection · Long Silence | `settings` | — |
+| **General** | Startup · Mode · Apps to Watch · Record Without Asking · Prompts · Detection · Long Silence | `settings` | — |
 | **Audio** | Microphone · Recording Levels · VAD · Echo · Per-Channel Indicator | `settings` | `audioDevices` |
 | **Transcription** | Engine + per-engine options + vocabulary source + status + idle-model retention | `settings`, three engines, `remoteVocabulary?` | — |
 | **Speakers** | Diarization · Speaker Naming · Speaker Identity · Known Voices · Recognition Stats · Experimental: Diarization Tuning | `settings`, `recognitionStatsLog`, `enrollmentDiarizerFactory` | `knownVoicesSheet` |
@@ -1108,7 +1122,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 - `customVocabularyEnabled` hides the vocabulary source picker, the vocabulary file row and the URL controls
 - `vocabularySource` switches between the local vocabulary file row and the URL controls (address, token, "Update now", status)
 - `unloadModelsWhenIdle` (default on) skips the launch ASR load (a missing model is still downloaded at launch) and releases in-memory ASR and batch VAD models at a safe pipeline drain; the toggle sits beside model status and "Load Model". Turning it off restores launch preload and retains models across drains and engine switches. With the setting on, unloaded status reads "Loads when needed" while `/state` continues to report `"unloaded"`.
-- `protocolProvider` switches between Claude CLI / Codex CLI / Custom Command / OpenAI-compatible / Local model / None panels
+- `protocolProvider` switches between Claude CLI / Codex CLI / Custom Command / OpenAI-compatible / Local model / None panels; the OpenAI-compatible panel starts with the saved-connection controls (`OpenAIConnectionControls`, see `docs/architecture/pipeline.md`)
 - `#if APPSTORE` removes the Claude CLI, Codex CLI, Custom Command and Local model provider options entirely
 - `updateChecker == nil` hides the entire Updates section in About
 

@@ -129,8 +129,10 @@ struct MeetingTranscriberApp: App {
 
     // MARK: - Menu Bar
 
+    /// The caption warm-up flag is set after the initializer rather than in
+    /// it: the initializer expression already sits near the type-check limit.
     private var menuBarContent: some View {
-        MenuBarView(
+        var menu = MenuBarView(
             status: appState.currentStatus,
             isWatching: appState.isWatching,
             pipelineQueue: appState.pipelineQueue,
@@ -149,6 +151,8 @@ struct MeetingTranscriberApp: App {
             notionExportEnabled: appState.settings.notionExportEnabled,
             actions: menuActions,
         )
+        menu.captionsPreparing = appState.liveTranscription.warmup.isPreparing
+        return menu
     }
 
     private var menuActions: MenuActions {
@@ -310,6 +314,7 @@ struct MeetingTranscriberApp: App {
         .onChange(of: appState.settings.liveCaptionsSize) { _, size in
             captionsWindow?.apply(size: size)
         }
+        .modifier(PromptWindowWiring(appState: appState))
     }
 
     // MARK: - Windows
@@ -370,6 +375,7 @@ struct MeetingTranscriberApp: App {
                     dbPath: appState.pipeline.speakersDB, notifier: appState.notifier,
                 ),
                 legacyWhisperModels: appState.engines.legacyWhisperModels,
+                captionWarmup: appState.liveTranscription.warmup,
             )
         }
         .windowResizability(.contentSize)

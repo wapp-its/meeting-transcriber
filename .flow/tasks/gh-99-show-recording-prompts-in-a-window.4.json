@@ -1,0 +1,19 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-11-14T20:20:00.851412Z",
+  "depends_on": [
+    "gh-99-show-recording-prompts-in-a-window.1",
+    "gh-99-show-recording-prompts-in-a-window.2",
+    "gh-99-show-recording-prompts-in-a-window.3"
+  ],
+  "id": "gh-99-show-recording-prompts-in-a-window.4",
+  "priority": null,
+  "review": "codex:gpt-6.1-sol:xhigh",
+  "spec": "gh-99-show-recording-prompts-in-a-window",
+  "spec_path": ".flow/tasks/gh-99-show-recording-prompts-in-a-window.4.md",
+  "status": "done",
+  "title": "Show the open questions in the window, wired into the app, with docs",
+  "updated_at": "2026-11-14T20:20:00.851412Z"
+}

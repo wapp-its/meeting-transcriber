@@ -96,6 +96,8 @@ struct GeneralSettingsView: View {
                 browserConsentWarning
             }
 
+            PromptWindowSection(settings: settings)
+
             Section("Detection") {
                 HStack {
                     Text("Poll Interval")
@@ -395,6 +397,31 @@ private struct SilencePromptSection: View {
                     .accessibilityIdentifier(A11yID.silencePromptMinutesStepper)
             }
             .disabled(!settings.silencePromptEnabled)
+        }
+    }
+}
+
+/// The switch that also shows the open questions in a window below the menu
+/// bar icon. Its help text sits under the switch rather than behind a
+/// `HelpfulToggle` badge, as the accepted Settings design draws it, and warns
+/// that the window shows during a screen share.
+private struct PromptWindowSection: View {
+    @Bindable var settings: AppSettings
+
+    var body: some View {
+        Section("Prompts") {
+            Toggle("Show prompts below the menu bar icon", isOn: $settings.promptWindowEnabled)
+                .accessibilityIdentifier(A11yID.promptWindowToggle)
+            Text(
+                """
+                The "Record … meeting?" question and the "Meeting seems to have ended" countdown also \
+                appear in a small window below the menu bar icon, even when a Focus mode holds \
+                notifications back. Others may see this window while you share your screen.
+                """,
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier(A11yID.promptWindowHelp)
         }
     }
 }

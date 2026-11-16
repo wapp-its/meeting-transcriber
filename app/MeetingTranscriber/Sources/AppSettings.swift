@@ -146,9 +146,12 @@ enum ProtocolProvider: String, CaseIterable {
     }
 }
 
-enum OpenAIAPIKeyPlacement: String, CaseIterable {
+// Codable for `OpenAIConnection`; the raw values are what UserDefaults already holds.
+// swiftlint:disable raw_value_for_camel_cased_codable_enum
+enum OpenAIAPIKeyPlacement: String, CaseIterable, Codable {
     case bearerToken
     case customHeader
+    // swiftlint:enable raw_value_for_camel_cased_codable_enum
 
     /// The header name a fresh install starts with.
     static let defaultHeaderName = "api-key"
@@ -289,6 +292,15 @@ final class AppSettings { // swiftlint:disable:this type_body_length
     /// per detection, so a Settings change applies without restarting watching.
     var recordWithoutAskingApps: [String] {
         didSet { defaults.set(recordWithoutAskingApps, forKey: "recordWithoutAskingApps") }
+    }
+
+    /// Also show the "Record … meeting?" prompt and the "Meeting seems to have
+    /// ended" countdown in a window below the menu bar icon, which a Focus
+    /// mode does not hold back as it does the notifications (issue #99). Off
+    /// by default: the window bypasses Focus on purpose, so it is the user's
+    /// choice; a missing or unreadable stored value reads as off.
+    var promptWindowEnabled: Bool {
+        didSet { defaults.set(promptWindowEnabled, forKey: "promptWindowEnabled") }
     }
 
     /// Mic-input-detected call apps (see `MicInputDetector`). Off by default —
@@ -932,13 +944,14 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         didSet { defaults.set(openAIAPIKeyHeaderName, forKey: "openAIAPIKeyHeaderName") }
     }
 
+    /// API key of the selected connection.
     var openAIAPIKey: String {
-        get { KeychainHelper.read(key: apiKeyAccount) ?? "" }
+        get { KeychainHelper.read(key: activeOpenAIKeyAccount) ?? "" }
         set {
             if newValue.isEmpty {
-                KeychainHelper.delete(key: apiKeyAccount)
+                KeychainHelper.delete(key: activeOpenAIKeyAccount)
             } else {
-                KeychainHelper.save(key: apiKeyAccount, value: newValue)
+                KeychainHelper.save(key: activeOpenAIKeyAccount, value: newValue)
             }
         }
     }
@@ -957,6 +970,30 @@ final class AppSettings { // swiftlint:disable:this type_body_length
             }
             remoteVocabularyTokenRevision += 1
         }
+    }
+
+    /// Saved OpenAI-compatible connections; never empty. The selected one's
+    /// entry is refreshed from the live `openAI*` values only when the selection
+    /// changes (see `AppSettings+OpenAIConnections.swift`), so between switches
+    /// the live values are the truth for it.
+    var openAIConnections: [OpenAIConnection] {
+        didSet {
+            defaults.set(try? JSONEncoder().encode(openAIConnections), forKey: "openAIConnections")
+        }
+    }
+
+    var activeOpenAIConnectionID: UUID {
+        didSet { defaults.set(activeOpenAIConnectionID.uuidString, forKey: "activeOpenAIConnectionID") }
+    }
+
+    /// Keychain account holding a connection's API key. Derived from the
+    /// injected `apiKeyAccount`, so tests never reach the production items.
+    func openAIKeyAccount(for connection: OpenAIConnection) -> String {
+        connection.usesOriginalKeychainItem ? apiKeyAccount : "\(apiKeyAccount).\(connection.id.uuidString)"
+    }
+
+    private var activeOpenAIKeyAccount: String {
+        activeOpenAIConnection.map(openAIKeyAccount(for:)) ?? apiKeyAccount
     }
 
     #if !APPSTORE
@@ -1089,6 +1126,7 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         let storedCustomApps = defaults.stringArray(forKey: "watchCustomApps") ?? []
         consentDeniedApps = Self.loadConsentDeniedApps(from: defaults, addedBundleIDs: storedCustomApps)
         recordWithoutAskingApps = defaults.stringArray(forKey: "recordWithoutAskingApps") ?? []
+        promptWindowEnabled = defaults.bool(forKey: "promptWindowEnabled", default: false)
         watchWeChat = defaults.bool(forKey: "watchWeChat", default: false)
         watchTencentMeeting = defaults.bool(forKey: "watchTencentMeeting", default: false)
         watchFaceTime = defaults.bool(forKey: "watchFaceTime", default: false)
@@ -1206,6 +1244,17 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         openAIAPIKeyPlacement = defaults.string(forKey: "openAIAPIKeyPlacement")
             .flatMap(OpenAIAPIKeyPlacement.init(rawValue:)) ?? .bearerToken
         openAIAPIKeyHeaderName = defaults.string(forKey: "openAIAPIKeyHeaderName") ?? OpenAIAPIKeyPlacement.defaultHeaderName
+        let storedConnectionData = defaults.data(forKey: "openAIConnections")
+        let decodedConnections = storedConnectionData.map(OpenAIConnection.decodeList)
+        let storedConnections = decodedConnections?.connections ?? []
+        // The next write drops what this build cannot read; keep the first such list.
+        if decodedConnections?.complete == false, defaults.data(forKey: "openAIConnectionsUnreadable") == nil {
+            defaults.set(storedConnectionData, forKey: "openAIConnectionsUnreadable")
+        }
+        let storedActive = defaults.string(forKey: "activeOpenAIConnectionID").flatMap(UUID.init(uuidString:))
+        openAIConnections = storedConnections
+        activeOpenAIConnectionID = storedConnections.first { $0.id == storedActive }?.id
+            ?? storedConnections.first?.id ?? UUID()
         customOutputDirBookmark = defaults.data(forKey: "customOutputDirBookmark")
         notionExportEnabled = defaults.object(forKey: "notionExportEnabled") as? Bool ?? false
         notionDatabaseID = defaults.string(forKey: "notionDatabaseID") ?? ""
@@ -1236,6 +1285,41 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         refreshCustomVocabularyValidation()
         refreshTerminologyRulesValidation()
         refreshWhisperKitCustomModelValidation()
+        if defaults.object(forKey: "openAIConnections") == nil {
+            migrateToOpenAIConnections()
+        } else if openAIConnections.isEmpty {
+            startFreshOpenAIConnection()
+        } else if let first = storedConnections.first, !storedConnections.contains(where: { $0.id == storedActive }) {
+            // The live values belong to a selection that is gone; load the
+            // connection that takes its place so its key goes to its endpoint.
+            applyOpenAIConnection(first)
+        }
+    }
+
+    /// Before connections existed: the one configured connection becomes
+    /// "Default" and keeps the Keychain item its key is already in.
+    private func migrateToOpenAIConnections() {
+        let migrated = OpenAIConnection(
+            id: UUID(), name: "Default", endpoint: openAIEndpoint, model: openAIModel,
+            temperature: openAITemperature, topP: openAITopP,
+            apiKeyPlacement: openAIAPIKeyPlacement, apiKeyHeaderName: openAIAPIKeyHeaderName,
+            usesOriginalKeychainItem: true,
+        )
+        openAIConnections = [migrated]
+        activeOpenAIConnectionID = migrated.id
+    }
+
+    /// Stored connections exist but none is readable. The live values belong to
+    /// whichever was selected, so the replacement gets its own empty Keychain
+    /// item: the original key must not go to that connection's endpoint.
+    private func startFreshOpenAIConnection() {
+        let fresh = OpenAIConnection(
+            id: UUID(), name: "Connection 1", endpoint: openAIEndpoint, model: openAIModel,
+            temperature: openAITemperature, topP: openAITopP,
+            apiKeyPlacement: openAIAPIKeyPlacement, apiKeyHeaderName: openAIAPIKeyHeaderName,
+        )
+        openAIConnections = [fresh]
+        activeOpenAIConnectionID = fresh.id
     }
 }
 

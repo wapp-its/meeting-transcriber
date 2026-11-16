@@ -89,4 +89,25 @@ final class SpeakerSampleLevelTests: XCTestCase {
             XCTAssertEqual(played, Array(file[range]), c.name)
         }
     }
+
+    /// Balanced, a speaker's own track that gives no sample gives way to the
+    /// next source, the mix, as `sampleWAVData` does unbalanced.
+    func testABalancedSampleIsReadFromTheFirstSourceThatHasOne() async throws {
+        let dir = try makeTempDirectory(prefix: "SpeakerSampleLevelSources")
+        let mix = dir.appendingPathComponent("standup_16k.wav")
+        let tone = (0 ..< Signal.sampleRate * 6).map { Float(sin(Double($0) * 0.05) * 0.2) }
+        try AudioMixer.saveWAV(samples: tone, sampleRate: Signal.sampleRate, url: mix)
+        let missingTrack = PipelineQueue.SpeakerNamingData.SampleSource(
+            url: dir.appendingPathComponent("standup_mic_16k.wav"), start: 1, end: 5,
+        )
+        let mixSource = PipelineQueue.SpeakerNamingData.SampleSource(url: mix, start: 1, end: 5)
+
+        let fromMix = await SpeakerNamingView.balancedSampleWAVData(from: [missingTrack, mixSource])
+
+        let mixAlone = try await SpeakerNamingView.playbackWAVData(from: mixSource, balanced: true)
+        XCTAssertNotNil(fromMix)
+        XCTAssertEqual(fromMix, mixAlone)
+        let none = await SpeakerNamingView.balancedSampleWAVData(from: [missingTrack])
+        XCTAssertNil(none)
+    }
 }

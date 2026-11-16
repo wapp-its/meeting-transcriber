@@ -28,4 +28,12 @@ extension AppState {
     func answerConsentQuestion(_ question: ConsentQuestion, granted: Bool, protocolOptions: MeetingProtocolOptions? = nil) -> Bool {
         watching.watchLoop?.answerParkedConsent(question, granted: granted, protocolOptions: protocolOptions) ?? false
     }
+
+    /// Answer `question` with any of the notification's answers, "Never for
+    /// this app" included, for the prompt window. Changes nothing unless it is
+    /// still the open prompt, and returns whether it was.
+    @discardableResult
+    func answerConsentQuestion(_ question: ConsentQuestion, answer: ConsentAnswer) -> Bool {
+        watching.watchLoop?.answerParkedConsent(question, answer: answer) ?? false
+    }
 }
