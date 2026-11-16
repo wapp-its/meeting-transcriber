@@ -11,9 +11,70 @@
   "impl_review_rounds": {},
   "next_task": 1,
   "no_plan": true,
-  "plan_review_rounds": 0,
-  "plan_review_status": "unknown",
-  "plan_reviewed_at": null,
+  "plan_review_rounds": 1,
+  "plan_review_status": "needs_work",
+  "plan_reviewed_at": "2026-11-16T12:54:24.800959Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "c20f6b947b66322bcbd2c9d2ff09753f447bfc20eac641e9297ffb052b132add",
+      "backend": "codex",
+      "base_sha": "322dd8b7457d234def6e2c575e1dfc24a5819b31",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-bea7f193d510a16c88dcf4b5c226aa2a",
+            "classification": "introduced",
+            "findingId": "finding-bea7f193d510a16c88dcf4b5c226aa2a",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-c8387f15270d01a7a171780c0b623be3",
+            "classification": "introduced",
+            "findingId": "finding-c8387f15270d01a7a171780c0b623be3",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "7e4a6106f7f68600f7ca883d4442959b7ef00dc4",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 402250,
+      "output_sha256": "1b26917506a56d9863a1d42ed20600738efa4d3bfab24badcf472cd317fba302",
+      "reservation_id": "2dbed7059b634df987adf4128e6bd2c6",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-16T12:54:24.430837Z",
+      "tool_calls": 27,
+      "verdict": "NEEDS_WORK"
+    }
+  ],
+  "review_hash_epoch": {},
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
   "spec_path": ".flow/specs/gh-258-name-teams-recordings-after-the-meeting.md",
   "status": "open",
   "title": "Name Teams recordings after the meeting window",
@@ -29,5 +90,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nA detected Teams meeting gets its title from one Teams window, read once when the meeting is detected. The app takes the first Teams window that isn't a Calendar, Chat or other tab. So the title depends on which Teams window is in front at that moment. A call can be named \"Sprint Review | Contoso | user@contoso.com\" (the meeting window). It can also be named \"Meeting compact view | Meeting in General\" (the small call window), or after an unrelated Teams window. It should get the meeting's own title every time.\n\n## NOTES\n\n- The pick is in `MeetingTitleMatcher.selectWindowTitle`. Teams ends most window titles with \" | Microsoft Teams\", so the preference for that pattern probably doesn't single out the meeting window.\n- The title never changes during the recording. So a call detected while another Teams window was in front keeps that title. All Recordings, the file names and the meeting notes all use it.\n\n## TASKS\n\n- [ ] Rank the Teams windows by how much they look like the meeting window\n- [ ] Decide if the title should also follow a better window during the recording\n- [ ] Add tests with window lists in and the title out",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/258"
   },
-  "updated_at": "2026-11-16T09:21:55.833859Z"
+  "updated_at": "2026-11-16T12:55:35.259562Z"
 }
