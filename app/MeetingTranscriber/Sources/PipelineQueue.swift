@@ -166,6 +166,10 @@ class PipelineQueue {
     /// used for a job without one (from a snapshot written before templates).
     /// Internal for the same reason as `protocolTemplateStore`.
     let defaultProtocolTemplateProvider: () -> ProtocolTemplateID
+    /// Whether the custom template of this name starts its notes with a
+    /// heading that holds the meeting title, read when a job's notes are
+    /// saved or exported (`meetingTitle(fromNotes:template:)`).
+    let templateHasTitleHeading: (String) -> Bool
     let speakerMatcherFactory: () -> SpeakerMatcher
     let vadConfig: VADConfig?
     /// nil disables JSONL logging. AppState injects a real instance for production;
@@ -417,6 +421,7 @@ class PipelineQueue {
         autoOpenSpeakerNaming: @escaping () -> Bool = { true },
         defaultProtocolTemplateProvider: @escaping () -> ProtocolTemplateID = { .builtIn },
         protocolTemplateStore: ProtocolTemplateStore = .production,
+        templateHasTitleHeading: @escaping (String) -> Bool = { _ in false },
     ) {
         self.logDir = logDir
         self.processedLedger = ProcessedRecordingsLedger(logDir: self.logDir)
@@ -446,6 +451,7 @@ class PipelineQueue {
         transcriptOutputOptionsProvider = { outputOptions }
         self.protocolTemplateStore = protocolTemplateStore
         self.defaultProtocolTemplateProvider = defaultProtocolTemplateProvider
+        self.templateHasTitleHeading = templateHasTitleHeading
         self.speakerMatcherFactory = speakerMatcherFactory
         self.snapshotWriter = snapshotWriter
         self.vadConfig = nil
@@ -598,6 +604,7 @@ class PipelineQueue {
         transcriptOutputOptionsProvider: (() -> TranscriptOutputOptions)? = nil,
         defaultProtocolTemplateProvider: @escaping () -> ProtocolTemplateID = { .builtIn },
         protocolTemplateStore: ProtocolTemplateStore = .production,
+        templateHasTitleHeading: @escaping (String) -> Bool = { _ in false },
         speakerMatcherFactory: @escaping () -> SpeakerMatcher = PipelineQueue.throwawayMatcherFactory(),
         snapshotWriter: @escaping @Sendable ([PipelineJob], URL) throws -> Void = PipelineSnapshot.save,
         vadConfig: VADConfig? = nil,
@@ -648,6 +655,7 @@ class PipelineQueue {
         self.transcriptOutputOptionsProvider = transcriptOutputOptionsProvider ?? { outputOptions }
         self.protocolTemplateStore = protocolTemplateStore
         self.defaultProtocolTemplateProvider = defaultProtocolTemplateProvider
+        self.templateHasTitleHeading = templateHasTitleHeading
         self.speakerMatcherFactory = speakerMatcherFactory
         self.snapshotWriter = snapshotWriter
         self.vadConfig = vadConfig

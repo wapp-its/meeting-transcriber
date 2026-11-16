@@ -133,6 +133,11 @@ enum A11yID {
         "protocolTemplateConfirmDelete.\(index)"
     }
 
+    /// Row `index`'s switch "First heading contains the meeting title".
+    static func protocolTemplateTitleHeadingToggle(_ index: Int) -> String {
+        "protocolTemplateTitleHeadingToggle.\(index)"
+    }
+
     static let includeFullTranscriptToggle = "includeFullTranscriptToggle"
     static let saveRawTranscriptToggle = "saveRawTranscriptToggle"
     static let useAITitleForFilenamesToggle = "useAITitleForFilenamesToggle"

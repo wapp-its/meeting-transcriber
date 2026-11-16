@@ -1,12 +1,13 @@
 @testable import MeetingTranscriber
 import XCTest
 
-/// "Name files with AI meeting title" against protocol templates. Only the
+/// "Name files with AI meeting title" against protocol templates. The
 /// built-in prompt asks the model for a `# <label> - <title>` heading; a
 /// custom template's first heading is whatever the template writes, often a
 /// section such as "Action items". So the files are named after the model's
-/// title only when the job ran the built-in prompt, and a job that ran a
-/// custom template keeps its date-based name.
+/// title when the job ran the built-in prompt or a custom template whose
+/// switch "First heading contains the meeting title" is on; any other job
+/// keeps its date-based name.
 @MainActor
 final class PipelineQueueAITitleTemplateTests: XCTestCase {
     // swiftlint:disable:previous balanced_xctest_lifecycle
@@ -25,7 +26,10 @@ final class PipelineQueueAITitleTemplateTests: XCTestCase {
 
     /// Runs one job with the AI title switched on, its model writing
     /// `heading` as the title, and returns the job as it ended.
-    private func runJob(template: ProtocolTemplateID, heading: String) async throws -> PipelineJob {
+    /// `titleHeading` names the templates whose switch is on.
+    private func runJob(
+        template: ProtocolTemplateID, heading: String, titleHeading: Set<String> = [],
+    ) async throws -> PipelineJob {
         let engine = MockEngine()
         engine.segmentsToReturn = [TimestampedSegment(start: 0, end: 5, text: "Hello everyone")]
         let protocolGen = MockProtocolGen()
@@ -38,6 +42,7 @@ final class PipelineQueueAITitleTemplateTests: XCTestCase {
             logDir: tmpDir,
             stagingDir: tmpDir.appendingPathComponent("staging"),
             protocolTemplateStore: store,
+            templateHasTitleHeading: { titleHeading.contains($0) },
             inFlightRuns: InFlightRunRegistry(),
         )
         try queue.enqueue(PipelineJob(
@@ -65,6 +70,12 @@ final class PipelineQueueAITitleTemplateTests: XCTestCase {
         XCTAssertTrue(slug.hasSuffix(job.shortID), "the date-based name carries the short id: \(slug)")
         XCTAssertFalse(slug.contains("action_items"), slug)
         XCTAssertEqual(job.protocolPath?.lastPathComponent, "\(slug).md")
+    }
+
+    func testACustomTemplateSwitchedOnNamesTheFilesAfterItsFirstHeading() async throws {
+        let job = try await runJob(template: .file(name: "Board"), heading: "Budget Review", titleHeading: ["Board"])
+
+        XCTAssertEqual(job.namingSlug, "budget_review")
     }
 
     /// What decides is the prompt the job ran: a template that fell back to

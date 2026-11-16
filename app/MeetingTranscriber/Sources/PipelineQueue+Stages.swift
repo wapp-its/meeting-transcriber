@@ -1166,7 +1166,8 @@ extension PipelineQueue {
 
         let outputOptions = transcriptOutputOptions(forJobID: jobID)
         var basename = initialBasename
-        if let titleSlug = ProtocolGenerator.fileTitleSlug(from: protocolMD, enabled: outputOptions.useAITitleForFilenames, template: usedTemplate) {
+        if outputOptions.useAITitleForFilenames,
+           let titleSlug = meetingTitle(fromNotes: protocolMD, template: usedTemplate).flatMap(ProtocolGenerator.toSnakeCase) {
             basename = renameJobArtifacts(
                 jobID: jobID, from: initialBasename, titleSlug: titleSlug, protocolsDir: protocolsDir,
             )
@@ -1179,6 +1180,14 @@ extension PipelineQueue {
             basename: basename, jobID: jobID, protocolsDir: protocolsDir, speakerNames: speakerNames, template: usedTemplate,
         )
         return .attempted
+    }
+
+    /// The meeting title in notes made from `template`, the one the job ran,
+    /// or nil. The one place that decides it, for the file names under "Name
+    /// files with AI meeting title" and for the Notion page title, which is
+    /// the job's title without one.
+    func meetingTitle(fromNotes markdown: String, template: ProtocolTemplateID) -> String? {
+        ProtocolGenerator.aiTitle(from: markdown, template: template, hasTitleHeading: templateHasTitleHeading)
     }
 
     /// Saves the notes the model wrote and queues their Notion export when one

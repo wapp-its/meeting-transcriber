@@ -172,21 +172,19 @@ final class ProtocolGeneratorTitleTests: XCTestCase {
 
     // MARK: - The title against the template the notes came from
 
-    /// Only the built-in template asks for a `# <label> - <title>` heading; a
-    /// custom template's first heading is a section as often as a title.
-    func testAITitleIsTakenOnlyFromNotesOfTheBuiltInTemplate() {
+    /// The built-in template always asks for a `# <label> - <title>` heading;
+    /// a custom template's first heading is a section as often as a title, so
+    /// it counts only when the template's switch, asked by name, is on.
+    func testAITitleIsTakenFromTheBuiltInTemplateAndFromCustomTemplatesSwitchedOn() {
         let notes = "# Meeting Protocol - Sprint Planning\n\n## Decisions\n"
+        let switchedOn: (String) -> Bool = { $0 == "Board" }
 
-        XCTAssertEqual(ProtocolGenerator.aiTitle(from: notes, template: .builtIn), "Sprint Planning")
-        XCTAssertNil(ProtocolGenerator.aiTitle(from: "# Action items\n", template: .file(name: "Board")))
-        XCTAssertNil(ProtocolGenerator.aiTitle(from: notes, template: .file(name: "Board")))
-    }
-
-    func testFileTitleSlugNeedsTheSettingAndTheBuiltInTemplate() {
-        let notes = "# Meeting Protocol - Sprint Planning\n"
-
-        XCTAssertEqual(ProtocolGenerator.fileTitleSlug(from: notes, enabled: true, template: .builtIn), "sprint_planning")
-        XCTAssertNil(ProtocolGenerator.fileTitleSlug(from: notes, enabled: false, template: .builtIn))
-        XCTAssertNil(ProtocolGenerator.fileTitleSlug(from: notes, enabled: true, template: .file(name: "Board")))
+        XCTAssertEqual(ProtocolGenerator.aiTitle(from: notes, template: .builtIn) { _ in false }, "Sprint Planning")
+        XCTAssertEqual(ProtocolGenerator.aiTitle(from: notes, template: .file(name: "Board"), hasTitleHeading: switchedOn), "Sprint Planning")
+        XCTAssertNil(ProtocolGenerator.aiTitle(from: notes, template: .file(name: "Retro"), hasTitleHeading: switchedOn))
+        XCTAssertNil(
+            ProtocolGenerator.aiTitle(from: "## Action items\n", template: .file(name: "Board"), hasTitleHeading: switchedOn),
+            "a switched-on template whose notes have no top-level heading still has no title",
+        )
     }
 }

@@ -6,7 +6,9 @@ import XCTest
 /// the rule of every other job: the template is fixed when the job enters the
 /// queue and read when the notes are made, so a default changed later never
 /// reaches them, not even after a relaunch. And as for every job, only notes
-/// from the built-in template lend their first heading as the meeting title.
+/// from the built-in template, or from a template whose switch "First heading
+/// contains the meeting title" is on, lend their first heading as the
+/// meeting title.
 @MainActor
 final class NotesOnlyProtocolTemplateTests: XCTestCase {
     // swiftlint:disable implicitly_unwrapped_optional
@@ -146,6 +148,24 @@ final class NotesOnlyProtocolTemplateTests: XCTestCase {
         XCTAssertEqual(titles, ["20261030_0900_standup"])
     }
 
+    /// The switch counts for a picked transcript as for any job: its page
+    /// takes the heading. The transcript keeps its name all the same.
+    func testNotesForAPickedTranscriptFromATemplateSwitchedOnTitleThePageAfterTheirHeading() async throws {
+        let exporter = TitleCapturingNotionExporter()
+        let generator = MockProtocolGen()
+        generator.headingTitle = "Budget Review"
+        let queue = makeQueue(generator: generator, exporter: exporter, useAITitleForFilenames: true, titleHeading: ["Board"])
+        currentDefault = .file(name: "Board")
+
+        try queue.enqueueNotes(fromTranscripts: [transcript("20261030_0900_standup")])
+        await queue.awaitProcessing()
+        await queue.awaitNotionExports()
+
+        XCTAssertEqual(queue.jobs.first?.protocolPath?.lastPathComponent, "20261030_0900_standup.md")
+        let titles = await exporter.titles
+        XCTAssertEqual(titles, ["Budget Review"])
+    }
+
     /// A retry runs the template the job recorded, so notes from a custom
     /// one keep the date-based name and title the page after the job.
     func testARetryOfCustomTemplateNotesTakesNoTitleFromThem() async throws {
@@ -181,9 +201,11 @@ final class NotesOnlyProtocolTemplateTests: XCTestCase {
         }
     }
 
-    /// `exporter` switches the Notion export on, into that exporter.
+    /// `exporter` switches the Notion export on, into that exporter;
+    /// `titleHeading` names the templates whose title switch is on.
     private func makeQueue(
         generator: MockProtocolGen, exporter: TitleCapturingNotionExporter? = nil, useAITitleForFilenames: Bool = false,
+        titleHeading: Set<String> = [],
     ) -> PipelineQueue {
         let engine = MockEngine()
         engine.segmentsToReturn = [TimestampedSegment(start: 0, end: 5, text: "Hello everyone")]
@@ -196,6 +218,7 @@ final class NotesOnlyProtocolTemplateTests: XCTestCase {
             useAITitleForFilenames: useAITitleForFilenames,
             defaultProtocolTemplateProvider: { self.currentDefault },
             protocolTemplateStore: store,
+            templateHasTitleHeading: { titleHeading.contains($0) },
             notionExportConfigurationProvider: notion,
             inFlightRuns: InFlightRunRegistry(),
         )

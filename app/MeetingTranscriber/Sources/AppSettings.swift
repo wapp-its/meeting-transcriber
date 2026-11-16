@@ -676,6 +676,36 @@ final class AppSettings { // swiftlint:disable:this type_body_length
     /// `ProtocolTemplateMigration`, which sets it when it is absent.
     static let defaultProtocolTemplateKey = "defaultProtocolTemplate"
 
+    /// The templates, by file name without the extension, whose notes start
+    /// with a heading that holds the meeting title: the switch "First heading
+    /// contains the meeting title" in each template's row. The built-in
+    /// template always does and is never listed. Kept here, not in the
+    /// template file, so the file stays the user's text alone. A name not
+    /// listed is off: a file added or renamed in Finder starts off, New
+    /// Template and the migrated legacy prompt start on, and Delete removes
+    /// the name.
+    var templatesWithTitleHeading: [String] {
+        didSet { defaults.set(templatesWithTitleHeading, forKey: Self.templatesWithTitleHeadingKey) }
+    }
+
+    /// Shared with `ProtocolTemplateMigration`, which lists the migrated
+    /// template.
+    static let templatesWithTitleHeadingKey = "protocolTemplatesWithTitleHeading"
+
+    /// Case-insensitive, as the template names are (`ProtocolTemplateName.isTaken`).
+    func templateHasTitleHeading(_ name: String) -> Bool {
+        ProtocolTemplateName.isTaken(name, in: templatesWithTitleHeading)
+    }
+
+    func setTemplateHasTitleHeading(_ isOn: Bool, for name: String) {
+        guard isOn != templateHasTitleHeading(name) else { return }
+        if isOn {
+            templatesWithTitleHeading.append(name)
+        } else {
+            templatesWithTitleHeading.removeAll { $0.caseInsensitiveCompare(name) == .orderedSame }
+        }
+    }
+
     /// The app meeting-notes templates open in, by bundle identifier: the one
     /// last chosen under Open With or Other… in Settings → Output. Absent until
     /// one is chosen, which means the Mac's default app for Markdown files
@@ -698,7 +728,8 @@ final class AppSettings { // swiftlint:disable:this type_body_length
     }
 
     /// Format output filenames using the AI-generated meeting title in snake_case without timestamps.
-    /// Only for a job that ran the built-in template (`ProtocolGenerator.fileTitleSlug`).
+    /// Only for notes whose template writes the title into the first heading
+    /// (`PipelineQueue.meetingTitle`).
     var useAITitleForFilenames: Bool {
         didSet { defaults.set(useAITitleForFilenames, forKey: "useAITitleForFilenames") }
     }
@@ -1022,6 +1053,7 @@ final class AppSettings { // swiftlint:disable:this type_body_length
         notifyOnMeetingNotesFailure = defaults.bool(forKey: "notifyOnMeetingNotesFailure", default: true)
         defaultProtocolTemplate = ProtocolTemplateID(storedValue: defaults.string(forKey: Self.defaultProtocolTemplateKey) ?? "")
         templateEditorBundleIdentifier = defaults.string(forKey: "templateEditorBundleIdentifier")
+        templatesWithTitleHeading = defaults.stringArray(forKey: Self.templatesWithTitleHeadingKey) ?? []
         includeFullTranscriptInProtocol = defaults.bool(forKey: "includeFullTranscriptInProtocol", default: true)
         saveRawTranscriptSeparately = defaults.bool(forKey: "saveRawTranscriptSeparately", default: true)
         useAITitleForFilenames = defaults.bool(forKey: "useAITitleForFilenames", default: false)

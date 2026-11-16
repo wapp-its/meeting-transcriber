@@ -2,10 +2,12 @@
 import XCTest
 
 /// The Notion page title against protocol templates, under the rule the file
-/// names follow (`ProtocolGenerator.aiTitle`): the page takes the title the
-/// model wrote only when the notes came from the built-in template. A custom
-/// template's first heading is a section as often as a title, so its page
-/// takes the job's title, the one the export uses for notes with no heading.
+/// names follow (`PipelineQueue.meetingTitle`): the page takes the title the
+/// model wrote when the notes came from the built-in template or from a
+/// custom one whose switch "First heading contains the meeting title" is on.
+/// Any other custom template's first heading is a section as often as a
+/// title, so its page takes the job's title, the one the export uses for
+/// notes with no heading.
 @MainActor
 final class PipelineQueueNotionTitleTemplateTests: XCTestCase {
     // swiftlint:disable:previous balanced_xctest_lifecycle
@@ -35,7 +37,10 @@ final class PipelineQueueNotionTitleTemplateTests: XCTestCase {
         try "# Action items\n\n## Decisions\n".write(to: store.fileURL(named: "Board"), atomically: true, encoding: .utf8)
     }
 
-    private func makeQueue(exporter: TitleCapturingNotionExporter, heading: String) -> PipelineQueue {
+    /// `titleHeading` names the templates whose switch is on.
+    private func makeQueue(
+        exporter: TitleCapturingNotionExporter, heading: String, titleHeading: Set<String> = [],
+    ) -> PipelineQueue {
         let engine = MockEngine()
         engine.segmentsToReturn = [TimestampedSegment(start: 0, end: 5, text: "Hello everyone")]
         let protocolGen = MockProtocolGen()
@@ -50,6 +55,7 @@ final class PipelineQueueNotionTitleTemplateTests: XCTestCase {
             logDir: tmpDir,
             stagingDir: tmpDir.appendingPathComponent("staging"),
             protocolTemplateStore: store,
+            templateHasTitleHeading: { titleHeading.contains($0) },
             notionExportConfigurationProvider: configurationProvider,
             inFlightRuns: InFlightRunRegistry(),
         )
@@ -57,9 +63,11 @@ final class PipelineQueueNotionTitleTemplateTests: XCTestCase {
 
     /// Runs one job whose model writes `heading` as the title, waits for its
     /// export, and returns the page titles the exporter was handed.
-    private func exportedTitles(template: ProtocolTemplateID, heading: String) async throws -> [String] {
+    private func exportedTitles(
+        template: ProtocolTemplateID, heading: String, titleHeading: Set<String> = [],
+    ) async throws -> [String] {
         let exporter = TitleCapturingNotionExporter()
-        let queue = makeQueue(exporter: exporter, heading: heading)
+        let queue = makeQueue(exporter: exporter, heading: heading, titleHeading: titleHeading)
         try queue.enqueue(PipelineJob(
             meetingTitle: "Board meeting", appName: "Teams",
             mixPath: createTestAudioFile(in: tmpDir), appPath: nil, micPath: nil, micDelay: 0,
@@ -81,6 +89,12 @@ final class PipelineQueueNotionTitleTemplateTests: XCTestCase {
         let titles = try await exportedTitles(template: .file(name: "Board"), heading: "Action items")
 
         XCTAssertEqual(titles, ["Board meeting"])
+    }
+
+    func testACustomTemplateSwitchedOnTitlesThePageAfterItsFirstHeading() async throws {
+        let titles = try await exportedTitles(template: .file(name: "Board"), heading: "Budget Review", titleHeading: ["Board"])
+
+        XCTAssertEqual(titles, ["Budget Review"])
     }
 
     /// What decides is the prompt the job ran: a template that fell back to

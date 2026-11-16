@@ -174,6 +174,26 @@ final class ProtocolTemplateMigrationTests: XCTestCase {
         migrate(otherBuild)
 
         XCTAssertEqual(otherBuild.string(forKey: key), "")
+        XCTAssertEqual(AppSettings(defaults: otherBuild).templatesWithTitleHeading, [])
+    }
+
+    /// The legacy prompt was the built-in one edited, so it asks for the
+    /// built-in's title heading: each build that adopts the migrated template
+    /// switches its title heading on, once, and a later launch leaves a switch
+    /// the user turned off alone.
+    func testTheMigratedTemplateStartsWithItsTitleSwitchOnInEachBuild() throws {
+        try legacyText.write(to: legacyPrompt, atomically: true, encoding: .utf8)
+        let defaults = try makeDefaults()
+        let otherBuild = try makeDefaults()
+
+        migrate(defaults)
+        migrate(otherBuild)
+
+        XCTAssertTrue(AppSettings(defaults: defaults).templateHasTitleHeading("Custom Prompt"))
+        XCTAssertTrue(AppSettings(defaults: otherBuild).templateHasTitleHeading("Custom Prompt"))
+        AppSettings(defaults: defaults).setTemplateHasTitleHeading(false, for: "Custom Prompt")
+        migrate(defaults)
+        XCTAssertFalse(AppSettings(defaults: defaults).templateHasTitleHeading("Custom Prompt"))
     }
 
     func testADefaultAlreadyChosenIsLeftAlone() throws {

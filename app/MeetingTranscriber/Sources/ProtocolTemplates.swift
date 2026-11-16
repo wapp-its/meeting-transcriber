@@ -317,7 +317,10 @@ enum ProtocolTemplateMigration {
     }
 
     /// Step 2: when this build has no default yet, take the template the
-    /// marker names if its file is still there, else the built-in.
+    /// marker names if its file is still there, else the built-in. The
+    /// legacy prompt was the built-in one edited, so it asks for the
+    /// built-in's title heading: the adopted template's title switch
+    /// (`AppSettings.templatesWithTitleHeading`) starts on, once per build.
     private static func adoptDefault(marker: URL, defaults: UserDefaults, store: ProtocolTemplateStore) {
         guard defaults.object(forKey: AppSettings.defaultProtocolTemplateKey) == nil else { return }
         guard let migratedName = try? String(contentsOf: marker, encoding: .utf8) else {
@@ -327,5 +330,11 @@ enum ProtocolTemplateMigration {
         let name = migratedName.trimmingCharacters(in: .whitespacesAndNewlines)
         let template = store.effectiveDefault(ProtocolTemplateID(storedValue: name))
         defaults.set(template.storedValue, forKey: AppSettings.defaultProtocolTemplateKey)
+        if case let .file(adopted) = template {
+            let listed = defaults.stringArray(forKey: AppSettings.templatesWithTitleHeadingKey) ?? []
+            if !ProtocolTemplateName.isTaken(adopted, in: listed) {
+                defaults.set(listed + [adopted], forKey: AppSettings.templatesWithTitleHeadingKey)
+            }
+        }
     }
 }

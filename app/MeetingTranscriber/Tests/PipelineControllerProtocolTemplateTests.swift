@@ -61,4 +61,19 @@ final class PipelineControllerProtocolTemplateTests: XCTestCase {
         settings.defaultProtocolTemplate = .file(name: "Gone")
         XCTAssertEqual(enqueuedJob()?.protocolTemplate, .file(name: "Gone"))
     }
+
+    /// The switch "First heading contains the meeting title" reaches the
+    /// queue the controller builds, read when notes are named.
+    func testTheQueueReadsATemplatesTitleSwitchFromTheSettings() throws {
+        let pc = PipelineController(
+            settings: settings, notifier: RecordingNotifier(), queueEnvironment: IsolatedQueueEnvironment.make(logDir: tmpDir),
+        )
+        pc.activate { MockEngine() }
+        let queue = try XCTUnwrap(pc.makeQueue())
+        let notes = "# Budget Review\n\n## Decisions\n"
+
+        XCTAssertNil(queue.meetingTitle(fromNotes: notes, template: .file(name: "Board")))
+        settings.setTemplateHasTitleHeading(true, for: "Board")
+        XCTAssertEqual(queue.meetingTitle(fromNotes: notes, template: .file(name: "Board")), "Budget Review")
+    }
 }

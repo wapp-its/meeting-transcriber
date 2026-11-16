@@ -72,7 +72,7 @@ struct PendingNotionExport {
     let configuration: NotionExportConfiguration
     let savedLocally: Bool
     /// The template the notes were made from, which decides whether the page
-    /// takes the title the model wrote (`ProtocolGenerator.aiTitle`).
+    /// takes the title the model wrote (`PipelineQueue.meetingTitle`).
     var template: ProtocolTemplateID = .builtIn
 }
 
@@ -239,8 +239,9 @@ extension PipelineQueue {
 
     /// Export finished Markdown independently of generation and local saving.
     /// A failed export leaves the local-save decision to the caller. The page
-    /// is titled after the meeting title the model wrote, which only notes
-    /// from the built-in `template` carry, else after the job's title.
+    /// is titled after the meeting title the model wrote into notes from
+    /// `template` (`meetingTitle(fromNotes:template:)`), else after the job's
+    /// title.
     func exportToNotion(
         jobID: UUID, protocolMD: String, transcript: String?,
         speakerNames: [String], configuration: NotionExportConfiguration?,
@@ -257,7 +258,7 @@ extension PipelineQueue {
                 await self?.recordNotionPageExport(jobID: jobID, databaseID: databaseID, page: page)
             }
             let exporter = configuration.exporter
-            let title = ProtocolGenerator.aiTitle(from: protocolMD, template: template) ?? job.meetingTitle
+            let title = meetingTitle(fromNotes: protocolMD, template: template) ?? job.meetingTitle
             let date = job.meetingStartTime
             let tags = configuration.speakerTagsEnabled ? NotionTagFilter.confirmedNames(speakerNames) : []
             let pageResult = try await NotionExportDeadline.run(limit: configuration.deadline) {

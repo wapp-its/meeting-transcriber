@@ -108,7 +108,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `Settings/OpenAIConnectionSection.swift` | Connection Settings section: selected connection's endpoint and API key, collapsed Advanced group (key placement, sampling overrides) and its `OpenAIAdvancedDisclosure` state |
 | `Settings/OpenAIConnectionControls.swift` | Saved OpenAI-compatible connection picker with Add/Delete/Rename buttons |
 | `Settings/OpenAIConnectionPrompts.swift` | State of the Add and Rename (name prompt) and Delete confirmation dialogs |
-| `Settings/ProtocolTemplatesSettingsView.swift` | Meeting Notes Templates section: default template picker, per template file the split button Edit (Open in the editor app, Open With, Show in Finder) and Delete (to the Trash, confirmed), New Template…, Open Templates Folder; its state and writes live in the `@Observable` `ProtocolTemplatesModel`, also for the New Template window |
+| `Settings/ProtocolTemplatesSettingsView.swift` | Meeting Notes Templates section: default template picker, per template file the split button Edit (Open in the editor app, Open With, Show in Finder), Delete (to the Trash, confirmed) and the switch "First heading contains the meeting title", New Template…, Open Templates Folder; its state and writes live in the `@Observable` `ProtocolTemplatesModel`, also for the New Template window |
 | `Settings/NewProtocolTemplateSheet.swift` | The New Template window: Name field, a note on what Create does, Cancel and Create. Create only writes the file from the built-in template and closes the window; it opens nothing |
 | `Settings/TemplateEditor.swift` | Which app a template opens in (the one chosen last under Open With, remembered by bundle identifier in `AppSettings.templateEditorBundleIdentifier`, else the default app for Markdown files), the Open With list, and the header help text and Finder lines that name it |
 | `Settings/TemplateOpener.swift` | The templates section's only way to the Mac: Markdown app lookups by content type, opening a file in an app, Finder and the app picker; tests inject a fake |
@@ -653,11 +653,15 @@ prefix scan, because a bare-title stem is a prefix of other jobs' stems. A title
 is taken only if none of its artifacts exist, otherwise `_<shortID>` is
 appended, and nothing is overwritten. If any move fails, the ones already done
 are undone and the job keeps its old stem and paths.
-The title is taken only for a job that ran the built-in template (after a
-fallback too): a custom template's first heading is whatever it writes, a
-section such as "Action items" as often as a title, so its files keep the
-timestamped names (`ProtocolGenerator.fileTitleSlug`, over
-`ProtocolGenerator.aiTitle`).
+The title is taken for a job that ran the built-in template (after a fallback
+too) or a custom template whose switch "First heading contains the meeting
+title" is on. A custom template's first heading is whatever it writes, a
+section such as "Action items" as often as a title, so any other job keeps the
+timestamped names. The switch is kept by template name in the settings
+(`AppSettings.templatesWithTitleHeading`), not in the file: New Template and the
+migrated "Custom Prompt" start on, a file added or renamed in Finder starts
+off, and Delete removes the name. `PipelineQueue.meetingTitle` decides, for the
+files and the Notion page alike (rule in `ProtocolGenerator.aiTitle`).
 
 The prompt is the job's meeting-notes template: the built-in one or a Markdown file in `~/Library/Application Support/MeetingTranscriber/Protocol Templates/`, named after the file and managed in Settings → Output. A job captures the default template's name when it enters the queue, and the file is read when the notes are made; a file that is missing or blank by then falls back to the built-in template with a warning on the job. A custom prompt from an earlier version (`protocol_prompt.md`) is copied in once as the template "Custom Prompt" and made the default; the old file is left in place. The rules and the reasons are in [pipeline.md](architecture/pipeline.md).
 
@@ -674,8 +678,9 @@ retry. Export failures add a job warning with a short cause and keep the local c
 `notionSpeakerTagsEnabled` separately opts in to sending confirmed speaker names as
 tags and defaults off. Date and Tags are written only when the selected database
 has recognized columns. The page title follows the file-name rule
-(`ProtocolGenerator.aiTitle`): the title the model wrote for notes from the
-built-in template, otherwise the job's title. A retry reads the notes from the
+(`PipelineQueue.meetingTitle`): the title the model wrote for notes from the
+built-in template or from a template whose title switch is on, otherwise the
+job's title. A retry reads the notes from the
 backup and decides by the template the job asked for.
 
 The job records its Notion page and database IDs as soon as the page is created,

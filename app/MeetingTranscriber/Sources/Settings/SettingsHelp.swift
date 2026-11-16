@@ -105,9 +105,19 @@ enum SettingsHelp {
 
     static let aiTitleForFilenames =
         """
-        Names the files after the meeting title the AI writes into the meeting \
-        notes, but only for notes made with the built-in template; notes from \
-        your own template keep the date-based name.
+        Names the files after the meeting title the AI writes into the first \
+        heading of the meeting notes: always for the built-in template, and for \
+        your own template only when its switch “First heading contains the \
+        meeting title” is on. Other notes keep the date-based name.
+        """
+
+    static let templateTitleHeading =
+        """
+        Turn on when this template has the AI start the notes with a heading \
+        that holds the meeting title, as the built-in template does. That title \
+        then names the Notion page and, with “Name files with AI meeting \
+        title”, the files. Leave it off when the first heading is a section \
+        such as “Action items”. A file added or renamed in Finder starts off.
         """
 
     static let customVocabularyWhisperKit = customVocabulary + "\n\n"

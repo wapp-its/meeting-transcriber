@@ -120,14 +120,16 @@ final class ProtocolTemplatesModel {
         pendingDeletion = name
     }
 
-    /// Moves the template to the Trash. Deleting the default makes the
-    /// built-in the default.
+    /// Moves the template to the Trash and forgets its title switch, so a
+    /// file made again under the name starts off like any new file. Deleting
+    /// the default makes the built-in the default.
     func confirmDelete(_ name: String) {
         pendingDeletion = nil
         // Read before the file goes: afterwards the default no longer resolves.
         let deletesTheDefault = defaultSelection == .file(name: name)
         do {
             try store.trash(name: name, trashItem: trashItem)
+            settings.setTemplateHasTitleHeading(false, for: name)
             if deletesTheDefault {
                 settings.defaultProtocolTemplate = .builtIn
             }
@@ -136,6 +138,16 @@ final class ProtocolTemplatesModel {
             notice = .error(error.localizedDescription)
         }
         reload()
+    }
+
+    /// Whether the template's switch "First heading contains the meeting
+    /// title" is on.
+    func hasTitleHeading(_ name: String) -> Bool {
+        settings.templateHasTitleHeading(name)
+    }
+
+    func setTitleHeading(_ isOn: Bool, for name: String) {
+        settings.setTemplateHasTitleHeading(isOn, for: name)
     }
 
     /// Creates the folder when it is missing, then opens it.
@@ -201,10 +213,12 @@ final class ProtocolTemplatesModel {
     /// other, so a template never opens in one app on Create and another on
     /// Edit. The store checks the name against the folder again, so one taken
     /// since the window opened is refused; a refusal or a failed write keeps
-    /// the window and the name.
+    /// the window and the name. The new template's title switch starts on:
+    /// its text is the built-in one, whose first heading holds the title.
     func createTemplate() {
         do {
-            _ = try store.create(name: newTemplateName)
+            let file = try store.create(name: newTemplateName)
+            settings.setTemplateHasTitleHeading(true, for: file.deletingPathExtension().lastPathComponent)
             isNewTemplateShown = false
             newTemplateName = ""
             notice = nil
@@ -334,23 +348,39 @@ struct ProtocolTemplatesSettingsView: View {
     private func templateRows(editor: TemplateEditor) -> some View {
         let openWith = model.openWithEntries
         return ForEach(Array(model.names.enumerated()), id: \.element) { index, name in
-            HStack {
-                Text(name)
-                Spacer()
-                editButton(row: index, template: name, editor: editor, openWith: openWith)
-                Button("Delete") { model.requestDelete(name) }
-                    .accessibilityIdentifier(A11yID.protocolTemplateDelete(index))
-                    .confirmationDialog(
-                        "Move “\(name)” to the Trash?",
-                        isPresented: deletionPrompt(for: name),
-                        titleVisibility: .visible,
-                    ) {
-                        Button("Move to Trash", role: .destructive) { model.confirmDelete(name) }
-                            .accessibilityIdentifier(A11yID.protocolTemplateConfirmDelete(index))
-                    } message: {
-                        Text(ProtocolTemplatesModel.deletionMessage)
-                    }
+            VStack(alignment: .leading) {
+                templateRow(index: index, template: name, editor: editor, openWith: openWith)
+                HelpfulToggle(
+                    title: "First heading contains the meeting title",
+                    help: SettingsHelp.templateTitleHeading,
+                    isOn: titleHeading(of: name),
+                )
+                .controlSize(.small)
+                .accessibilityIdentifier(A11yID.protocolTemplateTitleHeadingToggle(index))
             }
+        }
+    }
+
+    /// The template's name, Edit and Delete.
+    private func templateRow(
+        index: Int, template name: String, editor: TemplateEditor, openWith: [TemplateOpenWithEntry],
+    ) -> some View {
+        HStack {
+            Text(name)
+            Spacer()
+            editButton(row: index, template: name, editor: editor, openWith: openWith)
+            Button("Delete") { model.requestDelete(name) }
+                .accessibilityIdentifier(A11yID.protocolTemplateDelete(index))
+                .confirmationDialog(
+                    "Move “\(name)” to the Trash?",
+                    isPresented: deletionPrompt(for: name),
+                    titleVisibility: .visible,
+                ) {
+                    Button("Move to Trash", role: .destructive) { model.confirmDelete(name) }
+                        .accessibilityIdentifier(A11yID.protocolTemplateConfirmDelete(index))
+                } message: {
+                    Text(ProtocolTemplatesModel.deletionMessage)
+                }
         }
     }
 
@@ -440,6 +470,14 @@ struct ProtocolTemplatesSettingsView: View {
             set: { presented in
                 if !presented, model.pendingDeletion == name { model.pendingDeletion = nil }
             },
+        )
+    }
+
+    /// The template's switch "First heading contains the meeting title".
+    private func titleHeading(of name: String) -> Binding<Bool> {
+        Binding(
+            get: { model.hasTitleHeading(name) },
+            set: { model.setTitleHeading($0, for: name) },
         )
     }
 }

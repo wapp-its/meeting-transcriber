@@ -259,23 +259,17 @@ enum ProtocolGenerator {
     }
 
     /// The meeting title the model wrote into notes made from `template`, or
-    /// nil. Only the built-in template asks the model for a
-    /// `# <label> - <title>` heading. A custom template's first heading is
-    /// whatever that template writes, a section such as "# Action items" as
-    /// often as a title, so notes from one carry no title to take. `template`
-    /// is the one the job ran, which is the built-in after a fallback. Read
-    /// for the file names (`fileTitleSlug`) and the Notion page title.
-    static func aiTitle(from markdown: String, template: ProtocolTemplateID) -> String? {
-        guard template == .builtIn else { return nil }
+    /// nil. The built-in template asks the model for a `# <label> - <title>`
+    /// heading. A custom template's first heading is whatever that template
+    /// writes, a section such as "# Action items" as often as a title, so
+    /// notes from one carry a title only when `hasTitleHeading` says so for
+    /// its name, the user's switch in Settings. `template` is the one the job
+    /// ran, which is the built-in after a fallback.
+    static func aiTitle(
+        from markdown: String, template: ProtocolTemplateID, hasTitleHeading: (String) -> Bool,
+    ) -> String? {
+        if case let .file(name) = template, !hasTitleHeading(name) { return nil }
         return extractTitle(from: markdown)
-    }
-
-    /// The slug a job's files are renamed to under "Name files with AI meeting
-    /// title", or nil to keep the date-based name, which is what a job that
-    /// ran a custom template keeps (`aiTitle`).
-    static func fileTitleSlug(from markdown: String, enabled: Bool, template: ProtocolTemplateID) -> String? {
-        guard enabled else { return nil }
-        return aiTitle(from: markdown, template: template).flatMap(toSnakeCase)
     }
 
     /// Extract a meeting title from protocol markdown.

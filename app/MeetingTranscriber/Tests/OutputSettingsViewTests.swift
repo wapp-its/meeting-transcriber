@@ -109,7 +109,7 @@ final class OutputSettingsViewTests: XCTestCase {
         XCTAssertNoThrow(try view.inspect())
     }
 
-    /// The toggle says that only notes from the built-in template rename the files.
+    /// The toggle says which templates' notes rename the files.
     func testUseAITitleForFilenamesToggleExplainsTheTemplateRule() throws {
         let view = OutputSettingsView(settings: AppSettings(defaults: makeIsolatedDefaults()))
 

@@ -334,6 +334,7 @@ final class PipelineController {
             // back to the built-in template with a warning when its notes are made.
             defaultProtocolTemplateProvider: { [settings] in settings.defaultProtocolTemplate },
             protocolTemplateStore: queueEnvironment.protocolTemplateStore,
+            templateHasTitleHeading: { [settings] name in settings.templateHasTitleHeading(name) },
             speakerMatcherFactory: SpeakerMatcher.factory(dbPath: speakersDB, notifier: notifier),
             vadConfig: settings.vadEnabled ? VADConfig(threshold: settings.vadThreshold) : nil,
             recognitionStatsLog: RecognitionStatsLog(path: queueEnvironment.recognitionStatsLog),
