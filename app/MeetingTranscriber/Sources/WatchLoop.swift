@@ -104,8 +104,10 @@ class WatchLoop {
     var stopByHandRequestedAt: Date?
     /// Apps kept out of detection until their signal has gone once (`WatchLoop+RedetectionHold.swift`).
     var redetectionHolds = RedetectionHolds()
-    /// The held app "Record Again" was chosen for, parked for the next poll (`WatchLoop+RecordAgain.swift`).
-    var recordAgainRequest: String?
+    /// Calls answered "Ignore" while their signal stays, offered as "Record (<App>)" (`WatchLoop+RecordIgnored.swift`).
+    var ignoredCalls = IgnoredCalls()
+    /// The offer "Record Again" or "Record" was chosen for, parked for the next poll (`WatchLoop+RecordAgain.swift`).
+    var recordAgainRequest: RecordAgainOffer?
     var silencePrompt: SilencePromptRuntime
     /// The recording's pauses, from its capture start to its stop (`WatchLoop+Pause.swift`).
     var recordingPauses: RecordingPauseRecord?
@@ -240,6 +242,7 @@ class WatchLoop {
         declineParkedConsent()
         cleanupManualRecording()
         redetectionHolds.removeAll()
+        ignoredCalls.removeAll()
         recordAgainRequest = nil
         update { next in
             next.phase = .idle
@@ -425,6 +428,7 @@ class WatchLoop {
     private func watchLoop() async {
         while !Task.isCancelled {
             releaseEndedRedetectionHolds()
+            releaseEndedIgnoredCalls()
             // A Record Again click, then a prompt answered since the last poll:
             // both arrive out of band, but recordings only ever start here, and
             // each is re-checked, since the call may have ended in the meantime.
@@ -518,6 +522,7 @@ class WatchLoop {
         let source = RecordingSource.forApp(pid: meeting.windowPID, noMic: noMic())
         let micDeviceUID = micDeviceUID()
         recordingSource = source
+        ignoredCalls.forget(meeting.pattern.identityKey) // recorded now, by whichever path
         update(cause: startCause) { next in
             next.phase = .recording
             next.currentMeeting = meeting
