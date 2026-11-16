@@ -71,6 +71,33 @@ extension PipelineQueue {
         }.map(\.element)
     }
 
+    /// `segments`, each run of them that starts at the same moment in the order the
+    /// meeting's current transcript has their words, where it has them all. An
+    /// earlier build rendered such a tie by the labelling's topology rather than
+    /// by the kept order (`inKeptOrder`), so its transcript may have them the
+    /// other way round.
+    func inTheTranscriptsOrder(_ segments: [TimestampedSegment], jobID: UUID) -> [TimestampedSegment] {
+        guard let file = meetingFileStore?.record(for: jobID)?.files.last(where: { $0.role == .transcript && $0.state != .gone }),
+              let transcript = try? String(contentsOf: URL(filePath: file.path), encoding: .utf8)
+        else { return segments }
+        var ordered: [TimestampedSegment] = []
+        var first = segments.startIndex
+        while first < segments.endIndex {
+            let end = segments[first...].firstIndex { $0.start != segments[first].start } ?? segments.endIndex
+            let tie = segments[first ..< end]
+            let found = tie.compactMap { transcript.range(of: $0.text)?.lowerBound }
+            if tie.count > 1, found.count == tie.count {
+                ordered += zip(tie, found).enumerated()
+                    .sorted { ($0.element.1, $0.offset) < ($1.element.1, $1.offset) }
+                    .map(\.element.0)
+            } else {
+                ordered += tie
+            }
+            first = end
+        }
+        return ordered
+    }
+
     func retaggedForThisQueue(_ segments: [TimestampedSegment]) -> [TimestampedSegment] {
         segments.map { segment in
             guard segment.speaker != DiarizationProcess.remoteSpeakerLabel else { return segment }

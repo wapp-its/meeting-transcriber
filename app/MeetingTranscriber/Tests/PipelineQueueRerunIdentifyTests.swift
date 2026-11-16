@@ -137,27 +137,37 @@ final class PipelineQueueRerunIdentifyTests: XCTestCase {
 
     /// A first run whose call audio's speakers failed kept the microphone's lines
     /// labelled apart; two lines that start at once keep their order when both
-    /// tracks are labelled again.
+    /// tracks are labelled again, also in a transcript an earlier build rendered
+    /// with the microphone's line first.
     func testTwoLinesStartingAtOnceKeepTheirOrderWhenBothTracksAreLabelledAgain() async throws {
-        let fixture = try makeFixture()
-        fixture.engine.segmentsByPathSuffix = [
-            "app_16k.wav": [TimestampedSegment(start: 0, end: 2, text: "Welcome to the call")],
-            "mic_16k.wav": [TimestampedSegment(start: 0, end: 2, text: "Thanks for having me")],
-        ]
-        fixture.diarization.throwOnPathSuffix = "app_16k.wav"
-        let meeting = try await fixture.finishedMeeting(in: fixture.makeQueue(completedJobLifetime: 0), leavingTheQueue: true)
-        let before = try currentTranscript(meeting.id, fixture)
-        fixture.diarization.throwOnPathSuffix = nil
-        diarizeTwoVoices(fixture)
-        let queue = fixture.makeQueue(completedJobLifetime: 0)
-        queue.speakerNamingHandler = { .confirmed($0.mapping.mapValues { _ in "Alice" }) }
+        for earlierBuild in [false, true] {
+            let fixture = try makeFixture()
+            fixture.engine.segmentsByPathSuffix = [
+                "app_16k.wav": [TimestampedSegment(start: 0, end: 2, text: "Welcome to the call")],
+                "mic_16k.wav": [TimestampedSegment(start: 0, end: 2, text: "Thanks for having me")],
+            ]
+            fixture.diarization.throwOnPathSuffix = "app_16k.wav"
+            let meeting = try await fixture.finishedMeeting(in: fixture.makeQueue(completedJobLifetime: 0), leavingTheQueue: true)
+            if earlierBuild {
+                // In place, so the file stays the one the record names.
+                let file = try URL(filePath: XCTUnwrap(fixture.record(meeting.id).files.last { $0.role == .transcript }).path)
+                let lines = try String(contentsOf: file, encoding: .utf8).split(separator: "\n", omittingEmptySubsequences: false)
+                XCTAssertEqual(lines.count, 2, "test premise: \(lines)")
+                try lines.reversed().joined(separator: "\n").write(to: file, atomically: false, encoding: .utf8)
+            }
+            let before = try currentTranscript(meeting.id, fixture)
+            fixture.diarization.throwOnPathSuffix = nil
+            diarizeTwoVoices(fixture)
+            let queue = fixture.makeQueue(completedJobLifetime: 0)
+            queue.speakerNamingHandler = { .confirmed($0.mapping.mapValues { _ in "Alice" }) }
 
-        XCTAssertEqual(queue.rerunJob(id: meeting.id, mode: .identifySpeakersAgain), .queued)
-        await queue.awaitProcessing()
-        try await fixture.poll("the swap to end") { queue.job(withID: meeting.id)?.rerun == nil }
+            XCTAssertEqual(queue.rerunJob(id: meeting.id, mode: .identifySpeakersAgain), .queued, "earlier build \(earlierBuild)")
+            await queue.awaitProcessing()
+            try await fixture.poll("the swap to end") { queue.job(withID: meeting.id)?.rerun == nil }
 
-        let after = try currentTranscript(meeting.id, fixture)
-        XCTAssertEqual(words(of: after), words(of: before), "the words changed:\n\(before)\n---\n\(after)")
+            let after = try currentTranscript(meeting.id, fixture)
+            XCTAssertEqual(words(of: after), words(of: before), "earlier build \(earlierBuild):\n\(before)\n---\n\(after)")
+        }
     }
 
     func testItDiarizesWithTheChosenMethodAndCountAndTranscribesOnlyWithoutKeptWordTimings() async throws {

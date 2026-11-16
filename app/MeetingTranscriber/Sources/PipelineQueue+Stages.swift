@@ -726,6 +726,7 @@ extension PipelineQueue {
             try moveOntoTheMeetingsTimeline(mix16k, of: mixPath, jobID: ctx.jobID, micDelay: ctx.micDelay)
             recordAudioDuration(jobID: ctx.jobID, frames: AudioMixer.frameCount(of: mix16k))
         }
+        segments = inTheTranscriptsOrder(segments, jobID: ctx.jobID)
         if isStillQueued(ctx.jobID) { jobAudioSeconds[ctx.jobID] = segments.last?.end ?? 0 }
         let micMuted = job(withID: ctx.jobID)?.micMuteSpansOnTranscript ?? []
         return TranscriptionOutput(
