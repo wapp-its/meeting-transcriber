@@ -98,6 +98,12 @@ struct ProtocolTemplateStore {
 
     private static let fileExtension = "md"
 
+    /// The job warning when a template falls back to the built-in one. Matched
+    /// by /v1 clients and persisted jobs, so it is one fixed text: it names no
+    /// template, as a client could then match it only by a prefix, and the
+    /// name is the user's own text.
+    static let fallbackWarning = "The meeting notes template was not found or is empty, so the built-in template was used"
+
     /// What a template resolves to when meeting notes are made.
     struct Resolution: Equatable {
         let text: String
@@ -144,8 +150,8 @@ struct ProtocolTemplateStore {
         return id
     }
 
-    /// The template's text, falling back to the built-in with a warning that
-    /// names the template when its file is missing, unreadable or blank.
+    /// The template's text, falling back to the built-in with
+    /// `fallbackWarning` when its file is missing, unreadable or blank.
     func resolve(_ id: ProtocolTemplateID) -> Resolution {
         if let text = text(for: id) {
             return Resolution(text: text, used: id, warning: nil)
@@ -154,7 +160,7 @@ struct ProtocolTemplateStore {
             text: ProtocolGenerator.protocolPrompt,
             used: .builtIn,
             // Matched by /v1 clients and persisted jobs; keep the text stable.
-            warning: "Meeting notes template \"\(id.storedValue)\" was not found or is empty, so the built-in template was used",
+            warning: Self.fallbackWarning,
         )
     }
 

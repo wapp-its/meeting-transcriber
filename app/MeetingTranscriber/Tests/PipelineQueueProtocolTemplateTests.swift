@@ -115,11 +115,7 @@ final class PipelineQueueProtocolTemplateTests: XCTestCase {
             let job = try XCTUnwrap(queue.jobs.first)
             XCTAssertEqual(job.state, .done, name)
             XCTAssertEqual(protocolGen.capturedInstructions, builtIn, name)
-            XCTAssertEqual(
-                job.warnings,
-                ["Meeting notes template \"\(name)\" was not found or is empty, so the built-in template was used"],
-                name,
-            )
+            XCTAssertEqual(job.warnings, ["The meeting notes template was not found or is empty, so the built-in template was used"], name)
         }
     }
 

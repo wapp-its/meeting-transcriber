@@ -79,9 +79,7 @@ final class NotesOnlyProtocolTemplateTests: XCTestCase {
         let job = try XCTUnwrap(queue.jobs.first { $0.id == id })
         XCTAssertEqual(generator.capturedInstructions, ProtocolInstructions(template: ProtocolGenerator.protocolPrompt))
         XCTAssertNotNil(job.protocolPath)
-        XCTAssertEqual(
-            job.warnings, ["Meeting notes template \"Board\" was not found or is empty, so the built-in template was used"],
-        )
+        XCTAssertEqual(job.warnings, ["The meeting notes template was not found or is empty, so the built-in template was used"])
         XCTAssertFalse(queue.canRetryMeetingNotes(id: id))
     }
 

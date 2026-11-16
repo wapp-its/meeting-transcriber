@@ -54,25 +54,24 @@ final class ProtocolTemplateStoreTests: XCTestCase {
     // MARK: - Resolving
 
     /// A file that is missing, empty or only whitespace is no template: the
-    /// built-in one stands in, with a warning naming the one asked for.
+    /// built-in one stands in, with a warning. /v1 clients match the warning,
+    /// so it is one fixed text, without the template's name.
     func testResolvesTheFileTextOrFallsBackToTheBuiltInWithAWarning() throws {
         try write("Board template", as: "Board")
         try write("", as: "Empty")
         try write(" \n\t\n", as: "Blank")
-        let fallback = { (name: String) in
-            ProtocolTemplateStore.Resolution(
-                text: ProtocolGenerator.protocolPrompt,
-                used: .builtIn,
-                warning: "Meeting notes template \"\(name)\" was not found or is empty, so the built-in template was used",
-            )
-        }
+        let fallback = ProtocolTemplateStore.Resolution(
+            text: ProtocolGenerator.protocolPrompt,
+            used: .builtIn,
+            warning: "The meeting notes template was not found or is empty, so the built-in template was used",
+        )
 
         XCTAssertEqual(store.resolve(.builtIn), .init(text: ProtocolGenerator.protocolPrompt, used: .builtIn, warning: nil))
         XCTAssertEqual(
             store.resolve(.file(name: "Board")), .init(text: "Board template", used: .file(name: "Board"), warning: nil),
         )
         for name in ["Empty", "Blank", "Gone"] {
-            XCTAssertEqual(store.resolve(.file(name: name)), fallback(name), name)
+            XCTAssertEqual(store.resolve(.file(name: name)), fallback, name)
         }
     }
 
