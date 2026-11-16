@@ -12,6 +12,11 @@ extension PipelineQueue {
         meetingFileStore?.record(for: job.id) != nil && transcriptOutputOptions(of: job).saveRawTranscriptSeparately
     }
 
+    // The `SpeakerNamingSessionDelegate` requirement, called through the naming
+    // session's delegate. The conformance is declared in another extension, and
+    // `swiftlint analyze` does not see this one as its witness, so it reports the
+    // method as unused.
+    // swiftlint:disable:next unused_declaration
     func keepsWordTimings(jobID: UUID) -> Bool {
         job(withID: jobID).map(keepsWordTimings(of:)) ?? false
     }
