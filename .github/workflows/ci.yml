@@ -215,17 +215,19 @@ jobs:
           # tools/audiotap/Package.swift.
           #
           # OTHER_SWIFT_FLAGS adds the per-body type-check timing print that the
-          # report step below turns into a step summary. `$(inherited)` is
-          # load-bearing: a command-line setting reaches every SPM target, and
-          # without it the override would replace the package's own
-          # -warn-long-function-bodies gate instead of sitting next to it
-          # (verified on Xcode 26.6: both flags on the same compile command).
+          # report step below turns into a step summary, and raises the
+          # type-check limit to 1000 ms as the `test` matrix does (reason
+          # there). `$(inherited)` is load-bearing: a command-line setting
+          # reaches every SPM target, and without it the override would replace
+          # the package's own flags instead of following them (verified on
+          # Xcode 26.6: both on the same compile command). The compiler takes
+          # the last -warn-long-* value, so 1000 after the package's 300 wins.
           # The compiler prints one line per body, some 33,000 across app and
           # dependencies, so the file keeps them and the console stream does
           # not. Clean build time was unchanged within noise.
           # shellcheck disable=SC2016  # $(inherited) is an Xcode setting reference, not a shell expansion
           xcodebuild -scheme MeetingTranscriber -destination 'platform=macOS' SWIFT_SUPPRESS_WARNINGS=NO \
-            OTHER_SWIFT_FLAGS='$(inherited) -Xfrontend -debug-time-function-bodies' build-for-testing 2>&1 \
+            OTHER_SWIFT_FLAGS='$(inherited) -Xfrontend -debug-time-function-bodies -Xfrontend -warn-long-function-bodies=1000 -Xfrontend -warn-long-expression-type-checking=1000' build-for-testing 2>&1 \
             | tee /tmp/xcodebuild.log | bash "$GITHUB_WORKSPACE/scripts/ci/type-check-timings.sh" strip
           cd "$GITHUB_WORKSPACE"
           # swiftlint analyze re-runs the compiler with the arguments it finds
@@ -234,8 +236,9 @@ jobs:
           # change: output identical after the strip, +14 s on a 212 s run.
           swiftlint analyze --strict --compiler-log-path /tmp/xcodebuild.log --reporter github-actions-logging 2>&1 \
             | bash scripts/ci/type-check-timings.sh strip
-      # Non-gating by construction: the 300 ms limit in Package.swift stays the
-      # only enforcement. `continue-on-error` keeps any report problem from
+      # Non-gating by construction: the type-check limit stays the only
+      # enforcement (300 ms in Package.swift, raised to 1000 ms on this job's
+      # command line above). `continue-on-error` keeps any report problem from
       # failing the job, including the script's own exit 1 when it found no
       # timings, which then shows as a tolerated step failure plus a warning
       # annotation rather than as an empty table. Runs after a failed build
@@ -273,13 +276,27 @@ jobs:
       # summary, instead of being silently auto-cancelled by the matrix before
       # it can.
       fail-fast: false
+      # The two -warn-long-* flags raise the type-check limit from 300 to
+      # 1000 ms for this CI only. Hosted runners vary 2-3x between runs, and
+      # the first body in a batch that touches a heavy type pays a one-off
+      # cost, so the 300 ms gate failed on functions a pull request did not
+      # touch (fork issue 20). Package.swift keeps 300 ms for local builds and
+      # the original; the compiler takes the last occurrence of each flag and
+      # SwiftPM puts these after the manifest's. The values reach the pre-warm
+      # in setup-swift-test and `Build tests`; the mt-cli and audiotap steps
+      # carry the same two flags.
       matrix:
         variant: [homebrew, appstore]
         include:
           - variant: homebrew
-            swift-flags: ""
+            swift-flags: >-
+              -Xswiftc -Xfrontend -Xswiftc -warn-long-function-bodies=1000
+              -Xswiftc -Xfrontend -Xswiftc -warn-long-expression-type-checking=1000
           - variant: appstore
-            swift-flags: "-Xswiftc -DAPPSTORE"
+            swift-flags: >-
+              -Xswiftc -DAPPSTORE
+              -Xswiftc -Xfrontend -Xswiftc -warn-long-function-bodies=1000
+              -Xswiftc -Xfrontend -Xswiftc -warn-long-expression-type-checking=1000
     name: test (${{ matrix.variant }})
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -380,7 +397,8 @@ jobs:
         id: mt-cli-tests
         if: matrix.variant == 'homebrew'
         timeout-minutes: 5
-        run: cd tools/mt-cli && swift test --parallel
+        # The type-check limit raised to 1000 ms, as in the matrix above.
+        run: cd tools/mt-cli && swift test --parallel -Xswiftc -Xfrontend -Xswiftc -warn-long-function-bodies=1000 -Xswiftc -Xfrontend -Xswiftc -warn-long-expression-type-checking=1000
       # Skipping on test failure is intentional — we never want a stale
       # coverage snapshot uploaded as if it were green.
       - uses: ./.github/actions/export-lcov
@@ -463,7 +481,8 @@ jobs:
       - name: Swift tests
         id: swift-tests
         timeout-minutes: 5
-        run: cd tools/audiotap && swift test --parallel --enable-code-coverage
+        # The type-check limit raised to 1000 ms, as in the `test` matrix.
+        run: cd tools/audiotap && swift test --parallel --enable-code-coverage -Xswiftc -Xfrontend -Xswiftc -warn-long-function-bodies=1000 -Xswiftc -Xfrontend -Xswiftc -warn-long-expression-type-checking=1000
       - uses: ./.github/actions/export-lcov
         if: success()
         with:
