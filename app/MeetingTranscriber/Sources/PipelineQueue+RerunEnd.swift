@@ -144,7 +144,15 @@ extension PipelineQueue {
         // earlier version is the meeting's own.
         let stuck = marker.renames.map { undoRenames($0, jobID: jobID) } ?? []
         let targets = Set((marker.renames ?? []).map(\.to))
-        let left = removeRerunFiles(marker.files.filter { !targets.contains($0.path) }, jobID: jobID) + stuck
+        let listed = marker.files.filter { !targets.contains($0.path) }
+        // A file of the re-run moved back to its own name goes from there, also when
+        // the marker lists it only at the current name, as after an undo that went
+        // through only on a later try.
+        let paths = Set(listed.map(\.path))
+        let movedBack = (marker.renames ?? []).filter { !$0.earlier && !paths.contains($0.from) }.map { rename in
+            MeetingFile(role: rename.role, path: rename.from, identity: rename.identity, owned: true, state: .present)
+        }
+        let left = removeRerunFiles(listed + movedBack, jobID: jobID) + stuck
         let saved = store.update(jobID: jobID) { $0.endRerun(marker, leaving: left) }
         return (saved, left)
     }
