@@ -1,11 +1,87 @@
 {
   "branch_name": "gh-256-live-levels-for-every-device-in-the",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
   "created_at": "2026-11-16T08:49:52.316335Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-256-live-levels-for-every-device-in-the",
+  "impl_review_rounds": {},
   "next_task": 1,
-  "plan_review_status": "unknown",
-  "plan_reviewed_at": null,
+  "plan_review_rounds": 1,
+  "plan_review_status": "needs_work",
+  "plan_reviewed_at": "2026-11-16T09:16:13.130635Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "e196a59b335d46c6d578fe8940e3928fb124bd79c7cb326eec90dec90ac33646",
+      "backend": "codex",
+      "base_sha": "3b236a800c34709e7ea146b82d79e62337281e2e",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-22ff11b6ac42b868aa090146f9ef75f7",
+            "classification": "introduced",
+            "findingId": "finding-22ff11b6ac42b868aa090146f9ef75f7",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-fa90fd7ca5949961d0449dd66f96d958",
+            "classification": "introduced",
+            "findingId": "finding-fa90fd7ca5949961d0449dd66f96d958",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-5aadf814d8d45cf5535aa5fff0dc072a",
+            "classification": "introduced",
+            "findingId": "finding-5aadf814d8d45cf5535aa5fff0dc072a",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "4e919bc9a2bf83fee4e15f5000ddf4e6a72ac94b",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 407018,
+      "output_sha256": "418900faf29e5d4dd99592208761c6c9aa2672f4ffc6447e9ac077343421e473",
+      "reservation_id": "92fa047257ac46748721d5d96648fea3",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-16T09:16:12.791639Z",
+      "tool_calls": 28,
+      "verdict": "NEEDS_WORK"
+    }
+  ],
+  "review_hash_epoch": {},
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
   "spec_path": ".flow/specs/gh-256-live-levels-for-every-device-in-the.md",
   "status": "open",
   "title": "Live levels for every device in the Audio Devices window",
@@ -21,5 +97,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/256"
   },
-  "updated_at": "2026-11-16T08:49:52.329352Z"
+  "updated_at": "2026-11-16T09:18:07.386183Z"
 }
