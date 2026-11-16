@@ -119,6 +119,19 @@ final class PipelineQueueProtocolTemplateTests: XCTestCase {
         }
     }
 
+    /// The job records the template its notes came from, the built-in one
+    /// after a fallback, for a Notion retry that reads the notes back later.
+    func testAJobRecordsTheTemplateItsNotesCameFrom() async throws {
+        for (asked, used) in [(ProtocolTemplateID.file(name: "Board"), ProtocolTemplateID.file(name: "Board")), (.file(name: "Gone"), .builtIn)] {
+            let queue = makeQueue(engine: makeEngine(), protocolGen: MockProtocolGen())
+
+            try queue.enqueue(makeJob(template: asked))
+            await queue.awaitProcessing()
+
+            XCTAssertEqual(queue.jobs.first?.usedProtocolTemplate, used, asked.storedValue)
+        }
+    }
+
     /// A job restored from a snapshot written before templates carries no
     /// template, and gets what it got then: the current default.
     func testAJobFromAnOlderSnapshotUsesTheCurrentDefault() async throws {

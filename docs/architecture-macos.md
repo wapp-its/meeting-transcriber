@@ -681,7 +681,10 @@ has recognized columns. The page title follows the file-name rule
 (`PipelineQueue.meetingTitle`): the title the model wrote for notes from the
 built-in template or from a template whose title switch is on, otherwise the
 job's title. A retry reads the notes from the
-backup and decides by the template the job asked for.
+backup, which does not say what template made them, so the job records the
+template its notes came from each time it saves them
+(`PipelineJob.usedProtocolTemplate`, the built-in one after a fallback); a job
+that recorded none counts as built-in, as every job before templates was.
 
 The job records its Notion page and database IDs as soon as the page is created,
 so retries and protocol re-exports can use the same destination. Re-export after

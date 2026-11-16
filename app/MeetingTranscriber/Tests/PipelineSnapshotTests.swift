@@ -102,6 +102,22 @@ final class PipelineSnapshotTests: XCTestCase {
         XCTAssertEqual(loaded.protocolTemplate, .file(name: "Board"))
     }
 
+    /// The template the notes were made from outlives a relaunch, so a Notion
+    /// retry after one still titles the page by it.
+    func testTheTemplateTheNotesCameFromSurvivesARoundTrip() throws {
+        let dir = try makeTempDirectory(prefix: "pipeline-snapshot")
+        var job = PipelineJob(
+            meetingTitle: "Board", appName: "Teams", mixPath: nil, appPath: nil, micPath: nil, micDelay: 0,
+            protocolTemplate: .file(name: "Gone"),
+        )
+        job.usedProtocolTemplate = .builtIn
+
+        try PipelineSnapshot.save([job], to: dir)
+
+        let loaded = try XCTUnwrap(try PipelineSnapshot.load(from: dir)?.first)
+        XCTAssertEqual(loaded.usedProtocolTemplate, .builtIn)
+    }
+
     /// A snapshot an older build wrote has no template key; it must still decode.
     func testASnapshotWithoutTheTemplateKeyDecodes() throws {
         let dir = try makeTempDirectory(prefix: "pipeline-snapshot")
@@ -115,5 +131,6 @@ final class PipelineSnapshotTests: XCTestCase {
 
         XCTAssertEqual(loaded.meetingTitle, "Sync")
         XCTAssertNil(loaded.protocolTemplate)
+        XCTAssertNil(loaded.usedProtocolTemplate)
     }
 }

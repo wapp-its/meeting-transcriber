@@ -354,14 +354,13 @@ extension PipelineQueue {
             persistNotionExportChange(jobID: id)
             return false
         }
-        // The template the job asked for, not the one it ran, which nothing
-        // records: they differ only when a missing template fell back to the
-        // built-in one, and then the page keeps the job's title instead of the
-        // model's, which is never a section heading.
+        // The template the notes came from, which the backup does not say. A
+        // job that recorded none made its notes before this was recorded, as
+        // every job before templates did: from the built-in one.
         let succeeded = await exportToNotion(
             jobID: id, protocolMD: markdown, transcript: nil,
             speakerNames: job.notionExportSpeakerNames ?? [], configuration: configuration,
-            template: job.protocolTemplate ?? defaultProtocolTemplateProvider(),
+            template: job.usedProtocolTemplate ?? .builtIn,
         )
         if succeeded {
             if configuration.skipLocalMarkdown { removeLocalProtocol(jobID: id) }

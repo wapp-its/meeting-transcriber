@@ -37,9 +37,11 @@ final class PipelineQueueNotionTitleTemplateTests: XCTestCase {
         try "# Action items\n\n## Decisions\n".write(to: store.fileURL(named: "Board"), atomically: true, encoding: .utf8)
     }
 
-    /// `titleHeading` names the templates whose switch is on.
+    /// `titleHeading` names the templates whose switch is on, and
+    /// `defaultTemplate` is the settings' default.
     private func makeQueue(
         exporter: TitleCapturingNotionExporter, heading: String, titleHeading: Set<String> = [],
+        defaultTemplate: ProtocolTemplateID = .builtIn,
     ) -> PipelineQueue {
         let engine = MockEngine()
         engine.segmentsToReturn = [TimestampedSegment(start: 0, end: 5, text: "Hello everyone")]
@@ -54,6 +56,7 @@ final class PipelineQueueNotionTitleTemplateTests: XCTestCase {
             outputDir: tmpDir,
             logDir: tmpDir,
             stagingDir: tmpDir.appendingPathComponent("staging"),
+            defaultProtocolTemplateProvider: { defaultTemplate },
             protocolTemplateStore: store,
             templateHasTitleHeading: { titleHeading.contains($0) },
             notionExportConfigurationProvider: configurationProvider,
@@ -105,17 +108,52 @@ final class PipelineQueueNotionTitleTemplateTests: XCTestCase {
         XCTAssertEqual(titles, ["Sprint Planning"])
     }
 
-    /// A retry reads the notes from the local backup, which no longer says
-    /// what template made them; the job's template choice decides.
+    /// A retry reads the notes from the local backup, which does not say what
+    /// template made them; the template the job recorded when it made them
+    /// decides.
     func testARetryOfACustomTemplatesExportTitlesThePageAfterTheJob() async throws {
+        let titles = try await retriedTitles(backup: "# Action items\n\n## Decisions\n", asked: .file(name: "Board"), used: .file(name: "Board"))
+
+        XCTAssertEqual(titles, ["Board meeting"])
+    }
+
+    /// The template that ran decides, not the one asked for: after a fallback
+    /// the notes carry the built-in heading.
+    func testARetryAfterAFallbackTitlesThePageAfterTheModelsTitle() async throws {
+        let titles = try await retriedTitles(
+            backup: "# Meeting Protocol - Sprint Planning\n\n## Decisions\n", asked: .file(name: "Gone"), used: .builtIn,
+        )
+
+        XCTAssertEqual(titles, ["Sprint Planning"])
+    }
+
+    /// A job saved before the template that ran was recorded made its notes
+    /// as every job did before templates: from the built-in one, whatever
+    /// the default is now.
+    func testARetryOfAJobThatRecordedNoTemplateTakesTheBuiltInsRule() async throws {
+        let titles = try await retriedTitles(
+            backup: "# Meeting Protocol - Sprint Planning\n", asked: nil, used: nil, defaultTemplate: .file(name: "Board"),
+        )
+
+        XCTAssertEqual(titles, ["Sprint Planning"])
+    }
+
+    /// Retries the failed export of a done job whose backup holds `backup`,
+    /// with `asked` as its template and `used` as the one its notes came
+    /// from, and returns the page titles the exporter was handed.
+    private func retriedTitles(
+        backup text: String, asked: ProtocolTemplateID?, used: ProtocolTemplateID?,
+        defaultTemplate: ProtocolTemplateID = .builtIn,
+    ) async throws -> [String] {
         let backup = tmpDir.appendingPathComponent("board.md")
-        try "# Action items\n\n## Decisions\n".write(to: backup, atomically: true, encoding: .utf8)
+        try text.write(to: backup, atomically: true, encoding: .utf8)
         let exporter = TitleCapturingNotionExporter()
-        let queue = makeQueue(exporter: exporter, heading: "unused")
+        let queue = makeQueue(exporter: exporter, heading: "unused", defaultTemplate: defaultTemplate)
         var job = PipelineJob(
             meetingTitle: "Board meeting", appName: "Teams", mixPath: nil,
-            appPath: nil, micPath: nil, micDelay: 0, protocolTemplate: .file(name: "Board"),
+            appPath: nil, micPath: nil, micDelay: 0, protocolTemplate: asked,
         )
+        job.usedProtocolTemplate = used
         job.state = .done
         job.protocolPath = backup
         job.beginNotionExport(speakerNames: [])
@@ -125,7 +163,6 @@ final class PipelineQueueNotionTitleTemplateTests: XCTestCase {
         let retried = await queue.retryNotionExport(id: job.id)
 
         XCTAssertTrue(retried, "test premise: the retry ran")
-        let titles = await exporter.titles
-        XCTAssertEqual(titles, ["Board meeting"])
+        return await exporter.titles
     }
 }

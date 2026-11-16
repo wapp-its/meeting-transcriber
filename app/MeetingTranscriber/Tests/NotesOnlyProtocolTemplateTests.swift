@@ -64,6 +64,7 @@ final class NotesOnlyProtocolTemplateTests: XCTestCase {
 
         XCTAssertNotNil(queue.jobs.first { $0.id == id }?.protocolPath, "test premise: the retry saved notes")
         XCTAssertEqual(generator.capturedInstructions, ProtocolInstructions(template: boardText))
+        XCTAssertEqual(queue.jobs.first { $0.id == id }?.usedProtocolTemplate, .file(name: "Board"))
     }
 
     /// A retry reads the recorded template again. One deleted since falls back
@@ -82,6 +83,7 @@ final class NotesOnlyProtocolTemplateTests: XCTestCase {
         XCTAssertEqual(generator.capturedInstructions, ProtocolInstructions(template: ProtocolGenerator.protocolPrompt))
         XCTAssertNotNil(job.protocolPath)
         XCTAssertEqual(job.warnings, ["The meeting notes template was not found or is empty, so the built-in template was used"])
+        XCTAssertEqual(job.usedProtocolTemplate, .builtIn, "the job records the template that ran")
         XCTAssertFalse(queue.canRetryMeetingNotes(id: id))
     }
 

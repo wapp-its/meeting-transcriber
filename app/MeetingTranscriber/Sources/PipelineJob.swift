@@ -267,6 +267,13 @@ struct PipelineJob: Identifiable, Codable {
     /// templates, which uses the current default. A retry keeps it: it is the
     /// user's choice, not something the failed run concluded.
     var protocolTemplate: ProtocolTemplateID?
+    /// The template the job's saved notes were made from: `protocolTemplate`,
+    /// or the built-in one after a fallback. Recorded each time notes are
+    /// saved, so making them again overwrites it. Read by a Notion retry,
+    /// which takes the notes from the local backup and titles the page by
+    /// this template. Nil until notes are saved, and for a job from a
+    /// snapshot written before it was recorded.
+    var usedProtocolTemplate: ProtocolTemplateID?
     /// Diarizer mode that produced the *current* `speakerNamingDataByJob`
     /// entry. Set by `PipelineQueue` after diarisation completes (in the
     /// initial pipeline run and after `lateDiarization`). Used by the

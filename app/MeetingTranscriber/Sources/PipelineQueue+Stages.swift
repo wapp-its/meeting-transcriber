@@ -1193,12 +1193,16 @@ extension PipelineQueue {
     /// Saves the notes the model wrote and queues their Notion export when one
     /// is configured. `transcript` is the full transcript to carry along with
     /// them, nil when the job's output options leave it out. `template` is the
-    /// one the notes came from, which decides the Notion page title.
+    /// one the notes came from, which decides the Notion page title; the job
+    /// records it for a Notion retry, overwriting what earlier notes recorded.
     private func saveGeneratedNotes( // swiftlint:disable:this function_parameter_count
         _ protocolMD: String, transcript: String?, basename: String, jobID: UUID, protocolsDir: URL,
         speakerNames: [String], template: ProtocolTemplateID,
     ) {
         let markdown = transcript.map { protocolMD + "\n\n---\n\n## Full Transcript\n\n" + $0 } ?? protocolMD
+        if let index = jobs.firstIndex(where: { $0.id == jobID }) {
+            jobs[index].usedProtocolTemplate = template
+        }
 
         let configuration = resolveNotionExport(jobID: jobID).configuration
         // Saved first, even for a Notion-only export: the job reaches `.done` and
