@@ -377,6 +377,7 @@ extension PipelineQueue {
                     exporter: exporter, databaseID: databaseID, skipLocalMarkdown: skipLocalMarkdown, deadline: deadline,
                 ),
                 savedLocally: true,
+                template: .builtIn,
             ),
             jobID: job.id,
         )
@@ -393,6 +394,7 @@ extension PipelineQueue {
                 protocolMD: "# Standup", transcript: nil, speakerNames: ["Alice"],
                 configuration: NotionExportConfiguration(exporter: exporter, databaseID: databaseID),
                 savedLocally: true,
+                template: .builtIn,
             ),
             jobID: jobID,
         )

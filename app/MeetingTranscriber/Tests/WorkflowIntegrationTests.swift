@@ -1398,8 +1398,11 @@ final class WorkflowIntegrationTests: XCTestCase {
         )
 
         let succeeded = await queue.exportToNotion(
-            jobID: job.id, protocolMD: "# Meeting", transcript: nil,
-            speakerNames: [], configuration: configuration,
+            PendingNotionExport(
+                protocolMD: "# Meeting", transcript: nil, speakerNames: [],
+                configuration: configuration, savedLocally: false, template: .builtIn,
+            ),
+            jobID: job.id,
         )
 
         XCTAssertTrue(succeeded)
