@@ -29,6 +29,7 @@ final class TranscriptionsViewTests: XCTestCase {
         regenerationPhase: ProtocolRegenerator.Phase = .idle,
         selection: TranscriptionsSelection = TranscriptionsSelection(),
         transcribeAgain: TranscribeAgainSheetState = TranscribeAgainSheetState(),
+        identifySpeakersAgain: IdentifySpeakersAgainSheetState = IdentifySpeakersAgainSheetState(),
     ) -> TranscriptionsView {
         let box = queryBox ?? QueryBox()
         box.text = query
@@ -40,6 +41,7 @@ final class TranscriptionsViewTests: XCTestCase {
             regenerationPhase: regenerationPhase,
             selection: selection,
             transcribeAgain: transcribeAgain,
+            identifySpeakersAgain: identifySpeakersAgain,
         )
     }
 

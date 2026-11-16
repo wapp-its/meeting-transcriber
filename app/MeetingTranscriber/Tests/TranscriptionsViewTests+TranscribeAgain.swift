@@ -3,17 +3,18 @@ import SwiftUI
 import ViewInspector
 import XCTest
 
-/// A row's "Transcribe Again…": both menus list it as `RecordingRowActions` decides,
-/// from what the window hands that decision; it opens the sheet for its own row; and
-/// the row's source audio is read once per refresh, where the record lists it. Which
-/// rows get it is `RecordingRowActionsTests`, what the sheet does `TranscribeAgainSheetTests`.
+/// A row's "Transcribe Again…": both menus list it and "Identify Speakers Again…" as
+/// `RecordingRowActions` decides, from what the window hands that decision; it opens
+/// the sheet for its own row; and the row's source audio is read once per refresh, where
+/// the record lists it. Which rows get it is `RecordingRowActionsTests`, what the sheet
+/// does `TranscribeAgainSheetTests`.
 extension TranscriptionsViewTests {
-    private func rerunRow(_ title: String) -> TranscriptionEntry {
+    func rerunRow(_ title: String) -> TranscriptionEntry {
         entry(title, protocolPath: "/out/\(title).md", transcriptPath: "/out/\(title).txt")
     }
 
     /// A window whose rows each have a finished meeting with its source audio there.
-    private func rerunActions(_ rows: [TranscriptionEntry]) -> AllRecordingsActions {
+    func rerunActions(_ rows: [TranscriptionEntry]) -> AllRecordingsActions {
         let meetings = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, meeting($0)) })
         var actions = AllRecordingsActions.noop
         actions.filesOnDisk = { Self.recordedFilesOnDisk($0) }
@@ -45,8 +46,9 @@ extension TranscriptionsViewTests {
         XCTAssertThrowsError(try sut.inspect().find(TranscribeAgainSheet.self), "closed once queued")
     }
 
-    /// The "…" menu and the right-click menu list the same items, the row decision's.
-    func testBothMenusListTranscribeAgainAsTheRowDecides() throws {
+    /// The "…" menu and the right-click menu list the same items, the row decision's,
+    /// Identify Speakers Again right after Transcribe Again.
+    func testBothMenusListTheReRunItemsAsTheRowDecides() throws {
         let row = rerunRow("Retro")
         let sut = makeView([row], actions: rerunActions([row]))
         var rerunnable = meeting(row)
@@ -63,13 +65,14 @@ extension TranscriptionsViewTests {
             .findAll { (try? $0.accessibilityIdentifier()) != nil }
             .map { try $0.accessibilityIdentifier() }
 
-        XCTAssertTrue(expected.contains(A11yID.recordingMenuTranscribeAgain(0)), "\(expected)")
+        let again = try XCTUnwrap(expected.firstIndex(of: A11yID.recordingMenuTranscribeAgain(0)), "\(expected)")
+        XCTAssertEqual(expected.firstIndex(of: A11yID.recordingMenuIdentifySpeakersAgain(0)), again + 1, "\(expected)")
         XCTAssertEqual(more, expected)
         XCTAssertEqual(rightClick, expected)
     }
 
     /// The window hands the decision record-only mode and a running regeneration; a
-    /// finished meeting held for Retry Meeting Notes is offered the item.
+    /// finished meeting held for Retry Meeting Notes is offered both re-run items.
     func testTheItemFollowsRecordOnlyModeAndARunningRegeneration() throws {
         var job = PipelineJob(
             meetingTitle: "Retro", appName: "Teams", mixPath: URL(fileURLWithPath: "/rec/Retro_mix.wav"), appPath: nil, micPath: nil, micDelay: 0,
@@ -89,6 +92,7 @@ extension TranscriptionsViewTests {
             actions.optionsUse = { ProtocolOptionsUse(destination: .off, recordOnly: recordOnly) }
             let sut = makeView([held], actions: actions, regenerationPhase: phase)
             XCTAssertEqual(try button(A11yID.recordingMenuTranscribeAgain(0), in: sut).isDisabled(), disabled, name)
+            XCTAssertEqual(try button(A11yID.recordingMenuIdentifySpeakersAgain(0), in: sut).isDisabled(), disabled, name)
         }
     }
 

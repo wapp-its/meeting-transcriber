@@ -27,6 +27,9 @@ enum RerunSheetText {
         /// From the row's last read of the meeting's folder.
         let hasReports: Bool
         let hasNotionPage: Bool
+        /// The record lists the meeting's word timings (R7), which Identify Speakers
+        /// Again labels again instead of transcribing.
+        var hasWordTimings = false
     }
 
     /// What the sheet shows of Settings, as Settings holds it.
@@ -42,6 +45,8 @@ enum RerunSheetText {
         /// A protocol provider is set, so the re-run makes notes (A12).
         let makesNotes: Bool
         let notionExport: Bool
+        /// Expected speakers; 0 is Auto.
+        var numSpeakers = 0
     }
 
     /// One row of the white box: the label in grey, the value on the right.
@@ -135,6 +140,67 @@ enum RerunSheetText {
     }
 }
 
+extension RerunSheetText {
+    /// What the Identify Speakers Again sheet says (spec R9, D7): its fixed lines word
+    /// for word, what stands under the method list (A17) and the lines under "What
+    /// happens" for the case at hand (A16, A21). The meeting line and the red line are
+    /// the Transcribe Again sheet's.
+    enum IdentifySpeakersAgain {
+        static let title = "Identify Speakers Again"
+        static let actionButton = "Identify Speakers"
+        static let methodHeading = "Speaker method"
+        static let countLabel = "Expected speakers"
+        /// In orange, in the place of "The text stays." (A21).
+        static let noWordTimings = "This meeting has no saved word timings, so its audio is transcribed again first "
+            + "with the current transcription settings."
+
+        /// One line under "What happens".
+        struct Line: Equatable {
+            let text: String
+            /// Shown in orange: the meeting's audio is transcribed again first.
+            var isWarning = false
+        }
+
+        /// What stands under the method list, indented to the names (A17).
+        enum UnderTheList: Equatable {
+            /// "Expected speakers" with its number, while Standard is picked, and for a
+            /// recorded call the naming dialog's note on the microphone under it.
+            case count(note: String?)
+            /// The naming dialog's hint for a method that counts the speakers itself.
+            case hint(String)
+        }
+
+        /// Settings' expected speakers, 2 for Auto, which the naming dialog's count
+        /// does not offer.
+        static func startingCount(_ numSpeakers: Int) -> Int {
+            numSpeakers == 0 ? 2 : numSpeakers
+        }
+
+        @MainActor
+        static func underTheList(_ method: DiarizerMode, twoTracks: Bool) -> UnderTheList {
+            if let hint = SpeakerNamingView.rerunMethodHint(mode: method, isDualSource: twoTracks) { return .hint(hint) }
+            return .count(note: twoTracks ? SpeakerNamingView.micSideNote : nil)
+        }
+
+        /// "The text stays." only where the run labels the kept word timings again;
+        /// without them the orange line in its place (A21). Without notes nothing is
+        /// said about notes made again, and the current notes stay (A16).
+        static func whatHappens(_ settings: Settings, meeting: Meeting) -> [Line] {
+            let split = settings.makesNotes
+                ? "The speakers are split again with this method, you name them, and the notes are made again."
+                : "The speakers are split again with this method, and you name them."
+            let kept = settings.makesNotes
+                ? "The current transcript and notes stay beside the new ones as earlier versions, named with today's date and time."
+                : "The current transcript stays beside the new one as an earlier version, named with today's date and time. "
+                + "No new notes are made, so the current notes stay."
+            let run = meeting.hasWordTimings
+                ? [Line(text: "The text stays. " + split)]
+                : [Line(text: noWordTimings, isWarning: true), Line(text: split)]
+            return run + [Line(text: kept)]
+        }
+    }
+}
+
 extension RerunSheetText.Meeting {
     /// The row's meeting as the row showed it: its reports from the row's last read.
     init(entry: TranscriptionEntry, record: MeetingFileRecord, onDisk: RecordingRowActions.FilesOnDisk) {
@@ -142,6 +208,7 @@ extension RerunSheetText.Meeting {
         self.init(
             id: entry.id, title: entry.title, date: entry.date, duration: entry.audioDuration,
             twoTracks: tracks.app != nil && tracks.mic != nil, hasReports: !onDisk.reports.isEmpty, hasNotionPage: entry.hasNotionPage,
+            hasWordTimings: record.keptWordTimings != nil,
         )
     }
 }
@@ -153,6 +220,7 @@ extension RerunSheetText.Settings {
             whisperLanguage: settings.whisperLanguage, parakeetLanguage: settings.parakeetLanguage,
             vocabulary: settings.customVocabularyEnabled, diarize: settings.diarize, diarizerMode: settings.diarizerMode,
             makesNotes: ProtocolOptionsUse(settings: settings).destination != .off, notionExport: settings.notionExportEnabled,
+            numSpeakers: settings.numSpeakers,
         )
     }
 }

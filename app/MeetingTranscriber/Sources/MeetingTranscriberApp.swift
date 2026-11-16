@@ -233,6 +233,7 @@ struct MeetingTranscriberApp: App {
             },
             rerunSettings: { RerunSheetText.Settings(settings: appState.settings) },
             transcribeAgain: { appState.pipeline.rerunJob(id: $0, mode: .transcribeAgain) },
+            identifySpeakersAgain: { appState.pipeline.rerunJob(id: $0, mode: .identifySpeakersAgain, speakers: $1) },
         )
     }
 

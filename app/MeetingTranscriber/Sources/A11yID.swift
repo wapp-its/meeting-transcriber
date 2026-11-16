@@ -171,6 +171,10 @@ enum A11yID {
         "recordingMenuTranscribeAgain.\(index)"
     }
 
+    static func recordingMenuIdentifySpeakersAgain(_ index: Int) -> String {
+        "recordingMenuIdentifySpeakersAgain.\(index)"
+    }
+
     static func recordingMenuRetry(_ index: Int) -> String {
         "recordingMenuRetry.\(index)"
     }
@@ -351,6 +355,13 @@ enum A11yID {
     /// the meeting's title and stays off every RPC allowlist.
     static let transcribeAgainCancelButton = "transcribeAgainCancelButton"
     static let transcribeAgainConfirmButton = "transcribeAgainConfirmButton"
+
+    /// The Identify Speakers Again sheet's controls (All Recordings window). The sheet
+    /// shows the meeting's title and stays off every RPC allowlist.
+    static let identifySpeakersAgainMethodPicker = "identifySpeakersAgainMethodPicker"
+    static let identifySpeakersAgainCountStepper = "identifySpeakersAgainCountStepper"
+    static let identifySpeakersAgainCancelButton = "identifySpeakersAgainCancelButton"
+    static let identifySpeakersAgainConfirmButton = "identifySpeakersAgainConfirmButton"
 
     static let notifyOnMeetingNotesFailureToggle = "notifyOnMeetingNotesFailureToggle"
     static let includeFullTranscriptToggle = "includeFullTranscriptToggle"

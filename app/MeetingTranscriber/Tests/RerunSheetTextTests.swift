@@ -26,10 +26,11 @@ final class RerunSheetTextTests: XCTestCase {
     /// The boards' meeting: a recorded call of 48 minutes with a report and a page.
     private func meeting(
         twoTracks: Bool = true, reports: Bool = true, page: Bool = true, date: Date? = start, duration: TimeInterval? = 2880,
+        words: Bool = true,
     ) -> RerunSheetText.Meeting {
         RerunSheetText.Meeting(
             id: UUID(), title: "Weekly team sync", date: date, duration: duration, twoTracks: twoTracks, hasReports: reports,
-            hasNotionPage: page,
+            hasNotionPage: page, hasWordTimings: words,
         )
     }
 
@@ -137,10 +138,11 @@ final class RerunSheetTextTests: XCTestCase {
         settings.diarizerMode = .sortformer
         settings.protocolProvider = .none
         settings.notionExportEnabled = true
+        settings.numSpeakers = 3
 
         XCTAssertEqual(RerunSheetText.Settings(settings: settings), RerunSheetText.Settings(
             engine: .parakeet, whisperKitModel: settings.whisperKitModelSelection, whisperLanguage: "it", parakeetLanguage: "fr",
-            vocabulary: true, diarize: false, diarizerMode: .sortformer, makesNotes: false, notionExport: true,
+            vocabulary: true, diarize: false, diarizerMode: .sortformer, makesNotes: false, notionExport: true, numSpeakers: 3,
         ))
         settings.protocolProvider = .openAICompatible
         XCTAssertTrue(RerunSheetText.Settings(settings: settings).makesNotes)
@@ -168,5 +170,77 @@ final class RerunSheetTextTests: XCTestCase {
         XCTAssertFalse(RerunSheetText.Meeting(entry: entry, record: RetentionFixture.record(origin: .imported), onDisk: onDisk).twoTracks)
         let none = RecordingRowActions.FilesOnDisk(protocolExists: true, transcriptExists: true, transcriptSource: .transcriptFile)
         XCTAssertFalse(RerunSheetText.Meeting(entry: entry, record: RetentionFixture.record(), onDisk: none).hasReports)
+        let segments = { (state: MeetingFile.State) in
+            RetentionFixture.record { $0.files.append(RetentionFixture.file(.segments, "b_segments.json", state: state)) }
+        }
+        XCTAssertTrue(RerunSheetText.Meeting(entry: entry, record: segments(.present), onDisk: onDisk).hasWordTimings)
+        XCTAssertFalse(RerunSheetText.Meeting(entry: entry, record: segments(.gone), onDisk: onDisk).hasWordTimings)
+    }
+}
+
+/// The Identify Speakers Again sheet's texts (spec D7, A16, A17, A21). That the sheet
+/// shows them is `IdentifySpeakersAgainSheetTests`.
+extension RerunSheetTextTests {
+    private typealias Words = RerunSheetText.IdentifySpeakersAgain
+    private typealias Line = RerunSheetText.IdentifySpeakersAgain.Line
+
+    private static let splitWithNotes = "The speakers are split again with this method, you name them, and the notes are made again."
+    private static let keptWithNotes = "The current transcript and notes stay beside the new ones as earlier versions, named with today's date and time."
+
+    func testTheIdentifySheetsDrawnCaseWordForWord() {
+        XCTAssertEqual(Words.title, "Identify Speakers Again")
+        XCTAssertEqual(Words.methodHeading, "Speaker method")
+        XCTAssertEqual(DiarizerMode.displayOrder.map { [$0.displayName, $0.methodDescription] }, [
+            ["Standard", "Any number of speakers. Groups similar voices."],
+            ["Sortformer", "Handles people talking at the same time. Up to 4 speakers per input."],
+            ["Nemotron 3", "Handles people talking at the same time. Up to 8 speakers per input."],
+        ])
+        XCTAssertEqual(Words.countLabel, "Expected speakers")
+        XCTAssertEqual(Words.whatHappens(settings(), meeting: meeting()), [
+            Line(text: "The text stays. " + Self.splitWithNotes), Line(text: Self.keptWithNotes),
+        ])
+        XCTAssertEqual(Words.actionButton, "Identify Speakers")
+    }
+
+    /// Without kept word timings the orange line takes the place of "The text stays."
+    /// (A21); without notes nothing is made again and the current notes stay (A16).
+    func testTheIdentifySheetWithoutWordTimingsAndWithoutNotes() {
+        let orange = Line(
+            text: "This meeting has no saved word timings, so its audio is transcribed again first with the current transcription settings.",
+            isWarning: true,
+        )
+        let splitWithoutNotes = "The speakers are split again with this method, and you name them."
+        let keptWithoutNotes = "The current transcript stays beside the new one as an earlier version, named with today's date and time. "
+            + "No new notes are made, so the current notes stay."
+        let rows: [(String, RerunSheetText.Settings, RerunSheetText.Meeting, [Line])] = [
+            ("no word timings", settings(), meeting(words: false), [orange, Line(text: Self.splitWithNotes), Line(text: Self.keptWithNotes)]),
+            ("notes off", settings(makesNotes: false), meeting(), [Line(text: "The text stays. " + splitWithoutNotes), Line(text: keptWithoutNotes)]),
+            ("both", settings(makesNotes: false), meeting(words: false), [orange, Line(text: splitWithoutNotes), Line(text: keptWithoutNotes)]),
+        ]
+        for (name, settings, meeting, lines) in rows {
+            XCTAssertEqual(Words.whatHappens(settings, meeting: meeting), lines, name)
+        }
+    }
+
+    /// The naming dialog's hint in the count's place for a method that counts the
+    /// speakers itself, its microphone note under the count of a recorded call (A17).
+    @MainActor
+    func testWhatStandsUnderTheMethodListPerMethodAndTrackLayout() {
+        let rows: [(DiarizerMode, twoTracks: Bool, Words.UnderTheList)] = [
+            (.offline, true, .count(note: "Your microphone side is always counted automatically.")),
+            (.offline, false, .count(note: nil)),
+            (.sortformer, true, .hint("Sortformer counts the speakers itself: up to 4 in the call audio and 4 on your microphone.")),
+            (.sortformer, false, .hint("Sortformer counts the speakers itself: up to 4.")),
+            (.nemotron, true, .hint("Nemotron 3 counts the speakers itself: up to 8 in the call audio and 8 on your microphone.")),
+            (.nemotron, false, .hint("Nemotron 3 counts the speakers itself: up to 8.")),
+        ]
+        for (method, twoTracks, expected) in rows {
+            XCTAssertEqual(Words.underTheList(method, twoTracks: twoTracks), expected, "\(method) two tracks: \(twoTracks)")
+        }
+    }
+
+    /// Settings' expected speakers, 2 for Auto (D7).
+    func testTheCountStartsAtSettingsExpectedSpeakers() {
+        XCTAssertEqual([0, 1, 4, 10].map(Words.startingCount), [2, 1, 4, 10])
     }
 }

@@ -86,13 +86,16 @@ struct AllRecordingsActions {
     /// as a notification, writing what "Save as:" chose.
     var generate: (ProtocolRegenerationTarget, MeetingProtocolOptions, ProtocolRegenerationOutput) -> Void
 
-    // MARK: Transcribe Again sheet
+    // MARK: Re-run sheets
 
-    /// What the sheet shows of Settings, read on every redraw of the sheet, so it
-    /// shows what a click takes now.
+    /// What the sheets show of Settings, read on every redraw of a sheet, so it shows
+    /// what a click takes now; Identify Speakers Again starts at its method and count.
     var rerunSettings: () -> RerunSheetText.Settings
     /// "Transcribe Again" in the sheet: queues the meeting's re-run, or says why not.
     var transcribeAgain: (UUID) -> RerunAdmission
+    /// "Identify Speakers" in the Identify Speakers Again sheet: queues the meeting's
+    /// re-run with the method and count picked there, or says why not.
+    var identifySpeakersAgain: (UUID, RerunSpeakers) -> RerunAdmission
 
     /// Every action does nothing, no job can be retried or has a file record, no
     /// file is on disk, recordings are kept, the build has no identifier, protocol
@@ -136,6 +139,7 @@ struct AllRecordingsActions {
             )
         },
         transcribeAgain: { _ in .queued },
+        identifySpeakersAgain: { _, _ in .queued },
     )
 
     // MARK: - Production

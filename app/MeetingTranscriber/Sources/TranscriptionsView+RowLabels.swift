@@ -43,6 +43,7 @@ extension TranscriptionsView {
         switch item {
         case let .item(plain): title(of: plain)
         case .transcribeAgain: "Transcribe Again…"
+        case .identifySpeakersAgain: "Identify Speakers Again…"
         case .keep: "Keep (Never Delete Automatically)"
         case .moveAudioToTrash: "Move Audio to Trash…"
         case .moveMeetingToTrash: "Move Meeting to Trash…"
@@ -69,6 +70,7 @@ extension TranscriptionsView {
         switch item {
         case let .item(plain): identifier(of: plain, index: index)
         case .transcribeAgain: A11yID.recordingMenuTranscribeAgain(index)
+        case .identifySpeakersAgain: A11yID.recordingMenuIdentifySpeakersAgain(index)
         case .keep: A11yID.recordingMenuKeep(index)
         case .moveAudioToTrash: A11yID.recordingMenuMoveAudioToTrash(index)
         case .moveMeetingToTrash: A11yID.recordingMenuMoveMeetingToTrash(index)

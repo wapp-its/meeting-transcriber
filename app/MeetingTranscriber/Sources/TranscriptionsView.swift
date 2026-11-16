@@ -23,7 +23,7 @@ final class TranscriptionsFileNotice {
 /// over them moves their audio or the meetings to the Trash after one confirmation,
 /// as `TrashSelectionPlan` decides. The footer counts the rows shown. Regenerating
 /// a protocol happens in a sheet over the window, which `regenerateSheet` presents,
-/// and transcribing a meeting again in one of its own (`TranscribeAgainSheet`).
+/// and running a meeting again in sheets of their own (`TranscribeAgainSheet`, `IdentifySpeakersAgainSheet`).
 ///
 /// Data and actions arrive as stored properties, the way `SettingsView` takes
 /// them, so the view reads no app state of its own. The query is a binding for
@@ -64,6 +64,7 @@ struct TranscriptionsView: View {
     @State private var trashPrompt: TrashConfirmationPrompt
     @State private var selection: TranscriptionsSelection
     @State private var transcribeAgain: TranscribeAgainSheetState
+    @State private var identifySpeakersAgain: IdentifySpeakersAgainSheetState
 
     init(
         entries: [TranscriptionEntry],
@@ -73,6 +74,7 @@ struct TranscriptionsView: View {
         regenerationPhase: ProtocolRegenerator.Phase,
         selection: TranscriptionsSelection = TranscriptionsSelection(),
         transcribeAgain: TranscribeAgainSheetState = TranscribeAgainSheetState(),
+        identifySpeakersAgain: IdentifySpeakersAgainSheetState = IdentifySpeakersAgainSheetState(),
     ) {
         self.entries = entries
         self.query = query
@@ -87,6 +89,7 @@ struct TranscriptionsView: View {
         _trashPrompt = State(initialValue: TrashConfirmationPrompt())
         _selection = State(initialValue: selection)
         _transcribeAgain = State(initialValue: transcribeAgain)
+        _identifySpeakersAgain = State(initialValue: identifySpeakersAgain)
     }
 
     // Sections hoisted out of `body`, each type-checked on its own budget (see
@@ -101,6 +104,7 @@ struct TranscriptionsView: View {
         .toolbar { toolbarItems }
         .sheet(isPresented: Bindable(regenerateSheet).isPresented) { regenerateForm }
         .sheet(item: Bindable(transcribeAgain).meeting) { transcribeAgainForm($0) }
+        .identifySpeakersAgainSheet(identifySpeakersAgain, actions: actions)
         // `presenting`, so the buttons hold their request whether SwiftUI clears the
         // binding before or after running them.
         .alert(trashPrompt.request?.text.title ?? "", isPresented: trashPromptShown, presenting: trashPrompt.request) { request in
@@ -363,6 +367,12 @@ struct TranscriptionsView: View {
                 if let record = facts.meeting?.record { transcribeAgain.open(.init(entry: entry, record: record, onDisk: facts.onDisk)) }
             }
 
+        case .identifySpeakersAgain:
+            menuButton(item, index: index) {
+                guard let record = facts.meeting?.record else { return }
+                identifySpeakersAgain.open(.init(entry: entry, record: record, onDisk: facts.onDisk), settings: actions.rerunSettings())
+            }
+
         case let .keep(checked, _):
             Toggle(Self.title(of: item), isOn: keepBinding(entry, checked: checked))
                 .disabled(!isEnabled(item))
@@ -402,7 +412,7 @@ struct TranscriptionsView: View {
     private func isEnabled(_ item: RowMenuItem) -> Bool {
         switch item {
         case let .item(plain): plain != .regenerate(enabled: false)
-        case let .transcribeAgain(enabled), let .keep(_, enabled), let .moveAudioToTrash(enabled): enabled
+        case let .transcribeAgain(enabled), let .identifySpeakersAgain(enabled), let .keep(_, enabled), let .moveAudioToTrash(enabled): enabled
         case let .moveMeetingToTrash(enabled): enabled && !isRegenerating
         }
     }
