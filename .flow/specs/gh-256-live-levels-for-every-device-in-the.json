@@ -10,9 +10,9 @@
   "id": "gh-256-live-levels-for-every-device-in-the",
   "impl_review_rounds": {},
   "next_task": 1,
-  "plan_review_rounds": 1,
-  "plan_review_status": "needs_work",
-  "plan_reviewed_at": "2026-11-16T09:16:13.130635Z",
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-11-16T09:19:06.076756Z",
   "review_attempts": [
     {
       "artifact_sha256": "e196a59b335d46c6d578fe8940e3928fb124bd79c7cb326eec90dec90ac33646",
@@ -74,9 +74,72 @@
       "timestamp": "2026-11-16T09:16:12.791639Z",
       "tool_calls": 28,
       "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "68feef082ee6a3c6eecccdd70d5b6a20684a1cec1c3da0a6345ff77842e2c71c",
+      "backend": "codex",
+      "base_sha": "3b236a800c34709e7ea146b82d79e62337281e2e",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-22ff11b6ac42b868aa090146f9ef75f7",
+            "classification": "introduced",
+            "findingId": "finding-22ff11b6ac42b868aa090146f9ef75f7",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-fa90fd7ca5949961d0449dd66f96d958",
+            "classification": "introduced",
+            "findingId": "finding-fa90fd7ca5949961d0449dd66f96d958",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-5aadf814d8d45cf5535aa5fff0dc072a",
+            "classification": "introduced",
+            "findingId": "finding-5aadf814d8d45cf5535aa5fff0dc072a",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "294629fdf3d773d326023f51093a2e72ec122255",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 681,
+      "output_sha256": "58ba144e38276bc9ccabc0367bdd48db4fe4ae2d1fb9ad468834cee75b12e5fd",
+      "reservation_id": "69d8437334fd4de98e526d9c58c83b68",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-16T09:19:06.049528Z",
+      "verdict": "SHIP"
     }
   ],
-  "review_hash_epoch": {},
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
@@ -97,5 +160,5 @@
     "mergeBaseTracker": null,
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/256"
   },
-  "updated_at": "2026-11-16T09:18:07.386183Z"
+  "updated_at": "2026-11-16T09:19:06.078790Z"
 }
