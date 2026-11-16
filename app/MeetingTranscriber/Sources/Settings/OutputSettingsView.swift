@@ -62,10 +62,11 @@ struct OutputSettingsView: View {
     /// The API key fields type into these, not into the Keychain.
     @StateObject private var apiKeyDrafts: ProtocolAPIKeyDrafts
 
-    /// `templateStore` is the templates folder; tests hand in a temp folder.
+    /// `templateStore` is the templates folder. No default: the app passes the
+    /// real one and tests a temp folder (`ProtocolTemplatesFixture.swift`).
     init(
         settings: AppSettings,
-        templateStore: ProtocolTemplateStore = .production,
+        templateStore: ProtocolTemplateStore,
         // swiftlint:disable:next unneeded_escaping
         apiKeyDrafts: @autoclosure @escaping () -> ProtocolAPIKeyDrafts? = nil,
     ) {

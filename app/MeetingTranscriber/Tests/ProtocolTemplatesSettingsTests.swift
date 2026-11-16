@@ -293,6 +293,18 @@ final class ProtocolTemplatesSettingsTests: XCTestCase {
         XCTAssertNil(model.pendingDeletion)
     }
 
+    /// The confirmation says what deleting does to meetings still waiting.
+    func testTheDeleteConfirmationSaysWaitingMeetingsUseTheBuiltInTemplate() throws {
+        let (view, model, _) = try makeView()
+        model.requestDelete("Board")
+
+        let dialog = try view.inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.protocolTemplateDelete(0))
+            .confirmationDialog()
+
+        XCTAssertEqual(try dialog.message().text().string(), ProtocolTemplatesModel.deletionMessage)
+    }
+
     func testOpenFolderButtonOpensTheFolder() throws {
         let (view, _, fixture) = try makeView()
 

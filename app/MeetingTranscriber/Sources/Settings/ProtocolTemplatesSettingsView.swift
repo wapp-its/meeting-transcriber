@@ -19,6 +19,10 @@ import SwiftUI
 @MainActor
 final class ProtocolTemplatesModel {
     static let builtInLabel = "Standard (built-in)"
+    /// The delete confirmation's message. Jobs keep the template's name and
+    /// read the file only when their notes are made, so a queued job falls
+    /// back to the built-in template once the file is gone.
+    static let deletionMessage = "Meetings still waiting for their notes with this template will use the built-in template."
 
     /// Template names in Finder's order, as of the last `reload()`.
     private(set) var names: [String] = []
@@ -329,6 +333,8 @@ struct ProtocolTemplatesSettingsView: View {
                     ) {
                         Button("Move to Trash", role: .destructive) { model.confirmDelete(name) }
                             .accessibilityIdentifier(A11yID.protocolTemplateConfirmDelete(index))
+                    } message: {
+                        Text(ProtocolTemplatesModel.deletionMessage)
                     }
             }
         }

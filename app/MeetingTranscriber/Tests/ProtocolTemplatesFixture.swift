@@ -55,3 +55,17 @@ final class ProtocolTemplatesFixture {
         return model
     }
 }
+
+extension OutputSettingsView {
+    /// The Output tab for tests that do not look at its templates section, over
+    /// a templates folder that is never created, so no test reads the user's
+    /// templates. The app passes the real folder; this init is the tests' own.
+    init(
+        settings: AppSettings,
+        apiKeyDrafts: @autoclosure @escaping () -> ProtocolAPIKeyDrafts? = nil,
+    ) {
+        let unusedFolder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("unused-protocol-templates-\(UUID().uuidString)", isDirectory: true)
+        self.init(settings: settings, templateStore: ProtocolTemplateStore(directory: unusedFolder), apiKeyDrafts: apiKeyDrafts())
+    }
+}
