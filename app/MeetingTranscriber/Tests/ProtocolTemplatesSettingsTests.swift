@@ -277,6 +277,22 @@ final class ProtocolTemplatesSettingsTests: XCTestCase {
         XCTAssertEqual(fixture.files, ["Board.md", "Retro.md"], "nothing is deleted before the confirmation")
     }
 
+    func testMoveToTrashInRowZerosConfirmationTrashesIt() throws {
+        let (view, model, fixture) = try makeView()
+        model.requestDelete("Board")
+
+        try view.inspect()
+            .find(viewWithAccessibilityIdentifier: A11yID.protocolTemplateDelete(0))
+            .confirmationDialog()
+            .find(viewWithAccessibilityIdentifier: A11yID.protocolTemplateConfirmDelete(0))
+            .button()
+            .tap()
+
+        XCTAssertEqual(fixture.trashed, [fixture.store.fileURL(named: "Board")])
+        XCTAssertEqual(model.names, ["Retro"])
+        XCTAssertNil(model.pendingDeletion)
+    }
+
     func testOpenFolderButtonOpensTheFolder() throws {
         let (view, _, fixture) = try makeView()
 

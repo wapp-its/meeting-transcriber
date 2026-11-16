@@ -328,6 +328,7 @@ struct ProtocolTemplatesSettingsView: View {
                         titleVisibility: .visible,
                     ) {
                         Button("Move to Trash", role: .destructive) { model.confirmDelete(name) }
+                            .accessibilityIdentifier(A11yID.protocolTemplateConfirmDelete(index))
                     }
             }
         }

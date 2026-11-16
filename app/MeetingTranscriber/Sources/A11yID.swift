@@ -127,6 +127,12 @@ enum A11yID {
         "protocolTemplateDelete.\(index)"
     }
 
+    /// "Move to Trash" in the confirmation of row `index`'s Delete,
+    /// addressed like `protocolTemplateEdit`.
+    static func protocolTemplateConfirmDelete(_ index: Int) -> String {
+        "protocolTemplateConfirmDelete.\(index)"
+    }
+
     static let includeFullTranscriptToggle = "includeFullTranscriptToggle"
     static let saveRawTranscriptToggle = "saveRawTranscriptToggle"
     static let useAITitleForFilenamesToggle = "useAITitleForFilenamesToggle"
