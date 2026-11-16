@@ -21,5 +21,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nWith the local model (#138), a meeting whose notes the model can't start for lack of free memory ends with \"Meeting notes not written: low memory\". Under normal desktop load this happens to every meeting with the 27B model: 0.5 to 1.0 GB are missing. You then have to free memory and regenerate by hand.\n\n## NOTES\n\n- A refused job waits and tries again by itself: every 5 minutes, on wake, on screen lock and when the Mac is idle. Every try goes through the same memory check.\n- Tries stop after 24 hours, or after the model was stopped twice mid-run for memory.\n- The start and stop rules of the memory check stay as they are.\n- A smaller model is the other fix. #259 shows which models fit.\n\n## TASKS\n\n- [ ] Spec\n- [ ] Build it",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/263"
   },
-  "updated_at": "2026-11-16T12:57:33.233632Z"
+  "updated_at": "2026-11-16T13:05:43.818986Z"
 }
