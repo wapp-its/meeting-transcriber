@@ -11,5 +11,5 @@
   "spec_path": ".flow/tasks/gh-256-live-levels-for-every-device-in-the.3.md",
   "status": "todo",
   "title": "Detection skips this app's process; output list refresh off the main thread",
-  "updated_at": "2026-11-16T09:32:08.283828Z"
+  "updated_at": "2026-11-16T09:38:04.151323Z"
 }

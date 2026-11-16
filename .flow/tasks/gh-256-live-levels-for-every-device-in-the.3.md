@@ -7,8 +7,8 @@ satisfies: [R5, R7, R8, R13]
 Two changes that make the meters safe before any meter runs in the app: detection never claims this app's own process (R5, A8), and the output list refresh that a device notice starts reads off the main thread with a deadline, folding notices that arrive meanwhile (spec Architecture, "The device lists ignore the meters' own objects"; R7, R8). Both keep today's behaviour for users; they matter once every meter aggregate fires a device notice.
 
 **Size:** M
-**Files:** `Sources/MicInputDetector.swift`, `Sources/OutputDeviceController.swift`, `Tests/MicInputDetectorTests.swift`, `Tests/OutputDeviceControllerTests.swift`, `docs/architecture/detection.md`, `docs/architecture-macos.md` (the `OutputDeviceController` row, if its description changes)
-**Touches:** [app/MeetingTranscriber/Sources/MicInputDetector.swift, app/MeetingTranscriber/Sources/OutputDeviceController.swift, app/MeetingTranscriber/Tests/MicInputDetectorTests.swift, app/MeetingTranscriber/Tests/OutputDeviceControllerTests.swift, docs/architecture/detection.md, docs/architecture-macos.md]
+**Files:** `Sources/MicInputDetector.swift`, `Sources/OutputDeviceController.swift`, `Tests/MicInputDetectorTests.swift`, `Tests/OutputDeviceControllerTests.swift`, `docs/architecture/detection.md` (the `OutputDeviceController` row in `docs/architecture-macos.md` is updated by .6)
+**Touches:** [app/MeetingTranscriber/Sources/MicInputDetector.swift, app/MeetingTranscriber/Sources/OutputDeviceController.swift, app/MeetingTranscriber/Tests/MicInputDetectorTests.swift, app/MeetingTranscriber/Tests/OutputDeviceControllerTests.swift, docs/architecture/detection.md]
 
 Paths under `Sources/` and `Tests/` are relative to `app/MeetingTranscriber/`.
 
@@ -32,14 +32,11 @@ Test first for both.
 ### Key context
 - `OutputDevices.observeChanges` delivers on the main queue (`Sources/OutputDevices.swift:65-80`); the handler itself stays there, only the read moves.
 - A test that checks "no Core Audio read on the main thread" records `Thread.isMainThread` inside the injected `listDevices` fake.
-
 ## Acceptance
 - [ ] Detector tests, written first and seen failing: a snapshot carrying this process's pid running input is never claimed, by detection or by `signallingMeetings()`, with and without an added watched app whose bundle ID equals or prefixes this app's; other processes are claimed as before.
 - [ ] Output controller tests, written first and seen failing: a device notice runs no list read on the main thread; a notice while the injected read is blocked leaves the main actor free and folds further notices into one follow-up read; a result past its deadline is not adopted; an unchanged list assigns nothing; the routing warning still fires after a changed default output.
 - [ ] `docs/architecture/detection.md` states that detection never claims this app's own process.
 - [ ] Quick commands green; `./scripts/lint.sh` clean with the pinned tools.
-
-
 ## Done summary
 TBD
 

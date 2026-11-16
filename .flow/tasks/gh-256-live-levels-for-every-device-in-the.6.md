@@ -18,7 +18,7 @@ Test first for the reader and the wiring; the view gets one wiring test per stat
 2. **Reader:** `windowOpened()`/`windowClosed()` as today plus `visibilityChanged(_:)` handed to the meters (.5). The tick samples each meter's level with no Core Audio call and stores lit segments only on a change, as it does for the recorded levels; sampling runs only while the window is visible (Validation step 4). The reader builds `AudioDevicesWindowState` with .2's `Meters` input.
 3. **Wiring** (`Sources/AppState+AudioDevices.swift:8-48`): create the meters once with the production device layer; feed them `MicrophoneController.devices` and `OutputDeviceController.devices` (on change), the microphone authorization and `PermissionsController.health` (for A12); hand WatchingController its gate and activity hook (.5). The reader owns the meters, so `AppState.swift` (583 lines, at its cap) needs no new stored property.
 4. **View:** the level column on every row whenever the state shows it; paused, "Can't read", "No permission" and "Unknown" in the grey, right-aligned style of gh-150's "no level" (D7, A13); footers and hint lines from the state.
-5. **Docs:** `docs/architecture-macos.md` gets the meters: their owner, lane, pause and gate, and the rows for this task's files. The measured budget comes in .7.
+5. **Docs:** `docs/architecture-macos.md` gets the meters (their owner, lane, pause and gate), the Source Files rows for every file .1, .4, .5 and this task added, and the `OutputDeviceController` row updated for .3's off-main refresh. The earlier tasks leave this file alone so the first wave shares no file. The measured budget comes in .7.
 
 ### Investigation targets
 **Required** (read before coding):
@@ -36,15 +36,12 @@ Test first for the reader and the wiring; the view gets one wiring test per stat
 - A SwiftUI body over 300 ms of type-checking fails the build (`-warn-long-function-bodies=300`); keep the row and level views small.
 - `MeetingTranscriberApp.swift` is at 598 lines; the window scene needs no edit.
 - The App Store build has the meters but no `/state`; its checks are the unit tests.
-
 ## Acceptance
 - [ ] Reader tests, written first and seen failing: not visible closes the meters through the fake and stops sampling; visible again reopens them unless paused; lit segments are stored only on a change; the state carries the meters' input.
-- [ ] View tests (ViewInspector): a bar on every row while running, "Paused for call" on unrecorded rows during a recording, the failure texts, the footers and the A12 line; each test fails when its wiring is removed.
+- [ ] View tests (ViewInspector): a bar on every row while running, "Paused for call" on unrecorded rows during a recording and on every connected row in a watched call with no recording (no Meeting audio group), the failure texts, the footers and the A12 line; each test fails when its wiring is removed.
 - [ ] Wiring test: the meters are created once, follow the device lists, and the gate and activity hook reach WatchingController.
 - [ ] Both variants build and pass their tests: the repository's test command and `./scripts/pre-push.sh --with-appstore` (Validation step 5).
 - [ ] `docs/architecture-macos.md` describes the meters; `./scripts/lint.sh` clean with the pinned tools.
-
-
 ## Done summary
 TBD
 

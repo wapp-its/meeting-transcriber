@@ -7,8 +7,8 @@ satisfies: [R2, R3, R4, R13]
 When the meters may run, and the gate every recording start waits on: the window's visibility as an input, the pause signal (recording activity and the call signal), the ten-second resume, and the capture gate, wired into the recording side (spec Architecture, "The pause signal" and "The capture gate"; R2, R3, R4; A4, A5, A6, D9, A16).
 
 **Size:** M
-**Files:** `Sources/DeviceLevelMeters+RunState.swift` (new), `Sources/DeviceLevelMeters+CaptureGate.swift` (new), `Sources/WatchingController+DeviceMeters.swift` (new), `Sources/WatchingController+RecorderFactory.swift`, `Sources/WatchingController+LocalModel.swift`, `Tests/DeviceLevelMetersRunStateTests.swift` (new), `Tests/CaptureGateStartTests.swift` (new), `docs/architecture/recording.md`, `docs/architecture-macos.md` (rows for the new files)
-**Touches:** [app/MeetingTranscriber/Sources/DeviceLevelMeters+RunState.swift, app/MeetingTranscriber/Sources/DeviceLevelMeters+CaptureGate.swift, app/MeetingTranscriber/Sources/WatchingController+DeviceMeters.swift, app/MeetingTranscriber/Sources/WatchingController+RecorderFactory.swift, app/MeetingTranscriber/Sources/WatchingController+LocalModel.swift, app/MeetingTranscriber/Sources/WatchingController.swift, app/MeetingTranscriber/Tests/DeviceLevelMetersRunStateTests.swift, app/MeetingTranscriber/Tests/CaptureGateStartTests.swift, docs/architecture/recording.md, docs/architecture-macos.md]
+**Files:** `Sources/DeviceLevelMeters+RunState.swift` (new), `Sources/DeviceLevelMeters+CaptureGate.swift` (new), `Sources/WatchingController+DeviceMeters.swift` (new), `Sources/WatchingController+RecorderFactory.swift`, `Sources/WatchingController+LocalModel.swift`, `Tests/DeviceLevelMetersRunStateTests.swift` (new), `Tests/CaptureGateStartTests.swift` (new), `docs/architecture/recording.md`; the rows for the new files in `docs/architecture-macos.md` are written by .6
+**Touches:** [app/MeetingTranscriber/Sources/DeviceLevelMeters+RunState.swift, app/MeetingTranscriber/Sources/DeviceLevelMeters+CaptureGate.swift, app/MeetingTranscriber/Sources/WatchingController+DeviceMeters.swift, app/MeetingTranscriber/Sources/WatchingController+RecorderFactory.swift, app/MeetingTranscriber/Sources/WatchingController+LocalModel.swift, app/MeetingTranscriber/Sources/WatchingController.swift, app/MeetingTranscriber/Tests/DeviceLevelMetersRunStateTests.swift, app/MeetingTranscriber/Tests/CaptureGateStartTests.swift, docs/architecture/recording.md]
 
 Paths under `Sources/` and `Tests/` are relative to `app/MeetingTranscriber/`.
 
@@ -35,15 +35,12 @@ Test first, with an injected clock and .4's fake layer.
 ### Key context
 - The detected path sets `.recording` and fires `onMeetingCapture(true)` before awaiting the factory; the manual path counts from its registration. The pause has usually closed the meters before the gate runs; the gate covers outstanding calls and the starts with no call signal (manual, microphone-only, `/v1/record`, Record Again).
 - `WatchingController.swift` is at 585 lines; anything stored there must stay within the cap.
-
 ## Acceptance
 - [ ] Run-state tests, written first and seen failing: each pause source closes everything within one second; meters return ten seconds after the signal cleared, and a flap restarts the wait; `recording` wins over `call`; not visible closes within one second; becoming visible while paused opens nothing; a window opened during a call opens nothing before the first call read answers; an overdue call read counts as a call.
 - [ ] Gate tests: it returns at once with nothing open or outstanding; it waits for an outstanding close; an open stalled before its start step and released after the gate began starts no device; it gives up at two seconds with one log line; after closing a Bluetooth input it waits until 1.5 s after that close.
 - [ ] Start tests: the manual, microphone-only, detected and Record Again starts, each parked inside the gate and then quit or stopped, start no recording (the `QuitStartRefusalTests` pattern through the production factory with an injected recorder).
 - [ ] `docs/architecture/recording.md` states the gate and its place in the start order.
 - [ ] Quick commands green; `./scripts/lint.sh` clean with the pinned tools.
-
-
 ## Done summary
 TBD
 

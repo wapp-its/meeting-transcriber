@@ -7,8 +7,8 @@ satisfies: [R1, R7, R8, R9]
 The app-side owner of the meters (suggested `DeviceLevelMeters`, main actor): given the filtered microphone and output lists, the microphone permission and an "active" flag, it opens one meter per listed device through an injected device layer on one serial lane, keeps each device's result and level, and closes them all when deactivated. When it is active is .5's job (visibility, pause, gate); this task takes "active" as an input (spec Architecture, "One owner of the window's meters" and "Off the main thread, one at a time"; R1, R7, R8, R9; A10, A11, A14).
 
 **Size:** M
-**Files:** `Sources/DeviceLevelMeters.swift` (new), `Sources/DeviceLevelMeters+Lane.swift` (new), `Sources/MicrophoneDevices.swift` and `Sources/MicrophoneController.swift` (only if .1 found the meter aggregate in `AVCaptureDevice` discovery), `Tests/DeviceLevelMetersTests.swift` (new), `docs/architecture-macos.md` (rows for the new files)
-**Touches:** [app/MeetingTranscriber/Sources/DeviceLevelMeters*.swift, app/MeetingTranscriber/Sources/MicrophoneDevices.swift, app/MeetingTranscriber/Sources/MicrophoneController.swift, app/MeetingTranscriber/Tests/DeviceLevelMetersTests.swift, app/MeetingTranscriber/Tests/MicrophoneControllerTests.swift, docs/architecture-macos.md]
+**Files:** `Sources/DeviceLevelMeters.swift` (new), `Sources/DeviceLevelMeters+Lane.swift` (new), `Sources/MicrophoneDevices.swift` and `Sources/MicrophoneController.swift` (only if .1 found the meter aggregate in `AVCaptureDevice` discovery), `Tests/DeviceLevelMetersTests.swift` (new); the rows for the new files in `docs/architecture-macos.md` are written by .6
+**Touches:** [app/MeetingTranscriber/Sources/DeviceLevelMeters*.swift, app/MeetingTranscriber/Sources/MicrophoneDevices.swift, app/MeetingTranscriber/Sources/MicrophoneController.swift, app/MeetingTranscriber/Tests/DeviceLevelMetersTests.swift, app/MeetingTranscriber/Tests/MicrophoneControllerTests.swift]
 
 Paths under `Sources/` and `Tests/` are relative to `app/MeetingTranscriber/`.
 
@@ -36,14 +36,11 @@ Test first, with a fake device layer that can block, fail with a status or repor
 ### Key context
 - Opening an input turns on the orange microphone indicator and can switch a Bluetooth headset's profile; tests never touch hardware.
 - Keep meter work off the main actor entirely; the main actor only adopts results and reads cells.
-
 ## Acceptance
 - [ ] Tests with the fake layer, written first and seen failing: activating opens one meter per listed device and deactivating closes all within one tick; a list notice with unchanged UIDs opens and closes nothing; an added device opens, a removed one closes, one removed while its open is out closes when it returns; a failed open reads "can't read" and is retried only at a list change or the next activation; microphone permission denied opens no input; a hung open keeps the state current, counts as overdue and queues nothing behind it; an open whose generation went stale starts nothing; the open input and output counts are exact.
 - [ ] The start and stop log lines carry counts and status codes and no device name or UID (asserted on the formatted line).
 - [ ] Parked unknown 4's consequence handled as in Approach 7, or recorded as not needed.
 - [ ] Quick commands green; `./scripts/lint.sh` clean with the pinned tools.
-
-
 ## Done summary
 TBD
 
