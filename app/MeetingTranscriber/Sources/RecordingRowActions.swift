@@ -52,6 +52,8 @@ enum RecordingRowActions {
     /// lists, then the items acting on the meeting's files, declared in that order.
     enum RowMenuItem: Equatable {
         case item(MenuItem)
+        /// "Transcribe Again…", right after "Regenerate Notes…" (spec R2, D5).
+        case transcribeAgain(enabled: Bool)
         /// "Keep (Never Delete Automatically)".
         case keep(checked: Bool, enabled: Bool)
         /// "Move Audio to Trash…".
@@ -65,6 +67,9 @@ enum RecordingRowActions {
         let record: MeetingFileRecord
         let notionExportRunning: Bool
         let audio: RecordingAudioLine.AudioOnDisk
+        /// The audio a re-run reads, as the row last found it. Gone by default: a
+        /// selection's plan never reads it, and it never decides a Trash item.
+        var sourceAudio: SourceAudio = .gone
 
         /// Whether the window's actions would take this meeting now, by the rule
         /// `PipelineController.actionableMeetingRecord` applies again when one runs,
@@ -78,6 +83,25 @@ enum RecordingRowActions {
         /// Any audio present or out of reach, of the files a deletion would cover.
         var hasAudioLeft: Bool {
             audio.isAnyLeft && !record.filesCovered(by: .audioToTrash).isEmpty
+        }
+    }
+
+    /// The meeting's source audio as the row last found it: the tracks a re-run reads
+    /// (`MeetingFileRecord.rerunSourceTracks`), for an import the user's own file.
+    enum SourceAudio: Equatable {
+        /// At least one track is there.
+        case present
+        /// None is there, and at least one is on a drive that is not connected.
+        case onlyUnreachable
+        /// None is there, or the record lists none (notes made from a transcript).
+        case gone
+
+        init(_ tracks: [MeetingFilePresence]) {
+            if tracks.contains(.present) {
+                self = .present
+            } else {
+                self = tracks.contains(.unreachable) ? .onlyUnreachable : .gone
+            }
         }
     }
 
@@ -194,12 +218,43 @@ enum RecordingRowActions {
         return mainAction(state: state, files: files, canRetry: canRetry).map(RowMainAction.action)
     }
 
-    /// What the row lists for any job, then Keep and the two Trash items.
+    /// What the row lists for any job, then "Transcribe Again…" where it applies, then
+    /// Keep and the two Trash items. A separator sets "Regenerate Notes…" and
+    /// "Transcribe Again…" apart from the items above, where the reports' closing one
+    /// does not already, and from Keep and the Trash items below (spec D5); a row
+    /// without the item keeps today's menu (A19).
     static func menuItems(
         state: JobState, onDisk: FilesOnDisk, canRetry: Bool, meeting: Meeting?, hasNotionPage: Bool = false,
+        recordOnly: Bool = false, isRegenerating: Bool = false,
     ) -> [RowMenuItem] {
-        menuItems(state: state, onDisk: onDisk, canRetry: canRetry, hasNotionPage: hasNotionPage).map(RowMenuItem.item)
-            + meetingFileItems(state: state, meeting: meeting)
+        var above = menuItems(state: state, onDisk: onDisk, canRetry: canRetry, hasNotionPage: hasNotionPage).map(RowMenuItem.item)
+        let below = meetingFileItems(state: state, meeting: meeting)
+        guard let again = transcribeAgain(state: state, meeting: meeting, recordOnly: recordOnly, isRegenerating: isRegenerating) else {
+            return above + below
+        }
+        var group = [again]
+        if let last = above.last, case .item(.regenerate) = last {
+            group.insert(above.removeLast(), at: 0)
+        }
+        let separatorAbove = above.last.map { $0 != .item(.separator) } ?? false
+        return above + (separatorAbove ? [.item(.separator)] : []) + group + (below.isEmpty ? [] : [.item(.separator)]) + below
+    }
+
+    /// "Transcribe Again…" for a meeting a re-run could start from (R2), nil where the
+    /// row leaves it out: without a record, for a failed meeting (it has Retry), one
+    /// waiting for names (its dialog has Re-run), and when none of its source audio
+    /// was found. Listed but disabled while the re-run's admission would refuse, as
+    /// far as the row can tell, while a regeneration runs (gh-97 A19) and in
+    /// record-only mode; the action checks the audio again on the click.
+    private static func transcribeAgain(state: JobState, meeting: Meeting?, recordOnly: Bool, isRegenerating: Bool) -> RowMenuItem? {
+        guard let meeting, meeting.sourceAudio != .gone, state != .error, state != .speakerNamingPending else { return nil }
+        switch meeting.record.outcome {
+        case .failed, .leftUnfinished: return nil
+        case .inProgress, .finished: break
+        }
+        let enabled = meeting.isActionable(in: state) && meeting.record.incomplete == nil && meeting.sourceAudio == .present
+            && !recordOnly && !isRegenerating
+        return .transcribeAgain(enabled: enabled)
     }
 
     /// None without a record, or for a meeting that failed or left the queue unfinished:

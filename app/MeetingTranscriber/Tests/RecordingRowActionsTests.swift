@@ -474,3 +474,97 @@ extension RecordingRowActionsTests {
         return (job, meeting(record, audio: audio(present: left)))
     }
 }
+
+/// "Transcribe Again…" (spec R2, D5, A19): where a row lists it, between which
+/// separators, and when it is listed but disabled.
+extension RecordingRowActionsTests {
+    private typealias SourceAudio = RecordingRowActions.SourceAudio
+
+    private func rerunnable(_ record: MeetingFileRecord = RetentionFixture.record(), exporting: Bool = false, sources: SourceAudio = .present) -> Meeting {
+        var rerunnable = meeting(record, exporting: exporting)
+        rerunnable.sourceAudio = sources
+        return rerunnable
+    }
+
+    private func transcribeAgain(
+        _ state: JobState, _ meeting: Meeting?, recordOnly: Bool = false, regenerating: Bool = false,
+    ) -> RowMenuItem? {
+        RecordingRowActions.menuItems(
+            state: state, onDisk: protocolAndTranscript, canRetry: true, meeting: meeting, recordOnly: recordOnly, isRegenerating: regenerating,
+        ).first { if case .transcribeAgain = $0 { true } else { false } }
+    }
+
+    /// After Regenerate Notes, a separator above unless the reports' closing one is
+    /// there, and one before Keep and the Trash items; the other items as before.
+    func testTranscribeAgainFollowsRegenerateBetweenSeparators() {
+        let below: [RowMenuItem] = [.item(.separator)] + allThree(enabled: true)
+        XCTAssertEqual(
+            RecordingRowActions.menuItems(state: .done, onDisk: protocolAndTranscript, canRetry: false, meeting: rerunnable(), hasNotionPage: true),
+            [
+                .item(.openProtocol), .item(.openTranscript), .item(.showInFinder), .item(.openInNotion),
+                .item(.separator), .item(.regenerate(enabled: true)), .transcribeAgain(enabled: true),
+            ] + below,
+        )
+        let report = RecordingRowActions.Report(name: "Short", url: URL(fileURLWithPath: "/out/b (Short).md"))
+        let withReport = FilesOnDisk(protocolExists: true, transcriptExists: true, transcriptSource: .transcriptFile, reports: [report])
+        XCTAssertEqual(
+            RecordingRowActions.menuItems(state: .done, onDisk: withReport, canRetry: false, meeting: rerunnable()),
+            [
+                .item(.openProtocol), .item(.openTranscript), .item(.showInFinder),
+                .item(.separator), .item(.reportsHeading), .item(.report(report, position: 0)), .item(.separator),
+                .item(.regenerate(enabled: true)), .transcribeAgain(enabled: true),
+            ] + below,
+        )
+        XCTAssertEqual(
+            RecordingRowActions.menuItems(state: .transcribing, onDisk: protocolAndTranscript, canRetry: false, meeting: rerunnable()),
+            [.transcribeAgain(enabled: false), .item(.separator)] + allThree(enabled: false),
+        )
+    }
+
+    /// Without a record, for a failed meeting, one waiting for names, and when none of
+    /// its source audio was found, notes made from a transcript among them.
+    func testTranscribeAgainIsAbsentWhereNoReRunCanStart() {
+        let notesOnly = Fixture.record(origin: .imported) { $0.files.removeAll { $0.role.isAudio } }
+        let rows: [(String, JobState, Meeting?)] = [
+            ("no record", .done, nil),
+            ("failed", .error, rerunnable()),
+            ("failed in the record", .done, rerunnable(Fixture.record(outcome: .failed))),
+            ("left the queue unfinished", .done, rerunnable(Fixture.record(outcome: .leftUnfinished))),
+            ("waiting for names", .speakerNamingPending, rerunnable()),
+            ("its source audio gone", .done, rerunnable(sources: .gone)),
+            ("notes from a transcript", .done, rerunnable(notesOnly, sources: SourceAudio([]))),
+        ]
+        for (name, state, meeting) in rows {
+            XCTAssertNil(transcribeAgain(state, meeting), name)
+        }
+    }
+
+    func testTranscribeAgainIsDisabledWhileItsReRunWouldBeRefused() {
+        XCTAssertEqual(transcribeAgain(.done, rerunnable()), .transcribeAgain(enabled: true))
+        XCTAssertEqual(transcribeAgain(.done, rerunnable(Fixture.record(origin: .imported))), .transcribeAgain(enabled: true), "an import")
+        let rows: [(String, JobState, Meeting)] = liveStates.map { ("\($0)", $0, rerunnable()) } + [
+            ("a Notion export running", .done, rerunnable(exporting: true)),
+            ("a deletion pending", .done, rerunnable(Fixture.record { $0.pending = .init(kind: .audioToTrash, paths: []) })),
+            ("Move Audio incomplete", .done, rerunnable(incomplete(.audioToTrash))),
+            ("an automatic deletion incomplete", .done, rerunnable(incomplete(.automatic))),
+            ("another build's run", .done, rerunnable(Fixture.record(outcome: .inProgress))),
+            ("its audio only on a drive not connected", .done, rerunnable(sources: .onlyUnreachable)),
+        ]
+        for (name, state, meeting) in rows {
+            XCTAssertEqual(transcribeAgain(state, meeting), .transcribeAgain(enabled: false), name)
+        }
+        XCTAssertEqual(transcribeAgain(.done, rerunnable(), recordOnly: true), .transcribeAgain(enabled: false), "record-only mode")
+        XCTAssertEqual(transcribeAgain(.done, rerunnable(), regenerating: true), .transcribeAgain(enabled: false), "a regeneration running")
+    }
+
+    func testTheSourceAudioIsThereWhileAnyTrackIs() {
+        let rows: [([MeetingFilePresence], SourceAudio)] = [
+            ([.present], .present), ([.gone, .unreachable, .present], .present),
+            ([.unreachable], .onlyUnreachable), ([.gone, .unreachable], .onlyUnreachable),
+            ([.gone, .gone], .gone), ([], .gone),
+        ]
+        for (tracks, expected) in rows {
+            XCTAssertEqual(SourceAudio(tracks), expected, "\(tracks)")
+        }
+    }
+}

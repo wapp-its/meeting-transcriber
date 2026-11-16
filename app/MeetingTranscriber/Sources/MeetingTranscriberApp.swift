@@ -209,6 +209,7 @@ struct MeetingTranscriberApp: App {
                     AllRecordingsActions.readAudioOnDisk(of: record, scopeRoot: appState.settings.effectiveOutputDir)
                 }
             },
+            sourceAudio: { AllRecordingsActions.readSourceAudio(of: $0, scopeRoot: appState.settings.effectiveOutputDir) },
             reloadMeetingFiles: { appState.pipeline.meetingFileStore.reload() },
             moveAudioToTrash: { appState.pipeline.moveAudioToTrash(jobID: $0, named: $1) },
             moveMeetingToTrash: { appState.pipeline.moveMeetingToTrash(jobID: $0, named: $1) },
@@ -230,6 +231,8 @@ struct MeetingTranscriberApp: App {
             generate: { target, options, output in
                 Task { await appState.protocolRegenerator.regenerate(target, options: options, saveAs: output) }
             },
+            rerunSettings: { RerunSheetText.Settings(settings: appState.settings) },
+            transcribeAgain: { appState.pipeline.rerunJob(id: $0, mode: .transcribeAgain) },
         )
     }
 

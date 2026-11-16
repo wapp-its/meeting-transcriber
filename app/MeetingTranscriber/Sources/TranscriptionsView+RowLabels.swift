@@ -41,6 +41,7 @@ extension TranscriptionsView {
     static func title(of item: RowMenuItem) -> String {
         switch item {
         case let .item(plain): title(of: plain)
+        case .transcribeAgain: "Transcribe Again…"
         case .keep: "Keep (Never Delete Automatically)"
         case .moveAudioToTrash: "Move Audio to Trash…"
         case .moveMeetingToTrash: "Move Meeting to Trash…"
@@ -66,6 +67,7 @@ extension TranscriptionsView {
     static func identifier(of item: RowMenuItem, index: Int) -> String {
         switch item {
         case let .item(plain): identifier(of: plain, index: index)
+        case .transcribeAgain: A11yID.recordingMenuTranscribeAgain(index)
         case .keep: A11yID.recordingMenuKeep(index)
         case .moveAudioToTrash: A11yID.recordingMenuMoveAudioToTrash(index)
         case .moveMeetingToTrash: A11yID.recordingMenuMoveMeetingToTrash(index)

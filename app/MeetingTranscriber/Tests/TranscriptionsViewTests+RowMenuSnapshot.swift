@@ -5,7 +5,8 @@ import SwiftUI
 import XCTest
 
 /// The pixel record (dev-only) of a row's "…" menu with its Additional Reports
-/// group, so a long report name can be seen to widen the menu rather than be cut.
+/// group, so a long report name can be seen to widen the menu rather than be cut,
+/// and with "Transcribe Again…" after Regenerate Notes between its separators.
 /// It is the menu AppKit draws for the SwiftUI `Menu`, not a stand-in: SwiftUI
 /// fills the menu of its `NSPopUpButton` only when the menu opens, and an open menu
 /// runs its own tracking loop, so a timer in that loop captures the menu's window
@@ -25,6 +26,7 @@ extension TranscriptionsViewTests {
         var actions = AllRecordingsActions.noop
         actions.meetingFiles = { _ in meeting.record }
         actions.audioOnDisk = { _ in meeting.audio }
+        actions.sourceAudio = { _ in .present }
         actions.filesOnDisk = { _ in
             FilesOnDisk(protocolExists: true, transcriptExists: true, transcriptSource: .transcriptFile, reports: [
                 .init(name: "Board summary for the partners and the regional leads", url: URL(fileURLWithPath: "/out/s (Board).md")),

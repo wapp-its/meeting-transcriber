@@ -28,7 +28,7 @@ extension TranscriptionsViewTests {
     static func isDisabled(_ item: RecordingRowActions.RowMenuItem) -> Bool {
         switch item {
         case let .item(item): item == .regenerate(enabled: false)
-        case let .keep(_, enabled), let .moveAudioToTrash(enabled), let .moveMeetingToTrash(enabled): !enabled
+        case let .transcribeAgain(enabled), let .keep(_, enabled), let .moveAudioToTrash(enabled), let .moveMeetingToTrash(enabled): !enabled
         }
     }
 

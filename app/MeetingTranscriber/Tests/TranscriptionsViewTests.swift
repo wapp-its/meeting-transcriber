@@ -28,6 +28,7 @@ final class TranscriptionsViewTests: XCTestCase {
         regenerateSheet: RegenerateSheetState = RegenerateSheetState(),
         regenerationPhase: ProtocolRegenerator.Phase = .idle,
         selection: TranscriptionsSelection = TranscriptionsSelection(),
+        transcribeAgain: TranscribeAgainSheetState = TranscribeAgainSheetState(),
     ) -> TranscriptionsView {
         let box = queryBox ?? QueryBox()
         box.text = query
@@ -38,6 +39,7 @@ final class TranscriptionsViewTests: XCTestCase {
             regenerateSheet: regenerateSheet,
             regenerationPhase: regenerationPhase,
             selection: selection,
+            transcribeAgain: transcribeAgain,
         )
     }
 

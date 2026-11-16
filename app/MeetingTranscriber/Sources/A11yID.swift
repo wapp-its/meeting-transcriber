@@ -167,6 +167,10 @@ enum A11yID {
         "recordingMenuRegenerate.\(index)"
     }
 
+    static func recordingMenuTranscribeAgain(_ index: Int) -> String {
+        "recordingMenuTranscribeAgain.\(index)"
+    }
+
     static func recordingMenuRetry(_ index: Int) -> String {
         "recordingMenuRetry.\(index)"
     }
@@ -342,6 +346,11 @@ enum A11yID {
     static let regenerateGenerateButton = "regenerateGenerateButton"
     static let regenerateSaveAsReportOption = "regenerateSaveAsReportOption"
     static let regenerateSaveAsReplaceOption = "regenerateSaveAsReplaceOption"
+
+    /// The Transcribe Again sheet's buttons (All Recordings window). The sheet shows
+    /// the meeting's title and stays off every RPC allowlist.
+    static let transcribeAgainCancelButton = "transcribeAgainCancelButton"
+    static let transcribeAgainConfirmButton = "transcribeAgainConfirmButton"
 
     static let notifyOnMeetingNotesFailureToggle = "notifyOnMeetingNotesFailureToggle"
     static let includeFullTranscriptToggle = "includeFullTranscriptToggle"

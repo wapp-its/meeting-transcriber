@@ -36,6 +36,15 @@ extension PipelineController {
         queue.retryJob(id: id)
     }
 
+    /// "Transcribe Again" from a row's sheet. The pipeline is started first, as a
+    /// finished job of the meeting still only in the unread snapshot is one the
+    /// re-run has to take over rather than run beside.
+    @discardableResult
+    func rerunJob(id: UUID, mode: RerunMode) -> RerunAdmission {
+        ensureQueue()
+        return queue.rerunJob(id: id, mode: mode)
+    }
+
     /// Take a failed job off the list for good: out of the queue, its audio
     /// marked processed so orphan recovery does not bring it back, and out of
     /// the history. Deletes no file. Anything that is not a failed job is left
