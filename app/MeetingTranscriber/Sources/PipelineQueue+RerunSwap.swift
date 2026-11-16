@@ -21,7 +21,8 @@ extension RerunFailure {
 /// each only while it is still the file the record names and with a move that never
 /// replaces a file. One record update is the commit point. After it the finished-job
 /// entry is written, and once that write landed the job is the meeting's ordinary
-/// finished job again and its Notion export starts. A failed step before the commit
+/// finished job again; once the queue's snapshot holding it has landed it leaves the
+/// re-run file, and then its Notion export starts. A failed step before the commit
 /// ends the re-run as R6, whose end moves back every rename made
 /// (`closeRerun`); a quit between two steps reads as a row of the launch table
 /// (`resumeRerunSwaps`).
@@ -163,8 +164,10 @@ extension PipelineQueue {
     /// the current names the record lists, the earlier segments file goes, the
     /// raw-transcript setting is applied as a new meeting's `.done` applies it, and
     /// the finished-job entry is written.
-    /// Only once that write landed does the job turn into an ordinary finished job,
-    /// leave the re-run file and start its Notion export; until then it stays there.
+    /// Only once that write landed does the job turn into an ordinary finished job;
+    /// until then it stays in the re-run file. It leaves that file, and its Notion
+    /// export starts, only once the queue's snapshot holding it has landed
+    /// (`handOverCommittedRerun`).
     func finishCommittedRerun(id: UUID) {
         guard let index = jobs.firstIndex(where: { $0.id == id }), let rerun = jobs[index].rerun,
               let record = meetingFileStore?.record(for: id) else { return }
@@ -185,21 +188,14 @@ extension PipelineQueue {
         } else if madeNotes {
             logger.warning("[\(shortID, privacy: .public)] rerun_raw_transcript_kept: a current file was replaced")
         }
-        // Queued before a quit, with nothing running it: started once below, after
-        // the entry landed, so a failed write keeps it owed.
-        let interrupted = jobs[index].notionExportStatus == .inProgress
-            && pendingNotionExports[id] == nil && notionExportTasks[id] == nil
         guard terminalJobStore?.record(TerminalJobRecord(job: jobs[index])) ?? true else {
             logger.error("[\(shortID, privacy: .public)] rerun_entry_not_saved: the re-run stays in its file")
             saveSnapshot()
             return
         }
-        if interrupted {
-            jobs[index].finishNotionExport(succeeded: false)
-            Self.noteNotionExportFailure(
-                on: &jobs[index], reason: Self.notionExportInterruptedReason, backupSaved: jobs[index].protocolPath != nil,
-            )
-        }
+        // The re-run file keeps the job as it is now, export state included, until
+        // the hand-off below lets it go.
+        rerunJobsAwaitingRecord[id] = jobs[index]
         jobs[index].endRerunCommitted()
         jobs[index].exportsToPageDatabase = true
         if !madeNotes, case let .job(held) = rerun.heldEntry, held.notesFailure != nil {
@@ -207,17 +203,67 @@ extension PipelineQueue {
             jobs[index].notesFailure = held.notesFailure
             jobs[index].notesSpeakerNames = held.notesSpeakerNames
         }
-        saveSnapshot()
         logger.info("[\(shortID, privacy: .public)] rerun_committed")
-        if interrupted, jobs[index].protocolPath != nil, notionExportResolution(forJobID: id).configuration != nil {
-            Task { [weak self] in await self?.exportSavedNotes(id: id) }
-        } else {
-            startPendingNotionExport(jobID: id)
-        }
+        handOverCommittedRerun(id: id, runID: rerun.marker.runID)
         scheduleCompletedJobRemoval(id: id)
         if recordingRetention != nil {
             Task { [weak self] in await self?.sweepRetainedRecordings() }
         }
+    }
+
+    /// The committed job moves from the re-run file into the queue's snapshot, two
+    /// files with writers of their own: the re-run file keeps it
+    /// (`rerunJobsAwaitingRecord`) until the snapshot holding it as an ordinary
+    /// finished job has landed, so a quit at any moment leaves the job, and the
+    /// export it owes, in one of the two. Then it leaves the re-run file, and only
+    /// once that has landed too does its export start, so a launch that finds it
+    /// there knows the export never started and starts it once (`resumeRerunSwaps`;
+    /// the re-run file's job wins over the snapshot's). A write that fails again on
+    /// the flush's retry, as at the swap's start, leaves the job in the re-run file
+    /// and the export to the next launch.
+    private func handOverCommittedRerun(id: UUID, runID: UUID) {
+        saveSnapshot()
+        guard let name = rerunFilename else { return }
+        let logDir = logDir
+        Task { [weak self] in
+            await PipelineSnapshotStore.flush(logDir)
+            guard let self, !isRetired, let committed = rerunJobsAwaitingRecord[id], committed.rerun?.marker.runID == runID else { return }
+            // A flush leaves a store only for a write that failed again on its retry.
+            guard PipelineSnapshotStore.existing(for: logDir) == nil else {
+                logger.error("[\(PipelineJob.shortID(for: id), privacy: .public)] rerun_handover_not_saved: the re-run stays in its file")
+                return
+            }
+            rerunJobsAwaitingRecord[id] = nil
+            saveRerunFile()
+            await PipelineSnapshotStore.flush(logDir)
+            guard !isRetired else { return }
+            guard PipelineSnapshotStore.existing(for: logDir, named: name) == nil else {
+                // Still in the file on disk: it stays there, and the export with it.
+                rerunJobsAwaitingRecord[id] = committed
+                saveRerunFile()
+                logger.error("[\(PipelineJob.shortID(for: id), privacy: .public)] rerun_handover_not_removed: the re-run stays in its file")
+                return
+            }
+            startCommittedExport(id: id)
+        }
+    }
+
+    /// The committed job's Notion export, once its hand-off landed: the one queued
+    /// with its notes, or, for one queued before a quit with nothing running it,
+    /// one export from the saved notes, as a retry runs it.
+    private func startCommittedExport(id: UUID) {
+        guard let index = jobs.firstIndex(where: { $0.id == id }) else { return }
+        guard jobs[index].notionExportStatus == .inProgress, pendingNotionExports[id] == nil, notionExportTasks[id] == nil else {
+            startPendingNotionExport(jobID: id)
+            return
+        }
+        jobs[index].finishNotionExport(succeeded: false)
+        Self.noteNotionExportFailure(
+            on: &jobs[index], reason: Self.notionExportInterruptedReason, backupSaved: jobs[index].protocolPath != nil,
+        )
+        saveSnapshot()
+        guard jobs[index].protocolPath != nil, notionExportResolution(forJobID: id).configuration != nil else { return }
+        Task { [weak self] in await self?.exportSavedNotes(id: id) }
     }
 
     /// The meeting's segments file from before the re-run goes once the swap

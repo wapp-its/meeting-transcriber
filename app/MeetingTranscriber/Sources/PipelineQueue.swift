@@ -93,9 +93,10 @@ class PipelineQueue {
     /// admitted, so the record and the finished entry stay as they were. Internal
     /// because PipelineQueue+RerunEnd.swift writes it and the window reads it.
     var rerunWarnings: [UUID: RerunWarning] = [:]
-    /// Re-run jobs that left the queue while their record's last update failed.
-    /// They stay in the re-run file, so the next launch acts on what the record
-    /// says (PipelineQueue+RerunEnd.swift).
+    /// Re-run jobs that left the queue while their record's last update failed, and
+    /// committed ones until the queue's snapshot holding them as ordinary finished
+    /// jobs has landed. They stay in the re-run file, so the next launch acts on what
+    /// the record says (PipelineQueue+RerunEnd.swift, PipelineQueue+RerunSwap.swift).
     @ObservationIgnored var rerunJobsAwaitingRecord: [UUID: PipelineJob] = [:]
     /// Whether this build's re-run file may still hold jobs, so the next save
     /// writes it even with no re-run left (PipelineQueue+RerunRecovery.swift).

@@ -62,7 +62,12 @@ final class PipelineQueueRerunSwapTests: XCTestCase {
         XCTAssertEqual(queue.job(withID: meeting.id)?.state, .done, "test premise: the re-run succeeded")
         try beforeSwap(marker)
         queue.isRegenerationRunning = { false }
-        try await fixture.poll("the swap to end") { queue.job(withID: meeting.id)?.rerun == nil }
+        // The swap, then the job's hand-off from the re-run file to the queue's
+        // snapshot, after which its export starts.
+        try await fixture.poll("the swap to end") {
+            queue.job(withID: meeting.id)?.rerun == nil && queue.rerunJobsAwaitingRecord[meeting.id] == nil
+                && queue.pendingNotionExports[meeting.id] == nil
+        }
         return marker
     }
 
