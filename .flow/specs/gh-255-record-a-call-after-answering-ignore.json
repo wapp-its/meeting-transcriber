@@ -11,9 +11,62 @@
   "impl_review_rounds": {},
   "next_task": 1,
   "no_plan": true,
-  "plan_review_rounds": 0,
-  "plan_review_status": "unknown",
-  "plan_reviewed_at": null,
+  "plan_review_rounds": 1,
+  "plan_review_status": "needs_work",
+  "plan_reviewed_at": "2026-11-16T08:58:55.403479Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "425b8249c018bdddbee9fbe304a6c154f6c7fb3ca1fa4e4592b9ed6d1189258a",
+      "backend": "codex",
+      "base_sha": "3b236a800c34709e7ea146b82d79e62337281e2e",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-03246f619efb9d95c9ad8540754d8074",
+            "classification": "introduced",
+            "findingId": "finding-03246f619efb9d95c9ad8540754d8074",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "7e60aa0f504ead9442be57ab17bd0c6c2ec041c4",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 413085,
+      "output_sha256": "a1542c3860a326cda6afc422df3abcfec86ecf9564c11d10b7211b07501687a7",
+      "reservation_id": "9c152c62f3ab48e5bed74b8138da571d",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-16T08:58:55.365939Z",
+      "tool_calls": 27,
+      "verdict": "NEEDS_WORK"
+    }
+  ],
+  "review_hash_epoch": {},
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
   "spec_path": ".flow/specs/gh-255-record-a-call-after-answering-ignore.md",
   "status": "open",
   "title": "Record a call after answering Ignore",
@@ -29,5 +82,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nWhen the app asks \"Record <App> meeting?\" and I answer \"Ignore\", I sometimes change my mind while the call still goes on. Then there is no easy way to record the rest of that call. The app does not ask again for ten minutes.\n\nThe only obvious way is \"Record with Options\u2026\" and picking the meeting app again. That is a manual recording, so it does not stop when the call ends. It only stops when the app quits, on the silence question or at the maximum length.\n\n## NOTES\n\n- Idea: after \"Ignore\", while that call still runs, show \"Record (<App>)\" in the menu at the same place as \"Record Again (<App>)\" from #130. One click records the rest of the call like a detected meeting, so the recording ends with the call.\n- \"Ignore\" in the notification, in the menu and in the prompt window (#99) should all work the same.\n- Not after \"Never for this app\".\n\n## TASKS\n\n- [ ] Add a one-click item that records an ignored call that still runs\n- [ ] Test that this recording ends with the call",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/255"
   },
-  "updated_at": "2026-11-16T08:45:15.842090Z"
+  "updated_at": "2026-11-16T08:59:26.501278Z"
 }
