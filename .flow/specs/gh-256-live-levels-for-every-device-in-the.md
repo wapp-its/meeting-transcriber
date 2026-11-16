@@ -72,6 +72,10 @@ This replaces gh-150's rule that the window never opens a device (its R5 and D3)
 - **R12:** The window's layout, level column, footers and hint lines read as the accepted boards (D6 to D8) and, for what the boards do not draw, A12 and A13: outside a call a bar on every listed row and no Meeting audio group; during a recording bars only on the recorded microphone's row and the Meeting audio row and "Paused for call" on every other row; the footer outside a call says that levels pause during calls and that macOS shows the microphone as in use while levels show. No error surface beyond R1 and R2's texts. [inferred]
 - **R13:** `docs/architecture/recording.md` states the capture gate and the meters' place in the start order, `docs/architecture/detection.md` states that detection never claims this app's own process, and `docs/architecture-macos.md` describes the meters, their lane and their budget. No error surface. [inferred]
 
+## Early proof point
+
+Task gh-256-live-levels-for-every-device-in-the.1 validates the core approach (an input meter by an IOProc on the device and an output meter by a device-stream tap read through a private aggregate both deliver a live level on the build Mac and tear down without leaving a tap or aggregate behind; it also answers parked unknowns 1 and 4). If it fails, re-evaluate A1 and A2 (their listed alternatives, and the single-aggregate fallback in Architecture) before continuing with .4 and later; .2 and .3 do not depend on it.
+
 ## Validation
 
 In this order; each step passes before the next one is built on it.
@@ -127,24 +131,39 @@ In this order; each step passes before the next one is built on it.
 - **D8 · The footer reads "Speak or play a sound to see which device moves. While levels show, macOS shows the microphone as in use. Levels pause during calls. To switch a device, use Microphone or Output in the menu bar." outside a call and "Levels pause during calls and recordings. Bars show only what this recording captures. To switch a device, use Microphone or Output in the menu bar." during a recording.** why: the accepted boards (the owner's acceptance of 2026-11-16, paraphrased); replaces gh-150's D10 footers · status: active [owner-stated 2026-11-16]
 - **D9 · The live bars run only while the window is visible on screen, not while it is minimised or hidden behind other windows.** why: the owner's answer to A15 on 2026-11-16 (paraphrased) · status: active [owner-stated 2026-11-16]
 - **A16 · "Visible" for D9 means the window's occlusion state includes visible (some part of it on screen, on the current Space, not minimised); meters close within one second of it ceasing to be visible and reopen within one second when it shows again, with no grace period.** flip at: the meters' visibility handling · test: Validation step 2's visibility tests · alternatives: B a five-second grace before closing, against reopening a headset's microphone each time the window is briefly covered · status: active [agent-assumed 2026-11-16]
+- **A17 · Until the meters' first call read has answered, and while a call read is overdue, the call signal counts as on.** flip at: the call-signal read · test: Validation step 2's pause-source tests · alternatives: B count an unanswered read as no call · status: active [agent-assumed 2026-11-16]
 
 FIT: GO · 2026-11-16 · base 3b236a80 · engine flow-next 9.10.0 · origin/wapp/main has not moved since capture; gh-255 (planned, unmerged) adds no start path and leaves `signallingMeetings()` as is; anchors confirmed in the code
   - plan-only: the capture gate's two call sites in `WatchLoop` named, and `WatchLoop.swift` at its 600-line lint warning
 
 Mockup gate: accepted by the owner on 2026-11-16. The boards are on a private design canvas, so this spec writes out their layout and wording (D6 to D8); the device names in them (MacBook Pro Microphone, USB Headset, Studio Display Microphone, MacBook Pro Speakers, Studio Display Speakers), the app name (Teams), the hint line "Teams uses USB Headset", the marks shown on each row and the levels drawn are examples.
 
+## Quick commands
+
+Not run at plan time. `DeviceLevelMeter`, `DeviceLevelMeters` and `CaptureGateStart` match test classes the tasks add; the rest exist today. Send the output to a file and read it there; never pipe a test run into `tail` or `grep`.
+
+```bash
+cd tools/audiotap && swift build --build-tests -j 2 && swift test -j 2 --filter 'DeviceLevelMeter|AggregateDescription|CurrentLevel'
+```
+
+```bash
+cd app/MeetingTranscriber && mkdir -p .build/test-home && swift build --build-tests -j 2 && CFFIXED_USER_HOME="$PWD/.build/test-home" swift test -j 2 --filter 'AudioDevices|AppStateAudioDevices|DeviceLevelMeters|CaptureGateStart|MicInputDetector|OutputDeviceController|MicrophoneController|QuitStartRefusal|WatchLoopCancellation'
+```
+
 ## Requirement coverage
 
-- R1: fn-N.M (TBD - populate via /flow-next:plan)
-- R2: fn-N.M (TBD - populate via /flow-next:plan)
-- R3: fn-N.M (TBD - populate via /flow-next:plan)
-- R4: fn-N.M (TBD - populate via /flow-next:plan)
-- R5: fn-N.M (TBD - populate via /flow-next:plan)
-- R6: fn-N.M (TBD - populate via /flow-next:plan)
-- R7: fn-N.M (TBD - populate via /flow-next:plan)
-- R8: fn-N.M (TBD - populate via /flow-next:plan)
-- R9: fn-N.M (TBD - populate via /flow-next:plan)
-- R10: fn-N.M (TBD - populate via /flow-next:plan)
-- R11: fn-N.M (TBD - populate via /flow-next:plan)
-- R12: fn-N.M (TBD - populate via /flow-next:plan)
-- R13: fn-N.M (TBD - populate via /flow-next:plan)
+| Req | Description | Task(s) | Gap justification |
+| --- | --- | --- | --- |
+| R1 | While the window is visible and the pause signal is off, every microphone row and every output row shows a live 12-segment bar (gh-150's A9 mapping) from its own meter, updated at least ten times a second; a microphone bar follows what that microphone hears and an output bar what apps other than this one play to that output. Errors: a device that cannot be opened → "Can't read", no bar, tried again only at the next device-list change or the next time the window becomes visible; microphone permission denied → "No permission" and no input opened; an overdue open → "Unknown"; a configured microphone that is not connected → no bar; a device that goes quiet → no lit segment within one second. | gh-256-live-levels-for-every-device-in-the.1, gh-256-live-levels-for-every-device-in-the.4, gh-256-live-levels-for-every-device-in-the.6 | — |
+| R2 | While the pause signal is on (a recording from its registration until its recorder has stopped, paused included, or a watched app's call signal as `signallingMeetings()` reports it, watching on or off), no meter is open: every meter open when the signal turns on is closed within one second, and none opens until the signal has been off for ten seconds. The recorded microphone's row and the Meeting audio row keep gh-150's recorded bars; every other row shows "Paused for call", or "Paused for recording" during a recording with no app tapped and no call signal. Errors: a close past its deadline → its rows show "Unknown", the window stays responsive and R3 still bounds the recording start; a deny-listed app's call is not a call signal (A4). | gh-256-live-levels-for-every-device-in-the.5, gh-256-live-levels-for-every-device-in-the.6 | — |
+| R3 | Every recording start path (a detected meeting, an approved consent answer, Record Again, Record App, a microphone-only recording, `/v1/record`) waits, right before its recorder opens any device, until no meter is open and no meter open or close is outstanding, and never longer than the bound in A6; with none open or outstanding it does not wait at all. An open that was queued or setting up when the gate began starts no device. Errors: the bound passes with a meter still open or a call still out → the recording starts anyway and one log line says so; a quit, Stop Watching or a stop that arrives during the wait → no recording starts, as when it arrives while the recorder is built. | gh-256-live-levels-for-every-device-in-the.5 | — |
+| R4 | Closing the window or the window ceasing to be visible (D9, A16) closes every meter within one second, and nothing stays open afterwards; becoming visible again reopens them within one second unless paused. Errors: a close past its deadline → torn down when it returns, and `meters.overdue` counts it until then; a reopen while an old close is still out waits for it. | gh-256-live-levels-for-every-device-in-the.5, gh-256-live-levels-for-every-device-in-the.6 | — |
+| R5 | No detector reports a meeting or a call signal because of this app's own audio: `MicInputDetector` never claims this app's process, also when an added watched app's bundle ID equals or prefixes this app's, so the meters can never pause themselves. No error surface beyond that. | gh-256-live-levels-for-every-device-in-the.3 | — |
+| R6 | On a device a meter holds, "In use" shows only while a process other than this app runs audio on it (an aggregate such a process uses counts for its active sub-devices); this app's meters never light it. A device no meter holds keeps gh-150's R3 rule. Errors: a failed or late process read → "Status unknown", as in gh-150. | gh-256-live-levels-for-every-device-in-the.2 | — |
+| R7 | Creating or destroying a meter's taps and aggregates changes neither device list, adds no row, and starts no meter rebuild; the meters rebuild only when the filtered microphone or output list changes. No error surface beyond R9. | gh-256-live-levels-for-every-device-in-the.3, gh-256-live-levels-for-every-device-in-the.4 | — |
+| R8 | Every meter open and close runs off the main thread on one lane, one call at a time, each with a two-second deadline; no call queues behind an overdue one; `/state` and the window never wait on the lane. The device-list refresh that a meter's aggregate change starts reads off the main thread with a two-second deadline, and notices during a read fold into one follow-up read, so a stalled read blocks neither the window, nor `/state`, nor the gate's deadline. No error surface beyond R1's "Unknown" and R4's overdue count. | gh-256-live-levels-for-every-device-in-the.3, gh-256-live-levels-for-every-device-in-the.4 | — |
+| R9 | Hot-plug while the window is open: a device added gets its row and, unless paused, its meter within one second; a device removed loses its row and its meter is closed; a default change reopens no other meter. Errors: a device removed while its open is out → closed when the open returns. | gh-256-live-levels-for-every-device-in-the.4 | — |
+| R10 | The performance budget in A9 holds, measured live in the dev app as Validation step 6 says, and the numbers measured are recorded in `docs/architecture-macos.md`. Errors: a budget missed → the build stops and reports the numbers rather than shipping. | gh-256-live-levels-for-every-device-in-the.7 | — |
+| R11 | `/state.audioDevicesWindow` carries `visible`, `meters` and each row's `level` as in API Contracts, built with no Core Audio call. Errors: window closed → `open: false`, `visible: false`, `meters.state: "off"`, `rows: []`. | gh-256-live-levels-for-every-device-in-the.2, gh-256-live-levels-for-every-device-in-the.6 | — |
+| R12 | The window's layout, level column, footers and hint lines read as the accepted boards (D6 to D8) and, for what the boards do not draw, A12 and A13: outside a call a bar on every listed row and no Meeting audio group; during a recording bars only on the recorded microphone's row and the Meeting audio row and "Paused for call" on every other row; the footer outside a call says that levels pause during calls and that macOS shows the microphone as in use while levels show. No error surface beyond R1 and R2's texts. | gh-256-live-levels-for-every-device-in-the.2, gh-256-live-levels-for-every-device-in-the.6 | — |
+| R13 | `docs/architecture/recording.md` states the capture gate and the meters' place in the start order, `docs/architecture/detection.md` states that detection never claims this app's own process, and `docs/architecture-macos.md` describes the meters, their lane and their budget. No error surface. | gh-256-live-levels-for-every-device-in-the.3, gh-256-live-levels-for-every-device-in-the.5, gh-256-live-levels-for-every-device-in-the.6, gh-256-live-levels-for-every-device-in-the.7 | — |
