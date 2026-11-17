@@ -114,3 +114,10 @@ FIT: GO · 2026-11-16 · base 3b236a80 · engine flow-next 9.10.0 · no other sp
   - the re-run's success step `finishCommittedRerun` also runs after a relaunch and holds no notes text, so it reads the new notes file once, off the main actor
   - `ProtocolRegenerator`'s `regenerated` hook carries only the job and template, so it gains the saved text
   - the call passes `ProtocolInstructions(template:background:)`, which `buildSystemPrompt` wraps with nothing when there is no time, background or speaker note
+
+FIT: GO · 2026-11-17 · base 3256bb5b · engine flow-next 9.12.0 · wapp/main moved by gh-171 (merged), gh-255, an upstream sync and a CI-only change; every gh-171 anchor the spec names holds as merged
+  - re-run hand-off as merged: `finishCommittedRerun` runs live and from `resumeRerunSwaps` at launch, and `handOverCommittedRerun` starts the committed Notion export (`startCommittedExport`) only once the snapshot and the re-run file have landed, the point the summary step waits for (`PipelineQueue+RerunSwap.swift`)
+  - notes save path as merged: the one `saveGeneratedNotes` call in `PipelineQueue+Stages.swift` sits behind the `isRerun` checks; Retry Meeting Notes and Generate Meeting Notes from Transcript reach it through `generateProtocol` (`PipelineQueue+MeetingNotes.swift`)
+  - `ProtocolRegenerator`'s `regenerated` hook still carries only the job id and template and fires only when the main notes were replaced; gh-171 changed only its version stamp there
+  - row actions as merged: `RecordingRowActions` keeps `showInFinder` and adds Transcribe Again and Identify Speakers Again; `RegenerateSheetState`, `TranscriptionEntry` and `TranscriptionList.matching` (title and participants today) are where the spec places them
+  - gh-255 changes the menu bar and the watch loop only; the upstream sync and the CI change touch no file the spec names; no spec on any branch claims summaries, the row line or the menu item; the engine change (9.10.0 to 9.12.0) adds `--from-issue` and a post-merge fence, nothing the spec relies on
