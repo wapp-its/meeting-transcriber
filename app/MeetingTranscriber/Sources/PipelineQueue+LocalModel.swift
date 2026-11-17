@@ -14,6 +14,8 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Pipelin
 /// unchanged: none of them throws the deferred outcome.
 extension PipelineQueue {
     /// Runs `generator` as `jobID`'s generation and returns the protocol text.
+    /// The gate knows it as `gateJobID`: a re-run's own run id, the job's id for
+    /// every other job. The notices keep naming the job.
     ///
     /// A local generation a recording ended (`LocalModelOutcome.deferredForRecording`)
     /// is asked again at once, with the same generator, so the selection captured
@@ -28,14 +30,14 @@ extension PipelineQueue {
     /// Each deferral is reported (`onLocalModelEvent`); the notices decide which
     /// of them the person hears about.
     func generateWaitingOutRecordings(
-        _ generator: sending any ProtocolGenerating, jobID: UUID,
+        _ generator: sending any ProtocolGenerating, jobID: UUID, gateJobID: UUID,
         request: (transcript: String, title: String, meetingStartTime: Date?, instructions: ProtocolInstructions),
     ) async throws -> String {
         let diarized = ProtocolGenerator.looksDiarized(request.transcript)
         #if !APPSTORE
             if let local = generator as? LocalModelProtocolGenerator {
                 localModelGate = local.gate
-                return try await LocalModelGate.$jobID.withValue(jobID) {
+                return try await LocalModelGate.$jobID.withValue(gateJobID) {
                     var deferrals = 0
                     while true {
                         do {

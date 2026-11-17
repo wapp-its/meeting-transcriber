@@ -8,27 +8,6 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Speaker
 /// happens after the pipeline already reached `.speakerNamingPending`. Split
 /// out of `SpeakerNamingSession.swift` to keep both files under the lint cap.
 extension SpeakerNamingSession {
-    // MARK: - Late work tracking
-
-    /// Run `work` on a task of its own, tracked under `jobID` until it returns
-    /// so `cancelLateWork` can reach it.
-    func startLateWork(jobID: UUID, _ work: @escaping () async -> Void) {
-        let token = UUID()
-        lateWork[jobID, default: [:]][token] = Task {
-            await work()
-            lateWork[jobID]?[token] = nil
-            if lateWork[jobID]?.isEmpty == true { lateWork[jobID] = nil }
-        }
-    }
-
-    /// Cancel every late-naming task still running for `jobID`. Called when
-    /// the job is removed or cancelled. The tasks still re-check the job after
-    /// each await, because a step that ignores cancellation returns all the
-    /// same.
-    func cancelLateWork(jobID: UUID) {
-        lateWork.removeValue(forKey: jobID)?.values.forEach { $0.cancel() }
-    }
-
     // MARK: - Protocol for accepted auto-names
 
     /// Matched by /v1 clients and persisted jobs; keep the text stable.
@@ -152,7 +131,7 @@ extension SpeakerNamingSession {
               let saved = try? String(contentsOf: transcriptPath, encoding: .utf8)
         else {
             delegate.addWarning(id: jobID, Self.missingTranscriptWarning)
-            removeNamingData(jobID: jobID, slug: slug)
+            removeResolvedNamingData(jobID: jobID, slug: slug)
             delegate.updateJobState(id: jobID, to: .done)
             return
         }
@@ -175,7 +154,7 @@ extension SpeakerNamingSession {
             // synchronous and therefore says nothing about the transcript.
             // Idempotent, and the unconditional call at the end still covers
             // the paths that never reach this line.
-            removeNamingData(jobID: jobID, slug: slug)
+            removeResolvedNamingData(jobID: jobID, slug: slug)
 
             try await delegate.generateProtocol(
                 jobID: jobID,
@@ -197,7 +176,7 @@ extension SpeakerNamingSession {
             delegate.addWarning(id: jobID, "Protocol not generated: rewriting the transcript with the speaker names failed")
         }
 
-        removeNamingData(jobID: jobID, slug: slug)
+        removeResolvedNamingData(jobID: jobID, slug: slug)
         delegate.updateJobState(id: jobID, to: .done)
     }
 
@@ -479,7 +458,7 @@ extension SpeakerNamingSession {
             // queue alive; the guard is defensive for any future non-flow
             // caller → `notAvailable` rolls back to `.speakerNamingPending`.
             guard let delegate else { throw DiarizationError.notAvailable }
-            return try await delegate.runDualTrackDiarization(
+            let run = try await delegate.runDualTrackDiarization(
                 diarizeProcess: diarizer,
                 tracks: (
                     app: recordingsDir.appendingPathComponent("\(slug)_app_16k.wav"),
@@ -489,6 +468,9 @@ extension SpeakerNamingSession {
                 ),
                 speakerCount: speakerCount, title: title, jobID: jobID,
             )
+            // Inside a re-run a failed track fails this Re-run as a whole (A25).
+            guard run.failedTrack == nil || delegate.job(withID: jobID)?.rerun == nil else { throw DiarizationError.notAvailable }
+            return run
         }
         let mix16k = recordingsDir.appendingPathComponent("\(slug)_16k.wav")
         let diarization = try await diarizer.run(

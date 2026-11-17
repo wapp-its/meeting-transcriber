@@ -188,6 +188,22 @@ final class SpeakerNamingStoreTests: XCTestCase {
         }
     }
 
+    /// A finished meeting that keeps its word timings loses its audio sidecars only.
+    func test_cleanupSidecarFiles_keepingSegments_leavesOnlyTheSegmentsFile() throws {
+        let store = SpeakerNamingStore(outputDir: tmpDir)
+        let recordingsDir = tmpDir.appendingPathComponent("recordings")
+        try FileManager.default.createDirectory(at: recordingsDir, withIntermediateDirectories: true)
+        let slug = "kept_timings"
+        for suffix in SpeakerNamingStore.sidecarSuffixes {
+            try Data([0]).write(to: recordingsDir.appendingPathComponent("\(slug)\(suffix)"))
+        }
+
+        store.cleanupSidecarFiles(slug: slug, keepingSegments: true)
+
+        let left = try FileManager.default.contentsOfDirectory(atPath: recordingsDir.path)
+        XCTAssertEqual(left, ["\(slug)\(SpeakerNamingStore.segmentsSuffix)"])
+    }
+
     func test_cleanupSidecarFiles_nilSlug_isNoOp() {
         let store = SpeakerNamingStore(outputDir: tmpDir)
         // Must not throw or crash.

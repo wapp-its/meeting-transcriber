@@ -122,8 +122,9 @@ extension PipelineQueue {
             micDelay: job.micDelay,
             participants: job.participants,
             // Anchor the basename on the meeting start; reimport/orphan jobs
-            // have no recorded start, so fall back to the enqueue time.
-            slug: namingSlug(title: job.meetingTitle, jobID: job.id, startTime: job.artifactStartTime),
+            // have no recorded start, so fall back to the enqueue time. A
+            // re-run's carries its stamp as well.
+            slug: runStem(for: job),
         )
     }
 
@@ -247,7 +248,7 @@ extension PipelineQueue {
         }
         if await resumeProtocolOnly(job) { return true }
 
-        guard let engine, let outputDir else {
+        guard let engine = stageEngine(for: job), let outputDir else {
             logger.warning("Processing dependencies not configured — skipping")
             return false
         }
@@ -267,7 +268,10 @@ extension PipelineQueue {
             defer { try? FileManager.default.removeItem(at: workDir) }
 
             let transcription = try await stage(ctx.jobID) {
-                try await transcribe(ctx, engine: engine, workDir: workDir)
+                if let kept = keptWordTimings(for: job) {
+                    return try await reuseWordTimings(kept, ctx: ctx, engine: engine, workDir: workDir)
+                }
+                return try await transcribe(ctx, engine: engine, workDir: workDir)
             }
 
             // The transcript WITHOUT its recording-level note, its pause
@@ -644,7 +648,8 @@ extension PipelineQueue {
             // Optional VAD preprocessing: trim silence before transcription
             var vadMap: VadSegmentMap?
             let transcriptionPath: URL
-            if vadConfig != nil, let vadResult = try await preprocessWithVAD(audioPath: mix16k, workDir: workDir) {
+            if let threshold = vadThreshold(ctx.jobID),
+               let vadResult = try await preprocessWithVAD(audioPath: mix16k, workDir: workDir, threshold: threshold) {
                 transcriptionPath = vadResult.trimmedPath
                 vadMap = vadResult.map
             } else {
@@ -688,6 +693,55 @@ extension PipelineQueue {
         )
     }
 
+    /// Stage 1 of Identify Speakers Again for a meeting with its word timings kept
+    /// (R10): the 16 kHz copies the diarization reads, the track verdict and the
+    /// echo measure as `transcribe` takes them (the naming reads the measure to keep
+    /// the far end's voice out of the voice profiles), and the kept segments in
+    /// place of a transcription, so every word stays as it is. Nothing is
+    /// transcribed, so the job waits until the diarization starts.
+    private func reuseWordTimings(
+        _ kept: [TimestampedSegment], ctx: JobContext, engine: any TranscribingEngine, workDir: URL,
+    ) async throws -> TranscriptionOutput {
+        logger.info("[\(ctx.shortID, privacy: .public)] word_timings_reused segments=\(kept.count, privacy: .public)")
+        var segments = kept
+        let isDualSource = ctx.appPath != nil && ctx.micPath != nil
+        if let appAudioPath = ctx.appPath, let micAudioPath = ctx.micPath {
+            let app16k = workDir.appendingPathComponent("app_16k.wav")
+            let mic16k = workDir.appendingPathComponent("mic_16k.wav")
+            async let appResample: Void = resample(appAudioPath, to: app16k, track: "app", ctx: ctx)
+            async let micResample: Void = resample(micAudioPath, to: mic16k, track: "mic", ctx: ctx)
+            await appResample
+            await micResample
+            let appFrames = AudioMixer.frameCount(of: app16k)
+            let micFrames = AudioMixer.frameCount(of: mic16k)
+            recordAudioDuration(jobID: ctx.jobID, frames: max(appFrames, micFrames))
+            if resolveTrackViability(ctx, engine: engine, appFrames: appFrames, micFrames: micFrames) == .both {
+                _ = await measureEchoBleed(jobID: ctx.jobID, appURL: app16k, micURL: mic16k, micDelay: ctx.micDelay)
+            }
+            segments = retaggedForThisQueue(kept)
+        } else {
+            guard let mixPath = ctx.mixPath else { throw PipelineError.missingMixPath }
+            let mix16k = workDir.appendingPathComponent("mix_16k.wav")
+            try await AudioMixer.resampleFile(from: mixPath, to: mix16k)
+            try moveOntoTheMeetingsTimeline(mix16k, of: mixPath, jobID: ctx.jobID, micDelay: ctx.micDelay)
+            recordAudioDuration(jobID: ctx.jobID, frames: AudioMixer.frameCount(of: mix16k))
+        }
+        segments = inTheTranscriptsOrder(segments, jobID: ctx.jobID)
+        if isStillQueued(ctx.jobID) { jobAudioSeconds[ctx.jobID] = segments.last?.end ?? 0 }
+        let micMuted = job(withID: ctx.jobID)?.micMuteSpansOnTranscript ?? []
+        return TranscriptionOutput(
+            transcript: segments.transcriptText(
+                note: transcriptNote(ctx.jobID), pauses: transcriptPauses(ctx.jobID), micMuted: micMuted,
+            ),
+            note: transcriptNote(ctx.jobID),
+            pauses: transcriptPauses(ctx.jobID),
+            micMuted: micMuted,
+            cachedSegments: segments,
+            isDualSource: isDualSource,
+            terminologyNormalizer: TerminologyNormalizer(),
+        )
+    }
+
     /// Stage 2 — optional speaker diarization. Returns the labeled transcript
     /// with its structured speaker names, or the original transcript and no names
     /// when diarization is disabled, unavailable, or fails. Drives the speaker-naming
@@ -707,7 +761,7 @@ extension PipelineQueue {
     ) async throws(CancellationError) -> (transcript: String, speakerNames: [String]) {
         var output = (transcript: transcription.transcript, speakerNames: [String]())
 
-        guard diarizeEnabled, let diarizationFactory else { return output }
+        guard diarizes(ctx.jobID), let diarizationFactory else { return output }
         // An engine without per-utterance timestamps (one that emits a single
         // whole-recording segment) can't be diarized — assignSpeakers would
         // collapse the entire meeting onto one speaker. Skip it and tell the
@@ -721,8 +775,13 @@ extension PipelineQueue {
             )
             return output
         }
-        let diarizeProcess = diarizationFactory()
+        let diarizeProcess = stageDiarizer(ctx.jobID, queueFactory: diarizationFactory)
+        let identifies = identifiesSpeakersAgain(ctx.jobID)
         guard diarizeProcess.isAvailable else {
+            // A re-run swaps in no transcript without speakers (A25).
+            if isRerun(ctx.jobID) {
+                throw failRerun(ctx.jobID, identifies ? RerunFailure.diarizerNotAvailable : RerunFailure.speakersNotAvailable)
+            }
             logger.info("[\(ctx.shortID, privacy: .public)] diarization_skipped")
             return output
         }
@@ -736,11 +795,20 @@ extension PipelineQueue {
             // transcript that was already finished. Stage 3 tolerates a missing
             // mix, so there is nothing further downstream that needs it.
             let mix16k = try await ensureMixAudio(workDir: workDir, ctx: ctx)
-            let speakerCount = numSpeakers > 0 ? numSpeakers : nil
+            let expected = expectedSpeakers(ctx.jobID)
+            let speakerCount = expected > 0 ? expected : nil
             let run = try await runDiarization(
                 diarizeProcess: diarizeProcess, useDualTrack: transcription.isDualSource,
                 speakerCount: speakerCount, workDir: workDir, ctx: ctx,
             )
+            // A re-run whose offered track failed ends instead of falling back to the other (A25).
+            if isRerun(ctx.jobID), let track = run.failedTrack {
+                throw failRerun(ctx.jobID, track == .callAudio ? RerunFailure.callAudioSpeakersFailed : RerunFailure.microphoneSpeakersFailed)
+            }
+            // Identify Speakers Again exists to name the speakers it found.
+            if identifies, run.combined?.embeddings?.isEmpty ?? true {
+                throw failRerun(ctx.jobID, RerunFailure.foundNoVoices)
+            }
             // Match against the speaker DB and park the job for the (possibly
             // late) naming dialog. A speaker-count/mode re-run is no longer an
             // in-line loop here; it's driven after the job reaches
@@ -771,6 +839,7 @@ extension PipelineQueue {
             // stray `CancellationError` for a job still ours, costs the labels.
             guard isStillQueued(ctx.jobID) else { throw CancellationError() }
             logger.warning("[\(ctx.shortID, privacy: .public)] diarization_failed error=\(error.localizedDescription, privacy: .public)")
+            if isRerun(ctx.jobID) { throw failRerun(ctx.jobID, RerunFailure.speakersFailed) }
             addWarning(id: ctx.jobID, "Diarization failed — speakers not identified")
             // Continue with original transcript
         }
@@ -897,6 +966,7 @@ extension PipelineQueue {
         // track's segments with their raw tag instead of force-matching them; only
         // a both-track failure is a genuine diarization failure that propagates.
         let combined: DiarizationResult
+        var failedTrack: DiarizationRun.Track?
         switch (appDiarization, micDiarization) {
         case let (app?, mic?):
             combined = DiarizationProcess.mergeDualTrackDiarization(appDiarization: app, micDiarization: mic)
@@ -906,20 +976,23 @@ extension PipelineQueue {
             // audio was never offered, and the transcribe stage has already
             // said so once.
             if micError != nil {
+                failedTrack = .microphone
                 logger.warning(
                     "[\(sid, privacy: .public)] mic_diarization_failed error=\(micError?.localizedDescription ?? "unknown", privacy: .public) — falling back to app-only diarization",
                 )
-                addWarning(id: jobID, "Mic track diarization failed — speaker labels reflect remote audio only")
+                // A re-run fails instead of falling back (A25), so the line would not hold.
+                if !isRerun(jobID) { addWarning(id: jobID, "Mic track diarization failed — speaker labels reflect remote audio only") }
             }
             combined = app
 
         case let (nil, mic?):
             // Mirror of the arm above: silent when the track was never offered.
             if appError != nil {
+                failedTrack = .callAudio
                 logger.warning(
                     "[\(sid, privacy: .public)] app_diarization_failed error=\(appError?.localizedDescription ?? "unknown", privacy: .public) — falling back to mic-only diarization",
                 )
-                addWarning(id: jobID, "App track diarization failed — speaker labels reflect local mic only")
+                if !isRerun(jobID) { addWarning(id: jobID, "App track diarization failed — speaker labels reflect local mic only") }
             }
             combined = mic
 
@@ -929,7 +1002,7 @@ extension PipelineQueue {
             )
             throw appError ?? micError ?? DiarizationError.notAvailable
         }
-        return DiarizationRun(app: appDiarization, mic: micDiarization, combined: combined)
+        return DiarizationRun(app: appDiarization, mic: micDiarization, combined: combined, failedTrack: failedTrack)
     }
 
     /// Apply speaker names to the transcript for whichever topology the run
@@ -1000,7 +1073,7 @@ extension PipelineQueue {
             return nil
         }
         guard let topology else { return nil }
-        let labeled = DiarizationProcess.labelSegments(topology, autoNames: autoNames)
+        let labeled = Self.inKeptOrder(DiarizationProcess.labelSegments(topology, autoNames: autoNames), kept: cachedSegments)
         return DiarizationProcess.mergeConsecutiveSpeakers(labeled, breakingAt: annotations.pauses.map(\.offsetSeconds))
             .transcriptText(note: annotations.note, pauses: annotations.pauses, micMuted: annotations.micMuted)
     }
@@ -1034,10 +1107,13 @@ extension PipelineQueue {
         // Recorded before the transition below, so the snapshot that transition
         // writes already names the new locations. That ordering is the whole
         // fix: a quit during the protocol call must leave a snapshot the restore
-        // can still find the audio by.
-        let (relocated, moved) = Self.persistAudioToOutput(ctx: ctx, outputDir: recordingsDir, stagingDir: stagingDir)
-        recordRelocatedAudio(jobID: ctx.jobID, relocated)
-        registerRelocatedAudio(jobID: ctx.jobID, moved: moved, root: outputDir)
+        // can still find the audio by. A re-run reads the audio where the
+        // meeting keeps it and moves nothing.
+        if !isRerun(ctx.jobID) {
+            let (relocated, moved) = Self.persistAudioToOutput(ctx: ctx, outputDir: recordingsDir, stagingDir: stagingDir)
+            recordRelocatedAudio(jobID: ctx.jobID, relocated)
+            registerRelocatedAudio(jobID: ctx.jobID, moved: moved, root: outputDir)
+        }
 
         // --- Persist 16kHz audio for re-diarization (move instead of copy to avoid double I/O) ---
         // Replacing, because a job run a second time keeps its stem and the
@@ -1187,6 +1263,8 @@ extension PipelineQueue {
             request: (transcript: transcript, title: title, meetingStartTime: meetingStartTime, instructions: instructions),
             meeting: (folder: protocolsDir, basename: initialBasename, template: templateID, background: job.protocolBackground),
         ) else {
+            // A re-run keeps the meeting's notes rather than end without new ones (A25).
+            if isRerun(jobID) { throw failRerun(jobID, RerunFailure.notesNotMade) }
             // The names the notes were to carry, for a retry of them.
             recordNotesSpeakerNames(id: jobID, speakerNames)
             // No protocol, so no export, but an export that is switched on and
@@ -1203,7 +1281,8 @@ extension PipelineQueue {
 
         let outputOptions = transcriptOutputOptions(forJobID: jobID)
         var basename = initialBasename
-        if let titleSlug = ProtocolGenerator.fileTitleSlug(
+        // A re-run's files take the meeting's current names at its success instead.
+        if !isRerun(jobID), let titleSlug = ProtocolGenerator.fileTitleSlug(
             from: protocolMD, enabled: outputOptions.useAITitleForFilenames, template: usedTemplate,
         ) {
             basename = renameJobArtifacts(
@@ -1213,22 +1292,24 @@ extension PipelineQueue {
         // Checked again after the model call, which can take many minutes.
         if notesAppearedDuringTheCall(of: job, basename: basename, protocolsDir: protocolsDir) { return .attempted }
 
-        saveGeneratedNotes(
+        let saved = saveGeneratedNotes(
             protocolMD, transcript: outputOptions.includeFullTranscriptInProtocol ? transcript : nil,
             basename: basename, jobID: jobID, protocolsDir: protocolsDir,
             speakerNames: speakerNames, template: usedTemplate,
         )
+        if !saved, isRerun(jobID) { throw failRerun(jobID, RerunFailure.notesNotSaved) }
         return .attempted
     }
 
     /// Saves the notes the model wrote and queues their Notion export when one
     /// is configured. `transcript` is the full transcript to carry along with
     /// them, nil when the job's output options leave it out; `template` is the
-    /// one the notes were made from, which the export reads.
+    /// one the notes were made from, which the export reads. Returns whether
+    /// they were saved in the folder.
     private func saveGeneratedNotes( // swiftlint:disable:this function_parameter_count
         _ protocolMD: String, transcript: String?, basename: String, jobID: UUID, protocolsDir: URL,
         speakerNames: [String], template: ProtocolTemplateID,
-    ) {
+    ) -> Bool {
         let markdown = ProtocolGenerator.composeDocument(
             protocolMarkdown: protocolMD, transcript: transcript ?? "", includeFullTranscript: transcript != nil,
         )
@@ -1252,6 +1333,7 @@ extension PipelineQueue {
                 jobID: jobID,
             )
         }
+        return savedLocally
     }
 
     /// Reads the export configuration and, when the export is on but cannot run
@@ -1260,7 +1342,7 @@ extension PipelineQueue {
     /// because the user who switched the export on wants the reason in each.
     @discardableResult
     private func resolveNotionExport(jobID: UUID) -> NotionExportResolution {
-        let resolution = notionExportConfigurationProvider?() ?? .disabled
+        let resolution = notionExportResolution(forJobID: jobID)
         if case .unconfigured = resolution {
             addWarning(id: jobID, Self.notionExportUnconfiguredWarning)
         }
@@ -1304,7 +1386,9 @@ extension PipelineQueue {
             let isLocal = generator is LocalModelProtocolGenerator
         #endif
         do {
-            let text = try await generateWaitingOutRecordings(generator, jobID: jobID, request: request)
+            let text = try await generateWaitingOutRecordings(
+                generator, jobID: jobID, gateJobID: gateJobID(for: jobID), request: request,
+            )
             #if !APPSTORE
                 if isLocal { onLocalModelEvent?(.written) }
             #endif
@@ -1486,12 +1570,12 @@ extension PipelineQueue {
 
     /// Run VAD on a 16kHz audio file. Returns trimmed audio path and segment map,
     /// or nil if no speech regions are detected.
-    private func preprocessWithVAD(audioPath: URL, workDir: URL) async throws
+    private func preprocessWithVAD(audioPath: URL, workDir: URL, threshold: Float) async throws
         -> (trimmedPath: URL, map: VadSegmentMap)? {
-        guard let vadConfig else { return nil }
-
-        let vadInstance = vad ?? {
-            let v = FluidVAD(threshold: vadConfig.threshold)
+        // The cached detector has this queue's threshold; a re-run admitted with
+        // another one runs its own.
+        let vadInstance = threshold != vadConfig?.threshold ? FluidVAD(threshold: threshold) : vad ?? {
+            let v = FluidVAD(threshold: threshold)
             vad = v
             return v
         }()

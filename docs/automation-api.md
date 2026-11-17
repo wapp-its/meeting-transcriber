@@ -187,6 +187,16 @@ that moment. A poller that sees `error` and keeps polling may therefore see the
 job run again and end in `done`. If a retried job is then cancelled, the id
 answers `404`, not the earlier error.
 
+A job in `done` can be live again too: **Transcribe Again…** in the All
+Recordings window runs a finished meeting again under the **same id**. While it
+runs, the id answers from the live job (`waiting`, `transcribing`, …,
+`speaker_naming_pending`) and the finished record stays as it was. When the
+re-run succeeds the record is rewritten with the new `transcriptPath` and
+`protocolPath`, which keep the meeting's file names (the files they replaced
+stay beside them as `<name>.until-<yyyyMMdd_HHmmss>.<ext>`). When it fails, is
+cancelled or is left unnamed, the id answers from the finished record as it was
+before, with the earlier paths.
+
 ```bash
 curl -sS "$BASE/v1/jobs/<id>" -H "Authorization: Bearer $TOKEN"
 ```

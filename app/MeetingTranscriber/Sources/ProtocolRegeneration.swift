@@ -177,8 +177,6 @@ final class ProtocolRegenerator {
     static let succeededTitle = "Meeting Notes Regenerated"
     static let failedTitle = "Meeting Notes Not Regenerated"
 
-    private static let previousStamp = DateFormatter.filenameStamp("yyyyMMdd_HHmmss")
-
     private(set) var phase: Phase = .idle
     @ObservationIgnored let environment: Environment
 
@@ -441,7 +439,7 @@ final class ProtocolRegenerator {
         }
         var previous: URL?
         if replacing {
-            let stamp = Self.previousStamp.string(from: environment.now())
+            let stamp = DateFormatter.fileVersionStamp.string(from: environment.now())
             let aside = folder.appendingPathComponent("\(destination.deletingPathExtension().lastPathComponent).previous-\(stamp).md")
             do {
                 try ops.move(destination, aside)

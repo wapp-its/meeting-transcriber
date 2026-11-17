@@ -13,4 +13,9 @@ extension DateFormatter {
         fmt.dateFormat = format
         return fmt
     }
+
+    /// The stamp in the name of a file kept beside a meeting's current one, to the
+    /// second: a re-run's own files and the earlier versions it keeps
+    /// (`EarlierVersionName`), and the copies Regenerate Notes keeps.
+    static let fileVersionStamp = filenameStamp("yyyyMMdd_HHmmss")
 }

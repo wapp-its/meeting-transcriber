@@ -42,6 +42,9 @@ struct AllRecordingsActions {
     /// The audio of the row's meeting as it is on disk now; nil without a record. It
     /// reads every listed file, so the window asks it through `RowAvailability`.
     var audioOnDisk: (TranscriptionEntry) -> RecordingAudioLine.AudioOnDisk?
+    /// The audio a re-run of the meeting would read, as it is on disk now. It reads
+    /// each track, so the window asks it through `RowAvailability`.
+    var sourceAudio: (MeetingFileRecord) -> RecordingRowActions.SourceAudio
     /// Reads the record file again, which the other running build also writes, so a
     /// confirmation checks the files as they are listed now.
     var reloadMeetingFiles: () -> Void
@@ -83,9 +86,21 @@ struct AllRecordingsActions {
     /// as a notification, writing what "Save as:" chose.
     var generate: (ProtocolRegenerationTarget, MeetingProtocolOptions, ProtocolRegenerationOutput) -> Void
 
+    // MARK: Re-run sheets
+
+    /// What the sheets show of Settings, read on every redraw of a sheet, so it shows
+    /// what a click takes now; Identify Speakers Again starts at its method and count.
+    var rerunSettings: () -> RerunSheetText.Settings
+    /// "Transcribe Again" in the sheet: queues the meeting's re-run, or says why not.
+    var transcribeAgain: (UUID) -> RerunAdmission
+    /// "Identify Speakers" in the Identify Speakers Again sheet: queues the meeting's
+    /// re-run with the method and count picked there, or says why not.
+    var identifySpeakersAgain: (UUID, RerunSpeakers) -> RerunAdmission
+
     /// Every action does nothing, no job can be retried or has a file record, no
-    /// file is on disk, recordings are kept, the build has no identifier and protocol
-    /// generation is off, so a test sets only what it asserts on.
+    /// file is on disk, recordings are kept, the build has no identifier, protocol
+    /// generation is off and a re-run would run with the default settings, so a test
+    /// sets only what it asserts on.
     static let noop = Self(
         openProtocol: { _ in true },
         openTranscript: { _ in true },
@@ -102,6 +117,7 @@ struct AllRecordingsActions {
         filesOnDisk: { _ in FilesOnDisk(protocolExists: false, transcriptExists: false, transcriptSource: .none) },
         meetingFiles: { _ in nil },
         audioOnDisk: { _ in nil },
+        sourceAudio: { _ in .gone },
         reloadMeetingFiles: {},
         moveAudioToTrash: { _, _ in true },
         moveMeetingToTrash: { _, _ in true },
@@ -115,6 +131,15 @@ struct AllRecordingsActions {
         resolveFile: { _ in throw ProtocolRegenerationError.noTranscript },
         readTargetAgain: { $0 },
         generate: { _, _, _ in },
+        rerunSettings: {
+            RerunSheetText.Settings(
+                engine: .whisperKit, whisperKitModel: WhisperKitModelSelection(variant: WhisperKitStockModel.all[0].variant, origin: .stock),
+                whisperLanguage: "", parakeetLanguage: "", vocabulary: false, diarize: true, diarizerMode: .offline,
+                makesNotes: false, notionExport: false,
+            )
+        },
+        transcribeAgain: { _ in .queued },
+        identifySpeakersAgain: { _, _ in .queued },
     )
 
     // MARK: - Production
@@ -201,6 +226,16 @@ struct AllRecordingsActions {
             bytes: present.reduce(0) { $0 + size(of: $1.path) },
             gonePaths: Set(presence.filter { $0.value == .gone }.keys),
         )
+    }
+
+    /// The audio a re-run of the meeting would read (`MeetingFileRecord.rerunSourceTracks`),
+    /// as the disk answers for it inside the security scope of `scopeRoot`. Unlike
+    /// `readAudioOnDisk` it covers an import's own file, which the app does not own.
+    static func readSourceAudio(of record: MeetingFileRecord, scopeRoot: URL) -> RecordingRowActions.SourceAudio {
+        let accessing = scopeRoot.startAccessingSecurityScopedResource()
+        defer { if accessing { scopeRoot.stopAccessingSecurityScopedResource() } }
+        let tracks = record.rerunSourceTracks
+        return .init([tracks.mix, tracks.app, tracks.mic].compactMap { $0.map { MeetingFilePresence.of($0.path) } })
     }
 
     /// Zero for a file that went between the probe and this read.
