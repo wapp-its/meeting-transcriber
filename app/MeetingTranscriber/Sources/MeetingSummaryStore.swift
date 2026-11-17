@@ -18,6 +18,10 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Meeting
 /// reported: no job and no action depends on it. `summaries` follows the file at each
 /// write, so after a failed one it holds what the file holds.
 ///
+/// The file also holds each meeting's latest notes save (`beginNotesSave`), so the
+/// answer to a summary call counts only while no build saved newer notes for the
+/// meeting, cleared its summaries in the sheet or removed it since (`commit`).
+///
 /// Writes are atomic and owner-only. Summaries are meeting content: nothing from the
 /// file is logged, and none of it goes to the automation API.
 @MainActor
@@ -30,6 +34,16 @@ final class MeetingSummaryStore {
         var version: Int
         /// By job id (`UUID.uuidString`).
         var summaries: [String: MeetingSummaries]
+        /// Each meeting's latest notes save, by job id.
+        var notesSaves: [String: UUID]
+    }
+
+    /// What `commit` did.
+    enum Commit: Equatable {
+        case stored
+        /// A newer notes save, a cleared or removed meeting: nothing changed.
+        case overtaken
+        case failed
     }
 
     /// As for the record file: the write runs on the main actor and must not hang.
@@ -49,14 +63,38 @@ final class MeetingSummaryStore {
     }
 
     /// Change one meeting's summaries as the file holds them now; nil from `change`
-    /// removes them. False when it was not saved.
+    /// clears the meeting, its latest notes save included, so the answer of a call
+    /// still running for it is dropped. False when it was not saved.
     @discardableResult
     func update(jobID: UUID, _ change: (MeetingSummaries?) -> MeetingSummaries?) -> Bool {
         transact { document in
             let key = jobID.uuidString
-            let next = change(document.summaries[key])
-            document.summaries[key] = next?.notes == nil && next?.typed == nil ? nil : next
+            Self.set(change(document.summaries[key]), key: key, in: &document)
+            if document.summaries[key] == nil { document.notesSaves[key] = nil }
         }
+    }
+
+    /// Record `save` as the meeting's latest notes save, which drops the answer of
+    /// every call for an earlier one. False when it was not saved.
+    @discardableResult
+    func beginNotesSave(_ save: UUID, jobID: UUID) -> Bool {
+        transact { document in
+            document.notesSaves[jobID.uuidString] = save
+        }
+    }
+
+    /// Change one meeting's summaries for the notes save `save`, only while the file
+    /// still holds it as the meeting's latest.
+    func commit(_ save: UUID, jobID: UUID, _ change: (MeetingSummaries?) -> MeetingSummaries?) -> Commit {
+        var latest = false
+        let saved = transact { document in
+            let key = jobID.uuidString
+            guard document.notesSaves[key] == save else { return }
+            latest = true
+            Self.set(change(document.summaries[key]), key: key, in: &document)
+        }
+        guard saved else { return .failed }
+        return latest ? .stored : .overtaken
     }
 
     /// True also when the file holds none for the meeting.
@@ -65,12 +103,18 @@ final class MeetingSummaryStore {
         update(jobID: jobID) { _ in nil }
     }
 
-    /// Drop the summaries of every meeting `keeps` does not hold, in one write.
+    /// Drop the summaries and notes saves of every meeting `keeps` does not hold, in
+    /// one write.
     @discardableResult
     func removeAll(except keeps: (UUID) -> Bool) -> Bool {
         transact { document in
-            document.summaries = document.summaries.filter { key, _ in UUID(uuidString: key).map(keeps) ?? false }
+            document.summaries = document.summaries.filter { UUID(uuidString: $0.key).map(keeps) ?? false }
+            document.notesSaves = document.notesSaves.filter { UUID(uuidString: $0.key).map(keeps) ?? false }
         }
+    }
+
+    private static func set(_ summaries: MeetingSummaries?, key: String, in document: inout Document) {
+        document.summaries[key] = summaries?.notes == nil && summaries?.typed == nil ? nil : summaries
     }
 
     /// Read the file again. False when it could not be read.
@@ -126,7 +170,7 @@ final class MeetingSummaryStore {
     /// The file's content under the lock: empty for no file, and for one that could
     /// not be read or decoded once it is moved aside; nil when it could not be moved.
     private func readDocument() -> Document? {
-        let empty = Document(version: Self.formatVersion, summaries: [:])
+        let empty = Document(version: Self.formatVersion, summaries: [:], notesSaves: [:])
         let data: Data
         do {
             data = try Data(contentsOf: path)

@@ -10,7 +10,9 @@
     "gh-171-transcribe-again-and-identify-speakers"
   ],
   "id": "gh-257-meeting-summaries-in-all-recordings",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "gh-257-meeting-summaries-in-all-recordings.1": 1
+  },
   "next_task": 1,
   "no_plan": true,
   "plan_review_rounds": 0,
@@ -138,6 +140,82 @@
       "task": null,
       "timestamp": "2026-11-16T13:15:26.714593Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "4ddf555c9815b1210a59960934401dd784a8696bc4a7f6a48b2e87730b2704c8",
+      "backend": "codex",
+      "base_sha": "c4e876e1ffccdb5b19e744676446a91b6d0fb2b2",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-59b82727efe0d6a42880fb3302f9b102",
+            "classification": "introduced",
+            "findingId": "finding-59b82727efe0d6a42880fb3302f9b102",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-5dd104ec5cced55ae1b634a4ccf15ad3",
+            "classification": "introduced",
+            "findingId": "finding-5dd104ec5cced55ae1b634a4ccf15ad3",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-1e23d1dbf0b511012a7f40405e3b0458",
+            "classification": "introduced",
+            "findingId": "finding-1e23d1dbf0b511012a7f40405e3b0458",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-ab506d632951737a7904372266e0ca42",
+            "classification": "introduced",
+            "findingId": "finding-ab506d632951737a7904372266e0ca42",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-b1ae85f5283ccc3015f11e1a99cdafc8",
+            "classification": "introduced",
+            "findingId": "finding-b1ae85f5283ccc3015f11e1a99cdafc8",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "6a8ed589224e2ab08e5647596a8a6f24e0a49ee0",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6.1-sol",
+      "outcome": "verdict",
+      "output_bytes": 3664,
+      "output_sha256": "76dd2803a1422511ef55c21ff2f9b19c535179a913e94192bff833b279c2af13",
+      "reservation_id": "88566a7c85da40f4820d41766fa475e0",
+      "round_consumed": true,
+      "scope": "impl:gh-257-meeting-summaries-in-all-recordings.1",
+      "superseded_by": null,
+      "task": "gh-257-meeting-summaries-in-all-recordings.1",
+      "timestamp": "2026-11-17T09:03:05.172791Z",
+      "verdict": "NEEDS_WORK"
     }
   ],
   "review_hash_epoch": {
@@ -145,8 +223,10 @@
     "plan#completion": 0
   },
   "review_pending_rounds": {},
+  "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "impl:gh-257-meeting-summaries-in-all-recordings.1": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-257-meeting-summaries-in-all-recordings.md",
@@ -164,5 +244,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nAll Recordings lists each meeting with its title, app, date and length. Many titles are generic (the app name, a file name or \"Recovered Recording\"), so the list does not show which meeting is which. Today you have to open the notes to find out.\n\n## NOTES\n\n- Each row shows a short summary of what the meeting was about. It comes from the meeting notes, or from the transcript when there are no notes.\n- The summary can be edited. New notes for the meeting never replace a summary that was edited by hand.\n- Builds on the rows and the row menu of #171 (Transcribe Again).\n- Related: #126 (the search finds no participants), #201 (no file reads while the list is drawn).\n\n## TASKS\n\n- [ ] Mockup of the rows with summaries and of the edit state\n- [ ] Spec",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/257"
   },
-  "updated_at": "2026-11-16T13:16:01.117604Z"
+  "updated_at": "2026-11-17T09:04:21.336753Z"
 }

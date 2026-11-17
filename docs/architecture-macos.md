@@ -459,7 +459,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `MeetingFileRecord.swift` | One meeting's files and what has happened to them: paths, ownership, recording date, Keep mark, the build that created it, pending and incomplete deletions (see [Meeting Files and Deletion](#meeting-files-and-deletion)) |
 | `MeetingFileStore.swift` | `meeting_files.json`: every meeting's record, lock-guarded writes shared with a second running build |
 | `MeetingSummary.swift` | Pure rules of a meeting's summary: the summary section of saved notes, the clean-up, the summary call's instruction, and what a notes save or the sheet's Save does to the notes summary and the typed one |
-| `MeetingSummaryStore.swift` | `meeting-summaries.json`: every meeting's summaries by job id, lock-guarded writes shared with a second running build |
+| `MeetingSummaryStore.swift` | `meeting-summaries.json`: every meeting's summaries and latest notes save by job id, lock-guarded writes shared with a second running build |
 | `MeetingSummarizer.swift` | Takes a meeting's notes summary when its notes are saved: from their summary section, else from one call to the notes provider, one call at a time, apart from the queue |
 | `PipelineController+Summaries.swift` | The controller's summaries: notes saves of listed meetings, Save from the sheet, and the launch's removal of summaries no meeting holds |
 | `MeetingFilePresence.swift` | The one probe of a meeting's file: present, gone, or out of reach |

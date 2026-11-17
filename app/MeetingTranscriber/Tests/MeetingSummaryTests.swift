@@ -109,6 +109,25 @@ final class MeetingSummaryTests: XCTestCase {
         XCTAssertEqual(MeetingSummary.section(in: notes), "[Ana] and [Ben] agreed on the plan.")
     }
 
+    /// A table without outer pipes is dropped as one with them is; a section that
+    /// holds only a table has no summary.
+    func testATableWithoutOuterPipesIsDropped() {
+        let table = "Topic | Owner\n:--- | ---:\nBudget | Ana\nHiring | Ben"
+
+        XCTAssertEqual(MeetingSummary.section(in: "## Summary\n\(table)\n\nPlan agreed."), "Plan agreed.")
+        XCTAssertNil(MeetingSummary.section(in: "## Summary\n\(table)\n\n## Topics\nRelease."))
+        XCTAssertEqual(MeetingSummary.section(in: "## Summary\nRelease A | B on Friday."), "Release A | B on Friday.", "a pipe in a sentence")
+    }
+
+    /// A heading inside an HTML comment neither starts the section nor ends a real one.
+    func testAHeadingInsideAnHTMLCommentIsNoHeading() {
+        let commented = "# Notes\n<!--\n## Summary\nHidden template instructions.\n-->\n## Topics\nRelease."
+        let inside = "## Summary\nPlan agreed.\n<!-- ## Topics -->\nBen checks the notes.\n\n## Topics\nRelease."
+
+        XCTAssertNil(MeetingSummary.section(in: commented))
+        XCTAssertEqual(MeetingSummary.section(in: inside), "Plan agreed. Ben checks the notes.")
+    }
+
     /// An appended full transcript is never read: neither a summary heading inside it
     /// nor its lines after a section that runs to the end of the notes.
     func testAnAppendedFullTranscriptIsNeverPartOfTheSummary() {

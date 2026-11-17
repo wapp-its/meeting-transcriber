@@ -51,7 +51,7 @@ final class MeetingSummaryStoreTests: XCTestCase {
     func testAnUndecodableFileIsMovedAsideAndTheStoreStartsEmpty() throws {
         let path = try makePath()
         let aside = path.appendingPathExtension("unreadable")
-        for content in [Data("not json".utf8), Data(#"{"version":2,"summaries":{}}"#.utf8)] {
+        for content in [Data("not json".utf8), Data(#"{"version":2,"summaries":{},"notesSaves":{}}"#.utf8)] {
             try content.write(to: path)
 
             let store = MeetingSummaryStore(path: path)
@@ -97,9 +97,12 @@ final class MeetingSummaryStoreTests: XCTestCase {
         let store = MeetingSummaryStore(path: path)
         store.update(jobID: kept) { _ in self.notes("Kept") }
         store.update(jobID: dropped) { _ in self.notes("Dropped") }
+        let save = UUID()
+        store.beginNotesSave(save, jobID: dropped)
 
         XCTAssertTrue(store.removeAll { $0 == kept })
 
         XCTAssertEqual(MeetingSummaryStore(path: path).summaries, [kept: notes("Kept")])
+        XCTAssertEqual(store.commit(save, jobID: dropped) { _ in self.notes("Late") }, .overtaken, "its notes save went too")
     }
 }

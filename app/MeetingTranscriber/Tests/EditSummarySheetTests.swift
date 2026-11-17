@@ -19,7 +19,7 @@ final class EditSummarySheetTests: XCTestCase {
     private func opened(_ summaries: MeetingSummaries?, saved: @escaping (UUID, String) -> Void = { _, _ in }) throws
         -> (EditSummarySheetState, EditSummarySheet) {
         let state = EditSummarySheetState()
-        state.open(row(), summaries: summaries)
+        state.open(row()) { _ in summaries }
         return try (state, EditSummarySheet(meeting: XCTUnwrap(state.meeting), state: state, save: saved))
     }
 
@@ -94,5 +94,21 @@ final class EditSummarySheetTests: XCTestCase {
         XCTAssertEqual(state.text, "From the notes")
         let (_, without) = try opened(MeetingSummaries(typed: .init(text: "Mine", writtenAt: date)))
         XCTAssertTrue(try button(A11yID.editSummaryUseNotesButton, in: without).isDisabled())
+    }
+
+    /// A notes summary that arrives while the sheet is open is the one the button
+    /// offers, never the one the meeting had when the sheet opened.
+    func testUseSummaryFromNotesOffersTheNotesSummaryTheMeetingHasNow() throws {
+        var current: MeetingSummaries?
+        let state = EditSummarySheetState()
+        state.open(row()) { _ in current }
+        let sheet = try EditSummarySheet(meeting: XCTUnwrap(state.meeting), state: state) { _, _ in }
+        XCTAssertTrue(try button(A11yID.editSummaryUseNotesButton, in: sheet).isDisabled(), "test premise: none yet")
+
+        current = MeetingSummaries(notes: .init(text: "Current notes.", writtenAt: date))
+        try button(A11yID.editSummaryUseNotesButton, in: sheet).tap()
+
+        XCTAssertEqual(state.text, "Current notes.")
+        XCTAssertEqual(noteLine(of: sheet), EditSummarySheetState.fromNotesLine)
     }
 }

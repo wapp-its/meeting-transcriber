@@ -11,7 +11,10 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "Meeting
 /// Calls run one at a time, in the order the saves came, each stopped after
 /// `callTimeout`. A call's answer counts only while its save is the meeting's latest:
 /// a newer save of the meeting, or the meeting leaving the lists (`forget`), stops it
-/// and drops its answer. Nothing is kept across a quit, so a call that was started
+/// and drops its answer. The summary file records the latest save as well
+/// (`MeetingSummaryStore.beginNotesSave`), so a newer save or a removal in another
+/// running build, or summaries cleared in the sheet, drop the answer too. Nothing is
+/// kept across a quit, so a call that was started
 /// is never made again at the next launch. A failed, timed-out or empty call stores
 /// nothing and keeps the earlier summary; its one log line names the job's short id,
 /// the provider and the outcome, never the notes or the answer.
@@ -53,6 +56,11 @@ final class MeetingSummarizer {
         let save = UUID()
         latestSave[jobID] = save
         stopCalls(of: jobID)
+        // In the file too, so a call still running in another build drops its answer.
+        guard store.beginNotesSave(save, jobID: jobID) else {
+            logger.error("[\(PipelineJob.shortID(for: jobID), privacy: .public)] summary_skipped reason=save_not_recorded")
+            return
+        }
         switch notes {
         case let .text(text):
             summarize(text, save: save, jobID: jobID, title: title, generator: generator)
@@ -95,8 +103,7 @@ final class MeetingSummarizer {
     ) {
         let shortID = PipelineJob.shortID(for: jobID)
         if let section = MeetingSummary.section(in: notes) {
-            store(section, jobID: jobID)
-            logger.info("[\(shortID, privacy: .public)] summary_taken source=section")
+            store(section, save: save, jobID: jobID, source: "section")
             return
         }
         guard let made = generator() else {
@@ -157,8 +164,7 @@ final class MeetingSummarizer {
         switch late ? .failure(CancellationError()) : result {
         case let .success(answer):
             if let summary = MeetingSummary.clean(answer) {
-                store(summary, jobID: jobID)
-                logger.info("[\(shortID, privacy: .public)] summary_taken source=call provider=\(provider, privacy: .public)")
+                store(summary, save: save, jobID: jobID, source: "call provider=\(provider)")
             } else {
                 logger.info("[\(shortID, privacy: .public)] summary_failed provider=\(provider, privacy: .public) outcome=empty")
             }
@@ -169,10 +175,22 @@ final class MeetingSummarizer {
         }
     }
 
-    private func store(_ summary: String, jobID: UUID) {
+    /// Stores the notes summary of `save` while the file holds it as the meeting's
+    /// latest notes save: not after a newer save in any build, a cleared or a removed
+    /// meeting.
+    private func store(_ summary: String, save: UUID, jobID: UUID, source: String) {
         let date = now()
-        if !store.update(jobID: jobID, { MeetingSummary.afterNotesSaved($0, notesSummary: summary, at: date) }) {
-            logger.error("[\(PipelineJob.shortID(for: jobID), privacy: .public)] summary_not_saved")
+        let shortID = PipelineJob.shortID(for: jobID)
+        let outcome = store.commit(save, jobID: jobID) { MeetingSummary.afterNotesSaved($0, notesSummary: summary, at: date) }
+        switch outcome {
+        case .stored:
+            logger.info("[\(shortID, privacy: .public)] summary_taken source=\(source, privacy: .public)")
+
+        case .overtaken:
+            logger.info("[\(shortID, privacy: .public)] summary_dropped source=\(source, privacy: .public) reason=overtaken")
+
+        case .failed:
+            logger.error("[\(shortID, privacy: .public)] summary_not_saved")
         }
     }
 

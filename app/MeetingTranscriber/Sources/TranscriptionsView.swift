@@ -431,7 +431,7 @@ struct TranscriptionsView: View {
         case .openTranscript: open(entry.transcriptURL, with: actions.openTranscript)
         case .openInNotion: openInNotion(entry)
         case .showInFinder: open(onDisk.protocolExists ? entry.protocolURL : entry.transcriptURL, with: actions.reveal)
-        case .editSummary: editSummary.open(entry, summaries: actions.meetingSummaries(entry.id))
+        case .editSummary: editSummary.open(entry, summaries: actions.meetingSummaries)
         case .separator, .reportsHeading: break
         case let .report(report, _): open(report.url, with: actions.openProtocol)
         case .regenerate: notice.fileMissing = !actions.regenerate(entry)

@@ -146,6 +146,41 @@ final class MeetingSummarizerTests: XCTestCase {
         XCTAssertEqual(summarizer.store.summaries, [overtaken: saved("From the section.")])
     }
 
+    /// The file records each meeting's latest notes save: a newer save or a removal in
+    /// another running build, and summaries cleared in the sheet, drop the answer of a
+    /// call still running here.
+    func testAnotherBuildsSaveOrRemovalAndAClearedSummaryDropTheAnswer() async throws {
+        enum Change: CaseIterable { case newerSaveElsewhere, removalElsewhere, clearedInTheSheet }
+        for change in Change.allCases {
+            let path = try makeTempDirectory(prefix: "meeting-summarizer").appendingPathComponent(MeetingSummaryStore.filename)
+            let here = MeetingSummarizer(store: MeetingSummaryStore(path: path)) { [date] in date }
+            let elsewhere = MeetingSummarizer(store: MeetingSummaryStore(path: path)) { [date] in date }
+            let job = UUID()
+            let gate = AsyncGate()
+            let held = StubSummaryGenerator(answer: .success("Old answer."), gate: gate)
+            here.notesSaved(jobID: job, notes: .text(Self.withoutSection), title: "Sync") { held }
+            while await !gate.hasWaiter {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+
+            switch change {
+            case .newerSaveElsewhere:
+                elsewhere.notesSaved(jobID: job, notes: .text(Self.withSection), title: "Sync") { nil }
+
+            case .removalElsewhere:
+                elsewhere.forget(jobID: job)
+
+            case .clearedInTheSheet:
+                here.store.update(jobID: job) { MeetingSummary.afterTyped($0, field: " \n", at: self.date) }
+            }
+            await gate.open()
+            await here.awaitCalls()
+
+            let expected = change == .newerSaveElsewhere ? saved("From the section.") : nil
+            XCTAssertEqual(MeetingSummaryStore(path: path).summaries(for: job), expected, "\(change)")
+        }
+    }
+
     /// One call at a time: the second meeting's call starts once the first one ended.
     func testCallsRunOneAtATime() async throws {
         let summarizer = try makeSummarizer()

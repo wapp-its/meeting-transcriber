@@ -12,8 +12,6 @@ final class EditSummarySheetState {
         let id: UUID
         /// Title, date and length as the row shows them, joined with " · ".
         let line: String
-        /// The summaries as the meeting had them when the sheet opened.
-        let summaries: MeetingSummaries?
     }
 
     static let title = "Edit Summary"
@@ -24,12 +22,18 @@ final class EditSummarySheetState {
     /// Bound to the sheet; nil closes it.
     var meeting: Meeting?
     var text = ""
+    /// The meeting's summaries as the store holds them now, so a notes summary that
+    /// arrives while the sheet is open is the one the sheet offers.
+    @ObservationIgnored private var lookup: (UUID) -> MeetingSummaries? = { _ in nil }
 
-    func open(_ entry: TranscriptionEntry, summaries: MeetingSummaries?) {
+    /// Opens for `entry`, its field holding the shown summary; `summaries` reads a
+    /// meeting's summaries from the store each time the sheet needs them.
+    func open(_ entry: TranscriptionEntry, summaries: @escaping (UUID) -> MeetingSummaries?) {
         let date = entry.date?.formatted(date: .abbreviated, time: .shortened)
         let length = entry.audioDuration.map { formattedTime($0) }
-        meeting = Meeting(id: entry.id, line: [entry.title, date, length].compactMap(\.self).joined(separator: " · "), summaries: summaries)
-        text = summaries?.shown ?? ""
+        lookup = summaries
+        meeting = Meeting(id: entry.id, line: [entry.title, date, length].compactMap(\.self).joined(separator: " · "))
+        text = summaries(entry.id)?.shown ?? ""
     }
 
     func close() {
@@ -37,11 +41,16 @@ final class EditSummarySheetState {
         text = ""
     }
 
+    /// The meeting's summaries now.
+    var summaries: MeetingSummaries? {
+        meeting.flatMap { lookup($0.id) }
+    }
+
     /// The line under the field: why it is too long, else where the meeting's
     /// summary came from, nil for a meeting without one.
     var noteLine: String? {
         if isTooLong { return Self.tooLongLine }
-        guard let summaries = meeting?.summaries else { return nil }
+        guard let summaries else { return nil }
         if summaries.typed != nil { return Self.typedLine }
         return summaries.notes == nil ? nil : Self.fromNotesLine
     }
@@ -51,10 +60,10 @@ final class EditSummarySheetState {
     }
 
     var notesSummary: String? {
-        meeting?.summaries?.notes?.text
+        summaries?.notes?.text
     }
 
-    /// Puts the notes summary the meeting had when the sheet opened into the field.
+    /// Puts the meeting's notes summary into the field, as the store holds it now.
     func useNotesSummary() {
         if let notesSummary { text = notesSummary }
     }

@@ -63,10 +63,11 @@ enum MeetingSummary {
 
     /// The summary the saved notes give: the text of the first heading, at any level,
     /// whose words are or begin with a summary name, up to the next heading and never
-    /// past an appended full transcript, cleaned up. Nil when the notes have no such
-    /// section or it holds nothing once cleaned.
+    /// past an appended full transcript, cleaned up. A heading inside an HTML comment
+    /// neither starts nor ends the section. Nil when the notes have no such section or
+    /// it holds nothing once cleaned.
     static func section(in notes: String) -> String? {
-        let lines = lines(of: withoutTranscript(notes))
+        let lines = lines(of: withoutComments(withoutTranscript(notes)))
         guard let start = lines.firstIndex(where: { heading(of: $0).map(isSummaryHeading) ?? false }) else { return nil }
         let body = lines[(start + 1)...].prefix { heading(of: $0) == nil }
         return clean(body.joined(separator: "\n"))
@@ -90,8 +91,7 @@ enum MeetingSummary {
     /// marks removed, joined with single spaces and cut to `maxLength` at a word end
     /// with "…". Nil when nothing is left.
     static func clean(_ text: String) -> String? {
-        let withoutComments = text.replacingOccurrences(of: #"<!--[\s\S]*?(-->|$)"#, with: "", options: .regularExpression)
-        let kept = paragraphs(of: withoutComments).compactMap(paragraphText)
+        let kept = paragraphs(of: withoutComments(text)).compactMap(paragraphText)
         let joined = kept.joined(separator: " ")
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -148,6 +148,11 @@ enum MeetingSummary {
         return String(notes[..<separator.lowerBound])
     }
 
+    /// Without HTML comments, an unclosed one running to the end.
+    private static func withoutComments(_ text: String) -> String {
+        text.replacingOccurrences(of: #"<!--[\s\S]*?(-->|$)"#, with: "", options: .regularExpression)
+    }
+
     private static func lines(of text: String) -> [String] {
         text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map(String.init)
     }
@@ -191,7 +196,7 @@ enum MeetingSummary {
 
     /// One paragraph as plain text, nil when the rule drops all of it.
     private static func paragraphText(_ lines: [String]) -> String? {
-        let kept = lines.compactMap { line -> String? in
+        let kept = withoutTables(lines).compactMap { line -> String? in
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.hasPrefix("|") || isRule(trimmed) || heading(of: line) != nil || isLabelLine(trimmed) { return nil }
             return removingMarks(withoutMarkers(trimmed))
@@ -199,6 +204,30 @@ enum MeetingSummary {
         let text = kept.joined(separator: " ").trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty, !isWhollyBracketed(text) else { return nil }
         return text
+    }
+
+    /// Without its tables, outer pipes or not: a delimiter row such as `--- | :---:`,
+    /// the header row above it and the rows with a pipe below it.
+    private static func withoutTables(_ lines: [String]) -> [String] {
+        var kept = lines
+        var index = 1
+        while index < kept.count {
+            guard isTableDelimiter(kept[index]), kept[index - 1].contains("|") else {
+                index += 1
+                continue
+            }
+            var end = index + 1
+            while end < kept.count, kept[end].contains("|") {
+                end += 1
+            }
+            kept.removeSubrange((index - 1) ..< end)
+            index = max(index - 1, 1)
+        }
+        return kept
+    }
+
+    private static func isTableDelimiter(_ line: String) -> Bool {
+        line.wholeMatch(of: /\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?\s*/) != nil
     }
 
     private static func isListItem(_ line: String) -> Bool {
