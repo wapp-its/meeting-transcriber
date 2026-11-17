@@ -1295,7 +1295,7 @@ extension PipelineQueue {
         let saved = saveGeneratedNotes(
             protocolMD, transcript: outputOptions.includeFullTranscriptInProtocol ? transcript : nil,
             basename: basename, jobID: jobID, protocolsDir: protocolsDir,
-            speakerNames: speakerNames, template: usedTemplate,
+            speakerNames: speakerNames, template: usedTemplate, title: title,
         )
         if !saved, isRerun(jobID) { throw failRerun(jobID, RerunFailure.notesNotSaved) }
         return .attempted
@@ -1306,9 +1306,13 @@ extension PipelineQueue {
     /// them, nil when the job's output options leave it out; `template` is the
     /// one the notes were made from, which the export reads. Returns whether
     /// they were saved in the folder.
+    ///
+    /// Notes saved for the meeting, in the folder or for a Notion export that
+    /// replaces them, give its summary; a re-run's own notes do so only at its
+    /// success, under their final names (`handOverCommittedRerun`).
     private func saveGeneratedNotes( // swiftlint:disable:this function_parameter_count
         _ protocolMD: String, transcript: String?, basename: String, jobID: UUID, protocolsDir: URL,
-        speakerNames: [String], template: ProtocolTemplateID,
+        speakerNames: [String], template: ProtocolTemplateID, title: String,
     ) -> Bool {
         let markdown = ProtocolGenerator.composeDocument(
             protocolMarkdown: protocolMD, transcript: transcript ?? "", includeFullTranscript: transcript != nil,
@@ -1332,6 +1336,9 @@ extension PipelineQueue {
                 ),
                 jobID: jobID,
             )
+        }
+        if savedLocally || configuration != nil, !isRerun(jobID) {
+            onNotesSaved?(jobID, .text(protocolMD), title)
         }
         return savedLocally
     }

@@ -78,6 +78,7 @@ final class ProtocolRegeneratorReportTests: XCTestCase {
         var regenerated: [ProtocolTemplateID] = []
         var protocolReplaced: [(current: URL?, kept: URL?)] = []
         var reportKept: [URL] = []
+        var notesReplaced: [String] = []
     }
 
     private func makeRegenerator(
@@ -97,6 +98,7 @@ final class ProtocolRegeneratorReportTests: XCTestCase {
             fileOperations: ops ?? fileOperations(),
             now: { stamp },
             regenerated: { _, template in hooks.regenerated.append(template) },
+            notesReplaced: { _, notes, _ in hooks.notesReplaced.append(notes) },
             protocolReplaced: { _, current, kept in hooks.protocolReplaced.append((current, kept)) },
             reportKept: { _, kept in hooks.reportKept.append(kept) },
         ))
@@ -126,6 +128,7 @@ final class ProtocolRegeneratorReportTests: XCTestCase {
         XCTAssertEqual(after, before, "the main protocol, the transcript and the other report stay byte for byte")
         XCTAssertTrue(hooks.regenerated.isEmpty, "the job keeps the template its main protocol was made with")
         XCTAssertTrue(hooks.protocolReplaced.isEmpty, "the record's notes stay the main protocol")
+        XCTAssertTrue(hooks.notesReplaced.isEmpty, "a report gives the meeting no summary")
     }
 
     func testTheBuiltInTemplatesReportIsTheStandardOne() async throws {

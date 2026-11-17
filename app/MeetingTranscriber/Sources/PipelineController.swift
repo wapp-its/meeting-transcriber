@@ -52,6 +52,10 @@ final class PipelineController {
     /// the finished-job records beside it. Test-injectable.
     let meetingFileStore: MeetingFileStore
 
+    /// Each meeting's summary in All Recordings, and what takes it when notes are
+    /// saved (`PipelineController+Summaries.swift`).
+    let summarizer: MeetingSummarizer
+
     /// What moves a meeting's files, and the clock its deletions are dated by.
     /// Test-injectable, so no test touches the real Trash.
     let fileRemover: MeetingFileRemover
@@ -166,6 +170,9 @@ final class PipelineController {
             )
         self.fileRemover = fileRemover
         self.now = now
+        summarizer = MeetingSummarizer(
+            store: MeetingSummaryStore(path: queueEnvironment.logDir.appendingPathComponent(MeetingSummaryStore.filename)), now: now,
+        )
         self.queue = queueEnvironment.initialQueue
             ?? PipelineQueue(
                 logDir: queueEnvironment.logDir, stagingDir: queueEnvironment.stagingDir,
@@ -181,6 +188,7 @@ final class PipelineController {
         self.engineProvider = engineProvider
         reconcileInterruptedReruns()
         reconcileInterruptedDeletions()
+        pruneSummaries()
         observeOutputFolder()
         connectRetentionToMeetingRecords()
         startRecordingRetention()
@@ -477,6 +485,7 @@ final class PipelineController {
     func configureCallbacks(on target: PipelineQueue? = nil) {
         let queue = target ?? queue
         queue.isRegenerationRunning = { [weak self] in self?.isRegenerationRunning() ?? false }
+        queue.onNotesSaved = { [weak self] in self?.notesSaved(jobID: $0, notes: $1, title: $2) }
         queue.onNotionExportFinished = { [notifier] in notifier.notifyNotionExport(job: $0, failureReason: $1) }
         queue.onJobStateChange = { [notifier, settings] job, _, newState in
             switch newState {

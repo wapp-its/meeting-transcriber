@@ -30,6 +30,7 @@ final class TranscriptionsViewTests: XCTestCase {
         selection: TranscriptionsSelection = TranscriptionsSelection(),
         transcribeAgain: TranscribeAgainSheetState = TranscribeAgainSheetState(),
         identifySpeakersAgain: IdentifySpeakersAgainSheetState = IdentifySpeakersAgainSheetState(),
+        editSummary: EditSummarySheetState = EditSummarySheetState(),
     ) -> TranscriptionsView {
         let box = queryBox ?? QueryBox()
         box.text = query
@@ -42,6 +43,7 @@ final class TranscriptionsViewTests: XCTestCase {
             selection: selection,
             transcribeAgain: transcribeAgain,
             identifySpeakersAgain: identifySpeakersAgain,
+            editSummary: editSummary,
         )
     }
 

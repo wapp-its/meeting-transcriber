@@ -26,6 +26,9 @@ enum RecordingRowActions {
         case openInNotion
         /// Reveals the protocol, else the transcript.
         case showInFinder
+        /// "Edit Summary…", for every finished meeting, right after "Show in
+        /// Finder" and in its place when there is none (spec R4).
+        case editSummary
         /// Sets the Additional Reports group apart.
         case separator
         /// "Additional Reports", which does nothing.
@@ -178,9 +181,9 @@ enum RecordingRowActions {
     /// the right-click menu stands on its own. A waiting or running job lists
     /// nothing: the transcript stage 1 may already have written is a draft
     /// without speaker names that a later stage rewrites. A finished job with
-    /// a Notion page lists "Open in Notion" after its files. The meeting's
-    /// additional reports follow under their heading, set apart by a separator
-    /// on each side, before "Regenerate Notes…" (spec D3).
+    /// a Notion page lists "Open in Notion" after its files and "Edit Summary…".
+    /// The meeting's additional reports follow under their heading, set apart by
+    /// a separator on each side, before "Regenerate Notes…" (spec D3).
     static func menuItems(
         state: JobState, onDisk: FilesOnDisk, canRetry: Bool, hasNotionPage: Bool = false,
     ) -> [MenuItem] {
@@ -193,7 +196,9 @@ enum RecordingRowActions {
             fileItems(onDisk) + [.dismiss]
 
         case .done:
-            reportGroup(after: fileItems(onDisk) + (hasNotionPage ? [.openInNotion] : []), onDisk) + [.regenerate(enabled: hasSource)]
+            reportGroup(
+                after: fileItems(onDisk) + [.editSummary] + (hasNotionPage ? [.openInNotion] : []), onDisk,
+            ) + [.regenerate(enabled: hasSource)]
 
         case .error:
             reportGroup(after: fileItems(onDisk), onDisk) + (hasSource ? [.regenerate(enabled: true)] : [])

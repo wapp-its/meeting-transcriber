@@ -475,6 +475,7 @@ extension TranscriptionsViewTests {
             A11yID.recordingMenuOpenProtocol(0),
             A11yID.recordingMenuOpenTranscript(0),
             A11yID.recordingMenuShowInFinder(0),
+            A11yID.recordingMenuEditSummary(0),
             A11yID.recordingMenuRegenerate(0),
             A11yID.recordingMenuKeep(0),
             A11yID.recordingMenuMoveAudioToTrash(0),

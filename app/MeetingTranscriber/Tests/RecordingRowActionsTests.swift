@@ -174,36 +174,37 @@ final class RecordingRowActionsTests: XCTestCase {
     }
 
     /// A file missing on disk leaves its item out, and Show in Finder goes
-    /// with the last of them. Regenerate is always listed and disabled exactly
+    /// with the last of them. Edit Summary follows it, in its place without
+    /// one (spec R4). Regenerate is always listed and disabled exactly
     /// when the regenerator has no source: an existing but blank transcript
     /// alone does not enable it, the protocol's full transcript does. With
-    /// neither file the menu holds only the disabled Regenerate.
+    /// neither file the menu holds Edit Summary and the disabled Regenerate.
     func testMenuOfAFinishedJobLeavesOutMissingFilesAndDisablesRegenerateWithoutASource() {
         assertMenu(states: [.done], canRetry: eitherRetry, [
-            (protocolAndTranscript, [.openProtocol, .openTranscript, .showInFinder, .regenerate(enabled: true)]),
-            (protocolHoldingTranscript, [.openProtocol, .showInFinder, .regenerate(enabled: true)]),
-            (protocolWithoutTranscript, [.openProtocol, .showInFinder, .regenerate(enabled: false)]),
-            (transcriptOnly, [.openTranscript, .showInFinder, .regenerate(enabled: true)]),
-            (neither, [.regenerate(enabled: false)]),
-            (unusableTranscript, [.openTranscript, .showInFinder, .regenerate(enabled: false)]),
+            (protocolAndTranscript, [.openProtocol, .openTranscript, .showInFinder, .editSummary, .regenerate(enabled: true)]),
+            (protocolHoldingTranscript, [.openProtocol, .showInFinder, .editSummary, .regenerate(enabled: true)]),
+            (protocolWithoutTranscript, [.openProtocol, .showInFinder, .editSummary, .regenerate(enabled: false)]),
+            (transcriptOnly, [.openTranscript, .showInFinder, .editSummary, .regenerate(enabled: true)]),
+            (neither, [.editSummary, .regenerate(enabled: false)]),
+            (unusableTranscript, [.openTranscript, .showInFinder, .editSummary, .regenerate(enabled: false)]),
             (
                 unusableTranscriptBesideFullProtocol,
-                [.openProtocol, .openTranscript, .showInFinder, .regenerate(enabled: true)],
+                [.openProtocol, .openTranscript, .showInFinder, .editSummary, .regenerate(enabled: true)],
             ),
         ])
     }
 
     /// A finished job with a Notion page lists "Open in Notion" after its
-    /// files and before Regenerate, also when no file is left.
+    /// files and Edit Summary and before Regenerate, also when no file is left.
     func testMenuOfAFinishedJobWithANotionPageListsItAfterTheFiles() {
         for retry in eitherRetry {
             XCTAssertEqual(
                 RecordingRowActions.menuItems(state: .done, onDisk: protocolAndTranscript, canRetry: retry, hasNotionPage: true),
-                [.openProtocol, .openTranscript, .showInFinder, .openInNotion, .regenerate(enabled: true)],
+                [.openProtocol, .openTranscript, .showInFinder, .editSummary, .openInNotion, .regenerate(enabled: true)],
             )
             XCTAssertEqual(
                 RecordingRowActions.menuItems(state: .done, onDisk: neither, canRetry: retry, hasNotionPage: true),
-                [.openInNotion, .regenerate(enabled: false)],
+                [.editSummary, .openInNotion, .regenerate(enabled: false)],
             )
         }
     }
@@ -297,7 +298,7 @@ extension RecordingRowActionsTests {
                 state: .done, onDisk: protocolAndTranscript, canRetry: false, meeting: meeting(), hasNotionPage: true,
             ),
             [
-                .item(.openProtocol), .item(.openTranscript), .item(.showInFinder), .item(.openInNotion),
+                .item(.openProtocol), .item(.openTranscript), .item(.showInFinder), .item(.editSummary), .item(.openInNotion),
                 .item(.regenerate(enabled: true)),
                 .keep(checked: false, enabled: true), .moveAudioToTrash(enabled: true), .moveMeetingToTrash(enabled: true),
             ],
@@ -512,7 +513,7 @@ extension RecordingRowActionsTests {
         XCTAssertEqual(
             RecordingRowActions.menuItems(state: .done, onDisk: protocolAndTranscript, canRetry: false, meeting: rerunnable(), hasNotionPage: true),
             [
-                .item(.openProtocol), .item(.openTranscript), .item(.showInFinder), .item(.openInNotion),
+                .item(.openProtocol), .item(.openTranscript), .item(.showInFinder), .item(.editSummary), .item(.openInNotion),
                 .item(.separator), .item(.regenerate(enabled: true)),
             ] + rerunItems(enabled: true) + below,
         )
@@ -521,7 +522,7 @@ extension RecordingRowActionsTests {
         XCTAssertEqual(
             RecordingRowActions.menuItems(state: .done, onDisk: withReport, canRetry: false, meeting: rerunnable()),
             [
-                .item(.openProtocol), .item(.openTranscript), .item(.showInFinder),
+                .item(.openProtocol), .item(.openTranscript), .item(.showInFinder), .item(.editSummary),
                 .item(.separator), .item(.reportsHeading), .item(.report(report, position: 0)), .item(.separator),
                 .item(.regenerate(enabled: true)),
             ] + rerunItems(enabled: true) + below,

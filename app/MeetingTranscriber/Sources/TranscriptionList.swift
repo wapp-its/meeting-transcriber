@@ -55,6 +55,9 @@ struct TranscriptionEntry: Identifiable, Equatable {
     /// of. Only comparable between entries of one `TranscriptionList.entries`
     /// call.
     let finishOrder: Int?
+    /// The meeting's summary as All Recordings shows it (`MeetingSummaries.shown`),
+    /// nil when it has none. Set by the window's source, which holds the summaries.
+    var summary: String?
 
     /// What Open opens and Show in Finder reveals: the protocol, else the
     /// transcript.
@@ -172,14 +175,15 @@ enum TranscriptionList {
         return order
     }
 
-    /// The entries whose title or any participant contains `query`, ignoring
-    /// case and diacritics, in the order given. A query of only whitespace
+    /// The entries whose title, summary or any participant contains `query`,
+    /// ignoring case and diacritics, in the order given. A query of only whitespace
     /// matches everything.
     static func matching(_ entries: [TranscriptionEntry], query: String) -> [TranscriptionEntry] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty else { return entries }
         return entries.filter { entry in
             entry.title.localizedStandardContains(needle)
+                || entry.summary?.localizedStandardContains(needle) == true
                 || entry.participants.contains { $0.localizedStandardContains(needle) }
         }
     }

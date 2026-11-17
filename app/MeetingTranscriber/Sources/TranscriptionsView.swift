@@ -41,7 +41,7 @@ struct TranscriptionsView: View {
 
     /// What one row shows and offers, worked out once per draw, so its two menus and
     /// its button read the same answers.
-    private struct RowFacts {
+    struct RowFacts {
         let onDisk: FilesOnDisk
         let meeting: RecordingRowActions.Meeting?
         let audioLine: RecordingAudioLine
@@ -65,6 +65,7 @@ struct TranscriptionsView: View {
     @State private var selection: TranscriptionsSelection
     @State private var transcribeAgain: TranscribeAgainSheetState
     @State private var identifySpeakersAgain: IdentifySpeakersAgainSheetState
+    @State private var editSummary: EditSummarySheetState
 
     init(
         entries: [TranscriptionEntry],
@@ -75,6 +76,7 @@ struct TranscriptionsView: View {
         selection: TranscriptionsSelection = TranscriptionsSelection(),
         transcribeAgain: TranscribeAgainSheetState = TranscribeAgainSheetState(),
         identifySpeakersAgain: IdentifySpeakersAgainSheetState = IdentifySpeakersAgainSheetState(),
+        editSummary: EditSummarySheetState = EditSummarySheetState(),
     ) {
         self.entries = entries
         self.query = query
@@ -90,6 +92,7 @@ struct TranscriptionsView: View {
         _selection = State(initialValue: selection)
         _transcribeAgain = State(initialValue: transcribeAgain)
         _identifySpeakersAgain = State(initialValue: identifySpeakersAgain)
+        _editSummary = State(initialValue: editSummary)
     }
 
     // Sections hoisted out of `body`, each type-checked on its own budget (see
@@ -105,6 +108,7 @@ struct TranscriptionsView: View {
         .sheet(isPresented: Bindable(regenerateSheet).isPresented) { regenerateForm }
         .sheet(item: Bindable(transcribeAgain).meeting) { transcribeAgainForm($0) }
         .identifySpeakersAgainSheet(identifySpeakersAgain, actions: actions)
+        .editSummarySheet(editSummary) { actions.saveSummary($0, $1) }
         // `presenting`, so the buttons hold their request whether SwiftUI clears the
         // binding before or after running them.
         .alert(trashPrompt.request?.text.title ?? "", isPresented: trashPromptShown, presenting: trashPrompt.request) { request in
@@ -130,7 +134,7 @@ struct TranscriptionsView: View {
     /// their names, which a toolbar would otherwise reduce to the icon.
     private var toolbarItems: some ToolbarContent {
         ToolbarItemGroup {
-            TextField("Search titles and participants", text: query)
+            TextField("Search titles and summaries", text: query)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 240)
                 .accessibilityIdentifier(A11yID.transcriptionsSearchField)
@@ -287,6 +291,7 @@ struct TranscriptionsView: View {
                     .fontWeight(.medium)
                 if facts.audioLine.showsKeepBadge { keepBadge(index: index) }
             }
+            summaryLine(entry, index: index)
             Text(Self.detailLine(for: entry))
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -297,20 +302,6 @@ struct TranscriptionsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-        }
-    }
-
-    /// While a deletion is incomplete, why it stopped takes the status's place: that
-    /// is what the row needs from the user, and a finished job has nothing to add.
-    @ViewBuilder
-    private func statusLine(_ entry: TranscriptionEntry, facts: RowFacts) -> some View {
-        if let incomplete = facts.audioLine.incompleteText {
-            Label(incomplete, systemImage: "exclamationmark.triangle")
-                .font(.caption)
-                .foregroundStyle(.orange)
-        } else {
-            Label(statusText(entry), systemImage: statusSymbol(entry))
-                .font(.caption)
         }
     }
 
@@ -440,6 +431,7 @@ struct TranscriptionsView: View {
         case .openTranscript: open(entry.transcriptURL, with: actions.openTranscript)
         case .openInNotion: openInNotion(entry)
         case .showInFinder: open(onDisk.protocolExists ? entry.protocolURL : entry.transcriptURL, with: actions.reveal)
+        case .editSummary: editSummary.open(entry, summaries: actions.meetingSummaries(entry.id))
         case .separator, .reportsHeading: break
         case let .report(report, _): open(report.url, with: actions.openProtocol)
         case .regenerate: notice.fileMissing = !actions.regenerate(entry)

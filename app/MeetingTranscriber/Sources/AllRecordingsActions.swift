@@ -97,6 +97,13 @@ struct AllRecordingsActions {
     /// re-run with the method and count picked there, or says why not.
     var identifySpeakersAgain: (UUID, RerunSpeakers) -> RerunAdmission
 
+    // MARK: Summaries
+
+    /// The meeting's summaries, read when its Edit Summary sheet opens.
+    var meetingSummaries: (UUID) -> MeetingSummaries? = { _ in nil }
+    /// Save in the Edit Summary sheet, with the field's text as it is.
+    var saveSummary: (UUID, String) -> Void = { _, _ in }
+
     /// Every action does nothing, no job can be retried or has a file record, no
     /// file is on disk, recordings are kept, the build has no identifier, protocol
     /// generation is off and a re-run would run with the default settings, so a test
