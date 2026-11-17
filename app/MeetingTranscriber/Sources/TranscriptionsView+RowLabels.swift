@@ -14,6 +14,19 @@ extension TranscriptionsView {
         return "\(app) · \(date) · \(duration)"
     }
 
+    /// The line a finished row shows after its meeting's re-run failed or was left
+    /// unnamed (R6, A23).
+    static func rerunWarningLine(_ warning: RerunWarning) -> String {
+        let action = switch warning.mode {
+        case .transcribeAgain: "Transcribe Again"
+        case .identifySpeakersAgain: "Identify Speakers Again"
+        }
+        return switch warning.cause {
+        case let .failed(reason): "\(action) failed: \(reason)"
+        case .unnamed: "\(action) ended: the speakers were not named in time"
+        }
+    }
+
     static func title(of action: MainAction) -> String {
         switch action {
         case .cancel: "Cancel"
@@ -29,6 +42,8 @@ extension TranscriptionsView {
     static func title(of item: RowMenuItem) -> String {
         switch item {
         case let .item(plain): title(of: plain)
+        case .transcribeAgain: "Transcribe Again…"
+        case .identifySpeakersAgain: "Identify Speakers Again…"
         case .keep: "Keep (Never Delete Automatically)"
         case .moveAudioToTrash: "Move Audio to Trash…"
         case .moveMeetingToTrash: "Move Meeting to Trash…"
@@ -54,6 +69,8 @@ extension TranscriptionsView {
     static func identifier(of item: RowMenuItem, index: Int) -> String {
         switch item {
         case let .item(plain): identifier(of: plain, index: index)
+        case .transcribeAgain: A11yID.recordingMenuTranscribeAgain(index)
+        case .identifySpeakersAgain: A11yID.recordingMenuIdentifySpeakersAgain(index)
         case .keep: A11yID.recordingMenuKeep(index)
         case .moveAudioToTrash: A11yID.recordingMenuMoveAudioToTrash(index)
         case .moveMeetingToTrash: A11yID.recordingMenuMoveMeetingToTrash(index)

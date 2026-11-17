@@ -127,8 +127,9 @@ struct MeetingFileRemover {
     /// Whether the path still leads to the regular file the record names, in the
     /// folder it names. A file replaced at the path has another identity; a folder
     /// replaced by a symbolic link leaves the identity alone, as it reaches the very
-    /// same file, and only the resolved folder tells.
-    private static func isTheRecordedFile(_ file: MeetingFile) -> Bool {
+    /// same file, and only the resolved folder tells. A re-run's end makes the same
+    /// check before it removes a file of its own.
+    static func isTheRecordedFile(_ file: MeetingFile) -> Bool {
         var info = stat()
         guard lstat(file.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return false }
         let folder = URL(filePath: file.path, directoryHint: .notDirectory).deletingLastPathComponent()

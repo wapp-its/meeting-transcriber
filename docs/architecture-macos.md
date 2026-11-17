@@ -93,6 +93,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 |------|------|
 | `AppLauncher.swift` | The actual `@main` — a process entry point that makes the one pre-launch diversion decision (e.g. `--localvqe-selftest`) before `MeetingTranscriberApp`/`AppState` construct, since a conforming `App` type cannot intercept its own launch |
 | `MeetingTranscriberApp.swift` | UI shell — SwiftUI scenes, windows, NSOpenPanel, NSWorkspace. Observes `.showSettings` / `.closeSettings` / `.showSpeakerNaming` notifications for RPC- and pipeline-driven scene control; logs menu-triggered protocol-open and quit requests |
+| `Notification.Name+App.swift` | The notification names the menu bar scene observes (`.autoWatchStart`, `.showSpeakerNaming`, `.showSettings`, `.closeSettings`), split out of `MeetingTranscriberApp.swift` at its line cap |
 | `MeetingTranscriberApp+PureHelpers.swift` | Helpers split out of `MeetingTranscriberApp` at its line cap: the previous-exit report, whether watching starts at launch, opening the last notes file with its moved-or-deleted notice, a job line's Open (a file in the output folder's scope or a Notion page), and handing a Notion page to `ProtocolOpener` |
 | `AppState.swift` | `@Observable @MainActor` composition root — wires the concern controllers (`engines`, `watching`, `pipeline`, `permissions`, `channelHealth`, `microphone`, `output`, `audioDevices`, `liveTranscription`, `rpcController`) and exposes the derived UI state (badge, status label) rather than owning it |
 | `AppState+Microphone.swift` | The menu-bar body's accessors for the recording's microphone and app-audio channels (the two red tints, and the Microphone entry's `MicrophoneMenuState`), split out of `AppState.swift` at its line cap |
@@ -274,6 +275,7 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `SpeakerNamingSession.swift` | Collaborator `PipelineQueue` calls for the speaker-naming work still owned by the queue, split out for size |
 | `SpeakerNamingSessionDelegate.swift` | The delegate protocol the naming session reaches the queue through, split out of `SpeakerNamingSession` for size |
 | `SpeakerNamingSession+Late.swift` | Late-confirm and late re-diarization paths for speaker naming |
+| `SpeakerNamingSession+LateWork.swift` | Tracking of the late-naming tasks, so a removed or cancelled job stops them (`startLateWork`, `cancelLateWork`), split out of `SpeakerNamingSession+Late.swift` at its line cap |
 | `SpeakerNamingData.swift` | `PipelineQueue.SpeakerNamingData`/`.Segment`/`SpeakerNamingResult` value types, nested under `PipelineQueue` for source compat |
 | `StaleNamingTimeout.swift` | How long a meeting may wait for speaker names before the launch-time cleanup accepts the automatic names (1 day · 7 days · never) |
 | `SpeakerNamingStore.swift` | Disk persistence for a job's speaker-naming sidecars, keyed by per-job slug; pure I/O, no queue state |

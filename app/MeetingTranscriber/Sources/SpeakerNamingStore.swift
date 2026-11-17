@@ -146,10 +146,12 @@ struct SpeakerNamingStore {
         try FileManager.default.removeItem(at: path)
     }
 
-    /// Delete the 16 kHz audio and segment sidecar files for a slug.
-    func cleanupSidecarFiles(slug: String?) {
+    /// Delete the 16 kHz audio and segment sidecar files for a slug, all but the
+    /// segments file when `keepingSegments`: a finished meeting whose raw
+    /// transcript is kept keeps its word timings for Identify Speakers Again.
+    func cleanupSidecarFiles(slug: String?, keepingSegments: Bool = false) {
         guard let slug, let recordingsDir else { return }
-        for suffix in Self.sidecarSuffixes {
+        for suffix in Self.sidecarSuffixes where !(keepingSegments && suffix == Self.segmentsSuffix) {
             Self.remove(recordingsDir.appendingPathComponent("\(slug)\(suffix)"))
         }
     }

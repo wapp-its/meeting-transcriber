@@ -54,7 +54,7 @@ extension PipelineController {
         guard recordingRetention.effectiveSettings.enabled, !recordingRetention.registry.entries.isEmpty else { return }
         let held: Set<String>
         do {
-            held = try PipelineQueue.heldTrackKeys(of: PipelineSnapshotStore.latestJobs(in: queue.logDir) ?? [])
+            held = try PipelineQueue.heldTrackKeys(of: PipelineQueue.savedJobs(in: queue.logDir, bundleID: meetingFileStore.bundleID))
         } catch {
             logger.warning("Retention pass skipped: the queue snapshot could not be read")
             return

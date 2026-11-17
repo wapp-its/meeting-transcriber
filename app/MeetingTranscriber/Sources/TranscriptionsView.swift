@@ -22,7 +22,8 @@ final class TranscriptionsFileNotice {
 /// `RecordingAudioLine`. Several rows can be selected, and the right-click menu
 /// over them moves their audio or the meetings to the Trash after one confirmation,
 /// as `TrashSelectionPlan` decides. The footer counts the rows shown. Regenerating
-/// a protocol happens in a sheet over the window, which `regenerateSheet` presents.
+/// a protocol happens in a sheet over the window, which `regenerateSheet` presents,
+/// and running a meeting again in sheets of their own (`TranscribeAgainSheet`, `IdentifySpeakersAgainSheet`).
 ///
 /// Data and actions arrive as stored properties, the way `SettingsView` takes
 /// them, so the view reads no app state of its own. The query is a binding for
@@ -62,6 +63,8 @@ struct TranscriptionsView: View {
     @State private var availability: RowAvailability
     @State private var trashPrompt: TrashConfirmationPrompt
     @State private var selection: TranscriptionsSelection
+    @State private var transcribeAgain: TranscribeAgainSheetState
+    @State private var identifySpeakersAgain: IdentifySpeakersAgainSheetState
 
     init(
         entries: [TranscriptionEntry],
@@ -70,6 +73,8 @@ struct TranscriptionsView: View {
         regenerateSheet: RegenerateSheetState,
         regenerationPhase: ProtocolRegenerator.Phase,
         selection: TranscriptionsSelection = TranscriptionsSelection(),
+        transcribeAgain: TranscribeAgainSheetState = TranscribeAgainSheetState(),
+        identifySpeakersAgain: IdentifySpeakersAgainSheetState = IdentifySpeakersAgainSheetState(),
     ) {
         self.entries = entries
         self.query = query
@@ -83,6 +88,8 @@ struct TranscriptionsView: View {
         _availability = State(initialValue: RowAvailability())
         _trashPrompt = State(initialValue: TrashConfirmationPrompt())
         _selection = State(initialValue: selection)
+        _transcribeAgain = State(initialValue: transcribeAgain)
+        _identifySpeakersAgain = State(initialValue: identifySpeakersAgain)
     }
 
     // Sections hoisted out of `body`, each type-checked on its own budget (see
@@ -96,6 +103,8 @@ struct TranscriptionsView: View {
         .frame(minWidth: 560, minHeight: 320)
         .toolbar { toolbarItems }
         .sheet(isPresented: Bindable(regenerateSheet).isPresented) { regenerateForm }
+        .sheet(item: Bindable(transcribeAgain).meeting) { transcribeAgainForm($0) }
+        .identifySpeakersAgainSheet(identifySpeakersAgain, actions: actions)
         // `presenting`, so the buttons hold their request whether SwiftUI clears the
         // binding before or after running them.
         .alert(trashPrompt.request?.text.title ?? "", isPresented: trashPromptShown, presenting: trashPrompt.request) { request in
@@ -140,6 +149,11 @@ struct TranscriptionsView: View {
             }
             .accessibilityIdentifier(A11yID.recordingsRegenerateFromFileButton)
         }
+    }
+
+    /// The Transcribe Again sheet, opened by a row's item for that row's meeting.
+    private func transcribeAgainForm(_ meeting: RerunSheetText.Meeting) -> some View {
+        TranscribeAgainSheet(meeting: meeting, state: transcribeAgain, settings: actions.rerunSettings, transcribeAgain: actions.transcribeAgain)
     }
 
     /// The regenerate form, opened with what the presenter chose: a row's
@@ -239,9 +253,10 @@ struct TranscriptionsView: View {
         let onDisk = availability.filesOnDisk(for: entry, resolve: actions.filesOnDisk)
         let record = actions.meetingFiles(entry.id)
         let audio = availability.audioOnDisk(for: entry, record: record, resolve: actions.audioOnDisk)
+        let sources = availability.sourceAudio(for: entry, record: record, resolve: actions.sourceAudio) ?? .gone
         let exportRunning = entry.isLive && entry.liveNotionExport == .inProgress
         let meeting = record.flatMap { record in
-            audio.map { RecordingRowActions.Meeting(record: record, notionExportRunning: exportRunning, audio: $0) }
+            audio.map { RecordingRowActions.Meeting(record: record, notionExportRunning: exportRunning, audio: $0, sourceAudio: sources) }
         }
         let recorded = RecordingRowActions.RecordedFiles(
             hasProtocol: entry.protocolURL != nil, hasTranscript: entry.transcriptURL != nil,
@@ -259,7 +274,7 @@ struct TranscriptionsView: View {
             ),
             items: RecordingRowActions.menuItems(
                 state: entry.state, onDisk: onDisk, canRetry: canRetry, meeting: meeting,
-                hasNotionPage: entry.notionPageURL != nil,
+                hasNotionPage: entry.notionPageURL != nil, recordOnly: actions.optionsUse().recordOnly, isRegenerating: isRegenerating,
             ),
             main: RecordingRowActions.mainAction(state: entry.state, files: recorded, canRetry: canRetry, meeting: meeting),
         )
@@ -347,6 +362,17 @@ struct TranscriptionsView: View {
         case let .item(plain):
             menuButton(item, index: index) { perform(plain, on: entry, onDisk: facts.onDisk) }
 
+        case .transcribeAgain:
+            menuButton(item, index: index) {
+                if let record = facts.meeting?.record { transcribeAgain.open(.init(entry: entry, record: record, onDisk: facts.onDisk)) }
+            }
+
+        case .identifySpeakersAgain:
+            menuButton(item, index: index) {
+                guard let record = facts.meeting?.record else { return }
+                identifySpeakersAgain.open(.init(entry: entry, record: record, onDisk: facts.onDisk), settings: actions.rerunSettings())
+            }
+
         case let .keep(checked, _):
             Toggle(Self.title(of: item), isOn: keepBinding(entry, checked: checked))
                 .disabled(!isEnabled(item))
@@ -386,7 +412,7 @@ struct TranscriptionsView: View {
     private func isEnabled(_ item: RowMenuItem) -> Bool {
         switch item {
         case let .item(plain): plain != .regenerate(enabled: false)
-        case let .keep(_, enabled), let .moveAudioToTrash(enabled): enabled
+        case let .transcribeAgain(enabled), let .identifySpeakersAgain(enabled), let .keep(_, enabled), let .moveAudioToTrash(enabled): enabled
         case let .moveMeetingToTrash(enabled): enabled && !isRegenerating
         }
     }

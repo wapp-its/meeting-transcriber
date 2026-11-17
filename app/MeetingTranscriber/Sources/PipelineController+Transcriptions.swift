@@ -3,9 +3,18 @@ import Foundation
 /// What the Transcriptions window and the menu's job lines act through: the
 /// one list of jobs, and the actions on its entries.
 extension PipelineController {
-    /// The live jobs and the finished-job history as one list, newest first.
+    /// The live jobs and the finished-job history as one list, newest first. A
+    /// finished meeting whose re-run failed or was left unnamed carries the line
+    /// saying so first among its warnings (A23), on the row only: the record and
+    /// the finished entry stay as they were.
     var transcriptionEntries: [TranscriptionEntry] {
-        TranscriptionList.entries(liveJobs: queue.jobs, records: terminalJobStore.records)
+        let entries = TranscriptionList.entries(liveJobs: queue.jobs, records: terminalJobStore.records)
+        let warnings = queue.rerunWarnings
+        guard !warnings.isEmpty else { return entries }
+        return entries.map { entry in
+            guard entry.state == .done, let warning = warnings[entry.id] else { return entry }
+            return TranscriptionEntry(entry, warnings: [TranscriptionsView.rerunWarningLine(warning)] + entry.warnings)
+        }
     }
 
     /// Called when the Transcriptions window appears. Starts the pipeline the
@@ -25,6 +34,16 @@ extension PipelineController {
     @discardableResult
     func retryJob(id: UUID) -> Bool {
         queue.retryJob(id: id)
+    }
+
+    /// "Transcribe Again" or "Identify Speakers" from a row's sheet, the latter with
+    /// the method and count picked there. The pipeline is started first, as a
+    /// finished job of the meeting still only in the unread snapshot is one the
+    /// re-run has to take over rather than run beside.
+    @discardableResult
+    func rerunJob(id: UUID, mode: RerunMode, speakers: RerunSpeakers? = nil) -> RerunAdmission {
+        ensureQueue()
+        return queue.rerunJob(id: id, mode: mode, speakers: speakers)
     }
 
     /// Take a failed job off the list for good: out of the queue, its audio
@@ -108,6 +127,17 @@ extension PipelineController {
         }
         for jobID in finished {
             removeMovedMeeting(jobID: jobID)
+        }
+    }
+
+    /// The launch rows of a re-run that need no queue, read from this build's re-run
+    /// file before any queue exists (PipelineQueue+RerunRecovery.swift); the rows
+    /// that resume or finish a job run when the first queue restores the file. The
+    /// folder's scope opens only when a record holds a marker of this build.
+    func reconcileInterruptedReruns(isRunning: (DeletionProcess) -> Bool = DeletionProcess.isRunning) {
+        guard meetingFileStore.records.contains(where: { $0.rerun?.bundleID == meetingFileStore.bundleID }) else { return }
+        withOutputFolderScope {
+            PipelineQueue.reconcileOrphanedReruns(in: meetingFileStore, logDir: queueEnvironment.logDir, isRunning: isRunning)
         }
     }
 
@@ -238,5 +268,30 @@ extension PipelineController {
         let opened = access.start(root)
         defer { if opened { access.stop(root) } }
         return body()
+    }
+}
+
+private extension TranscriptionEntry {
+    /// `entry` with other warnings, for the row only.
+    init(_ entry: Self, warnings: [String]) {
+        id = entry.id
+        title = entry.title
+        appName = entry.appName
+        date = entry.date
+        meetingStartTime = entry.meetingStartTime
+        enqueuedAt = entry.enqueuedAt
+        audioDuration = entry.audioDuration
+        participants = entry.participants
+        state = entry.state
+        error = entry.error
+        self.warnings = warnings
+        protocolURL = entry.protocolURL
+        transcriptURL = entry.transcriptURL
+        notionPageURL = entry.notionPageURL
+        hasNotionPage = entry.hasNotionPage
+        liveNotionExport = entry.liveNotionExport
+        isLive = entry.isLive
+        hasRetryableMeetingNotes = entry.hasRetryableMeetingNotes
+        finishOrder = entry.finishOrder
     }
 }

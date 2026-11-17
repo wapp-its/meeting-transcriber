@@ -18,6 +18,11 @@ enum SpeakerNamingRefusal: Error, Equatable {
     /// naming it had before.
     case rerunFoundNoVoices
 
+    /// The reasons of two of the messages, as Identify Speakers Again's warning
+    /// line says them after "failed: ".
+    static let diarizerUnavailableReason = "speaker diarization is not available right now"
+    static let foundNoVoicesReason = "found no voices to name"
+
     var message: String {
         switch self {
         case .notAwaitingNaming:
@@ -27,13 +32,13 @@ enum SpeakerNamingRefusal: Error, Equatable {
             "Re-run is not possible: the saved audio for this meeting was not found."
 
         case .rerunDiarizerUnavailable:
-            "Re-run is not possible: speaker diarization is not available right now."
+            "Re-run is not possible: \(Self.diarizerUnavailableReason)."
 
         case .rerunFailed:
             "Re-run failed, so the speakers from before are shown."
 
         case .rerunFoundNoVoices:
-            "Re-run found no voices to name, so the speakers from before are shown."
+            "Re-run \(Self.foundNoVoicesReason), so the speakers from before are shown."
         }
     }
 }

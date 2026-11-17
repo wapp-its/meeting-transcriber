@@ -49,15 +49,15 @@ extension PipelineController {
     }
 
     // swiftlint:disable discouraged_optional_collection
-    /// The saved jobs only the snapshot holds (`loadSnapshot` reads the same two
-    /// places), none once a queue has read it or when there is no file, and nil when
-    /// they cannot be known: the file does not read, or did not when the queue tried,
-    /// which leaves a queue with an engine and an empty list.
+    /// The saved jobs only the snapshot and this build's re-run file hold
+    /// (`loadSnapshot` reads the same places), none once a queue has read them or
+    /// when there is no file, and nil when they cannot be known: a file does not
+    /// read, or the snapshot did not when the queue tried, which leaves a queue with
+    /// an engine and an empty list.
     private func jobsTheQueueHasNotRead() -> [PipelineJob]? {
         guard !queue.snapshotRestoreFailed else { return nil }
         guard queue.engine == nil else { return [] }
-        let logDir = queueEnvironment.logDir
-        return try? PipelineSnapshotStore.existing(for: logDir)?.latestSaved ?? PipelineSnapshot.load(from: logDir) ?? []
+        return try? PipelineQueue.savedJobs(in: queueEnvironment.logDir, bundleID: meetingFileStore.bundleID)
     }
 
     // swiftlint:enable discouraged_optional_collection

@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-11-14T20:19:06.661933Z",
+  "depends_on": [
+    "gh-171-transcribe-again-and-identify-speakers.1"
+  ],
+  "id": "gh-171-transcribe-again-and-identify-speakers.2",
+  "priority": null,
+  "review": "codex:gpt-6.1-sol:xhigh",
+  "spec": "gh-171-transcribe-again-and-identify-speakers",
+  "spec_path": ".flow/tasks/gh-171-transcribe-again-and-identify-speakers.2.md",
+  "status": "done",
+  "title": "Re-run a finished meeting through the pipeline under file names of its own",
+  "updated_at": "2026-11-14T20:38:08.996385Z"
+}
