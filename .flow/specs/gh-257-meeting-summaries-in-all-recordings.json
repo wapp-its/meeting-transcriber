@@ -344,7 +344,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/gh-257-meeting-summaries-in-all-recordings.md",
-  "status": "open",
+  "status": "done",
   "title": "Meeting summaries in All Recordings",
   "tracker": {
     "baseHashFlow": "41c019de550ee6464bfdecc61b8a402f4f01413b336782361c65036fb3dfaee9",
@@ -358,5 +358,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nAll Recordings lists each meeting with its title, app, date and length. Many titles are generic (the app name, a file name or \"Recovered Recording\"), so the list does not show which meeting is which. Today you have to open the notes to find out.\n\n## NOTES\n\n- Each row shows a short summary of what the meeting was about. It comes from the meeting notes, or from the transcript when there are no notes.\n- The summary can be edited. New notes for the meeting never replace a summary that was edited by hand.\n- Builds on the rows and the row menu of #171 (Transcribe Again).\n- Related: #126 (the search finds no participants), #201 (no file reads while the list is drawn).\n\n## TASKS\n\n- [ ] Mockup of the rows with summaries and of the edit state\n- [ ] Spec",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/257"
   },
-  "updated_at": "2026-11-17T09:36:10.416867Z"
+  "updated_at": "2026-11-17T09:40:58.795240Z"
 }

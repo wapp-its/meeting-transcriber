@@ -10,7 +10,7 @@
   "review": "codex:gpt-6.1-sol:xhigh",
   "spec": "gh-257-meeting-summaries-in-all-recordings",
   "spec_path": ".flow/tasks/gh-257-meeting-summaries-in-all-recordings.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement Meeting summaries in All Recordings",
   "updated_at": "2026-11-17T05:40:34.154346Z"
 }
