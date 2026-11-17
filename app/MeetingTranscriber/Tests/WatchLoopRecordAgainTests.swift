@@ -339,7 +339,10 @@ final class WatchLoopRecordAgainTests: XCTestCase { // swiftlint:disable:this ba
             // Exact lines, so no title rides along and no release follows the lift.
             XCTAssertEqual(
                 harness.noticeLines,
-                ["recording_stopped_by_hand trigger=auto", "redetect_hold_set app=Microsoft Teams", "record_again app=Microsoft Teams"],
+                [
+                    "meeting_title_rank at=detection rank=4 parts=1", "recording_stopped_by_hand trigger=auto", "redetect_hold_set app=Microsoft Teams",
+                    "record_again app=Microsoft Teams", "meeting_title_rank at=detection rank=4 parts=1",
+                ],
                 label,
             )
             loop.stop()

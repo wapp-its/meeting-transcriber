@@ -239,7 +239,10 @@ final class WatchLoopStopByHandTests: XCTestCase { // swiftlint:disable:this bal
         XCTAssertEqual(try trackFrames(recorder), [480_000, 480_000, 480_000], "nothing is cut")
         XCTAssertTrue(harness.askedIDs.isEmpty, "no meeting-end question")
         // Exact lines, so nothing else, a title least of all, rides along.
-        XCTAssertEqual(harness.noticeLines, ["recording_stopped_by_hand trigger=auto", "redetect_hold_set app=Microsoft Teams"])
+        XCTAssertEqual(
+            harness.noticeLines,
+            ["meeting_title_rank at=detection rank=4 parts=1", "recording_stopped_by_hand trigger=auto", "redetect_hold_set app=Microsoft Teams"],
+        )
         XCTAssertTrue(harness.autoStopLines.isEmpty, "a stop by hand is not an automatic stop")
     }
 
@@ -346,7 +349,10 @@ final class WatchLoopStopByHandTests: XCTestCase { // swiftlint:disable:this bal
         XCTAssertTrue(queue.jobs.isEmpty, "no job for a recording that failed to stop")
         XCTAssertGreaterThanOrEqual(harness.elapsed, watchingAgainAt + 6, "precondition: at least five more polls")
         XCTAssertEqual(harness.recorderStarts, 1, "the still-active app is not recorded again")
-        XCTAssertEqual(harness.noticeLines, ["recording_stopped_by_hand trigger=auto", "redetect_hold_set app=Microsoft Teams"])
+        XCTAssertEqual(
+            harness.noticeLines,
+            ["meeting_title_rank at=detection rank=4 parts=1", "recording_stopped_by_hand trigger=auto", "redetect_hold_set app=Microsoft Teams"],
+        )
         loop.stop()
     }
 

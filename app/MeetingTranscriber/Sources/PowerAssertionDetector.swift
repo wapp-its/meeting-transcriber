@@ -527,6 +527,8 @@ class PowerAssertionDetector: MeetingDetecting {
         case .shared: matchers[pattern.appName]
         case .perProcess: MeetingTitleMatcher(pattern: meetingPattern)
         }
+        // Teams ranks its windows (`TeamsWindowTitle`), every other app keeps the plain pick.
+        if TeamsWindowTitle.ranks(meetingPattern) { return matcher?.selectRankedTitle(from: windowListProvider())?.title }
         return matcher?.selectWindowTitle(from: windowListProvider())
     }
 
@@ -571,5 +573,17 @@ class PowerAssertionDetector: MeetingDetecting {
             if a meeting is active, detection is not firing.
             """)
         }
+    }
+}
+
+extension PowerAssertionDetector {
+    /// The best-ranked Teams window title right now, for a running Teams
+    /// recording's meeting-end wait (`WatchLoop+MeetingTitle.swift`). Nil for
+    /// any other app, which keeps its detection title, and when no Teams
+    /// window is usable: without the Screen Recording grant the list carries
+    /// no titles.
+    func rankedWindowTitle(for meeting: DetectedMeeting) -> RankedWindowTitle? {
+        guard TeamsWindowTitle.ranks(meeting.pattern), let matcher = matchers[AppMeetingPattern.teams.appName] else { return nil }
+        return matcher.selectRankedTitle(from: windowListProvider())
     }
 }

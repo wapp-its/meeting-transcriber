@@ -588,4 +588,12 @@ final class CompositeMeetingDetector: MeetingDetecting {
             detector.markConfirmed(appName: appName)
         }
     }
+
+    /// The first strategy's answer, each asked once: an ask reads a fresh window list (only the assertion channel answers).
+    func rankedWindowTitle(for meeting: DetectedMeeting) -> RankedWindowTitle? {
+        for detector in detectors {
+            if let ranked = detector.rankedWindowTitle(for: meeting) { return ranked }
+        }
+        return nil
+    }
 }
