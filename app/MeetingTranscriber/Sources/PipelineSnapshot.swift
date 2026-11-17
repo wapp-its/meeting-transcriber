@@ -17,6 +17,20 @@ enum PipelineSnapshot {
     static let snapshotFilename = "pipeline_queue.json"
     static let stagingFilename = "pipeline_queue.tmp"
 
+    /// The file a build keeps its re-run jobs in, beside the queue's snapshot and
+    /// never in it (A24): both builds restore `pipeline_queue.json` at launch, and
+    /// a build without re-runs would run one as a new meeting under the meeting's
+    /// current names. Named with the build's bundle identifier, so each build
+    /// restores only its own.
+    static func rerunFilename(bundleID: String?) -> String {
+        "pipeline_reruns.\(bundleID ?? "unknown").json"
+    }
+
+    /// The staging file a write of `name` goes through first.
+    private static func stagingName(for name: String) -> String {
+        name == snapshotFilename ? stagingFilename : URL(filePath: name).deletingPathExtension().lastPathComponent + ".tmp"
+    }
+
     /// The encoder every snapshot is written with. Keys are sorted because a
     /// plain `JSONEncoder` writes an object's keys in hash order, which can
     /// differ between two encodes of the same value in one process, so equal
@@ -39,7 +53,12 @@ enum PipelineSnapshot {
     /// - Throws: `EncodingError` from JSONEncoder, or any `FileManager` /
     ///   `FileHandle` I/O error. A failed replace leaves no staging file.
     static func save(_ jobs: [PipelineJob], to logDir: URL) throws {
-        try save(jobs, to: logDir) { snapshot, staging in
+        try save(jobs, to: logDir, named: snapshotFilename)
+    }
+
+    /// `save` into the file `name` instead, staged the same way.
+    static func save(_ jobs: [PipelineJob], to logDir: URL, named name: String) throws {
+        try save(jobs, to: logDir, named: name) { snapshot, staging in
             _ = try FileManager.default.replaceItemAt(snapshot, withItemAt: staging)
         }
     }
@@ -49,10 +68,17 @@ enum PipelineSnapshot {
     static func save(
         _ jobs: [PipelineJob], to logDir: URL, replace: (_ snapshot: URL, _ staging: URL) throws -> Void,
     ) throws {
+        try save(jobs, to: logDir, named: snapshotFilename, replace: replace)
+    }
+
+    private static func save(
+        _ jobs: [PipelineJob], to logDir: URL, named name: String,
+        replace: (_ snapshot: URL, _ staging: URL) throws -> Void,
+    ) throws {
         let data = try makeEncoder().encode(jobs)
-        let stagingPath = logDir.appendingPathComponent(stagingFilename)
+        let stagingPath = logDir.appendingPathComponent(stagingName(for: name))
         try writeOwnerOnly(data, to: stagingPath)
-        let snapshotPath = logDir.appendingPathComponent(snapshotFilename)
+        let snapshotPath = logDir.appendingPathComponent(name)
         do {
             try replace(snapshotPath, stagingPath)
         } catch {
@@ -91,8 +117,8 @@ enum PipelineSnapshot {
     ///   `[]` on missing-file would lose that distinction.
     /// - Throws: any read or `DecodingError` failure. Caller decides how
     ///   to recover (PipelineQueue logs + drops the load).
-    static func load(from logDir: URL) throws -> [PipelineJob]? {
-        let snapshotPath = logDir.appendingPathComponent(snapshotFilename)
+    static func load(from logDir: URL, named name: String = snapshotFilename) throws -> [PipelineJob]? {
+        let snapshotPath = logDir.appendingPathComponent(name)
         guard FileManager.default.fileExists(atPath: snapshotPath.path) else {
             return nil
         }

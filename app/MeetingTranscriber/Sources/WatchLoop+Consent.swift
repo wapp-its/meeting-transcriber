@@ -170,7 +170,8 @@ extension WatchLoop {
         // one lost its options when it was cleared, and the ones held now
         // belong to the newer question.
         var protocolOptions: MeetingProtocolOptions?
-        if pendingConsentQuestion == question {
+        let wasOpen = pendingConsentQuestion == question
+        if wasOpen {
             protocolOptions = pendingConsentProtocolOptions
             clearConsentState()
         }
@@ -190,6 +191,7 @@ extension WatchLoop {
                 // by up to ten minutes, so undoing a mistaken Never would
                 // silently keep doing nothing.
                 denyListStore.deny(key)
+                ignoredCalls.forget(key)
 
             default:
                 consentPolicy.recordDecline(app: key, now: nowProvider())
@@ -206,6 +208,11 @@ extension WatchLoop {
             not asking again \(quiet, privacy: .public)
             """)
             detector.reset(appName: key)
+            // An Ignore offers "Record (<App>)" for the rest of this call
+            // (`WatchLoop+RecordIgnored.swift`). A decline booked by Stop
+            // Watching or a manual start cleared the question before it
+            // landed here, so it offers nothing.
+            if answer == .declined, wasOpen, isActive { rememberIgnoredCall(meeting) }
             return
         }
         logger.info("Consent for \(question.app, privacy: .public) resolved: granted")

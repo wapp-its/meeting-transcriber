@@ -17,12 +17,14 @@ import Observation
 /// A row's audio also follows its `MeetingFileRecord`: the automatic check deletes
 /// audio with the window open, and `TranscriptionEntry` says nothing about audio,
 /// so nothing above would notice. A record that differs from the one the audio
-/// was read for is read again.
+/// was read for is read again. The same holds for the audio a re-run would read,
+/// which for an import is the user's own file, outside what the app owns.
 @Observable
 @MainActor
 final class RowAvailability {
     typealias FilesOnDisk = RecordingRowActions.FilesOnDisk
     typealias AudioOnDisk = RecordingAudioLine.AudioOnDisk
+    typealias SourceAudio = RecordingRowActions.SourceAudio
 
     /// Moved on by every refresh and read by every lookup, so a refresh
     /// redraws the rows that asked, while a lookup storing what it read into
@@ -30,6 +32,7 @@ final class RowAvailability {
     private var generation = 0
     @ObservationIgnored private var found: [UUID: FilesOnDisk] = [:]
     @ObservationIgnored private var audio: [UUID: (record: MeetingFileRecord, onDisk: AudioOnDisk?)] = [:]
+    @ObservationIgnored private var sources: [UUID: (record: MeetingFileRecord, found: SourceAudio)] = [:]
 
     /// The row's files as last read, read now through `resolve` when this row
     /// has not been read since the last refresh.
@@ -56,11 +59,26 @@ final class RowAvailability {
         return read
     }
 
+    /// The row's source audio as last read for `record`, read now through `resolve`
+    /// under the same rule as `audioOnDisk`. Nil without a record.
+    func sourceAudio(for entry: TranscriptionEntry, record: MeetingFileRecord?, resolve: (MeetingFileRecord) -> SourceAudio) -> SourceAudio? {
+        _ = generation
+        guard let record else {
+            sources[entry.id] = nil
+            return nil
+        }
+        if let known = sources[entry.id], known.record == record { return known.found }
+        let read = resolve(record)
+        sources[entry.id] = (record, read)
+        return read
+    }
+
     /// Forgets every row's files and audio, so each is read again the next time it
     /// is drawn.
     func refresh() {
         found.removeAll()
         audio.removeAll()
+        sources.removeAll()
         generation += 1
     }
 }

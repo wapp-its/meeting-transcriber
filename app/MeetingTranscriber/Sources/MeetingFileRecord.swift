@@ -89,11 +89,22 @@ struct MeetingFileRecord: Codable, Equatable, Sendable {
     /// retention acts only on the records of its own build. Nil in a record from before
     /// this field, or from a build without an identifier: never deleted automatically.
     var createdBy: String?
+    /// What a re-run of the meeting needs and its finished-job entry does not keep,
+    /// taken from the job when it enters processing. Nil in a record from before
+    /// this field, and in one an older build rewrote, which drops fields it does
+    /// not know; `rerunInputs(finished:)` then gives the fallbacks.
+    var runInputs: RunInputs?
+    /// The re-run of the meeting under way, from its admission until it ends. While
+    /// it is set the outcome reads in progress and no second re-run is admitted.
+    var rerun: RerunMarker?
+    /// How the meeting's last re-run ended, kept until the next one is admitted.
+    var rerunNote: RerunNote?
 }
 
 extension MeetingFileRecord {
     /// A new record for a job entering processing, listing the source tracks it
-    /// carries. `createdBy` is the running build's bundle identifier
+    /// carries and its run inputs, so `job` must already carry the template its
+    /// admission picked. `createdBy` is the running build's bundle identifier
     /// (`MeetingFileStore.bundleID`).
     init(job: PipelineJob, origin: Origin, createdBy: String?) {
         let tracks: [(role: MeetingFile.Role, url: URL?)] = [
@@ -107,6 +118,7 @@ extension MeetingFileRecord {
                 track.url.map { MeetingFile(role: track.role, url: $0, owned: origin.owns(track.role)) }
             },
             createdBy: createdBy,
+            runInputs: RunInputs(job: job),
         )
     }
 
@@ -128,6 +140,9 @@ extension MeetingFileRecord {
                 .decodeIfPresent(Bool.self, forKey: .excludedFromAutomaticDeletion) ?? false,
             savedToNotion: container.decodeIfPresent(Bool.self, forKey: .savedToNotion) ?? false,
             createdBy: container.decodeIfPresent(String.self, forKey: .createdBy),
+            runInputs: container.decodeIfPresent(RunInputs.self, forKey: .runInputs),
+            rerun: container.decodeIfPresent(RerunMarker.self, forKey: .rerun),
+            rerunNote: container.decodeIfPresent(RerunNote.self, forKey: .rerunNote),
         )
     }
 

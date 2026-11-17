@@ -148,7 +148,8 @@ final class PipelineQueueMeetingFilesLifecycleTests: XCTestCase {
     }
 
     /// The queue removes a finished job after a minute, and that says nothing
-    /// about how the meeting ended. Removing it takes the sidecars with it.
+    /// about how the meeting ended. Removing it takes the audio sidecars with it;
+    /// the word timings stay, as the raw transcript is kept (R7).
     func testTheQueuesReapingOfAFinishedJobKeepsItsOutcome() async throws {
         let queue = makeQueue(completedJobLifetime: 0.01)
         let job = try makeRecording()
@@ -158,8 +159,8 @@ final class PipelineQueueMeetingFilesLifecycleTests: XCTestCase {
 
         XCTAssertTrue(queue.jobs.isEmpty, "test premise: the job was reaped")
         XCTAssertEqual(try record(of: job).outcome, .finished(protocolExpected: true))
-        XCTAssertEqual(try roles(in: .gone, of: job), [.mix16k, .app16k, .mic16k, .segments])
-        XCTAssertEqual(try roles(in: .present, of: job), [.mix, .appTrack, .micTrack, .transcript, .protocol])
+        XCTAssertEqual(try roles(in: .gone, of: job), [.mix16k, .app16k, .mic16k])
+        XCTAssertEqual(try roles(in: .present, of: job), [.mix, .appTrack, .micTrack, .segments, .transcript, .protocol])
     }
 
     func testRemovingAFailedJobKeepsItsOutcome() async throws {
@@ -255,6 +256,7 @@ final class PipelineQueueMeetingFilesLifecycleTests: XCTestCase {
 
     // MARK: - Speaker naming
 
+    /// All but the word timings, which stay with the raw transcript kept (R7).
     func testEveryWayOutOfNamingMarksItsFilesGone() async throws {
         let resolutions: [(name: String, resolve: (PipelineQueue, UUID) -> Void)] = [
             ("confirmed", { $0.completeSpeakerNaming(jobID: $1, result: .confirmed(["SPEAKER_0": "Alice"])) }),
@@ -269,7 +271,7 @@ final class PipelineQueueMeetingFilesLifecycleTests: XCTestCase {
             await waitFor(queue.job(withID: job.id)?.state == .done, timeout: .seconds(10))
 
             XCTAssertEqual(queue.job(withID: job.id)?.state, .done, "test premise: \(name)")
-            XCTAssertEqual(try roles(in: .gone, of: job), namingRoles, name)
+            XCTAssertEqual(try roles(in: .gone, of: job), namingRoles.subtracting([.segments]), name)
         }
     }
 
@@ -517,5 +519,64 @@ final class PipelineQueueMeetingFilesLifecycleTests: XCTestCase {
         )
 
         XCTAssertFalse(try record(of: job).savedToNotion)
+    }
+}
+
+extension PipelineQueueMeetingFilesLifecycleTests {
+    // MARK: - Word timings (R7)
+
+    /// How a finished meeting's naming files go.
+    private enum NamingFilesGo: CaseIterable {
+        case named, leftTheQueue, heldAfterCompletion
+    }
+
+    /// A recorded meeting run to its end in `way`, with the raw transcript option as given.
+    private func finishedMeeting(_ way: NamingFilesGo, keepingRawTranscript: Bool) async throws -> PipelineJob {
+        switch way {
+        case .named:
+            let queue = makeQueue(parksForNaming: true, saveRawTranscript: keepingRawTranscript)
+            let job = try await parkForNaming(in: queue)
+            queue.completeSpeakerNaming(jobID: job.id, result: .confirmed(["SPEAKER_0": "Alice"]))
+            await waitFor(queue.job(withID: job.id)?.state == .done, timeout: .seconds(10))
+            XCTAssertEqual(queue.job(withID: job.id)?.state, .done, "test premise")
+            return job
+
+        case .leftTheQueue:
+            let queue = makeQueue(saveRawTranscript: keepingRawTranscript, completedJobLifetime: 0.01)
+            let job = try makeRecording()
+            await run(job, in: queue)
+            await waitFor(queue.jobs.isEmpty, timeout: .seconds(5))
+            XCTAssertTrue(queue.jobs.isEmpty, "test premise: the job was reaped")
+            return job
+
+        case .heldAfterCompletion:
+            let generator = MockProtocolGen()
+            generator.shouldThrow = true
+            let queue = makeQueue(protocolGen: generator, saveRawTranscript: keepingRawTranscript)
+            let job = try makeRecording()
+            await run(job, in: queue)
+            XCTAssertEqual(queue.job(withID: job.id)?.isHeldAfterCompletion, true, "test premise: the failed notes hold it")
+            return job
+        }
+    }
+
+    func testAFinishedMeetingKeepsItsWordTimingsOnlyWithTheRawTranscriptKept() async throws {
+        for way in NamingFilesGo.allCases {
+            let kept = try await finishedMeeting(way, keepingRawTranscript: true)
+            let segments = try file(.segments, of: kept)
+            XCTAssertEqual(segments.state, .present, "\(way)")
+            XCTAssertEqual(segments.identity, FileIdentity.of(segments.path), "\(way): not the file on disk")
+            XCTAssertNotNil(segments.identity, "\(way): the segments file is not on disk")
+            XCTAssertEqual(try permissions(of: segments.path), FileManager.ownerOnlyPermissions, "\(way)")
+            let record = try record(of: kept)
+            XCTAssertTrue(record.filesCovered(by: .meetingToTrash).contains(segments), "\(way): Move Meeting to Trash leaves it")
+            for kind in [MeetingFileRecord.DeletionKind.audioToTrash, .automatic] {
+                XCTAssertFalse(record.filesCovered(by: kind).contains { $0.role == .segments }, "\(way): \(kind) takes it")
+            }
+
+            let deleted = try await finishedMeeting(way, keepingRawTranscript: false)
+            XCTAssertEqual(try file(.segments, of: deleted).state, .gone, "\(way)")
+            try XCTAssertFalse(FileManager.default.fileExists(atPath: file(.segments, of: deleted).path), "\(way)")
+        }
     }
 }

@@ -29,8 +29,9 @@ extension PipelineQueue {
     /// all reach too. Before the job is done the cleaner still keeps the
     /// recording, since the job holds its tracks.
     func markOutputWritten(jobID: UUID, output: URL?) {
-        // Named is not written: the file has to be there, with content.
-        guard let recordingRetention, let output, RecordingRetentionPolicy.isWrittenFile(output) else { return }
+        // Named is not written: the file has to be there, with content. A re-run's
+        // output is not the meeting's until the re-run succeeds.
+        guard let recordingRetention, let output, !isRerun(jobID), RecordingRetentionPolicy.isWrittenFile(output) else { return }
         recordingRetention.registry.markEligible(jobID: jobID, output: output, at: Date())
     }
 

@@ -184,6 +184,8 @@ final class PipelineQueueMeetingFilesEntryTests: XCTestCase {
         XCTAssertEqual(record.recordingDate, job.enqueuedAt)
         XCTAssertEqual(record.files.map(\.role), [.mix, .appTrack, .micTrack])
         XCTAssertTrue(record.files.allSatisfy(\.owned))
+        XCTAssertNotNil(job.protocolTemplate, "test premise: the admission picked a template")
+        XCTAssertEqual(record.runInputs, MeetingFileRecord.RunInputs(job: job), "taken after the admission")
         await queue.awaitProcessing()
     }
 

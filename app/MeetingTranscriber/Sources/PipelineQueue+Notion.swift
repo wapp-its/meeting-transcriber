@@ -14,8 +14,25 @@ struct NotionExportConfiguration {
     /// Notion that answers slowly instead of failing keeps the job's export in
     /// progress for hours.
     var deadline = Self.defaultDeadline
+    /// Makes an exporter for another database with the same key, for an export
+    /// that goes to the database of the page a meeting already has (`targeting`).
+    /// Nil keeps every export in `databaseID`.
+    var exporterForDatabase: (@Sendable (String) -> any NotionExporting)?
 
     static let defaultDeadline = Duration.seconds(600)
+
+    /// This configuration aimed at `other`, the database of a page the meeting
+    /// already has (A26), so the page is found there and the client reads that
+    /// database's columns; unchanged when `other` is this database or no exporter
+    /// can be made for it.
+    func targeting(databaseID other: String) -> Self {
+        let normalize = { (id: String) in NotionClient.extractID(from: id) ?? id }
+        guard let exporterForDatabase, normalize(other) != normalize(databaseID) else { return self }
+        return Self(
+            exporter: exporterForDatabase(other), databaseID: other, skipLocalMarkdown: skipLocalMarkdown,
+            speakerTagsEnabled: speakerTagsEnabled, deadline: deadline, exporterForDatabase: exporterForDatabase,
+        )
+    }
 
     @MainActor
     static func resolve(settings: AppSettings) -> NotionExportResolution {
@@ -30,7 +47,7 @@ struct NotionExportConfiguration {
             databaseID: databaseID,
             skipLocalMarkdown: settings.notionSkipLocalMarkdownOnSuccess,
             speakerTagsEnabled: settings.notionSpeakerTagsEnabled,
-        ))
+        ) { NotionClient(apiKey: key, databaseID: $0) })
     }
 }
 
@@ -344,8 +361,36 @@ extension PipelineQueue {
 
     @discardableResult
     func retryNotionExport(id: UUID) async -> Bool {
-        guard canRetryNotionExport(id: id), let job = jobs.first(where: { $0.id == id }) else { return false }
-        guard let configuration = notionExportConfigurationProvider?().configuration else {
+        guard canRetryNotionExport(id: id) else { return false }
+        return await exportSavedNotes(id: id)
+    }
+
+    /// The export configuration Settings give, aimed at the database of the page
+    /// the meeting has when the job `id` is a re-run or a finished job one made
+    /// (A26). Such a job with a page but no recorded database (a record from before
+    /// the run inputs) takes its page as the configured database's, so the page is
+    /// updated, not made again (A6).
+    func notionExportResolution(forJobID id: UUID) -> NotionExportResolution {
+        let resolution = notionExportConfigurationProvider?() ?? .disabled
+        guard let index = liveJobIndex(of: id), jobs[index].rerun != nil || jobs[index].exportsToPageDatabase == true,
+              case let .ready(configuration) = resolution else { return resolution }
+        guard let databaseID = jobs[index].notionDatabaseID else {
+            if let page = jobs[index].notionPageID {
+                jobs[index].recordNotionPage(
+                    NotionPageResult(pageID: page, url: jobs[index].notionPageURL?.absoluteString), databaseID: configuration.databaseID,
+                )
+            }
+            return resolution
+        }
+        return .ready(configuration.targeting(databaseID: databaseID))
+    }
+
+    /// The export of the notes saved on disk, the path a retry takes; also the one
+    /// export a re-run committed before a quit starts at the next launch.
+    @discardableResult
+    func exportSavedNotes(id: UUID) async -> Bool {
+        guard let job = jobs.first(where: { $0.id == id }) else { return false }
+        guard let configuration = notionExportResolution(forJobID: job.id).configuration else {
             addWarning(id: id, Self.notionRetryConfigurationWarning)
             persistNotionExportChange(jobID: id)
             return false
@@ -410,9 +455,23 @@ extension PipelineQueue {
     /// never got the rest of the content, and an export that starts over an earlier
     /// page may leave that page in any state. So the mark goes off when one starts,
     /// also one still queued, which a quit ends failed without it having run.
+    ///
+    /// The run inputs get the job's page and its database with it, which a re-run
+    /// updates instead of making a second page. The other inputs stay as the job
+    /// entered processing with them, also after a Regenerate Notes changed the
+    /// job's template; a record an older build rewrote without them takes them
+    /// from the job.
     private func noteNotionExport(of job: PipelineJob) {
-        guard !isRetired else { return }
-        meetingFileStore?.update(jobID: job.id) { $0.savedToNotion = job.hasCompletedNotionExport }
+        // A re-run's export starts only once it succeeded; until then the record
+        // keeps the meeting's export as it was.
+        guard !isRetired, job.rerun == nil else { return }
+        meetingFileStore?.update(jobID: job.id) { record in
+            record.savedToNotion = job.hasCompletedNotionExport
+            var inputs = record.runInputs ?? MeetingFileRecord.RunInputs(job: job)
+            inputs.notionDatabaseID = job.notionDatabaseID
+            inputs.notionPageID = job.notionPageID
+            record.runInputs = inputs
+        }
     }
 
     private func addNotionExportWarnings(_ result: NotionPageResult, id jobID: UUID) {

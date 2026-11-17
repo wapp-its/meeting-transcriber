@@ -119,6 +119,10 @@ final class PipelineController {
     /// runs the quit.
     @ObservationIgnored var quitHasBegun: () -> Bool = { false }
 
+    /// Whether a Regenerate Notes runs, which a re-run's swap waits out. Set by
+    /// `AppState`, which holds the regenerator.
+    @ObservationIgnored var isRegenerationRunning: @MainActor () -> Bool = { false }
+
     /// The output-folder bookmark the current queue was built from, so a change
     /// of folder can be noticed without resolving the bookmark again.
     @ObservationIgnored private var queueBuiltFromBookmark: Data?
@@ -133,6 +137,11 @@ final class PipelineController {
     /// reachable at process teardown, since `rebuild`/`ensureQueue` are driven
     /// by user actions while `AppState` is alive. Captures the owner weakly.
     private var engineProvider: (() -> (any TranscribingEngine)?)?
+
+    /// Each engine kind's instance, as the active-engine provider last returned it
+    /// while Settings named that kind. A re-run runs with the engine Settings named
+    /// when it was admitted, which a later switch in Settings must not change.
+    @ObservationIgnored private var enginesByKind: [TranscriptionEngineSetting: any TranscribingEngine] = [:]
 
     init(
         settings: AppSettings,
@@ -170,6 +179,7 @@ final class PipelineController {
     /// stored-property init.
     func activate(engineProvider: @escaping () -> (any TranscribingEngine)?) {
         self.engineProvider = engineProvider
+        reconcileInterruptedReruns()
         reconcileInterruptedDeletions()
         observeOutputFolder()
         connectRetentionToMeetingRecords()
@@ -370,6 +380,13 @@ final class PipelineController {
             protocolTemplateStore: .production,
             speakerMatcherFactory: SpeakerMatcher.factory(dbPath: speakersDB, notifier: notifier),
             vadConfig: settings.vadEnabled ? VADConfig(threshold: settings.vadThreshold) : nil,
+            engineForKind: { [self] kind in self.engine(ofKind: kind) },
+            rerunSettings: { [settings] in
+                PipelineJob.RerunSettings(
+                    engine: settings.transcriptionEngine, diarize: settings.diarize, numSpeakers: settings.numSpeakers,
+                    vadThreshold: settings.vadEnabled ? settings.vadThreshold : nil,
+                )
+            },
             recognitionStatsLog: RecognitionStatsLog(path: queueEnvironment.recognitionStatsLog),
             terminologyNormalizer: { [weak settings] in
                 settings?.terminologyNormalizerForJob() ?? TerminologyNormalizer()
@@ -381,6 +398,17 @@ final class PipelineController {
             securityScope: queueEnvironment.securityScope,
             recordingRetention: recordingRetention,
         )
+    }
+
+    /// The engine instance of `kind`: the active one while Settings names `kind`,
+    /// else the instance it was the last time Settings named it, nil if never.
+    /// A re-run's admission asks while Settings names its kind, so its stages find it.
+    func engine(ofKind kind: TranscriptionEngineSetting) -> (any TranscribingEngine)? {
+        if settings.transcriptionEngine == kind, let active = engineProvider?() {
+            enginesByKind[kind] = active
+            return active
+        }
+        return enginesByKind[kind]
     }
 
     /// One-stop FluidDiarizer instantiation. Captures the current tuning fields
@@ -448,6 +476,7 @@ final class PipelineController {
 
     func configureCallbacks(on target: PipelineQueue? = nil) {
         let queue = target ?? queue
+        queue.isRegenerationRunning = { [weak self] in self?.isRegenerationRunning() ?? false }
         queue.onNotionExportFinished = { [notifier] in notifier.notifyNotionExport(job: $0, failureReason: $1) }
         queue.onJobStateChange = { [notifier, settings] job, _, newState in
             switch newState {

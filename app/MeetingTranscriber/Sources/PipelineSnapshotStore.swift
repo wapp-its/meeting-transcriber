@@ -22,24 +22,36 @@ final class PipelineSnapshotStore {
 
     private static var live: [String: PipelineSnapshotStore] = [:]
 
-    /// The store writing `dir` right now, or nil when every write to it has
-    /// landed.
-    static func existing(for dir: URL) -> PipelineSnapshotStore? {
-        live[key(dir)]
+    /// The store writing the file `name` in `dir` right now, or nil when every
+    /// write to it has landed.
+    static func existing(for dir: URL, named name: String = PipelineSnapshot.snapshotFilename) -> PipelineSnapshotStore? {
+        live[key(dir, name)]
     }
 
-    /// The newest job list for `dir`: the one waiting to be written, else the
-    /// file. Nil when there is neither; throws when the file is unreadable.
-    static func latestJobs(in dir: URL) throws -> [PipelineJob]? { // swiftlint:disable:this discouraged_optional_collection
-        try existing(for: dir)?.latestSaved ?? PipelineSnapshot.load(from: dir)
+    /// Whether a write of any file in `dir` has not landed yet.
+    static func isWriting(into dir: URL) -> Bool {
+        live.values.contains { $0.dirKey == dirKey(dir) }
     }
 
-    /// Queue `jobs` for writing into `dir`. Rapid saves coalesce: only the
-    /// latest one waiting is written, with the writer it was saved with.
-    static func save(_ jobs: [PipelineJob], to dir: URL, using writer: @escaping Writer) {
-        let key = key(dir)
+    /// The newest job list of the file `name` in `dir`: the one waiting to be
+    /// written, else the file. Nil when there is neither; throws when the file
+    /// is unreadable.
+    static func latestJobs(
+        in dir: URL, named name: String = PipelineSnapshot.snapshotFilename,
+    ) throws -> [PipelineJob]? { // swiftlint:disable:this discouraged_optional_collection
+        try existing(for: dir, named: name)?.latestSaved ?? PipelineSnapshot.load(from: dir, named: name)
+    }
+
+    /// Queue `jobs` for writing into the file `name` in `dir`. Rapid saves
+    /// coalesce: only the latest one waiting is written, with the writer it was
+    /// saved with.
+    static func save(
+        _ jobs: [PipelineJob], to dir: URL, named name: String = PipelineSnapshot.snapshotFilename,
+        using writer: @escaping Writer,
+    ) {
+        let key = key(dir, name)
         let store = live[key] ?? {
-            let created = PipelineSnapshotStore(dir: dir, key: key)
+            let created = PipelineSnapshotStore(dir: dir, name: name, key: key)
             live[key] = created
             return created
         }()
@@ -50,12 +62,21 @@ final class PipelineSnapshotStore {
 
     /// Symlinks resolved, so `/var/...` and `/private/var/...` name one file
     /// and get one store.
-    private static func key(_ dir: URL) -> String {
+    private static func dirKey(_ dir: URL) -> String {
         dir.resolvingSymlinksInPath().standardizedFileURL.path
     }
 
+    private static func key(_ dir: URL, _ name: String) -> String {
+        "\(dirKey(dir))/\(name)"
+    }
+
     private let dir: URL
+    private let name: String
     private let key: String
+
+    private var dirKey: String {
+        Self.dirKey(dir)
+    }
 
     // swiftlint:disable discouraged_optional_collection
     /// The latest saved state that is not known to be on disk yet: waiting for
@@ -84,8 +105,9 @@ final class PipelineSnapshotStore {
     /// any I/O starts.
     private let writeActor = SnapshotWriterActor()
 
-    private init(dir: URL, key: String) {
+    private init(dir: URL, name: String, key: String) {
         self.dir = dir
+        self.name = name
         self.key = key
     }
 
@@ -129,7 +151,14 @@ final class PipelineSnapshotStore {
     /// more and failed again. In that case the store stays, so the state is
     /// still reported as owed. Not bounded; the quit bounds it.
     static func flush(_ dir: URL) async {
-        while let store = existing(for: dir), !Task.isCancelled {
+        let names = Set(live.values.filter { $0.dirKey == dirKey(dir) }.map(\.name))
+        for name in names.union([PipelineSnapshot.snapshotFilename]).sorted() {
+            await flush(dir, named: name)
+        }
+    }
+
+    private static func flush(_ dir: URL, named name: String) async {
+        while let store = existing(for: dir, named: name), !Task.isCancelled {
             if let worker = store.worker {
                 await worker.value
             } else if !store.failedStateRetried, let writer = store.failedWriter, let owed = store.latestSaved {

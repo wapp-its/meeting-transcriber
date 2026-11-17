@@ -40,7 +40,7 @@ Two layers of defense, both enforced on every request:
    server off then on rotates the token (invalidating any previously leaked
    value). A missing or wrong token returns `401`. Comparison is constant-time.
 2. **Origin / Host guard.** Any request carrying a non-empty browser `Origin`
-   header (other than the literal `null`) is rejected with `403`, which blocks
+   header, the literal `null` included, is rejected with `403`, which blocks
    CSRF and DNS-rebinding from a page running locally. The `Host` header, when
    present, must be `127.0.0.1` or `localhost` (with or without the port), else
    `403`. The match is exact and case-sensitive (`Host: LOCALHOST:9876` is
@@ -186,6 +186,16 @@ bar or the All Recordings window, which moves it back to `waiting` under the
 that moment. A poller that sees `error` and keeps polling may therefore see the
 job run again and end in `done`. If a retried job is then cancelled, the id
 answers `404`, not the earlier error.
+
+A job in `done` can be live again too: **Transcribe Again…** in the All
+Recordings window runs a finished meeting again under the **same id**. While it
+runs, the id answers from the live job (`waiting`, `transcribing`, …,
+`speaker_naming_pending`) and the finished record stays as it was. When the
+re-run succeeds the record is rewritten with the new `transcriptPath` and
+`protocolPath`, which keep the meeting's file names (the files they replaced
+stay beside them as `<name>.until-<yyyyMMdd_HHmmss>.<ext>`). When it fails, is
+cancelled or is left unnamed, the id answers from the finished record as it was
+before, with the earlier paths.
 
 ```bash
 curl -sS "$BASE/v1/jobs/<id>" -H "Authorization: Bearer $TOKEN"
