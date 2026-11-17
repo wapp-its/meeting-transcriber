@@ -1,7 +1,7 @@
 {
   "branch_name": "gh-257-meeting-summaries-in-all-recordings",
-  "completion_review_status": "not_required",
-  "completion_reviewed_at": "2026-11-17T09:20:55.841289Z",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-11-17T09:36:10.411847Z",
   "created_at": "2026-11-16T09:19:18.209369Z",
   "default_impl": null,
   "default_review": null,
@@ -292,17 +292,54 @@
       "task": "gh-257-meeting-summaries-in-all-recordings.1",
       "timestamp": "2026-11-17T09:18:05.775941Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "3cbe356e8139a2925637a8465a54add884acd43cbd655b86c147e357213f04b2",
+      "backend": "codex",
+      "base_sha": "3256bb5b7b669253306f0f43bdecbc651a2c53b4",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "143db82f797b0e3528eb322a448f48956d0939a0",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 553833,
+      "output_sha256": "e99f50b54af14c2679e7ba54cbe079627ff6e08c1b9dae3fae2fe57c99648b64",
+      "reservation_id": "dcc00478fc3846a3941fb12c56b21194",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-17T09:36:10.379661Z",
+      "tool_calls": 39,
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:gh-257-meeting-summaries-in-all-recordings.1": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_phase_leases": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:gh-257-meeting-summaries-in-all-recordings.1": 0,
     "plan": 0
   },
@@ -321,5 +358,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nAll Recordings lists each meeting with its title, app, date and length. Many titles are generic (the app name, a file name or \"Recovered Recording\"), so the list does not show which meeting is which. Today you have to open the notes to find out.\n\n## NOTES\n\n- Each row shows a short summary of what the meeting was about. It comes from the meeting notes, or from the transcript when there are no notes.\n- The summary can be edited. New notes for the meeting never replace a summary that was edited by hand.\n- Builds on the rows and the row menu of #171 (Transcribe Again).\n- Related: #126 (the search finds no participants), #201 (no file reads while the list is drawn).\n\n## TASKS\n\n- [ ] Mockup of the rows with summaries and of the edit state\n- [ ] Spec",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/257"
   },
-  "updated_at": "2026-11-17T09:20:55.841452Z"
+  "updated_at": "2026-11-17T09:36:10.416867Z"
 }
