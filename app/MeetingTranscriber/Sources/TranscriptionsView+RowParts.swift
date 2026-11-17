@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Parts of `TranscriptionsView` that read none of its state: the window's
-/// messages and placeholder, and a row's badge, status and outcome lines.
+/// messages and placeholder, and a row's badge, summary, status and outcome lines.
 extension TranscriptionsView {
     func windowMessage(_ text: String) -> some View {
         Text(text)
@@ -26,6 +26,36 @@ extension TranscriptionsView {
             .padding(.vertical, 1)
             .overlay(Capsule().stroke(.secondary.opacity(0.5), lineWidth: 1))
             .accessibilityIdentifier(A11yID.recordingKeepBadge(index))
+    }
+
+    /// The meeting's summary under the title line (spec R3, D6): at most two lines
+    /// cut with "…", the whole text as the tooltip, nothing without one. Smaller than
+    /// the title and larger than the lines below it.
+    @ViewBuilder
+    func summaryLine(_ entry: TranscriptionEntry, index: Int) -> some View {
+        if let summary = entry.summary {
+            Text(summary)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .truncationMode(.tail)
+                .help(summary)
+                .accessibilityIdentifier(A11yID.recordingSummaryLine(index))
+        }
+    }
+
+    /// While a deletion is incomplete, why it stopped takes the status's place: that
+    /// is what the row needs from the user, and a finished job has nothing to add.
+    @ViewBuilder
+    func statusLine(_ entry: TranscriptionEntry, facts: RowFacts) -> some View {
+        if let incomplete = facts.audioLine.incompleteText {
+            Label(incomplete, systemImage: "exclamationmark.triangle")
+                .font(.caption)
+                .foregroundStyle(.orange)
+        } else {
+            Label(statusText(entry), systemImage: statusSymbol(entry))
+                .font(.caption)
+        }
     }
 
     func statusText(_ entry: TranscriptionEntry) -> String {

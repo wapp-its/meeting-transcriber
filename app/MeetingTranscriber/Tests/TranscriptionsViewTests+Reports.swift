@@ -25,6 +25,7 @@ extension TranscriptionsViewTests {
         let sut = makeView([row], actions: withReports())
         let expected = [
             A11yID.recordingMenuOpenProtocol(0), A11yID.recordingMenuOpenTranscript(0), A11yID.recordingMenuShowInFinder(0),
+            A11yID.recordingMenuEditSummary(0),
             A11yID.recordingMenuReportsHeading(0), A11yID.recordingMenuReport(0, 0), A11yID.recordingMenuReport(0, 1),
             A11yID.recordingMenuRegenerate(0),
         ]

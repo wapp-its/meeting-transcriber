@@ -41,7 +41,7 @@ final class RowAvailabilityTests: XCTestCase {
         try Data("[Anna] Hello".utf8).write(to: transcript)
         let store = RowAvailability()
         let withTranscript: [RecordingRowActions.MenuItem] = [
-            .openProtocol, .openTranscript, .showInFinder, .regenerate(enabled: true),
+            .openProtocol, .openTranscript, .showInFinder, .editSummary, .regenerate(enabled: true),
         ]
         XCTAssertEqual(menu(entry, store, scopeRoot: folder), withTranscript)
 
@@ -50,7 +50,7 @@ final class RowAvailabilityTests: XCTestCase {
         store.refresh()
         XCTAssertEqual(
             menu(entry, store, scopeRoot: folder),
-            [.openProtocol, .showInFinder, .regenerate(enabled: false)],
+            [.openProtocol, .showInFinder, .editSummary, .regenerate(enabled: false)],
         )
 
         try Data("[Anna] Hello".utf8).write(to: transcript)

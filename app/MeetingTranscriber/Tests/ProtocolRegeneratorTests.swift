@@ -77,6 +77,7 @@ final class ProtocolRegeneratorTests: XCTestCase {
         notifier: RecordingNotifier = RecordingNotifier(),
         jobs: @escaping @MainActor () -> [PipelineJob] = { [] },
         regenerated: @escaping @MainActor (UUID, ProtocolTemplateID) -> Void = { _, _ in },
+        notesReplaced: @escaping @MainActor (UUID, String, String) -> Void = { _, _, _ in },
     ) -> ProtocolRegenerator {
         let folder: URL = folder
         let stamp = stamp
@@ -93,6 +94,7 @@ final class ProtocolRegeneratorTests: XCTestCase {
             fileOperations: fileOperations ?? self.fileOperations(),
             now: now,
             regenerated: regenerated,
+            notesReplaced: notesReplaced,
         ))
     }
 
@@ -339,29 +341,34 @@ final class ProtocolRegeneratorTests: XCTestCase {
         try Data("Board minutes".utf8).write(to: templates.appendingPathComponent("Board.md"))
         let jobID = UUID()
         var told: [(UUID, ProtocolTemplateID)] = []
-        // Labelled: a trailing closure would bind to `jobs`.
-        // swiftlint:disable:next trailing_closure
-        let sut = makeRegenerator(regenerated: { told.append(($0, $1)) })
+        var replaced: [(id: UUID, notes: String, title: String)] = []
+        let sut = makeRegenerator(regenerated: { told.append(($0, $1)) }, notesReplaced: { replaced.append(($0, $1, $2)) })
+        let meeting = try target(jobID: jobID)
 
-        try await sut.regenerate(target(jobID: jobID), options: MeetingProtocolOptions(template: .file(name: "Board"), rawBackground: ""))
+        await sut.regenerate(meeting, options: MeetingProtocolOptions(template: .file(name: "Board"), rawBackground: ""))
 
         XCTAssertEqual(sut.phase, .succeeded(md, warnings: []), "test premise: the run succeeded")
         XCTAssertEqual(told.map(\.0), [jobID])
         XCTAssertEqual(told.map(\.1), [.file(name: "Board")])
+        XCTAssertEqual(replaced.map(\.id), [jobID], "the new notes give the meeting its summary")
+        XCTAssertEqual(replaced.map(\.title), [meeting.title])
+        XCTAssertTrue(replaced.first?.notes.contains("## Summary") ?? false)
     }
 
     /// The notes are unchanged, so the template the job has stays right.
     func testAFailureTellsTheJobNothing() async throws {
         try writeMeeting()
         var told: [(UUID, ProtocolTemplateID)] = []
-        // Labelled: a trailing closure would bind to `jobs`.
-        // swiftlint:disable:next trailing_closure
-        let sut = makeRegenerator(generator: EchoingFailureGenerator(), regenerated: { told.append(($0, $1)) })
+        var replaced = 0
+        let sut = makeRegenerator(
+            generator: EchoingFailureGenerator(), regenerated: { told.append(($0, $1)) }, notesReplaced: { _, _, _ in replaced += 1 },
+        )
 
         try await sut.regenerate(target(jobID: UUID()), options: Self.options)
 
         XCTAssertEqual(sut.phase, .failed(ProtocolRegenerationError.generationFailed.localizedDescription), "test premise: the run failed")
         XCTAssertTrue(told.isEmpty)
+        XCTAssertEqual(replaced, 0)
     }
 }
 

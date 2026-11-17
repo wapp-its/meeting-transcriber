@@ -156,6 +156,10 @@ enum A11yID {
         "recordingMenuShowInFinder.\(index)"
     }
 
+    static func recordingMenuEditSummary(_ index: Int) -> String {
+        "recordingMenuEditSummary.\(index)"
+    }
+
     static func recordingMenuReportsHeading(_ index: Int) -> String {
         "recordingMenuReportsHeading.\(index)"
     }
@@ -209,6 +213,12 @@ enum A11yID {
     /// The "Keep" badge after a kept meeting's title.
     static func recordingKeepBadge(_ index: Int) -> String {
         "recordingKeepBadge.\(index)"
+    }
+
+    /// The summary line under a row's title. It shows meeting content and stays off
+    /// every RPC allowlist.
+    static func recordingSummaryLine(_ index: Int) -> String {
+        "recordingSummaryLine.\(index)"
     }
 
     /// The two Trash items of the right-click menu over several selected rows.
@@ -371,6 +381,14 @@ enum A11yID {
     /// the meeting's title and stays off every RPC allowlist.
     static let transcribeAgainCancelButton = "transcribeAgainCancelButton"
     static let transcribeAgainConfirmButton = "transcribeAgainConfirmButton"
+
+    /// The Edit Summary sheet's controls (All Recordings window). The sheet shows the
+    /// meeting's summary and stays off every RPC allowlist.
+    static let editSummaryTextField = "editSummaryTextField"
+    static let editSummaryNoteLine = "editSummaryNoteLine"
+    static let editSummaryUseNotesButton = "editSummaryUseNotesButton"
+    static let editSummaryCancelButton = "editSummaryCancelButton"
+    static let editSummarySaveButton = "editSummarySaveButton"
 
     /// The Identify Speakers Again sheet's controls (All Recordings window). The sheet
     /// shows the meeting's title and stays off every RPC allowlist.

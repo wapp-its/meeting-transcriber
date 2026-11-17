@@ -84,6 +84,33 @@ final class PipelineQueueRerunHandOffTests: XCTestCase {
         XCTAssertEqual(try snapshotHolds(meeting.id, fixture), [true], "the snapshot does not hold the finished job")
     }
 
+    /// A hand-off a quit interrupted gives the meeting's summary when a launch replays
+    /// it, once, from the notes the re-run made current; the quit queue gave none
+    /// (spec R5).
+    func testAHandOffReplayedAtLaunchHandsTheNewNotesOnOnce() async throws {
+        let fixture = try Fixture(tmpDir: makeTempDirectory(prefix: "rerun_hand_off_summary"))
+        let meeting = try await fixture.finishedMeeting(in: fixture.makeQueue(completedJobLifetime: 0), leavingTheQueue: true)
+        let queue = fixture.makeQueue(completedJobLifetime: 0)
+        var handedOn: [String] = []
+        queue.onNotesSaved = { _, notes, _ in handedOn.append("quit queue \(notes)") }
+        let marker = try await commitWhileTheSnapshotFails(meeting, in: queue, fixture, "summary")
+        queue.retire()
+        await dropOwedWrites(fixture)
+
+        PipelineQueue.reconcileOrphanedReruns(in: fixture.store, logDir: fixture.logDir) { _ in false }
+        let restarted = fixture.makeQueue()
+        restarted.onNotesSaved = { id, notes, _ in
+            guard case let .file(url) = notes else { return handedOn.append("text") }
+            handedOn.append("\(id == meeting.id) \(FileIdentity.of(url.path) == marker.files.last { $0.role == .protocol }?.identity)")
+        }
+        restarted.loadSnapshot()
+        try await fixture.poll("the replayed hand-off") { !handedOn.isEmpty }
+        try await Task.sleep(for: .milliseconds(300))
+        await PipelineSnapshotStore.flush(fixture.logDir)
+
+        XCTAssertEqual(handedOn, ["true true"], "the new notes, once, from the replay")
+    }
+
     // MARK: - Helpers
 
     /// `meeting`'s re-run in `queue` run to its commit point while no write of the

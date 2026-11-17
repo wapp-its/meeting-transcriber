@@ -182,58 +182,6 @@ struct MeetingTranscriberApp: App {
         )
     }
 
-    private var allRecordingsActions: AllRecordingsActions {
-        AllRecordingsActions(
-            openProtocol: { AllRecordingsActions.openFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
-            openTranscript: { AllRecordingsActions.openFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
-            reveal: { AllRecordingsActions.revealFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
-            openInNotion: { Self.openInNotion(.notion($0)) },
-            regenerate: { regenerateSheet.present(entry: $0, using: appState.protocolRegenerator) },
-            retry: { appState.pipeline.retryJob(id: $0) },
-            remove: { appState.pipeline.removeFailedJob(id: $0) },
-            dismiss: { appState.pipelineQueue.removeJob(id: $0) },
-            cancel: { appState.pipelineQueue.cancelJob(id: $0) },
-            nameSpeakers: { id in
-                appState.selectedNamingJobID = id
-                bringWindowToFront(id: "speaker-naming")
-            },
-            openProtocolsFolder: { AllRecordingsActions.openFolder(appState.settings.effectiveOutputDir) },
-            canRetry: { appState.pipeline.canRetryJob(id: $0) },
-            filesOnDisk: { AllRecordingsActions.readFilesOnDisk(of: $0, scopeRoot: appState.settings.effectiveOutputDir) },
-            meetingFiles: { appState.pipeline.meetingFileStore.record(for: $0) },
-            audioOnDisk: { entry in
-                appState.pipeline.meetingFileStore.record(for: entry.id).map { record in
-                    AllRecordingsActions.readAudioOnDisk(of: record, scopeRoot: appState.settings.effectiveOutputDir)
-                }
-            },
-            sourceAudio: { AllRecordingsActions.readSourceAudio(of: $0, scopeRoot: appState.settings.effectiveOutputDir) },
-            reloadMeetingFiles: { appState.pipeline.meetingFileStore.reload() },
-            moveAudioToTrash: { appState.pipeline.moveAudioToTrash(jobID: $0, named: $1) },
-            moveMeetingToTrash: { appState.pipeline.moveMeetingToTrash(jobID: $0, named: $1) },
-            meetingReports: { appState.pipeline.meetingReportPaths(of: $0) },
-            retryDeletion: { appState.pipeline.retryDeletion(jobID: $0) },
-            setKeep: { appState.pipeline.setKeep(jobID: $0, $1) },
-            retention: {
-                RecordingRetentionSettings(
-                    enabled: appState.settings.recordingRetentionEnabled, days: appState.settings.recordingRetentionDays,
-                )
-            },
-            retainedRecording: { id in appState.pipeline.recordingRetention.registry.entries.first { $0.jobID == id } },
-            bundleID: appState.pipeline.meetingFileStore.bundleID,
-            templateChoices: { appState.protocolTemplateChoices() },
-            optionsUse: { appState.protocolOptionsUse() },
-            chooseFile: { RegenerateProtocolView.chooseFile(startingIn: appState.settings.effectiveOutputDir) },
-            resolveFile: { try appState.protocolRegenerator.target(for: $0) },
-            readTargetAgain: { appState.protocolRegenerator.readAgain($0) },
-            generate: { target, options, output in
-                Task { await appState.protocolRegenerator.regenerate(target, options: options, saveAs: output) }
-            },
-            rerunSettings: { RerunSheetText.Settings(settings: appState.settings) },
-            transcribeAgain: { appState.pipeline.rerunJob(id: $0, mode: .transcribeAgain) },
-            identifySpeakersAgain: { appState.pipeline.rerunJob(id: $0, mode: .identifySpeakersAgain, speakers: $1) },
-        )
-    }
-
     private var menuBarLabel: some View {
         Label {
             Text(appState.currentStateLabel)
@@ -555,11 +503,65 @@ struct MeetingTranscriberApp: App {
     }
 }
 
-// MARK: - Window helpers
+// MARK: - The All Recordings actions and window helpers
 
 // In an extension of this file, so they stay private and the struct's body
 // stays under SwiftLint's `type_body_length` limit.
 extension MeetingTranscriberApp {
+    private var allRecordingsActions: AllRecordingsActions {
+        AllRecordingsActions(
+            openProtocol: { AllRecordingsActions.openFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
+            openTranscript: { AllRecordingsActions.openFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
+            reveal: { AllRecordingsActions.revealFile($0, scopeRoot: appState.settings.effectiveOutputDir) },
+            openInNotion: { Self.openInNotion(.notion($0)) },
+            regenerate: { regenerateSheet.present(entry: $0, using: appState.protocolRegenerator) },
+            retry: { appState.pipeline.retryJob(id: $0) },
+            remove: { appState.pipeline.removeFailedJob(id: $0) },
+            dismiss: { appState.pipelineQueue.removeJob(id: $0) },
+            cancel: { appState.pipelineQueue.cancelJob(id: $0) },
+            nameSpeakers: { id in
+                appState.selectedNamingJobID = id
+                bringWindowToFront(id: "speaker-naming")
+            },
+            openProtocolsFolder: { AllRecordingsActions.openFolder(appState.settings.effectiveOutputDir) },
+            canRetry: { appState.pipeline.canRetryJob(id: $0) },
+            filesOnDisk: { AllRecordingsActions.readFilesOnDisk(of: $0, scopeRoot: appState.settings.effectiveOutputDir) },
+            meetingFiles: { appState.pipeline.meetingFileStore.record(for: $0) },
+            audioOnDisk: { entry in
+                appState.pipeline.meetingFileStore.record(for: entry.id).map { record in
+                    AllRecordingsActions.readAudioOnDisk(of: record, scopeRoot: appState.settings.effectiveOutputDir)
+                }
+            },
+            sourceAudio: { AllRecordingsActions.readSourceAudio(of: $0, scopeRoot: appState.settings.effectiveOutputDir) },
+            reloadMeetingFiles: { appState.pipeline.meetingFileStore.reload() },
+            moveAudioToTrash: { appState.pipeline.moveAudioToTrash(jobID: $0, named: $1) },
+            moveMeetingToTrash: { appState.pipeline.moveMeetingToTrash(jobID: $0, named: $1) },
+            meetingReports: { appState.pipeline.meetingReportPaths(of: $0) },
+            retryDeletion: { appState.pipeline.retryDeletion(jobID: $0) },
+            setKeep: { appState.pipeline.setKeep(jobID: $0, $1) },
+            retention: {
+                RecordingRetentionSettings(
+                    enabled: appState.settings.recordingRetentionEnabled, days: appState.settings.recordingRetentionDays,
+                )
+            },
+            retainedRecording: { id in appState.pipeline.recordingRetention.registry.entries.first { $0.jobID == id } },
+            bundleID: appState.pipeline.meetingFileStore.bundleID,
+            templateChoices: { appState.protocolTemplateChoices() },
+            optionsUse: { appState.protocolOptionsUse() },
+            chooseFile: { RegenerateProtocolView.chooseFile(startingIn: appState.settings.effectiveOutputDir) },
+            resolveFile: { try appState.protocolRegenerator.target(for: $0) },
+            readTargetAgain: { appState.protocolRegenerator.readAgain($0) },
+            generate: { target, options, output in
+                Task { await appState.protocolRegenerator.regenerate(target, options: options, saveAs: output) }
+            },
+            rerunSettings: { RerunSheetText.Settings(settings: appState.settings) },
+            transcribeAgain: { appState.pipeline.rerunJob(id: $0, mode: .transcribeAgain) },
+            identifySpeakersAgain: { appState.pipeline.rerunJob(id: $0, mode: .identifySpeakersAgain, speakers: $1) },
+            meetingSummaries: { appState.pipeline.summaryStore.summaries(for: $0) },
+            saveSummary: { appState.pipeline.saveTypedSummary(jobID: $0, field: $1) },
+        )
+    }
+
     /// Starts in the notes folder, where the app's transcripts are.
     private func generateNotesFromTranscripts() {
         let panel = NSOpenPanel()

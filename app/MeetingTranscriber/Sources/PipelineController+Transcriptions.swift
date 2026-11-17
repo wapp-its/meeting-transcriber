@@ -10,10 +10,15 @@ extension PipelineController {
     var transcriptionEntries: [TranscriptionEntry] {
         let entries = TranscriptionList.entries(liveJobs: queue.jobs, records: terminalJobStore.records)
         let warnings = queue.rerunWarnings
-        guard !warnings.isEmpty else { return entries }
+        let summaries = summaryStore.summaries
+        guard !warnings.isEmpty || !summaries.isEmpty else { return entries }
         return entries.map { entry in
-            guard entry.state == .done, let warning = warnings[entry.id] else { return entry }
-            return TranscriptionEntry(entry, warnings: [TranscriptionsView.rerunWarningLine(warning)] + entry.warnings)
+            var shown = entry
+            if entry.state == .done, let warning = warnings[entry.id] {
+                shown = TranscriptionEntry(entry, warnings: [TranscriptionsView.rerunWarningLine(warning)] + entry.warnings)
+            }
+            shown.summary = summaries[entry.id]?.shown
+            return shown
         }
     }
 
@@ -231,6 +236,7 @@ extension PipelineController {
             guard forgetInUnreadSnapshot(jobID: jobID) else { return }
         }
         guard terminalJobStore.remove(jobID: jobID) else { return }
+        summarizer.forget(jobID: jobID)
         guard queue.isSnapshotWorkerActive else {
             meetingFileStore.remove(jobID: jobID)
             return
@@ -293,5 +299,6 @@ private extension TranscriptionEntry {
         isLive = entry.isLive
         hasRetryableMeetingNotes = entry.hasRetryableMeetingNotes
         finishOrder = entry.finishOrder
+        summary = entry.summary
     }
 }

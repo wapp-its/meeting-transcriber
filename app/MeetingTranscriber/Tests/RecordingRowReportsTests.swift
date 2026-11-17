@@ -24,7 +24,7 @@ final class RecordingRowReportsTests: XCTestCase {
         )
 
         XCTAssertEqual(items, [
-            .openProtocol, .openTranscript, .showInFinder, .openInNotion,
+            .openProtocol, .openTranscript, .showInFinder, .editSummary, .openInNotion,
             .separator, .reportsHeading, .report(Self.minutes, position: 0), .report(Self.short, position: 1), .separator,
             .regenerate(enabled: true),
         ])
@@ -33,15 +33,21 @@ final class RecordingRowReportsTests: XCTestCase {
     func testARowWithoutReportsHasNeitherHeadingNorSeparator() {
         let items = RecordingRowActions.menuItems(state: .done, onDisk: onDisk(reports: []), canRetry: false)
 
-        XCTAssertEqual(items, [.openProtocol, .openTranscript, .showInFinder, .regenerate(enabled: true)])
+        XCTAssertEqual(items, [.openProtocol, .openTranscript, .showInFinder, .editSummary, .regenerate(enabled: true)])
     }
 
+    /// A failed row without files starts with the reports; a finished one with
+    /// "Edit Summary…" in the place of its files (meeting summaries, R4).
     func testNoSeparatorOpensAMenuThatStartsWithTheReports() {
         let none = FilesOnDisk(protocolExists: false, transcriptExists: false, transcriptSource: .none, reports: [Self.short])
 
         XCTAssertEqual(
+            RecordingRowActions.menuItems(state: .error, onDisk: none, canRetry: false),
+            [.reportsHeading, .report(Self.short, position: 0), .separator, .remove],
+        )
+        XCTAssertEqual(
             RecordingRowActions.menuItems(state: .done, onDisk: none, canRetry: false),
-            [.reportsHeading, .report(Self.short, position: 0), .separator, .regenerate(enabled: false)],
+            [.editSummary, .separator, .reportsHeading, .report(Self.short, position: 0), .separator, .regenerate(enabled: false)],
         )
     }
 

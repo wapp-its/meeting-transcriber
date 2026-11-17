@@ -69,6 +69,14 @@
             )
         }
 
+        /// Whether the program gets the prompt, on stdin or through `{prompt_file}`.
+        /// One that takes only `{transcript_file}` gets the input without the
+        /// instructions, so a meeting summary is not asked of it (spec A20).
+        var receivesPrompt: Bool {
+            let arguments = CommandTemplate.effectiveArguments(arguments)
+            return CommandTemplate.inputMode(of: arguments) == .stdin || CommandTemplate.uses(.promptFile, in: arguments)
+        }
+
         /// What one run starts: the resolved program, its environment and
         /// its private run folder.
         struct RunSetup {

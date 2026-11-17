@@ -251,6 +251,11 @@ extension PipelineQueue {
                 logger.error("[\(PipelineJob.shortID(for: id), privacy: .public)] rerun_handover_not_removed: the re-run stays in its file")
                 return
             }
+            // Its new notes are the meeting's current ones now, and give its summary.
+            if committed.rerun?.marker.files.contains(where: { $0.role == .protocol }) == true,
+               let job = jobs.first(where: { $0.id == id }), let notes = job.protocolPath {
+                onNotesSaved?(id, .file(notes), job.meetingTitle)
+            }
             startCommittedExport(id: id)
         }
     }

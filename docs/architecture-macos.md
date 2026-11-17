@@ -105,7 +105,8 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `MenuBarView+LastRecording.swift` | The dropdown's "Last Recording" section: the newest finished job's name, a details line with its app and time ("Teams · Today at 10:30"), and "Open Notes", which opens its notes file or, while Notion export is on, its Notion page ("Open in Notion"), as `JobOpenTarget` resolves it; left out while no finished job has either |
 | `MenuBarView+Jobs.swift` | The dropdown's job lines under "In progress" and "Needs you", one line per job with its actions in a submenu; a finished job whose Notion export runs or failed keeps a line there with "Retry Notion Export" and "Discard Notion Retry" |
 | `JobMenuSummary.swift` | Status text and symbol of a job's single line in the menu bar dropdown |
-| `TranscriptionsView.swift` | The All Recordings window: every job the app knows, searched by title and participant; each row's main button, "…" menu (repeated by its right-click menu) and audio line; several rows selected at once with one right-click menu for them; the footer; the Trash confirmations |
+| `TranscriptionsView.swift` | The All Recordings window: every job the app knows, searched by title, summary and participant; each row's main button, "…" menu (repeated by its right-click menu), summary line and audio line; several rows selected at once with one right-click menu for them; the footer; the Trash confirmations |
+| `EditSummarySheet.swift` | The Edit Summary sheet over the window and its state: the field with the shown summary, where it came from, "Use Summary from Notes", Save and Cancel |
 | `TranscriptionsView+RowLabels.swift` | A row's detail line and the titles and accessibility identifiers of its buttons and menu items |
 | `TranscriptionsSelection.swift` | The window's selection and Trash-confirmation models, `TrashSelectionPlan` (which selected meetings a Trash action applies to, by each row's own rules) and the footer text |
 | `TrashConfirmationText.swift` | Pure wording of the Trash confirmations for one meeting and for a selection, from the record less what the disk answered gone |
@@ -459,6 +460,10 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `TerminalJobStore.swift` | File-backed store of recent finished-job statuses (survives queue reaping + app restart) |
 | `MeetingFileRecord.swift` | One meeting's files and what has happened to them: paths, ownership, recording date, Keep mark, the build that created it, pending and incomplete deletions (see [Meeting Files and Deletion](#meeting-files-and-deletion)) |
 | `MeetingFileStore.swift` | `meeting_files.json`: every meeting's record, lock-guarded writes shared with a second running build |
+| `MeetingSummary.swift` | Pure rules of a meeting's summary: the summary section of saved notes, the clean-up, the summary call's instruction, and what a notes save or the sheet's Save does to the notes summary and the typed one |
+| `MeetingSummaryStore.swift` | `meeting-summaries.json`: every meeting's summaries and latest notes save by job id, lock-guarded writes shared with a second running build |
+| `MeetingSummarizer.swift` | Takes a meeting's notes summary when its notes are saved: from their summary section, else from one call to the notes provider, one call at a time, apart from the queue |
+| `PipelineController+Summaries.swift` | The controller's summaries: notes saves of listed meetings, Save from the sheet, and the launch's removal of summaries no meeting holds |
 | `MeetingFilePresence.swift` | The one probe of a meeting's file: present, gone, or out of reach |
 | `MeetingFileRemover.swift` | Moves a meeting's files to the Trash or deletes them for good, after the pending mark is on disk |
 | `PipelineController+RetentionRecords.swift` | The fork's link from recording retention to the records: the meetings a pass must leave (Keep, a deletion of the user's, a recording from before the records), and marking what a pass deleted |

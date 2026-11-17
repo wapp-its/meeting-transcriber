@@ -161,6 +161,9 @@ final class ProtocolRegenerator {
         /// reads those notes and titles its page by that template's rule
         /// (`ProtocolGenerator.aiTitle`).
         var regenerated: @MainActor (_ jobID: UUID, _ template: ProtocolTemplateID) -> Void = { _, _ in }
+        /// Called with the notes text after a run replaced the notes of a meeting
+        /// that has a job, and the meeting's title, for its summary (spec R2).
+        var notesReplaced: @MainActor (_ jobID: UUID, _ notes: String, _ title: String) -> Void = { _, _, _ in }
         /// Called with what a run left on disk for a meeting that has a job, for
         /// its file record (`MeetingFileStore.noteProtocolReplaced`). The rename
         /// into place gives the path a new file, which the record has to name, or
@@ -256,11 +259,12 @@ final class ProtocolRegenerator {
             "protocol_regeneration_started job=\(target.jobID ?? "none", privacy: .public) background=\(backgroundPresence, privacy: .public) output=\(output, privacy: .public)",
         )
         do {
-            let (written, runWarnings) = try await run(target, options: options, saveAs: saveAs)
+            let (written, runWarnings, markdown) = try await run(target, options: options, saveAs: saveAs)
             let warnings = runWarnings + notes
             logger.info("protocol_regenerated job=\(target.jobID ?? "none", privacy: .public)")
             if written == target.protocolURL, let jobID = target.jobID.flatMap(UUID.init(uuidString:)) {
                 environment.regenerated(jobID, options.template)
+                environment.notesReplaced(jobID, markdown, target.title)
             }
             phase = .succeeded(written, warnings: warnings)
             environment.notifier.notify(title: Self.succeededTitle, body: ([target.title] + warnings).joined(separator: "\n"))
@@ -272,10 +276,10 @@ final class ProtocolRegenerator {
         }
     }
 
-    /// The file written, and the run's warnings.
+    /// The file written, the run's warnings and the notes the model wrote.
     private func run(
         _ target: ProtocolRegenerationTarget, options: MeetingProtocolOptions, saveAs: ProtocolRegenerationOutput,
-    ) async throws -> (written: URL, warnings: [String]) {
+    ) async throws -> (written: URL, warnings: [String], notes: String) {
         guard let generator = environment.generatorFactory() else { throw ProtocolRegenerationError.providerOff }
         guard !environment.recordOnly() else { throw ProtocolRegenerationError.recordOnly }
         guard !isBusy(target) else { throw ProtocolRegenerationError.meetingBusy }
@@ -313,7 +317,7 @@ final class ProtocolRegenerator {
         } else {
             try replaceProtocol(of: target, with: document, replacing: files.protocolFile != nil)
         }
-        return (report ?? target.protocolURL, [templateWarning, incompleteWarning, trashWarning].compactMap(\.self))
+        return (report ?? target.protocolURL, [templateWarning, incompleteWarning, trashWarning].compactMap(\.self), protocolMarkdown)
     }
 
     /// The last look before a report is written: a meeting that took its name

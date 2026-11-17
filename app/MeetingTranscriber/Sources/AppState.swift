@@ -177,6 +177,7 @@ final class AppState {
             outputDir: { [settings] in settings.effectiveOutputDir },
             notifier: notifier,
             regenerated: { [pipeline] in pipeline.queue.recordRegeneratedTemplate(jobID: $0, template: $1) },
+            notesReplaced: { [pipeline] in pipeline.notesSaved(jobID: $0, notes: .text($1), title: $2) },
             protocolReplaced: pipeline.meetingFileStore.noteProtocolReplaced,
             reportKept: pipeline.meetingFileStore.noteKeptFile,
         ))

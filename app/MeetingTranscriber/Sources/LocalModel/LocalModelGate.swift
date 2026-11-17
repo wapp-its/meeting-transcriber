@@ -20,6 +20,10 @@
     /// resumed) frees it after `LocalModelLimits.deferredHold`. Admission waits
     /// while a recording runs.
     ///
+    /// A caller that yields (`yields`, a meeting summary) comes last: it is
+    /// admitted only while nobody else waits and no place is held, and any other
+    /// caller arriving while it runs ends its helper (`.cancelled`) and goes next.
+    ///
     /// Ready synchronously at init: nothing a job does before its state
     /// transition may wait for the gate to come up (a restored job races otherwise).
     @MainActor
@@ -29,6 +33,10 @@
         /// so the gate records which job owns the running helper and
         /// `cancel(jobID:)` can find it. Nil for a caller that has no job.
         @TaskLocal nonisolated static var jobID: UUID?
+        /// Whether the caller yields to every other one: a meeting summary, which
+        /// must never hold up meeting notes (spec A20). Set around the provider
+        /// call like `jobID`.
+        @TaskLocal nonisolated static var yields = false
 
         struct Configuration: Sendable {
             var memoryProbe: any LocalModelMemoryProbing = SystemMemoryProbe()
@@ -116,15 +124,19 @@
 
         /// Waits for this caller's turn. Throws `CancellationError` for a
         /// cancelled job or task, also while it waits.
-        private func admit(jobID: UUID?, tag: String) async throws -> Turn {
+        private func admit(jobID: UUID?, yields: Bool, tag: String) async throws -> Turn {
             if let jobID, cancelledJobs.contains(jobID) {
                 diagnostics.notice("local_model_refused \(tag) reason=cancelled")
                 throw CancellationError()
             }
             try Task.checkCancellation()
+            if !yields, let owner, owner.yields {
+                diagnostics.notice("local_model_yield \(Self.logTag(owner.jobID)) for=\(tag)")
+                owner.stop(.cancelled)
+            }
             let order = jobID.flatMap { heldPlaces.removeValue(forKey: $0)?.order } ?? takeOrder()
-            if owner == nil, !isRecording, isNextInLine(order) {
-                let turn = Turn(jobID: jobID, order: order)
+            if owner == nil, !isRecording, isNextInLine(order, yields: yields) {
+                let turn = Turn(jobID: jobID, order: order, yields: yields)
                 owner = turn
                 return turn
             }
@@ -133,7 +145,7 @@
             let token = UUID()
             return try await withTaskCancellationHandler {
                 try await withCheckedThrowingContinuation { continuation in
-                    waiters.append(Waiter(token: token, jobID: jobID, order: order, continuation: continuation))
+                    waiters.append(Waiter(token: token, jobID: jobID, order: order, yields: yields, continuation: continuation))
                 }
             } onCancel: {
                 Task { @MainActor [weak self] in self?.abandonWait(token) }
@@ -156,20 +168,28 @@
             admitNext()
         }
 
+        /// The first in line of those that do not yield, else of those that do.
         private func admitNext() {
+            let notYielding = waiters.indices.filter { !waiters[$0].yields }
+            let candidates = notYielding.isEmpty ? Array(waiters.indices) : notYielding
             guard owner == nil, !isRecording,
-                  let next = waiters.indices.min(by: { waiters[$0].order < waiters[$1].order }),
-                  isNextInLine(waiters[next].order)
+                  let next = candidates.min(by: { waiters[$0].order < waiters[$1].order }),
+                  isNextInLine(waiters[next].order, yields: waiters[next].yields)
             else { return }
             let waiter = waiters.remove(at: next)
-            let turn = Turn(jobID: waiter.jobID, order: waiter.order)
+            let turn = Turn(jobID: waiter.jobID, order: waiter.order, yields: waiter.yields)
             owner = turn
             waiter.continuation.resume(returning: turn)
         }
 
         /// Whether nobody waiting, and no job whose place is held, comes before `order`.
-        private func isNextInLine(_ order: Int) -> Bool {
-            !waiters.contains { $0.order < order } && !heldPlaces.values.contains { $0.order < order }
+        /// A caller that yields comes after everybody who does not, and after every
+        /// held place.
+        private func isNextInLine(_ order: Int, yields: Bool) -> Bool {
+            if yields {
+                return heldPlaces.isEmpty && !waiters.contains { !$0.yields || $0.order < order }
+            }
+            return !waiters.contains { !$0.yields && $0.order < order } && !heldPlaces.values.contains { $0.order < order }
         }
 
         /// Holds `order` for `jobID`, whose helper a recording ended, until it
@@ -203,6 +223,7 @@
             let token: UUID
             let jobID: UUID?
             let order: Int
+            let yields: Bool
             let continuation: CheckedContinuation<Turn, any Error>
         }
 
@@ -213,12 +234,14 @@
         private final class Turn {
             let jobID: UUID?
             let order: Int
+            let yields: Bool
             private(set) var stopReason: LocalModelStopReason?
             private var runner: LocalModelHelperRunner?
 
-            init(jobID: UUID?, order: Int) {
+            init(jobID: UUID?, order: Int, yields: Bool) {
                 self.jobID = jobID
                 self.order = order
+                self.yields = yields
             }
 
             func stop(_ reason: LocalModelStopReason) {
@@ -248,7 +271,7 @@
         func run(_ job: LocalModelJob) async throws -> String {
             let jobID = Self.jobID
             let tag = Self.logTag(jobID)
-            let turn = try await admit(jobID: jobID, tag: tag)
+            let turn = try await admit(jobID: jobID, yields: Self.yields, tag: tag)
             defer { release(turn) }
             do {
                 return try await runHelper(job, turn: turn, tag: tag)

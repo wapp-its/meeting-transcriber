@@ -221,6 +221,10 @@ class PipelineQueue {
     /// Whether a Regenerate Notes runs, which a re-run's swap waits out
     /// (`rerunSucceeded`). Set by the controller.
     @ObservationIgnored var isRegenerationRunning: @MainActor () -> Bool = { false }
+    /// The meeting's current notes were saved, with their title: a new meeting's or
+    /// a retry's, and a re-run's once its success handed the job over. Takes the
+    /// meeting's summary (spec R2). Set by the controller.
+    @ObservationIgnored var onNotesSaved: ((_ jobID: UUID, _ notes: MeetingSummarizer.SavedNotes, _ title: String) -> Void)?
     /// nil disables JSONL logging. AppState injects a real instance for production;
     /// tests leave it nil unless they explicitly want to assert on the log.
     let recognitionStatsLog: RecognitionStatsLog?

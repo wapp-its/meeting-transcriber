@@ -155,6 +155,15 @@ final class TranscriptionListTests: XCTestCase {
         XCTAssertEqual(TranscriptionList.matching(entries, query: "Quarterly"), [])
     }
 
+    /// The shown summary is searched as the title is (spec R6).
+    func testSearchFindsTheShownSummaryIgnoringCaseAndDiacritics() throws {
+        var entries = try TranscriptionList.entries(liveJobs: [job("Sync", addedAt: 1), job("Standup", addedAt: 0)], records: [])
+        entries[0].summary = "The café budget was approved."
+
+        XCTAssertEqual(titles(TranscriptionList.matching(entries, query: "CAFE BUDGET")), ["Sync"])
+        XCTAssertEqual(TranscriptionList.matching(entries, query: "approved").map(\.id), [entries[0].id])
+    }
+
     // MARK: - The menu's share
 
     /// Jobs waiting or running are in progress, jobs waiting for speaker names

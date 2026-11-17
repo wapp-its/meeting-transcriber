@@ -1,0 +1,372 @@
+{
+  "branch_name": "gh-257-meeting-summaries-in-all-recordings",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-11-17T09:36:10.411847Z",
+  "created_at": "2026-11-16T09:19:18.209369Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [
+    "gh-171-transcribe-again-and-identify-speakers"
+  ],
+  "id": "gh-257-meeting-summaries-in-all-recordings",
+  "impl_review_rounds": {
+    "gh-257-meeting-summaries-in-all-recordings.1": 0
+  },
+  "next_task": 1,
+  "no_plan": true,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-11-16T13:15:27.790459Z",
+  "ready": true,
+  "review_attempts": [
+    {
+      "artifact_sha256": "3a150c4dc08ed9e616dd610cdf0ea408119fbc62435ff52ebd6876417c8f9e97",
+      "backend": "codex",
+      "base_sha": "3b236a800c34709e7ea146b82d79e62337281e2e",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-12bc4687e2fd189bc5e50f115c08f34f",
+            "classification": "introduced",
+            "findingId": "finding-12bc4687e2fd189bc5e50f115c08f34f",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-baf6fc672715426d19ba93b8d5fe3517",
+            "classification": "introduced",
+            "findingId": "finding-baf6fc672715426d19ba93b8d5fe3517",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-5382999d9663a5e00ae8e6be02be4583",
+            "classification": "introduced",
+            "findingId": "finding-5382999d9663a5e00ae8e6be02be4583",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "74c17722d38a128d8b7ae601b597b775307827ff",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 449098,
+      "output_sha256": "394e74554790cd4245b51ed6d61931d040bb9fd38a363ceee6035d7f4304ef00",
+      "reservation_id": "165f4cf2bfd743c193dac301f552f704",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-16T13:11:34.215739Z",
+      "tool_calls": 25,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "e930c642bcbd238f785c2bc8adc4670b53c0776ba0db2d090efa02501d496e5a",
+      "backend": "codex",
+      "base_sha": "3b236a800c34709e7ea146b82d79e62337281e2e",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-12bc4687e2fd189bc5e50f115c08f34f",
+            "classification": "introduced",
+            "findingId": "finding-12bc4687e2fd189bc5e50f115c08f34f",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-baf6fc672715426d19ba93b8d5fe3517",
+            "classification": "introduced",
+            "findingId": "finding-baf6fc672715426d19ba93b8d5fe3517",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-5382999d9663a5e00ae8e6be02be4583",
+            "classification": "introduced",
+            "findingId": "finding-5382999d9663a5e00ae8e6be02be4583",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "182e791e75bfac66a1a155bb1d67a87502d719f5",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 710,
+      "output_sha256": "36ab573df06ca568e5cd68752d2cf6d66d6568441c43ba1e2b650c8c3538ecb8",
+      "reservation_id": "5767c9bae8344cc8b109d266b13b46d5",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-16T13:15:26.714593Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "4ddf555c9815b1210a59960934401dd784a8696bc4a7f6a48b2e87730b2704c8",
+      "backend": "codex",
+      "base_sha": "c4e876e1ffccdb5b19e744676446a91b6d0fb2b2",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-59b82727efe0d6a42880fb3302f9b102",
+            "classification": "introduced",
+            "findingId": "finding-59b82727efe0d6a42880fb3302f9b102",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-5dd104ec5cced55ae1b634a4ccf15ad3",
+            "classification": "introduced",
+            "findingId": "finding-5dd104ec5cced55ae1b634a4ccf15ad3",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-1e23d1dbf0b511012a7f40405e3b0458",
+            "classification": "introduced",
+            "findingId": "finding-1e23d1dbf0b511012a7f40405e3b0458",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-ab506d632951737a7904372266e0ca42",
+            "classification": "introduced",
+            "findingId": "finding-ab506d632951737a7904372266e0ca42",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-b1ae85f5283ccc3015f11e1a99cdafc8",
+            "classification": "introduced",
+            "findingId": "finding-b1ae85f5283ccc3015f11e1a99cdafc8",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "6a8ed589224e2ab08e5647596a8a6f24e0a49ee0",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6.1-sol",
+      "outcome": "verdict",
+      "output_bytes": 3664,
+      "output_sha256": "76dd2803a1422511ef55c21ff2f9b19c535179a913e94192bff833b279c2af13",
+      "reservation_id": "88566a7c85da40f4820d41766fa475e0",
+      "round_consumed": true,
+      "scope": "impl:gh-257-meeting-summaries-in-all-recordings.1",
+      "superseded_by": null,
+      "task": "gh-257-meeting-summaries-in-all-recordings.1",
+      "timestamp": "2026-11-17T09:03:05.172791Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "87d4cca096466114aeb8692a7a2cdb5dc540e95eaa1320ffd65e3f937b1a7d3a",
+      "backend": "codex",
+      "base_sha": "c4e876e1ffccdb5b19e744676446a91b6d0fb2b2",
+      "counter_kind": "impl",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-59b82727efe0d6a42880fb3302f9b102",
+            "classification": "introduced",
+            "findingId": "finding-59b82727efe0d6a42880fb3302f9b102",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-5dd104ec5cced55ae1b634a4ccf15ad3",
+            "classification": "introduced",
+            "findingId": "finding-5dd104ec5cced55ae1b634a4ccf15ad3",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-1e23d1dbf0b511012a7f40405e3b0458",
+            "classification": "introduced",
+            "findingId": "finding-1e23d1dbf0b511012a7f40405e3b0458",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-ab506d632951737a7904372266e0ca42",
+            "classification": "introduced",
+            "findingId": "finding-ab506d632951737a7904372266e0ca42",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-b1ae85f5283ccc3015f11e1a99cdafc8",
+            "classification": "introduced",
+            "findingId": "finding-b1ae85f5283ccc3015f11e1a99cdafc8",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "fff94cfd3768e09a47152594ed4647a0e10c1c68",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-6.1-sol",
+      "outcome": "verdict",
+      "output_bytes": 1077,
+      "output_sha256": "03aae5ac8c1c6473e024fc1528f4edf0c028db5525530757d18c47b3c677574b",
+      "reservation_id": "de8aba19145542fbb60594bae22c1f2b",
+      "round_consumed": true,
+      "scope": "impl:gh-257-meeting-summaries-in-all-recordings.1",
+      "superseded_by": null,
+      "task": "gh-257-meeting-summaries-in-all-recordings.1",
+      "timestamp": "2026-11-17T09:18:05.775941Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "3cbe356e8139a2925637a8465a54add884acd43cbd655b86c147e357213f04b2",
+      "backend": "codex",
+      "base_sha": "3256bb5b7b669253306f0f43bdecbc651a2c53b4",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "143db82f797b0e3528eb322a448f48956d0939a0",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 553833,
+      "output_sha256": "e99f50b54af14c2679e7ba54cbe079627ff6e08c1b9dae3fae2fe57c99648b64",
+      "reservation_id": "dcc00478fc3846a3941fb12c56b21194",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-17T09:36:10.379661Z",
+      "tool_calls": 39,
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "impl:gh-257-meeting-summaries-in-all-recordings.1": 1,
+    "plan": 1,
+    "plan#completion": 1
+  },
+  "review_pending_rounds": {},
+  "review_phase_leases": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "completion": 0,
+    "impl:gh-257-meeting-summaries-in-all-recordings.1": 0,
+    "plan": 0
+  },
+  "spec_path": ".flow/specs/gh-257-meeting-summaries-in-all-recordings.md",
+  "status": "done",
+  "title": "Meeting summaries in All Recordings",
+  "tracker": {
+    "baseHashFlow": "6ae6378f8c3035ec94932b854a543af7adc8289793b68ea66490915c390ef5e9",
+    "baseHashTracker": "17c44391dbf2011915e6c7ecb3e3cbf27b26456ca4a3fab8cfe2cdea8fd9d91d",
+    "depRelations": [
+      {
+        "dep_spec": "gh-171-transcribe-again-and-identify-speakers",
+        "from_tracker_id": "I_kwDOUvyDOc8AAAABfosU_A",
+        "key": "9d9568ca415bf263",
+        "source": "flow",
+        "to_tracker_id": "I_kwDOUvyDOc8AAAABYhuJzg",
+        "type": "blocks",
+        "updatedAt": "2026-11-17T09:46:40.344722Z"
+      }
+    ],
+    "id": "I_kwDOUvyDOc8AAAABfosU_A",
+    "identifier": "#257",
+    "lastSyncedAt": "2026-11-17T09:46:45.027124Z",
+    "linkState": "linked",
+    "mergeBaseFlow": "# Meeting summaries in All Recordings\n\n## Conversation Evidence\n\nThe fork is public, so the owner's turns are paraphrased, not quoted.\n\n> owner (paraphrased, 2026-11-16): in the All Recordings window, each recording should show a short summary of what the meeting was about, so the overview already tells which entry is which.\n> owner (paraphrased, 2026-11-16): the summary comes from the generated meeting notes or the transcript, and the owner can edit it.\n> owner (paraphrased, 2026-11-16): accepted both mockup boards as drawn: the list with a grey two-line summary under each title and the search hint \"Search titles and summaries\", and the Edit Summary sheet.\n> owner (paraphrased, 2026-11-16): not every notes template has a summary section. When the notes have one, the summary is taken from it; when they have none, the app asks the notes provider once more for a short summary of the finished notes, in the background after the notes are saved. With provider None there is no call and no summary.\n> owner (paraphrased, 2026-11-16): only new meetings get a summary on their own; older ones keep none unless the owner types one, with no background fill and no \"Summarize\" item. The title is not editable in this spec.\n\n## Goal & Context\n\n<!-- Source: 0% user / 55% [paraphrase] / 45% [inferred] -->\n\nAll Recordings lists each meeting with its title, app, date and length. Many titles are generic: the meeting app's name, an imported file's name, \"New Recording 3\" or \"Recovered Recording (\u2026)\". To find out which row is which meeting, the user opens the notes one by one. [paraphrase]\n\nAfter this spec, every meeting whose notes the app saves from this version on carries a short summary of what it was about, shown in grey under its title in All Recordings. When the notes have a summary section, the app takes the summary from it. When they have none, the app asks the notes provider for a short summary of the finished notes, in the background after the notes are saved. The user can change the summary or write one for any finished meeting, and new notes never replace a summary the user wrote. Meetings from before this version get none unless the user types one. The search finds words in summaries too. [paraphrase]\n\nWho it is for: everyone who records or imports meetings with the app. Why now: the owner asked for it on 2026-11-16. It builds on the rows and the row menu that #171 (Transcribe Again, Identify Speakers Again) changes, and says what happens to the summary when a meeting is processed again. [inferred]\n\nUpstream check (2026-11-16): the original project has no issue or pull request about a summary per recording or about editing one. Related only: its open issue 873 proposes a separate \"Meetings\" window that shows a meeting's notes and transcript side by side (no pull request yet); its open PR 990 adds named notes templates, which is why the summary rule below does not depend on the built-in template's layout; its open PR 979 passes the meeting title to the notes prompt and does not change the title the list shows. In the fork, #126 (the search finds no participants, since few meetings have any) and #201 (All Recordings must not wait on a volume that stops answering) bear on R6 and on the rule that the window reads no notes file for a summary.\n\n## Architecture & Data Models\n\n- **The summary of a meeting** is one plain-text paragraph of at most 600 characters. The app keeps up to two per meeting: the **notes summary**, which the app got from the notes it last saved for the meeting, and the **typed summary**, which the user wrote. The row, its tooltip, the sheet and the search use the typed summary when there is one, else the notes summary (A15). A typed summary stays until the user changes or empties it. [inferred]\n- **Where it is kept:** its own file in the app's data folder, beside the finished-job list, keyed by the meeting's job id: per meeting each of the two texts with when it was written. Neither the meeting record (gh-97, `MeetingFileRecord`) nor the finished-job list (`TerminalJobRecord`) holds it: meetings from before the record have no record, and a build that does not know a field drops it when it rewrites either file, which would lose a typed summary (A8). The file is written atomically and readable only by the user, as the record file is, and two running builds of the fork take turns through a lock beside it, as they do for the record file (`MeetingFileStore`). [inferred]\n- **The summary section rule** is one pure function of the saved notes' text (A13). It looks for the first heading, at any level, whose text without Markdown marks, a leading number (\"1.\") and a trailing colon, compared ignoring case and diacritics, is or begins with one of the summary names: \"Summary\" and the word for it in each notes language the app offers (`AppSettings.protocolLanguages`), for example \"Zusammenfassung\", \"R\u00e9sum\u00e9\", \"Resumen\", \"Samenvatting\". The section runs to the next heading and never past the separator before an appended full transcript (`ProtocolGenerator.fullTranscriptSeparator`). From it the rule drops tables, HTML comments, horizontal rules, label lines such as `**Date:** \u2026` and paragraphs wholly in square brackets (a model that copied the template's placeholder), removes list and block-quote markers and Markdown marks (emphasis, inline code, link targets), joins what is left with single spaces and cuts it to 600 characters at a word end, adding \"\u2026\". An empty result counts as no summary section. In notes from the built-in template this is the Summary section. [inferred]\n- **The summary call** (D2, A14): when the saved notes have no summary section, the app asks the notes provider for a summary of them, after the notes are saved and in the background. It takes a generator from the same factory the notes came from (`PipelineQueue.protocolGeneratorFactory`, `ProtocolRegenerator`'s `generatorFactory`, both built by `PipelineController.makeProtocolGenerator()`), asked once right after the save, so the call uses the provider set in Settings at that moment; with provider None the factory gives none and there is no call. The request is the generator's own `generate` with the notes as its text (without an appended full transcript, cut to the first 32,000 characters at a line end), the meeting's title, `diarized: false`, no meeting time, and `ProtocolInstructions(template: MeetingSummary.instruction, background: nil)` in place of the notes template, so `ProtocolGenerator.buildSystemPrompt` adds no meeting time, background or speaker note around it. `MeetingSummary.instruction` reads: \"Write a summary of the following meeting notes in {LANGUAGE}: one paragraph of plain text, at most three sentences and at most 600 characters, saying what the meeting was about and what was decided. Return only the summary, with no heading, list, Markdown or introduction.\" followed by a blank line and \"Meeting notes:\". The answer goes through the same clean-up as a section's text; an empty result stores nothing. Calls run one at a time, apart from the pipeline's queue: the job reaches Done and the queue goes on before the call starts. A custom command gets the call only when it receives the prompt, on stdin or through `{prompt_file}` (`CommandTemplate.inputMode`, `CommandTemplate.uses`); one that takes only `{transcript_file}` would get the notes without the instruction, so it gets no call and no summary, as with provider None (A20). The local model has one helper, which the notes use too (`LocalModelGate`, FIFO by arrival), so a local summary call yields to notes: it waits while a job of the queue is making notes or waits at the gate, and a job that asks the gate for notes while a summary call runs cancels that call, which counts as failed (A20). A local model's deferral for a running recording is waited out as for the notes. A call still running after 180 seconds is cancelled and counts as failed. [paraphrase]\n- **When a summary is taken:** wherever the app saves a meeting's current notes, from the text it saved, never by reading the file back: the notes of a new meeting, Retry Meeting Notes and Generate Meeting Notes from Transcript\u2026 (all three through `PipelineQueue.saveGeneratedNotes` in `PipelineQueue+Stages.swift`), a regeneration that replaces the main notes of a meeting that has a job (`ProtocolRegenerator`'s `regenerated` hook in `ProtocolRegeneration.swift`, from the row's Regenerate Notes\u2026 with \"Replace the current notes\" or from \"Regenerate from File\u2026\" on a file of a listed meeting, A19), and the success step of Transcribe Again and Identify Speakers Again (#171). The `regenerated` hook carries only the job and the template today, so it gains the saved notes text. A re-run's own save under names of its own (`saveGeneratedNotes` while `isRerun` holds for the job) takes nothing; at the re-run's success (`PipelineQueue.finishCommittedRerun` on the #171 branch, which also runs when a swap completes after a relaunch) the summary step runs only once the re-run's hand-off has landed (`handOverCommittedRerun`, at the point where it starts the committed Notion export), so a launch that replays an unfinished hand-off runs the step then and a call that was already started is never started again. That step reads the new current notes file once, off the main actor, as the one exception to \"never read back\", since the swap can happen in a later launch than the save; a file that is gone or unreadable there changes no summary. A found summary section, or a call's answer, becomes the meeting's notes summary; a typed summary stays as it is. A save that gets no summary (provider None, a failed or empty call) leaves the notes summary as it was (A18). An additional report (gh-190) and \"Regenerate from File\u2026\" on a file of no listed meeting change no summary. [inferred]\n- **Meetings from before this version** (D3): they have no summary until the user types one or the app saves new notes for them (A16). The app reads no notes file to make a summary, at launch, when the window opens or from the sheet, and offers no \"Summarize\" item. [paraphrase]\n- **The row** (`TranscriptionsView`, `TranscriptionsView+RowParts.swift`) reads the summary from the store in memory, never from a file while it is drawn. The row's list entry (`TranscriptionEntry`) carries the summary it shows, so the search reads it too (`TranscriptionList.matching`). [inferred]\n- **\"Edit Summary\u2026\"** is one more item of the pure row decision (`RecordingRowActions.menuItems`), so the \"\u2026\" menu and the right-click menu list it together. It opens a sheet over All Recordings, like the regenerate sheet (`RegenerateSheetState`). The sheet's state lives in one `@Observable` object, so a ViewInspector test can read back what a control wrote (gui-testing doc, rung 2). [inferred]\n- **The accepted row** (D6, D10): the summary is one more line directly under the title line (the title and its Keep badge), above the \"app \u00b7 date \u00b7 length\" line, in the secondary text colour, smaller than the title and larger than the lines below it. It shows at most two lines, cut at the end with \"\u2026\", and hovering the line shows the whole summary as a tooltip. A row without a summary looks as today. The line shows in every state of the row, so a meeting being transcribed again keeps it. [paraphrase]\n- **The accepted Edit Summary sheet** (D11), top to bottom: the heading \"Edit Summary\"; below it in secondary text the meeting's title, date and length as the row shows them, joined with \" \u00b7 \" (for example \"Weekly team sync \u00b7 16 Nov 2026 at 09:00 \u00b7 48:12\"); a multi-line text field about five lines high with the summary the row shows (empty when it has none), focused when the sheet opens; one line in secondary text under the field (below); and a bottom row with \"Use Summary from Notes\" at the left and Cancel and Save at the right, Save the default button. The line under the field reads \"Taken from the meeting notes. Once you change it, new notes for this meeting no longer replace it.\" while the meeting shows its notes summary, and \"You wrote this summary. New notes for this meeting do not replace it.\" while it shows a typed one. A meeting with no summary shows no line, and while the field holds more than 600 characters the line reads \"At most 600 characters.\" (A17). [paraphrase]\n\n## API Contracts\n\n- No new endpoint. The summary is not part of `JobStatusDTO`, `GET /v1/jobs/<id>` or any other `/v1` response, and All Recordings stays off the `/ui/tree` and `/ui/press` window allowlist, since it shows meeting content. [inferred]\n- The summary call uses the existing generator interface (`ProtocolGenerating.generate`) and the provider settings as they are; no new setting. [inferred]\n- The summary file is new and only this fork reads it. The meeting record file and the finished-job list keep their formats unchanged, so a build without this spec reads them as before. [inferred]\n\n## Edge Cases & Constraints\n\n- **Notes in another language:** the rule knows the summary heading of every notes language the app offers, so German notes (\"## Zusammenfassung\") work as English ones do. A summary heading the rule does not know counts as none, and the call makes the summary instead. [inferred]\n- **Custom templates (gh-2, gh-207):** notes with a summary section, whatever its place, give that section; notes without one get the call. A summary section that is a list gives its items joined as one paragraph. [paraphrase]\n- **No notes:** protocol provider None, failed notes, notes generation off for a re-run (#171 A12) and meetings whose notes were never saved leave the summary as it was; a row without one shows no summary line. A Retry Meeting Notes that succeeds fills it. [inferred]\n- **Notion export that replaces the local Markdown:** the summary is taken, or the call made, from the generated text, which the app has in memory before the local copy is removed. [inferred]\n- **Transcribe Again and Identify Speakers Again (#171):** while the re-run waits or runs, the row keeps showing the meeting's current summary, since its notes stay current until the re-run succeeds. At success the new notes give the notes summary by the rules above; a typed one stays. A re-run that fails, is cancelled or stays unnamed leaves the summary as it was. Earlier versions (`.until-<stamp>`) and `.previous-<stamp>` copies get no summary of their own. [inferred]\n- **During a call:** the row shows the meeting's earlier summary, or none for a new meeting, until the answer arrives. A newer notes save for the same meeting makes an older call's answer void; a meeting moved to the Trash during its call stores nothing; a summary typed during the call stays shown, and the answer becomes the notes summary. A quit during the call stores nothing, and the call is not made again at the next launch. [inferred]\n- **Notes edited outside the app** do not change the summary. \"Use Summary from Notes\" offers the notes summary of the notes the app last saved, not of the edited file (A15). [inferred]\n- **No notes file is read for a summary:** a notes file that is gone, unreadable or on a volume that is not connected or does not answer changes nothing, and the window never waits on one (#201). [inferred]\n- **Record-only mode:** recordings made in it have no row, so nothing changes for them; rows from before stay editable. [inferred]\n- **Privacy:** a summary is meeting content, and so are the notes the call sends. Neither appears in a log line, a notification, a job warning, the automation API or a test fixture; tests use made-up text. The call's log lines name the job's short id, the provider and the outcome only. [inferred]\n- **Wording:** on screen the app says \"notes\" (gh-97 A11) and \"summary\". [inferred]\n\n## Acceptance Criteria\n\n- **R1:** The app keeps each meeting's notes summary and typed summary in their own file keyed by the job id, written atomically and readable only by the user, and loads it at launch. Errors: a file that cannot be read or decoded is moved aside under an `.unreadable` name before anything new is written, and the app starts with no summaries; a failed write is logged without content and never fails a job or an action; while the other running build holds the lock longer than the wait bound, the write fails and is logged, as for the record file. [inferred]\n- **R2:** Each time the app saves a meeting's current notes (a new meeting, Retry Meeting Notes, Generate Meeting Notes from Transcript\u2026, a regeneration that replaces the main notes of a meeting with a job, the success step of Transcribe Again and Identify Speakers Again), it applies the summary section rule to the saved text; a found section becomes the notes summary, and notes without one start the summary call of R5. A typed summary stays unchanged throughout. Errors: a save that gets no summary leaves the notes summary as it was; an additional report, \"Regenerate from File\u2026\" on a file of no listed meeting, failed notes and a re-run that fails, is cancelled or stays unnamed change no summary and make no call; with the Notion export replacing the local Markdown the summary is still taken or the call still made, except at a re-run's success, where a notes file that is gone or unreadable changes no summary. [paraphrase]\n- **R3:** A meeting with a summary shows it in its All Recordings row as the accepted row describes (Architecture): directly under the title, in the secondary text colour, at most two lines cut with \"\u2026\", the whole text as the tooltip of that line. Errors: a row without a summary looks as today; a meeting that is being transcribed again keeps showing its summary until the re-run succeeds; drawing a row reads no file. [paraphrase]\n- **R4:** Every finished row offers \"Edit Summary\u2026\" in its \"\u2026\" menu and its right-click menu, directly after \"Show in Finder\" (in that place when the row lists no Show in Finder), also when it has no notes or no record. It opens the accepted Edit Summary sheet (Architecture). Save stores the text, trimmed and with line breaks joined by single spaces, as the typed summary, and the row shows it at once; a text equal to the notes summary is stored as the notes summary instead, with no typed one; Cancel and Escape change nothing. \"Use Summary from Notes\" puts the meeting's notes summary into the field, reads no file and makes no call. Errors: saving an empty text removes both summaries, so the meeting's next notes fill it again; Save is disabled while the text is longer than 600 characters; \"Use Summary from Notes\" is disabled for a meeting without a notes summary; a Save for a meeting moved to the Trash while the sheet was open stores nothing; not offered for a waiting, running, naming or failed row, nor in the menu of a multi-row selection. [paraphrase]\n- **R5:** When saved notes have no summary section and the factory gives a generator, the app makes the summary call as Architecture describes it: after the save, in the background, one call at a time, with the notes (no appended transcript, at most 32,000 characters), the title and `MeetingSummary.instruction`, and stores the cleaned answer of at most 600 characters as the notes summary. It works the same in both build variants with whatever provider the variant offers. Errors: provider None makes no call; a failed call (the provider is unavailable, the command is missing, the endpoint answers an error), a call cancelled after 180 seconds or an empty answer stores nothing, keeps the earlier notes summary, logs one line without content and shows no notification or job warning; the answer of a call that a newer save of the same meeting overtook, or of a meeting moved to the Trash, is dropped; a quit drops a call that was started, and no call is made for it at the next launch, while a re-run success whose hand-off a relaunch completes makes its call then; a custom command that receives only `{transcript_file}` gets no call; with the local model a job that asks for notes cancels a running summary call, and no summary call starts while a job makes notes or waits for the model; the call never delays the job or, apart from stopping a local summary call, the next job in the queue. [paraphrase]\n- **R6:** The All Recordings search matches the summary a row shows as well as the title and the participants, ignoring case and diacritics, and its hint reads \"Search titles and summaries\". No error surface beyond today's search. [paraphrase]\n- **R7:** Move Meeting to Trash removes the meeting's summaries once its files are moved; a deletion left incomplete keeps them until it finishes; Move Audio to Trash and the automatic deletion leave them. At launch, summaries whose job neither the finished-job list nor the record file holds are dropped. Errors: a failed removal is logged without content and retried at the next launch by the same rule. [inferred]\n- **R8:** The summary section rule, the answer clean-up, the replace-or-keep rule for every save point of R2 and the menu item list for every job state are pure functions with unit tests: notes from the built-in template with an English and a German summary heading, the summary heading of each notes language the app offers, a custom template without a summary section, a summary section that is a list, an appended full transcript, label lines, a bracketed placeholder, Markdown marks and the 600-character cut. The store is tested with a temporary folder: an unreadable file, two writers, a write failure. The summary call is tested with a stub generator: it is called once with the expected text, title and instruction for notes without a summary section, never for notes with one or with provider None, and a failure, a time-out, an empty answer, an overtaken call and a meeting moved to the Trash each store nothing. Through the real `CommandProtocolGenerator`, a command taking `{prompt_file}` or stdin receives the instruction and one taking only `{transcript_file}` gets no call. With a stub local gate, a notes request arriving during a summary call cancels the summary and runs the notes, and a summary call waits while notes run. A re-run whose hand-off is interrupted and replayed at the next launch makes its summary call once. The re-run's success step is tested in the pipeline's test setup with a stub generator, with a notes summary and with a typed summary. Each new control has one ViewInspector wiring test located by an `A11yID` constant. Both build variants run the suite, and `docs/architecture/pipeline.md` describes the summary, its file, its rule and the call. No error surface beyond R1 to R7. [inferred]\n\n## Boundaries\n\n- **Follow-up, not this spec** (if use shows the need): a summary for meetings from before this version or a \"Summarize\" item (D3); editing the meeting's title (D7); showing the summary in the menu's Last Recording section, in notifications or in Notion; a summary for a multi-row selection; a call made again for a meeting whose call failed. [paraphrase]\n- No change to the notes prompt, the built-in template or the notes files: the summary is read from the notes or asked for beside them, never written into them. [inferred]\n- No change to Regenerate Notes, Transcribe Again, Identify Speakers Again or the deletion rules beyond the summary steps above. [inferred]\n- `CLAUDE.md` and `AGENTS.md` stay unchanged; submitting this to the original project is a separate step. [inferred]\n\n## Decision Context\n\n- **D1 \u00b7 Each row in All Recordings shows a short summary of what the meeting was about, taken from the notes or the transcript, and the user can edit it.** why: the owner's wish of 2026-11-16 (paraphrased): the overview should already tell which entry is which \u00b7 status: active [owner-stated 2026-11-16]\n- **A1 \u00b7 Product call: the summary is the first plain paragraph after the first `##` heading of the notes (the Summary section of the built-in template), taken when the app saves the notes; no extra model call and no prompt change.** flip at: the owner's answer \u00b7 test: R8's summary rule tests \u00b7 alternatives: B one extra one-line summary the model writes in the same call, as a marked line the app removes from the notes (a prompt change, which custom templates do not get); C a separate short model call per meeting after the notes \u00b7 status: superseded by D2 [agent-assumed 2026-11-16]\n- **A2 \u00b7 Product call: a row without notes shows no summary line, the user can type one, and meetings that already have notes get theirs from their notes file when All Recordings opens.** flip at: the owner's answer \u00b7 test: R4's and R5's tests \u00b7 alternatives: B also a \"Summarize\" item that asks the model for a summary from the transcript; C only meetings whose notes are saved from this version on get a summary \u00b7 status: superseded by D3 [agent-assumed 2026-11-16]\n- **A3 \u00b7 Product call: the summary is edited in a sheet over All Recordings, opened by \"Edit Summary\u2026\" directly after \"Show in Finder\" in the row's \"\u2026\" and right-click menu.** flip at: the owner's answer to the mockup \u00b7 test: R8's menu order test and the sheet's wiring tests \u00b7 alternatives: B inline in the row; C a detail pane beside the list \u00b7 status: superseded by D4 [agent-assumed 2026-11-16]\n- **A4 \u00b7 Product call: new notes never replace a typed summary; \"Use Summary from Notes\" in the sheet takes it back from the current notes, and saving an empty summary lets the next notes fill it again.** flip at: the owner's answer \u00b7 test: R8's replace-or-keep tests \u00b7 alternatives: B a \"Replace my summary\" checkbox in the regenerate and re-run sheets; C new notes always replace it \u00b7 status: superseded by D5 [agent-assumed 2026-11-16]\n- **A5 \u00b7 Product call: the row shows at most two lines of the summary, cut with \"\u2026\"; the whole text is the row's tooltip and is in the sheet.** flip at: the owner's answer to the mockup \u00b7 test: R3's wiring test \u00b7 alternatives: B one line; C the whole summary, which makes rows several lines taller \u00b7 status: superseded by D6 [agent-assumed 2026-11-16]\n- **A6 \u00b7 Product call: the meeting's title stays as recorded; editing it is not part of this spec.** flip at: the owner's answer \u00b7 test: none (no title change is built) \u00b7 alternatives: B an editable display title in the same sheet, shown in the row and the search only, while files, menu, notifications and Notion keep the recorded title; C renaming the files to it as well \u00b7 status: superseded by D7 [agent-assumed 2026-11-16]\n- **A7 \u00b7 Product call: the search covers summaries, and its hint reads \"Search titles and summaries\".** flip at: the owner's answer \u00b7 test: R6's search tests \u00b7 alternatives: B titles and participants only, as today \u00b7 status: superseded by D8 [agent-assumed 2026-11-16]\n- **A8 \u00b7 Summaries live in their own owner-only file keyed by the job id, not in the meeting record or the finished-job list.** why: meetings from before gh-97 have no record, and a build that does not know a field drops it when it rewrites either file, which would lose a typed summary \u00b7 flip at: the summary store \u00b7 test: R1's store tests \u00b7 alternatives: B an optional field in `MeetingFileRecord`; C an optional field in `TerminalJobRecord` \u00b7 status: active [agent-inferred 2026-11-16]\n- **A9 \u00b7 The summary follows the meeting: Move Meeting to Trash removes it, Move Audio to Trash and the automatic deletion keep it, and an entry no job or record holds is dropped at launch.** flip at: the deletion and launch steps of the store \u00b7 test: R7's tests \u00b7 alternatives: B keep summaries of deleted meetings \u00b7 status: active [agent-assumed 2026-11-16]\n- **A10 \u00b7 A summary is at most 600 characters, taken or typed, and the summary of a meeting from before this version is read from the first 64 KB of its notes once per launch.** flip at: the summary rule and the read of older notes \u00b7 test: R8's cut test and R5's tests \u00b7 alternatives: B no limit; C read the whole notes file \u00b7 status: superseded by D9 [agent-assumed 2026-11-16]\n- **A11 \u00b7 The summary stays off the automation API and out of log lines, notifications and test fixtures.** why: it is meeting content, like the titles and participants the window already keeps off `/ui/tree` \u00b7 flip at: the store and `JobStatusDTO` \u00b7 test: R8's store tests \u00b7 status: active [agent-inferred 2026-11-16]\n- **A12 \u00b7 This spec builds after #171 and adds the summary step to #171's re-run success; while a re-run waits or runs, the row keeps the current summary.** why: #171 changes the same rows and menu and adds the re-run that makes new notes for a finished meeting \u00b7 flip at: the spec dependency and the re-run's success step \u00b7 test: R8's re-run tests \u00b7 alternatives: B build first and leave the re-run's summary step to #171 \u00b7 status: active [agent-inferred 2026-11-16]\n- **D2 \u00b7 The summary comes from the notes' summary section when they have one, with no model call; notes without one get one short extra model call on the finished notes, in the background after they are saved, with the notes provider; provider None means no call and no summary.** why: the owner's answer of 2026-11-16 (paraphrased): not every notes template has a summary section \u00b7 status: active [owner-stated 2026-11-16]\n- **D3 \u00b7 Only meetings whose notes are saved from this version on get a summary on their own; older ones keep none unless the user types one, with no background fill and no \"Summarize\" item.** why: the owner's answer of 2026-11-16 (paraphrased) \u00b7 status: active [owner-stated 2026-11-16]\n- **D4 \u00b7 The summary is edited in the Edit Summary sheet over All Recordings, opened by \"Edit Summary\u2026\" directly after \"Show in Finder\" in a finished row's \"\u2026\" and right-click menu.** why: the owner accepted the Edit Summary board as drawn on 2026-11-16 \u00b7 status: active [owner-stated 2026-11-16]\n- **D5 \u00b7 New notes never replace a typed summary; \"Use Summary from Notes\" in the sheet brings the notes' version back, and saving an empty field removes the summary.** why: the owner accepted the Edit Summary board as drawn on 2026-11-16 \u00b7 status: active [owner-stated 2026-11-16]\n- **D6 \u00b7 The row shows at most two lines of the summary, cut with \"\u2026\", and the whole text on hover.** why: the owner accepted the list board as drawn on 2026-11-16 \u00b7 status: active [owner-stated 2026-11-16]\n- **D7 \u00b7 The meeting's title stays as recorded; editing it is not part of this spec.** why: the owner's answer of 2026-11-16 (paraphrased) \u00b7 status: active [owner-stated 2026-11-16]\n- **D8 \u00b7 The search covers summaries, and its hint reads \"Search titles and summaries\".** why: the owner accepted the list board as drawn on 2026-11-16 \u00b7 status: active [owner-stated 2026-11-16]\n- **D9 \u00b7 A summary is at most 600 characters, whether taken from notes, made by the call or typed.** why: the owner accepted the Edit Summary board, which states the limit, on 2026-11-16; the read of older notes files that A10 also held went with D3 \u00b7 status: active [owner-stated 2026-11-16]\n- **D10 \u00b7 The summary is a grey line directly under the title line and above the \"app \u00b7 date \u00b7 length\" line; a row without one looks as today, and a row being transcribed again keeps its summary.** why: the owner accepted the list board as drawn on 2026-11-16 \u00b7 status: active [owner-stated 2026-11-16]\n- **D11 \u00b7 The Edit Summary sheet holds, top to bottom, the heading \"Edit Summary\", the title \u00b7 date \u00b7 length line, the text field, the origin line (\"Taken from the meeting notes. Once you change it, new notes for this meeting no longer replace it.\" or \"You wrote this summary. New notes for this meeting do not replace it.\") and \"Use Summary from Notes\" at the left with Cancel and Save, the default button, at the right.** why: the owner accepted the Edit Summary board as drawn on 2026-11-16 \u00b7 status: active [owner-stated 2026-11-16]\n- **A13 \u00b7 A summary section is found by its heading's words (\"Summary\" and the word for it in each notes language the app offers), at any heading level and place; its whole text up to the next heading is taken, so a list section gives its items as one paragraph.** flip at: the summary section rule \u00b7 test: R8's summary rule tests \u00b7 alternatives: B the first section whatever its heading, which takes the wrong section in templates that start with something else; C only the built-in template's layout \u00b7 status: active [agent-assumed 2026-11-16]\n- **A14 \u00b7 The summary call sends the notes without an appended transcript, at most 32,000 characters, with a fixed instruction in the notes language, runs one call at a time apart from the queue, is cancelled after 180 seconds, and also runs when a typed summary is shown, so \"Use Summary from Notes\" can offer the current notes' summary.** flip at: the summary call \u00b7 test: R8's call tests \u00b7 alternatives: B skip the call while a typed summary is shown, which saves a call but leaves \"Use Summary from Notes\" with older notes' text \u00b7 status: active [agent-assumed 2026-11-16]\n- **A15 \u00b7 The store keeps the notes summary beside a typed one, and \"Use Summary from Notes\" puts that stored notes summary into the field, with no file read and no model call; it is disabled when the meeting has none.** flip at: the store and the sheet \u00b7 test: R4's sheet tests \u00b7 alternatives: B read the current notes file again and call the model when it has no summary section, which is a \"Summarize\" item that D3 rules out for older meetings \u00b7 status: active [agent-assumed 2026-11-16]\n- **A16 \u00b7 New notes the app saves for a meeting from before this version (Retry Meeting Notes, Regenerate Notes, Transcribe Again) give it a summary like any other notes save; only the fill without new notes is left out.** flip at: the owner's answer \u00b7 test: R8's replace-or-keep tests \u00b7 alternatives: B never give an older meeting a summary on its own, which needs a mark of which meetings count as new \u00b7 status: active [agent-assumed 2026-11-16]\n- **A17 \u00b7 The sheet shows no origin line for a meeting without a summary and \"At most 600 characters.\" while the field is longer; Save joins line breaks with single spaces.** flip at: the owner's answer \u00b7 test: R4's sheet tests \u00b7 status: active [agent-assumed 2026-11-16]\n- **A18 \u00b7 A notes save that gets no summary (provider None, a failed, timed-out or empty call) keeps the earlier notes summary instead of removing it, so the row never goes blank while a call runs or after one fails.** flip at: the replace-or-keep rule \u00b7 test: R8's replace-or-keep tests \u00b7 alternatives: B remove it, since it describes earlier notes \u00b7 status: active [agent-assumed 2026-11-16]\n- **A19 \u00b7 \"Regenerate from File\u2026\" on a file of a listed meeting replaces that meeting's notes, so it takes the summary as Regenerate Notes does.** why: both end in `ProtocolRegenerator`'s `regenerated` hook with the meeting's job, and a summary of the replaced notes would be stale \u00b7 flip at: the regeneration's summary step \u00b7 test: R8's replace-or-keep tests \u00b7 status: active [agent-inferred 2026-11-16]\n- **A20 \u00b7 The summary call goes only to a provider that receives the instruction (a custom command taking only `{transcript_file}` gets none), and with the local model it yields to notes: it waits while notes run or wait, and a notes request cancels it.** why: such a command would return ordinary notes as the \"summary\", and the local model's one helper is FIFO, so a summary could otherwise hold up the next meeting's notes \u00b7 flip at: the summary call's provider check and its use of `LocalModelGate` \u00b7 test: R8's command and gate tests \u00b7 alternatives: B a fixed command-only prompt file; C let a following job's notes wait for the summary, at most the 180-second bound \u00b7 status: active [agent-inferred 2026-11-16]\n- **A21 \u00b7 The Edit Summary sheet applies the 600-character limit to the field's text as typed, before Save trims it and joins its line breaks, so a field just over 600 characters shows \"At most 600 characters.\" and disables Save even when its saved form would fit.** alternatives: B \u2014 count the text as Save would store it \u00b7 flip at: `EditSummarySheet.swift` `EditSummarySheetState.isTooLong` \u00b7 test: `EditSummarySheetTests.testALongTextDisablesSaveAndCancelSavesNothing` \u00b7 status: active [agent-assumed 2026-11-17]\n\nMockup gate: accepted by the owner on 2026-11-16. The boards are on a private design canvas, so this spec writes out their layout and wording (Architecture, the accepted row and the accepted Edit Summary sheet; D4 to D6, D8, D10 and D11); the meeting titles, apps, dates, lengths, audio lines, summaries, the footer's counts and the five rows drawn in them are examples.\n\nFIT: GO \u00b7 2026-11-16 \u00b7 base 3b236a80 \u00b7 engine flow-next 9.10.0 \u00b7 no other spec claims summaries, the row line or the menu item; gh-258 keeps titles as gh-257 shows them, gh-263 adds no save path of its own; four plan-only anchors fixed\n  - the re-run's own save goes through `saveGeneratedNotes` (with `isRerun` checks on the #171 branch), so the summary step skips it\n  - the re-run's success step `finishCommittedRerun` also runs after a relaunch and holds no notes text, so it reads the new notes file once, off the main actor\n  - `ProtocolRegenerator`'s `regenerated` hook carries only the job and template, so it gains the saved text\n  - the call passes `ProtocolInstructions(template:background:)`, which `buildSystemPrompt` wraps with nothing when there is no time, background or speaker note\n\nFIT: GO \u00b7 2026-11-17 \u00b7 base 3256bb5b \u00b7 engine flow-next 9.12.0 \u00b7 wapp/main moved by gh-171 (merged), gh-255, an upstream sync and a CI-only change; every gh-171 anchor the spec names holds as merged\n  - re-run hand-off as merged: `finishCommittedRerun` runs live and from `resumeRerunSwaps` at launch, and `handOverCommittedRerun` starts the committed Notion export (`startCommittedExport`) only once the snapshot and the re-run file have landed, the point the summary step waits for (`PipelineQueue+RerunSwap.swift`)\n  - notes save path as merged: the one `saveGeneratedNotes` call in `PipelineQueue+Stages.swift` sits behind the `isRerun` checks; Retry Meeting Notes and Generate Meeting Notes from Transcript reach it through `generateProtocol` (`PipelineQueue+MeetingNotes.swift`)\n  - `ProtocolRegenerator`'s `regenerated` hook still carries only the job id and template and fires only when the main notes were replaced; gh-171 changed only its version stamp there\n  - row actions as merged: `RecordingRowActions` keeps `showInFinder` and adds Transcribe Again and Identify Speakers Again; `RegenerateSheetState`, `TranscriptionEntry` and `TranscriptionList.matching` (title and participants today) are where the spec places them\n  - gh-255 changes the menu bar and the watch loop only; the upstream sync and the CI change touch no file the spec names; no spec on any branch claims summaries, the row line or the menu item; the engine change (9.10.0 to 9.12.0) adds `--from-issue` and a post-merge fence, nothing the spec relies on\n",
+    "mergeBaseTracker": "## BACKGROUND\n\nAll Recordings lists each meeting with its title, app, date and length. Many titles are generic (the app name, a file name or \"Recovered Recording\"), so the list does not show which meeting is which. Today you have to open the notes to find out.\n\n## NOTES\n\n- Each row shows a short summary of what the meeting was about. It comes from the meeting notes, or from the transcript when there are no notes.\n- The summary can be edited. New notes for the meeting never replace a summary that was edited by hand.\n- Builds on the rows and the row menu of #171 (Transcribe Again).\n- Related: #126 (the search finds no participants), #201 (no file reads while the list is drawn).\n\n## TASKS\n\n- [ ] Mockup of the rows with summaries and of the edit state\n- [ ] Spec",
+    "url": "https://github.com/wapp-its/meeting-transcriber/issues/257"
+  },
+  "updated_at": "2026-11-17T09:46:45.027158Z"
+}
