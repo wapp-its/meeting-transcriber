@@ -89,7 +89,9 @@ extension WatchLoop {
         var phase = MeetingEndPhase.listening(signalLostAt: nil)
         var callIDsSeen: Set<String> = []
         var capWarned = false
-        let title = Self.cleanTitle(meeting.windowTitle)
+        // The held title, which a better Teams window replaces while the call runs (`WatchLoop+MeetingTitle.swift`).
+        var title = Self.cleanTitle(of: meeting)
+        holdTitle(of: meeting)
         defer {
             withdrawMeetingEndQuestion()
             endSilencePrompt()
@@ -101,7 +103,7 @@ extension WatchLoop {
                 // arriving at the same poll does not override the person.
                 if let requestedAt = takeStopByHandRequest() {
                     diagnostics.notice("recording_stopped_by_hand trigger=auto")
-                    holdRedetection(of: meeting, offeringRecordAgain: true)
+                    holdRedetection(of: titled(meeting), offeringRecordAgain: true)
                     // Ends as Stop Watching ends it, but only an answer given
                     // before the stop may settle the question: a Keep
                     // recording tapped after it must not keep the countdown.
@@ -112,13 +114,15 @@ extension WatchLoop {
                 let decision = WatchLoopEndPolicy.step(config: config, startTime: startTime, phase: phase, poll: poll)
                 if let stop = stepSilencePrompt(beside: decision, from: phase) {
                     diagnostics.notice(AutoStopReason.silenceStop.logLine(trigger: .auto, silentFor: stop.silentFor))
-                    holdRedetection(of: meeting, offeringRecordAgain: true)
+                    holdRedetection(of: titled(meeting), offeringRecordAgain: true)
                     return .ended(cutAt: stop.cutAt)
                 }
                 switch decision {
                 case let .continuePolling(next):
                     logGraceChange(from: phase, to: next)
                     phase = next
+                    // Only while the signal is there: a poll that ends, asks or follows a loss keeps the title.
+                    if next == .listening(signalLostAt: nil), let retitled = refreshTitle(of: meeting) { title = retitled }
 
                 case let .askToEnd(pending):
                     phase = .askingToEnd(pending)
@@ -164,6 +168,8 @@ extension WatchLoop {
         participants: [String] = [],
         protocolOptions: MeetingProtocolOptions? = nil,
     ) async throws {
+        // The title the recording held at its stop, not the detection title (`WatchLoop+MeetingTitle.swift`).
+        let title = Self.cleanTitle(of: takeTitled(meeting))
         if end.cutAt == nil { clearStoredCut(of: recorder) }
         let stoppedAt = nowProvider()
         let recording: RecordingResult = if finishingForQuit {
@@ -176,7 +182,6 @@ extension WatchLoop {
             stopped = cutBack(stopped, to: cutAt, startedAt: startedAt, stoppedAt: stoppedAt, recorder: recorder)
             clearStoredCut(of: recorder)
         }
-        let title = Self.cleanTitle(meeting.windowTitle)
         if finishingForQuit, recordOnly() {
             await writeRecordOnlyOffMain(
                 title: title, appName: meeting.pattern.appName, recording: stopped.recording, trigger: .auto,

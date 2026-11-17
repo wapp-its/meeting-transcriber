@@ -90,6 +90,6 @@ extension WatchLoop {
     /// The title the status line shows while recording, as the two start
     /// paths put it there.
     private var detailTitle: String {
-        manualRecordingInfo?.title ?? currentMeeting.map { Self.cleanTitle($0.windowTitle) } ?? ""
+        manualRecordingInfo?.title ?? currentMeeting.map { Self.cleanTitle(of: $0) } ?? ""
     }
 }

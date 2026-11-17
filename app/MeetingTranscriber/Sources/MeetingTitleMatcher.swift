@@ -56,18 +56,38 @@ struct MeetingTitleMatcher {
     func selectWindowTitle(from windows: [[String: Any]]) -> String? {
         var firstNonIdle: String?
         for window in windows {
-            guard let owner = window["kCGWindowOwnerName"] as? String,
-                  ownerNames.contains(owner),
-                  let title = window["kCGWindowName"] as? String,
-                  !title.isEmpty,
-                  title != appName,
-                  !isIdleTitle(title) else {
-                continue
-            }
+            guard let title = usableTitle(of: window) else { continue }
             if isMeetingTitle(title) { return title }
             if firstNonIdle == nil { firstNonIdle = title }
         }
         return firstNonIdle
+    }
+
+    /// Teams' pick (issue #258): of the titles `selectWindowTitle` would
+    /// consider, the one of the best rank in `TeamsWindowTitle`, the first in
+    /// list order within a rank; nil when none is usable, and the caller
+    /// substitutes the placeholder.
+    func selectRankedTitle(from windows: [[String: Any]]) -> RankedWindowTitle? {
+        var best: RankedWindowTitle?
+        for window in windows {
+            guard let title = usableTitle(of: window), let rank = TeamsWindowTitle.rank(of: title) else { continue }
+            if best.map({ rank < $0.rank }) ?? true { best = RankedWindowTitle(title: title, rank: rank) }
+        }
+        return best
+    }
+
+    /// The window's title when it is ours and could name a meeting: not
+    /// empty, not the app name, not an idle tab.
+    private func usableTitle(of window: [String: Any]) -> String? {
+        guard let owner = window["kCGWindowOwnerName"] as? String,
+              ownerNames.contains(owner),
+              let title = window["kCGWindowName"] as? String,
+              !title.isEmpty,
+              title != appName,
+              !isIdleTitle(title) else {
+            return nil
+        }
+        return title
     }
 
     private static func anyMatch(_ regexes: [NSRegularExpression], _ title: String) -> Bool {

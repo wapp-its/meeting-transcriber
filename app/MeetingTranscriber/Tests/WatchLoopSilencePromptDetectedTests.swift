@@ -279,6 +279,7 @@ final class WatchLoopSilencePromptDetectedTests: XCTestCase { // swiftlint:disab
         XCTAssertEqual(try trackFrames(recorder), [240_000, 240_000, 240_000], "every track ends 10 s after the last speech")
         // Exact lines, so nothing else, a title least of all, rides along.
         XCTAssertEqual(harness.noticeLines, [
+            "meeting_title_rank at=detection rank=4 parts=1",
             "silence_question_posted trigger=auto silent_s=20",
             "recording_auto_stop trigger=auto reason=silence_stop silent_s=22",
             "redetect_hold_set app=Microsoft Teams",
