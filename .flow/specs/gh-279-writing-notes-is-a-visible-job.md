@@ -19,7 +19,7 @@ Why: a local model can take up to 20 minutes, and a sheet holds its window for a
 
 This spec builds on "Notes made again are kept and show up" (gh-278), which makes notes written later reach the row, records a local-model stop as failed notes and fixes the sheet's smaller bugs. It waits for a mockup of the sheet and the row states. [inferred]
 
-Stands on the original: no. It builds on gh-170 (All Recordings) and gh-190 (additional reports), which exist only in the fork. Related in the original: its open issue 873, a prototype of a separate "Meetings" window, with no pull request yet. Related fork work: #261 (a local-model picker in the sheet), #263 (waiting for free memory), #262 (small gaps around re-runs and notes). [inferred]
+Stands on the original: no. It builds on gh-170 (All Recordings) and gh-190 (additional reports), which exist only in the fork. Related in the original: its open issue 873, a prototype of a separate "Meetings" window, with no pull request yet; #282 watches it. Related fork work: #261 (a local-model picker in the sheet), #263 (waiting for free memory), #262 (small gaps around re-runs and notes). [inferred]
 
 ## Architecture & Data Models
 
@@ -55,7 +55,7 @@ Stands on the original: no. It builds on gh-170 (All Recordings) and gh-190 (add
 ## Boundaries
 
 - The reports line, the Reports submenu and earlier versions belong to "A meeting's reports in one place". [paraphrase]
-- A per-run choice of notes provider ("Write with") is filed for later and not built here (D2). [paraphrase]
+- A per-run choice of notes provider ("Write with") is filed for later (#281) and not built here (D2). [paraphrase]
 - No change to the notes prompt, the templates or the notes files' format. `CLAUDE.md` and `AGENTS.md` stay unchanged. [inferred]
 
 ## Decision Context

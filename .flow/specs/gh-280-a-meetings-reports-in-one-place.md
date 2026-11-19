@@ -17,7 +17,7 @@ A user sees at a glance which notes and reports a meeting has, and can open, rev
 
 This spec builds on "Notes made again are kept and show up" (gh-278), which numbers additional reports instead of replacing them and makes "Show in Finder" select the meeting's notes, transcript and reports. It waits for a mockup of the row's reports line and the Reports submenu. [inferred]
 
-Stands on the original: no. It builds on gh-170 (All Recordings) and gh-190 (additional reports), which exist only in the fork. Related in the original: its open issue 873, a prototype of a separate "Meetings" window with notes and transcript side by side, with no pull request yet; if that window is merged there, the two windows need reconciling (watched in a fork issue labelled `upstream-overlap`). Related fork work: #197 (additional reports to Notion), #201 (no file reads while the list is drawn). [inferred]
+Stands on the original: no. It builds on gh-170 (All Recordings) and gh-190 (additional reports), which exist only in the fork. Related in the original: its open issue 873, a prototype of a separate "Meetings" window with notes and transcript side by side, with no pull request yet; if that window is merged there, the two windows need reconciling (watched in #282). Related fork work: #197 (additional reports to Notion), #201 (no file reads while the list is drawn). [inferred]
 
 ## Architecture & Data Models
 
