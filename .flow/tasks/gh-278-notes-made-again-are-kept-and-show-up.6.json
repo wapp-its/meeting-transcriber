@@ -1,0 +1,19 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-11-19T10:31:10.960256Z",
+  "depends_on": [
+    "gh-278-notes-made-again-are-kept-and-show-up.1",
+    "gh-278-notes-made-again-are-kept-and-show-up.3",
+    "gh-278-notes-made-again-are-kept-and-show-up.5"
+  ],
+  "id": "gh-278-notes-made-again-are-kept-and-show-up.6",
+  "priority": null,
+  "review": "codex:gpt-6.1-sol:xhigh",
+  "spec": "gh-278-notes-made-again-are-kept-and-show-up",
+  "spec_path": ".flow/tasks/gh-278-notes-made-again-are-kept-and-show-up.6.md",
+  "status": "todo",
+  "title": "Regenerate sheet: another meeting's run, the background box and the result lines",
+  "updated_at": "2026-11-19T10:41:19.154665Z"
+}
