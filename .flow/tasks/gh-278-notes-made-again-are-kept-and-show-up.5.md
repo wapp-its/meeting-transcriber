@@ -7,8 +7,8 @@ satisfies: [R4, R7, R8, R9]
 The row's actions: Retry Meeting Notes as the main button and the first menu item for a meeting whose notes failed (R4), "Write Notes…" for a meeting without notes (R8, the row part), and Finder actions that show all of a meeting's files and the folder the notes are in (R7). It needs nothing from the other tasks: the entry already knows `hasRetryableMeetingNotes`.
 
 **Size:** M
-**Files:** `Sources/RecordingRowActions.swift`, `Sources/TranscriptionsView+RowLabels.swift`, `Sources/TranscriptionsView.swift`, `Sources/AllRecordingsActions.swift`, `Sources/MeetingTranscriberApp.swift`, `Sources/A11yID.swift`; tests `Tests/RecordingRowActionsTests.swift`, `Tests/TranscriptionsViewTests.swift`
-**Touches:** [app/MeetingTranscriber/Sources/RecordingRowActions.swift, app/MeetingTranscriber/Sources/TranscriptionsView+RowLabels.swift, app/MeetingTranscriber/Sources/TranscriptionsView.swift, app/MeetingTranscriber/Sources/AllRecordingsActions.swift, app/MeetingTranscriber/Sources/MeetingTranscriberApp.swift, app/MeetingTranscriber/Sources/A11yID.swift, app/MeetingTranscriber/Tests/RecordingRowActionsTests.swift, app/MeetingTranscriber/Tests/TranscriptionsViewTests*.swift]
+**Files:** `Sources/RecordingRowActions.swift`, `Sources/TranscriptionsView+RowLabels.swift`, `Sources/TranscriptionsView.swift`, `Sources/AllRecordingsActions.swift`, `Sources/MeetingTranscriberApp.swift`, `Sources/A11yID.swift`; tests `Tests/RecordingRowActionsTests.swift`, a new `Tests/TranscriptionsViewTests+RowActions.swift`
+**Touches:** [app/MeetingTranscriber/Sources/RecordingRowActions.swift, app/MeetingTranscriber/Sources/TranscriptionsView+RowLabels.swift, app/MeetingTranscriber/Sources/TranscriptionsView.swift, app/MeetingTranscriber/Sources/AllRecordingsActions.swift, app/MeetingTranscriber/Sources/MeetingTranscriberApp.swift, app/MeetingTranscriber/Sources/A11yID.swift, app/MeetingTranscriber/Tests/RecordingRowActionsTests.swift, app/MeetingTranscriber/Tests/TranscriptionsViewTests+RowActions.swift]
 
 Paths under `Sources/` and `Tests/` are relative to `app/MeetingTranscriber/`.
 
@@ -36,15 +36,12 @@ Tests:
 **Optional** (reference as needed):
 - `Sources/TranscriptionFileOpener.swift` — the file-gone message
 - `docs/architecture/gui-testing.md` — A11yID, wiring tests, snapshots
-
 ## Acceptance
 - [ ] A finished row with retryable notes has "Retry Meeting Notes" as its main button and first menu item, calling the menu bar's retry; a refused retry's warning shows on the row; a history-only or waiting row offers none.
 - [ ] A meeting without notes reads "Write Notes…", one with notes "Regenerate Notes…".
 - [ ] Show in Finder selects notes, transcript and every existing report in one call; with none left the row says "The file was moved or deleted."
 - [ ] Open Notes Folder opens `<output folder>/protocols`, created when missing, under the output folder's security scope.
 - [ ] Each new or changed test fails on the code before this task.
-
-
 ## Done summary
 TBD
 

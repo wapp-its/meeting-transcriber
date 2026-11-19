@@ -1,11 +1,119 @@
 {
   "branch_name": "gh-278-notes-made-again-are-kept-and-show-up",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
   "created_at": "2026-11-19T10:15:13.175322Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
   "depends_on_epics": [],
   "id": "gh-278-notes-made-again-are-kept-and-show-up",
+  "impl_review_rounds": {},
   "next_task": 1,
-  "plan_review_status": "unknown",
-  "plan_reviewed_at": null,
+  "plan_review_rounds": 1,
+  "plan_review_status": "needs_work",
+  "plan_reviewed_at": "2026-11-19T10:37:24.953101Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "af048b2effad4f9d697653fb457eb748e127d612aead7d17071c32b41f135b34",
+      "backend": "codex",
+      "base_sha": "6c73d17883142cb0808ffe0669cc1edc97c235a9",
+      "counter_kind": "plan",
+      "effort": "xhigh",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-97bee84efed70a307b380fb9382e7637",
+            "classification": "introduced",
+            "findingId": "finding-97bee84efed70a307b380fb9382e7637",
+            "firstSeenThisRound": true,
+            "severity": "P0",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-efe06cfda9be0514934abdc11e000142",
+            "classification": "introduced",
+            "findingId": "finding-efe06cfda9be0514934abdc11e000142",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-1e80f19eb2aedc4fe30cf3157f52944c",
+            "classification": "introduced",
+            "findingId": "finding-1e80f19eb2aedc4fe30cf3157f52944c",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-6be46a0dac41d08cb49a84d1981d4fa3",
+            "classification": "introduced",
+            "findingId": "finding-6be46a0dac41d08cb49a84d1981d4fa3",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-fe044e08d21f912a7c4e57659705a8bc",
+            "classification": "introduced",
+            "findingId": "finding-fe044e08d21f912a7c4e57659705a8bc",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-13fe857190d21d98bdb1d754b3c120f4",
+            "classification": "introduced",
+            "findingId": "finding-13fe857190d21d98bdb1d754b3c120f4",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-4508f04ad7b35ff206d67fdee90e2743",
+            "classification": "introduced",
+            "findingId": "finding-4508f04ad7b35ff206d67fdee90e2743",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "d40958a2349d285f3471626e90898023e0f81e0c",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-6-astra",
+      "outcome": "verdict",
+      "output_bytes": 555086,
+      "output_sha256": "a824927133b65ebd687325cb058d58c264c1267c08e753cdafb4ad0517ad9b68",
+      "reservation_id": "aefd20e462b142038b11c368da529fbb",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-11-19T10:37:24.782152Z",
+      "tool_calls": 30,
+      "verdict": "NEEDS_WORK"
+    }
+  ],
+  "review_hash_epoch": {},
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
   "spec_path": ".flow/specs/gh-278-notes-made-again-are-kept-and-show-up.md",
   "status": "open",
   "title": "Notes made again are kept and show up",
@@ -21,5 +129,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nIn All Recordings, \"An additional report\" with a template that already has a report replaces that report. The old one goes to the Trash. Notes made later for a meeting without notes never reach its row. A local-model stop for low memory looks like a finished meeting, with no way to retry.\n\n## NOTES\n\n- The same template again gives \"Short 2\", \"Short 3\" and so on. No report is replaced or trashed.\n- Notes saved later show on the row with \"Open Notes\", also after a relaunch.\n- A low-memory stop reads \"Notes not written\" with the memory needed and free, and offers Retry Meeting Notes in the window and the menu bar.\n- Smaller fixes in the sheet: another meeting's run, the Background info box, wording. \"Show in Finder\" selects all of a meeting's files.\n- Builds on #170 and #190.\n\n## TASKS\n\n- [ ] Spec\n- [ ] Build it",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/278"
   },
-  "updated_at": "2026-11-19T10:31:28.192518Z"
+  "updated_at": "2026-11-19T10:41:33.030979Z"
 }
