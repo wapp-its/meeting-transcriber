@@ -21,5 +21,5 @@
     "mergeBaseTracker": "## BACKGROUND\n\nIn All Recordings, \"An additional report\" with a template that already has a report replaces that report. The old one goes to the Trash. Notes made later for a meeting without notes never reach its row. A local-model stop for low memory looks like a finished meeting, with no way to retry.\n\n## NOTES\n\n- The same template again gives \"Short 2\", \"Short 3\" and so on. No report is replaced or trashed.\n- Notes saved later show on the row with \"Open Notes\", also after a relaunch.\n- A low-memory stop reads \"Notes not written\" with the memory needed and free, and offers Retry Meeting Notes in the window and the menu bar.\n- Smaller fixes in the sheet: another meeting's run, the Background info box, wording. \"Show in Finder\" selects all of a meeting's files.\n- Builds on #170 and #190.\n\n## TASKS\n\n- [ ] Spec\n- [ ] Build it",
     "url": "https://github.com/wapp-its/meeting-transcriber/issues/278"
   },
-  "updated_at": "2026-11-19T10:15:14.542872Z"
+  "updated_at": "2026-11-19T10:31:28.192518Z"
 }
