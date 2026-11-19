@@ -60,6 +60,7 @@ struct OutputSettingsView: View {
     @State private var connectionTestResult: ConnectionTestResult?
     @State private var availableModels: [String] = []
     @State private var didAttemptConnectionTest = false
+    static let fieldWidth: CGFloat = 260
     /// The API key fields type into these, not into the Keychain.
     @StateObject private var apiKeyDrafts: ProtocolAPIKeyDrafts
 
@@ -114,46 +115,22 @@ struct OutputSettingsView: View {
             // output itself is never recorded, so the setting cannot reach it.
             recordingRetentionSection
 
-            Section("Meeting Notes") {
-                Toggle("Include full transcript in meeting notes", isOn: $settings.includeFullTranscriptInProtocol)
-                    .accessibilityIdentifier(A11yID.includeFullTranscriptToggle)
-                Toggle("Save raw transcript separately", isOn: $settings.saveRawTranscriptSeparately)
-                    .accessibilityIdentifier(A11yID.saveRawTranscriptToggle)
-                HelpfulToggle(
-                    title: "Use AI meeting title for filenames",
-                    help: SettingsHelp.aiTitleForFilenames,
-                    isOn: $settings.useAITitleForFilenames,
-                )
-                .accessibilityIdentifier(A11yID.useAITitleForFilenamesToggle)
-                HelpfulToggle(
-                    title: "Notify when meeting notes fail",
-                    help: SettingsHelp.notifyOnMeetingNotesFailure,
-                    isOn: $settings.notifyOnMeetingNotesFailure,
-                )
-                .accessibilityIdentifier(A11yID.notifyOnMeetingNotesFailureToggle)
+            meetingNotesSection
 
-                Picker("LLM Provider", selection: $settings.protocolProvider) {
-                    ForEach(ProtocolProvider.allCases, id: \.self) { provider in
-                        Text(provider.label).tag(provider)
-                    }
-                }
-                .accessibilityIdentifier(A11yID.protocolProviderPicker)
-
-                providerConfigView
-
-                Picker("Notes Language", selection: $settings.protocolLanguage) {
-                    ForEach(languagePickerOptions, id: \.self) { lang in
-                        Text(lang).tag(lang)
-                    }
-                }
-            }
-            .accessibilityIdentifier(A11yID.protocolSection)
-            .recordOnlyDisabled(settings.recordOnly)
-
+            // The templates take the place of a single prompt, so they follow
+            // the notes settings, and the provider keeps its connection below it.
             ProtocolTemplatesSettingsView(model: templatesModel)
                 .recordOnlyDisabled(settings.recordOnly)
             TemplateRulesSettingsView(model: templateRulesModel)
                 .recordOnlyDisabled(settings.recordOnly)
+
+            providerSection
+
+            if settings.protocolProvider == .openAICompatible {
+                OpenAIConnectionSection(settings: settings, apiKeyDrafts: apiKeyDrafts)
+                    .accessibilityIdentifier(A11yID.openAIConnectionSection)
+                    .recordOnlyDisabled(settings.recordOnly)
+            }
         }
         .formStyle(.grouped)
         .onAppear {
@@ -169,6 +146,55 @@ struct OutputSettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             apiKeyDrafts.commitPending(to: settings)
         }
+    }
+
+    private var meetingNotesSection: some View {
+        Section("Meeting Notes") {
+            Picker("Notes Language", selection: $settings.protocolLanguage) {
+                ForEach(languagePickerOptions, id: \.self) { lang in
+                    Text(lang).tag(lang)
+                }
+            }
+
+            Toggle("Include full transcript", isOn: $settings.includeFullTranscriptInProtocol)
+                .accessibilityIdentifier(A11yID.includeFullTranscriptToggle)
+            Toggle("Save raw transcript separately", isOn: $settings.saveRawTranscriptSeparately)
+                .accessibilityIdentifier(A11yID.saveRawTranscriptToggle)
+            HelpfulToggle(
+                title: "Name files with AI meeting title",
+                help: SettingsHelp.aiTitleForFilenames,
+                isOn: $settings.useAITitleForFilenames,
+            )
+            .accessibilityIdentifier(A11yID.useAITitleForFilenamesToggle)
+            HelpfulToggle(
+                title: "Notify when meeting notes fail",
+                help: SettingsHelp.notifyOnMeetingNotesFailure,
+                isOn: $settings.notifyOnMeetingNotesFailure,
+            )
+            .accessibilityIdentifier(A11yID.notifyOnMeetingNotesFailureToggle)
+        }
+        .accessibilityIdentifier(A11yID.protocolSection)
+        .recordOnlyDisabled(settings.recordOnly)
+    }
+
+    private var providerSection: some View {
+        Section {
+            Picker("Provider", selection: $settings.protocolProvider) {
+                ForEach(ProtocolProvider.allCases, id: \.self) { provider in
+                    Text(provider.label).tag(provider)
+                }
+            }
+            .accessibilityIdentifier(A11yID.protocolProviderPicker)
+
+            providerConfigView
+        } header: {
+            HStack(spacing: 4) {
+                Text("AI Provider")
+                HelpBadge(text: providerHelp, systemImage: "questionmark.circle")
+            }
+        }
+        .accessibilityIdentifier(A11yID.protocolProviderSection)
+        .recordOnlyDisabled(settings.recordOnly)
     }
 
     private var recordingRetentionSection: some View {
@@ -211,9 +237,6 @@ struct OutputSettingsView: View {
                         Text(bin).tag(bin)
                     }
                 }
-                Text("Binary used to generate meeting notes")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
 
                 HStack {
                     Text("API Key")
@@ -221,15 +244,15 @@ struct OutputSettingsView: View {
                     DraftTextField("", value: apiKeyDrafts.savedClaude, draft: $apiKeyDrafts.claude, secure: true) { key in
                         apiKeyDrafts.commitClaude(key, to: settings)
                     }
-                    .frame(width: 200)
+                    .frame(width: Self.fieldWidth)
                     .accessibilityIdentifier(A11yID.claudeAPIKeyField)
                 }
-                Text("Optional. Leave empty to use your \"claude login\" session.")
+
+                // In view rather than in the help popover: it is what saves a surprise bill.
+                Text("A key set here is billed separately from your subscription.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text("Only set this if that session can't stay signed in. An explicit key here is billed separately from your subscription.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier(A11yID.claudeAPIKeyBillingNote)
 
             case .codexCLI:
                 CodexProviderSettingsView()
@@ -242,136 +265,91 @@ struct OutputSettingsView: View {
         #endif
 
         case .openAICompatible:
-            openAIConfigView
+            OpenAIConnectionControls(settings: settings, switchConnection: switchConnection)
+            modelRow
 
         case .none:
-            Text("No LLM summarization will be generated. Raw transcripts are retained if no meeting notes are saved.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            EmptyView()
         }
     }
 
-    @ViewBuilder
-    private var openAIConfigView: some View { // swiftlint:disable:this attributes
-        OpenAIConnectionControls(settings: settings, switchConnection: switchConnection)
+    private var providerHelp: String {
+        switch settings.protocolProvider {
+        #if !APPSTORE
+            case .claudeCLI: SettingsHelp.claudeCLIProvider
 
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Endpoint")
-            TextField("http://localhost:1234/v1", text: $settings.openAIEndpoint)
-                .textFieldStyle(.roundedBorder)
-            Text("Base URL (e.g. http://localhost:1234/v1) or full chat-completions URL — both work.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            case .codexCLI: SettingsHelp.codexCLIProvider
+
+            case .customCommand: SettingsHelp.customCommandProvider
+
+            case .localModel: SettingsHelp.localModelProvider
+        #endif
+
+        case .openAICompatible: SettingsHelp.openAIProvider
+
+        case .none: SettingsHelp.noProvider
         }
+    }
 
-        if !availableModels.isEmpty {
-            Picker("Model", selection: $settings.openAIModel) {
-                ForEach(modelPickerOptions, id: \.self) { model in
-                    Text(model).tag(model)
+    private var modelRow: some View {
+        HStack {
+            if !availableModels.isEmpty {
+                Picker(selection: $settings.openAIModel) {
+                    ForEach(modelPickerOptions, id: \.self) { model in
+                        Text(model).tag(model)
+                    }
+                } label: {
+                    modelLabel
                 }
-            }
-        } else {
-            HStack {
-                Text("Model")
+            } else {
+                modelLabel
                 Spacer()
                 TextField("", text: $settings.openAIModel)
-                    .frame(width: 200)
+                    .frame(width: Self.fieldWidth)
                     .multilineTextAlignment(.trailing)
+                    .accessibilityIdentifier(A11yID.openAIModelField)
             }
-        }
 
-        SamplingOverrideRow(
-            parameter: .temperature,
-            value: $settings.openAITemperature,
-            toggleID: A11yID.openAITemperatureToggle,
-            valueID: A11yID.openAITemperatureValue,
-        )
-        SamplingOverrideRow(
-            parameter: .topP,
-            value: $settings.openAITopP,
-            toggleID: A11yID.openAITopPToggle,
-            valueID: A11yID.openAITopPValue,
-        )
-        Text("Passed to the server only when switched on. Off leaves the server's own default in place.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        Text("Some servers reject both together, and reasoning models often reject any value.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-
-        HStack {
-            Text("API Key")
-            Spacer()
-            DraftTextField("", value: apiKeyDrafts.savedOpenAI, draft: $apiKeyDrafts.openAI, secure: true) { key in
-                apiKeyDrafts.commitOpenAI(key, to: settings)
-            }
-            .frame(width: 200)
-            .accessibilityIdentifier(A11yID.openAIAPIKeyField)
-        }
-        Text("Leave empty if your local server doesn't require authentication")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-
-        Picker("API Key Authentication", selection: $settings.openAIAPIKeyPlacement) {
-            ForEach(OpenAIAPIKeyPlacement.allCases, id: \.self) { placement in
-                Text(placement.label).tag(placement)
-            }
-        }
-        .accessibilityIdentifier(A11yID.openAIAPIKeyPlacementPicker)
-
-        if settings.openAIAPIKeyPlacement == .customHeader {
-            HStack {
-                Text("Header Name")
-                Spacer()
-                TextField("", text: $settings.openAIAPIKeyHeaderName)
-                    .frame(width: 200)
-                    .multilineTextAlignment(.trailing)
-                    .accessibilityIdentifier(A11yID.openAIAPIKeyHeaderNameField)
-            }
-            Text("Sends the API key unchanged in this HTTP header, e.g. api-key.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            if !OpenAIProtocolGenerator.isValidAPIKeyHeaderName(
-                settings.openAIAPIKeyHeaderName.trimmingCharacters(in: .whitespacesAndNewlines),
-            ) {
-                Text("Enter a valid HTTP header name. Content-Type, Content-Length, Host and other connection-level headers are reserved.")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .accessibilityIdentifier(A11yID.openAIAPIKeyHeaderNameWarning)
-            }
-        }
-
-        HStack {
+            let fetchTitle = availableModels.isEmpty ? "Fetch Models" : "Refresh Models"
             Button {
                 testConnection()
             } label: {
-                HStack(spacing: 4) {
-                    if testingConnection {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                    Text(availableModels.isEmpty ? "Fetch Models" : "Refresh Models")
-                }
+                Image(systemName: "arrow.clockwise")
+                    .frame(width: 14, height: 14)
             }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
             .disabled(testingConnection)
-
-            if let result = connectionTestResult {
-                switch result {
-                case let .success(msg):
-                    Label(msg, systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                        .font(.caption)
-
-                case let .failure(msg):
-                    Label(msg, systemImage: "xmark.circle.fill")
-                        .foregroundStyle(.red)
-                        .font(.caption)
-                }
-            }
+            .help(fetchTitle)
+            .accessibilityLabel(fetchTitle)
+            .accessibilityIdentifier(A11yID.openAIRefreshModelsButton)
         }
         .onAppear {
             if availableModels.isEmpty && !didAttemptConnectionTest {
                 testConnection()
+            }
+        }
+    }
+
+    private var modelLabel: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Model")
+            if testingConnection {
+                Text("Checking\u{2026}")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if let result = connectionTestResult {
+                switch result {
+                case let .success(msg):
+                    Label(msg, systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+
+                case let .failure(msg):
+                    Label(msg, systemImage: "xmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
             }
         }
     }
@@ -450,52 +428,5 @@ struct OutputSettingsView: View {
         panel.message = "Choose a folder for recordings, transcripts and meeting notes"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         settings.setCustomOutputDir(url)
-    }
-}
-
-/// One optional sampling override: a toggle that switches it on and, while it
-/// is on, a field and stepper for the value. Switching it off clears the value,
-/// so the parameter is left out of the request and the server default applies.
-private struct SamplingOverrideRow: View {
-    let parameter: OpenAISamplingParameter
-    @Binding var value: Double?
-    let toggleID: String
-    let valueID: String
-
-    var body: some View {
-        Toggle("Override \(parameter.label)", isOn: isOverridden)
-            .accessibilityIdentifier(toggleID)
-
-        if value != nil {
-            HStack {
-                Text(parameter.label)
-                Spacer()
-                TextField(parameter.label, value: currentValue, format: .number)
-                    .labelsHidden()
-                    .frame(width: 60)
-                    .multilineTextAlignment(.trailing)
-                Stepper(parameter.label, value: currentValue, in: parameter.range, step: 0.05)
-                    .labelsHidden()
-            }
-            // A container element, so the identifier names the row instead
-            // of being copied onto the label, field and stepper inside it.
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier(valueID)
-        }
-    }
-
-    private var isOverridden: Binding<Bool> {
-        Binding(
-            get: { value != nil },
-            set: { value = $0 ? OpenAISamplingParameter.initialOverride : nil },
-        )
-    }
-
-    private var currentValue: Binding<Double> {
-        Binding(
-            // The row only renders while overridden; the fallback just makes it total.
-            get: { value ?? OpenAISamplingParameter.initialOverride },
-            set: { value = $0 },
-        )
     }
 }

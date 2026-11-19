@@ -144,10 +144,11 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `WhisperKitStockModel.swift` | The six stock WhisperKit variants in picker order, each with its label and approximate download size (measured 2026-10-06) for the load offer |
 | `Settings/VocabularySourceSettingsView.swift` | "Vocabulary source" picker (Local file / URL), shown in the Vocabulary section while "Use custom vocabulary" is on; for URL the address, the Keychain-backed access token, "Update now" and the status line from `RemoteVocabularyController` |
 | `Settings/SpeakersSettingsView.swift` | Diarization · Speaker Naming (open the naming window automatically, how long unnamed meetings wait) · Mic Speaker Name · Known Voices · Recognition Stats · Experimental: Diarization Tuning |
-| `Settings/OutputSettingsView.swift` | Output folder · Notion export · Recording Retention · Meeting Notes (transcript options, AI-title file names, notify when meeting notes fail, LLM provider, saved OpenAI-compatible connections, notes language) · Meeting Notes Templates and Template Rules sections |
-| `Settings/OpenAIConnectionControls.swift` | Saved OpenAI-compatible connection picker, name field, Add/Delete |
-| `Settings/OpenAIConnectionPrompts.swift` | State of the Add (name prompt) and Delete confirmation dialogs |
-| `Settings/LocalModelSettingsView.swift` | The local model provider's panel in Settings → Output: the model folder with Choose…, the status line with Check Model (runs the helper's `check` mode, no weights loaded), and the memory and recording notes (`#if !APPSTORE`) |
+| `Settings/OutputSettingsView.swift` | Output tab: output folder · Notion export · recording retention · Meeting Notes (notes language, output toggles; AI-title file names and notify when meeting notes fail explain themselves in help popovers) · Meeting Notes Templates and Template Rules sections, in place of the original's single prompt row · AI Provider (provider, Claude CLI binary and key, Codex CLI note, custom command, local model, connection picker, model) |
+| `Settings/OpenAIConnectionSection.swift` | Connection Settings section: selected connection's endpoint and API key, collapsed Advanced group (key placement, sampling overrides) and its `OpenAIAdvancedDisclosure` state |
+| `Settings/OpenAIConnectionControls.swift` | Saved OpenAI-compatible connection picker with Add/Delete/Rename buttons |
+| `Settings/OpenAIConnectionPrompts.swift` | State of the Add and Rename (name prompt) and Delete confirmation dialogs |
+| `Settings/LocalModelSettingsView.swift` | The local model provider's rows in Settings → Output → AI Provider: the model folder with Choose…, the status line with Check Model (runs the helper's `check` mode, no weights loaded), and the memory and recording notes (`#if !APPSTORE`) |
 | `Settings/ProtocolTemplatesSettingsView.swift` | Meeting Notes Templates section: default template picker, per template file the split button Edit (Open in the editor app, Open With, Show in Finder) and Delete, New Template…, Open Templates Folder; its state and writes live in the `@Observable` `ProtocolTemplatesModel`, also for the New Template window |
 | `Settings/NewProtocolTemplateSheet.swift` | The New Template window: Name field, a note on what Create does, Cancel and Create |
 | `Settings/TemplateEditor.swift` | Which app a template opens in (the one chosen last under Open With, remembered by bundle identifier in `AppSettings.templateEditorBundleIdentifier`, else the default app for Markdown files), the Open With list, and the help text, note and Finder lines that name it |
@@ -286,6 +287,8 @@ State writes to `AppPaths.dataDir`; IPC + queue snapshots to `ipcDir`.
 | `NamingWindowPolicy.swift` | Pins the "Name Speakers" window so it stays available while the user works in other apps (issue #504) |
 | `LiveTranscriptionController.swift` | Wires the per-channel live-caption pipeline (streaming or re-transcribe) to both `DualSourceRecorder` sinks (mic + app), feeds `LiveCaptionsState` |
 | `LiveTranscriptionController+Nemotron.swift` | Nemotron streaming-pipeline construction, split out for size; injectable factory for testing the build + model-load-failure fallback |
+| `LiveTranscriptionController+LanguageProbe.swift` | Auto-detect captions with WhisperKit: holds caption audio, detects the recording's language, then installs Parakeet EOU (English) or re-transcribe; also the stop-time `flush()` |
+| `CaptionLanguageProbe.swift` | Per-channel VAD probe that collects 4 s of speech for language detection, and the pure decision rule (probability ≥ 0.8, two English windows for EOU, up to 4 attempts) |
 | `LiveTranscriptionCoordinator.swift` | `@Observable` coordinator: builds + arms `LiveTranscriptionController`, feeds `LiveCaptionsState` |
 | `LiveCaptionPipeline.swift` | Per-channel live captioning strategy protocol (English EOU streaming \| Nemotron streaming \| WhisperKit/Parakeet re-transcribe) |
 | `LiveCaptionsGate.swift` | Pure decision logic for live captions routing: master toggle + explicit engine language (`en` → English EOU streaming, a language in `LiveCaptionLanguages` → Nemotron streaming, auto-detect or any other language → re-transcribe or none) — shared by `AppState`, coordinator, and controller. Overlay visibility is a separate UI AND (`overlayVisible`); it is not a strategy input |
@@ -675,6 +678,10 @@ function — shared by `AppState`, `LiveTranscriptionCoordinator`, and `LiveTran
 | a language Nemotron was trained on (`LiveCaptionLanguages`) | Nemotron streaming | `NemotronStreamingCaptionSession` / `NemotronAsrManager` (FluidAudio Nemotron multilingual) |
 | auto-detect (`nil`) or any other language | re-transcribe | `StreamingTranscriber` via the active engine's `transcribeSamples`, if supported |
 | auto-detect or any other language + engine doesn't support live re-transcribe | none | captions off |
+
+The gate's re-transcribe for auto-detect is where a recording starts. With WhisperKit active,
+`LiveTranscriptionController` first detects each recording's language and streams English through
+Parakeet EOU instead (see `docs/architecture/transcription.md`).
 
 Both streaming sessions are engine-independent (they drive their own FluidAudio models directly),
 so they're available even when the active `TranscribingEngine` has no live re-transcribe hook.
@@ -1121,7 +1128,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 | **Audio** | Microphone · Recording Levels · VAD · Echo · Per-Channel Indicator | `settings` | `audioDevices` |
 | **Transcription** | Engine + per-engine options + vocabulary source + status + idle-model retention | `settings`, three engines, `remoteVocabulary?` | — |
 | **Speakers** | Diarization · Speaker Naming · Speaker Identity · Known Voices · Recognition Stats · Experimental: Diarization Tuning | `settings`, `recognitionStatsLog`, `enrollmentDiarizerFactory` | `knownVoicesSheet` |
-| **Output** | LLM Provider (with the local model's folder and Check Model) · Notes Language · Output Folder · Notion Export · Recording Retention · Meeting Notes Templates · Template Rules | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel`, the rules section in `TemplateRulesModel` |
+| **Output** | Output Folder · Notion Export · Recording Retention · Meeting Notes (language, output toggles) · Meeting Notes Templates · Template Rules · AI Provider (with the local model's folder and Check Model) · Connection Settings (endpoint, key, Advanced) | `settings`, `templateStore` | `claudeBinaries` (#if !APPSTORE), connection-test state, `availableModels`; the templates section keeps its state in `ProtocolTemplatesModel`, the rules section in `TemplateRulesModel` |
 | **Advanced** | Permissions · Diagnostics | — | `micPermission`, `screenRecordingOK`, `accessibilityOK` |
 | **About** | Build identity · Dependencies · Updates | `settings`, `updateChecker?` | — |
 
@@ -1133,7 +1140,7 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 - `customVocabularyEnabled` hides the vocabulary source picker, the vocabulary file row and the URL controls
 - `vocabularySource` switches between the local vocabulary file row and the URL controls (address, token, "Update now", status)
 - `unloadModelsWhenIdle` (default on) skips the launch ASR load (a missing model is still downloaded at launch) and releases in-memory ASR and batch VAD models at a safe pipeline drain; the toggle sits beside model status and "Load Model". Turning it off restores launch preload and retains models across drains and engine switches. With the setting on, unloaded status reads "Loads when needed" while `/state` continues to report `"unloaded"`.
-- `protocolProvider` switches between Claude CLI / Codex CLI / Custom Command / OpenAI-compatible / Local model / None panels; the OpenAI-compatible panel starts with the saved-connection controls (`OpenAIConnectionControls`, see `docs/architecture/pipeline.md`)
+- `protocolProvider` switches the AI Provider section between Claude CLI / Codex CLI / Custom Command / OpenAI-compatible / Local model / None; OpenAI-compatible shows the saved-connection controls (`OpenAIConnectionControls`, see `docs/architecture/pipeline.md`) and the model row there, and adds a Connection Settings section with the selected connection's endpoint, key and a collapsed Advanced group (key placement, sampling overrides; an invalid header name keeps it open, and editing a row inside it or clicking Advanced while the name is invalid latches it open, so fixing the name never closes it under the cursor). The explanations for these sections are `HelpBadge` popovers on the section headers (`SettingsHelp`), not footers, except the note that a Claude CLI API key is billed separately from the subscription, which stays in view under the key. The Codex CLI, custom command and local model rows keep their own notes in view and get a header popover of their own
 - `#if APPSTORE` removes the Claude CLI, Codex CLI, Custom Command and Local model provider options entirely
 - `updateChecker == nil` hides the entire Updates section in About
 
