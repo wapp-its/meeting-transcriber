@@ -285,6 +285,8 @@ enum A11yID {
     }
 
     static let protocolSection = "protocolSection"
+    static let protocolProviderSection = "protocolProviderSection"
+    static let openAIConnectionSection = "openAIConnectionSection"
     static let protocolProviderPicker = "protocolProviderPicker"
     static let codexProviderNote = "codexProviderNote"
     static let customCommandEditor = "customCommandEditor"
@@ -402,8 +404,13 @@ enum A11yID {
     static let saveRawTranscriptToggle = "saveRawTranscriptToggle"
     static let useAITitleForFilenamesToggle = "useAITitleForFilenamesToggle"
     static let openAIAPIKeyField = "openAIAPIKeyField"
+    static let openAIEndpointField = "openAIEndpointField"
+    static let openAIModelField = "openAIModelField"
+    static let claudeAPIKeyBillingNote = "claudeAPIKeyBillingNote"
     static let openAIConnectionPicker = "openAIConnectionPicker"
-    static let openAIConnectionNameField = "openAIConnectionNameField"
+    static let openAIConnectionRenameButton = "openAIConnectionRenameButton"
+    static let openAIRefreshModelsButton = "openAIRefreshModelsButton"
+    static let openAIAdvancedToggle = "openAIAdvancedToggle"
     static let openAIConnectionAddButton = "openAIConnectionAddButton"
     static let openAIConnectionDeleteButton = "openAIConnectionDeleteButton"
     static let claudeAPIKeyField = "claudeAPIKeyField"

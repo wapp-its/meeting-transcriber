@@ -137,7 +137,7 @@ jobs:
     runs-on: xcode-27
     env:
       # Pinned by path, as in ci.yml; keep the two in step.
-      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
     timeout-minutes: 60
     permissions:
       contents: write
@@ -169,9 +169,9 @@ jobs:
         run: |
           set -o pipefail
           if (cd app/MeetingTranscriber && swift build) 2>&1 | tee "$RUNNER_TEMP/build.log"; then exit 0; fi
-          # One retry: the app compiles with a 300 ms type-check limit as an error,
-          # which hosted runners overshoot now and then, and a package fetch can
-          # fail transiently. An incremental rebuild redoes only what failed; a real
+          # One retry: the type-check limits in the Package.swift manifests (app
+          # 1000 ms, AudioTapLib 300 ms) are errors a loaded runner can still
+          # overshoot, and a package fetch can fail transiently. An incremental rebuild redoes only what failed; a real
           # error fails again.
           echo "::warning::build failed, retrying once"
           if (cd app/MeetingTranscriber && swift build) 2>&1 | tee "$RUNNER_TEMP/build.log"; then exit 0; fi

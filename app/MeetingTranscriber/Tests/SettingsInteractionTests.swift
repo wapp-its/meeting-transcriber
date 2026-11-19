@@ -63,7 +63,7 @@ final class SettingsInteractionTests: XCTestCase {
         let view = OutputSettingsView(settings: settings)
 
         let picker = try view.inspect().find(ViewType.Picker.self) { picker in
-            try picker.labelView().text().string() == "LLM Provider"
+            try picker.labelView().text().string() == "Provider"
         }
         try picker.select(value: ProtocolProvider.openAICompatible)
 
@@ -101,7 +101,7 @@ final class SettingsInteractionTests: XCTestCase {
     func testOpenAIAPIKeyPlacementPickerWritesBackToSettings() throws {
         let settings = makeSettings()
         settings.protocolProvider = .openAICompatible
-        let view = OutputSettingsView(settings: settings)
+        let view = connectionSection(settings)
 
         let picker = try view.inspect()
             .find(viewWithAccessibilityIdentifier: A11yID.openAIAPIKeyPlacementPicker)
@@ -115,7 +115,7 @@ final class SettingsInteractionTests: XCTestCase {
         let settings = makeSettings()
         settings.protocolProvider = .openAICompatible
         settings.openAIAPIKeyPlacement = .customHeader
-        let view = OutputSettingsView(settings: settings)
+        let view = connectionSection(settings)
 
         let field = try view.inspect()
             .find(viewWithAccessibilityIdentifier: A11yID.openAIAPIKeyHeaderNameField)
@@ -128,12 +128,12 @@ final class SettingsInteractionTests: XCTestCase {
 
     // MARK: - OpenAI sampling overrides
 
-    private func openAIView(temperature: Double? = nil, topP: Double? = nil) -> (OutputSettingsView, AppSettings) {
+    private func openAIView(temperature: Double? = nil, topP: Double? = nil) -> (OpenAIConnectionSection, AppSettings) {
         let settings = makeSettings()
         settings.protocolProvider = .openAICompatible
         settings.openAITemperature = temperature
         settings.openAITopP = topP
-        return (OutputSettingsView(settings: settings), settings)
+        return (connectionSection(settings), settings)
     }
 
     func testOpenAITemperatureToggleSwitchesOverrideOn() throws {
@@ -217,7 +217,7 @@ final class SettingsInteractionTests: XCTestCase {
         settings.protocolProvider = .openAICompatible
         settings.openAIAPIKeyPlacement = .bearerToken
         settings.openAIAPIKeyHeaderName = "Content-Type"
-        let body = try OutputSettingsView(settings: settings).inspect()
+        let body = try connectionSection(settings).inspect()
 
         // The placement picker renders, so the absences below are not a failed lookup.
         XCTAssertNoThrow(try body.find(viewWithAccessibilityIdentifier: A11yID.openAIAPIKeyPlacementPicker))
@@ -232,20 +232,20 @@ final class SettingsInteractionTests: XCTestCase {
 
         settings.openAIAPIKeyHeaderName = "Content-Type"
         XCTAssertNoThrow(
-            try OutputSettingsView(settings: settings).inspect()
+            try connectionSection(settings).inspect()
                 .find(viewWithAccessibilityIdentifier: A11yID.openAIAPIKeyHeaderNameWarning),
         )
 
         settings.openAIAPIKeyHeaderName = "x-api-key"
         XCTAssertThrowsError(
-            try OutputSettingsView(settings: settings).inspect()
+            try connectionSection(settings).inspect()
                 .find(viewWithAccessibilityIdentifier: A11yID.openAIAPIKeyHeaderNameWarning),
         )
 
         // The generator trims the name before it validates it, so the warning must too.
         settings.openAIAPIKeyHeaderName = " x-api-key "
         XCTAssertThrowsError(
-            try OutputSettingsView(settings: settings).inspect()
+            try connectionSection(settings).inspect()
                 .find(viewWithAccessibilityIdentifier: A11yID.openAIAPIKeyHeaderNameWarning),
         )
     }
@@ -398,7 +398,7 @@ final class SettingsInteractionTests: XCTestCase {
             whisperKitEngine: WhisperKitEngine(),
             parakeetEngine: ParakeetEngine(),
         )
-        let footnote = TranscriptionSettingsView.captionBackendFootnote(strategy: .reTranscribe, languageIsSet: true)
+        let footnote = TranscriptionSettingsView.captionBackendFootnote(strategy: .reTranscribe, languageIsSet: true, detectsLanguage: true)
         XCTAssertFalse(footnote.contains("Nemotron"))
         XCTAssertNoThrow(try view.inspect().find(text: footnote))
     }
@@ -416,7 +416,7 @@ final class SettingsInteractionTests: XCTestCase {
             whisperKitEngine: WhisperKitEngine(),
             parakeetEngine: ParakeetEngine(),
         )
-        let footnote = TranscriptionSettingsView.captionBackendFootnote(strategy: .nemotronStreaming, languageIsSet: true)
+        let footnote = TranscriptionSettingsView.captionBackendFootnote(strategy: .nemotronStreaming, languageIsSet: true, detectsLanguage: true)
         XCTAssertTrue(footnote.contains("Nemotron"))
         XCTAssertNoThrow(try view.inspect().find(text: footnote))
     }
