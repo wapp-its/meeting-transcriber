@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-11-19T10:31:10.960198Z",
+  "depends_on": [
+    "gh-278-notes-made-again-are-kept-and-show-up.2"
+  ],
+  "id": "gh-278-notes-made-again-are-kept-and-show-up.4",
+  "priority": null,
+  "review": "codex:gpt-6.1-sol:xhigh",
+  "spec": "gh-278-notes-made-again-are-kept-and-show-up",
+  "spec_path": ".flow/tasks/gh-278-notes-made-again-are-kept-and-show-up.4.md",
+  "status": "todo",
+  "title": "Failed notes read \"Notes not written\" with their reason",
+  "updated_at": "2026-11-19T10:41:17.983799Z"
+}
